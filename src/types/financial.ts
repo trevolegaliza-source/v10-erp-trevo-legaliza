@@ -1,4 +1,4 @@
-import type { Cliente as SupabaseCliente } from '@/integrations/supabase/types';
+import type { Cliente as SupabaseCliente } from '@/types/supabase';
 
 export type TipoCliente = 'MENSALISTA' | 'AVULSO_4D';
 export type TipoProcesso = 'abertura' | 'alteracao' | 'transformacao' | 'baixa' | 'avulso' | 'orcamento';
