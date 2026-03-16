@@ -69,7 +69,7 @@ export function useCreateCliente() {
       qc.invalidateQueries({ queryKey: ['clientes'] });
       toast.success('Cliente criado com sucesso!');
     },
-    onError: (e: Error) => toast.error(formatClienteSchemaCacheError(e)),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -91,11 +91,8 @@ export function useUpdateCliente() {
       const telefone = normalizeOptionalNullableText(updates.telefone);
       if (telefone !== undefined) payload.telefone = telefone;
 
-      const nomeContador = normalizeOptionalNullableText(updates.nome_contador);
-      if (nomeContador !== undefined) payload.nome_contador = nomeContador;
-
-      const apelido = normalizeOptionalNullableText(updates.apelido);
-      if (apelido !== undefined) payload.apelido = apelido;
+      if (updates.nome_contador !== undefined) payload.nome_contador = normalizeRequiredText(updates.nome_contador);
+      if (updates.apelido !== undefined) payload.apelido = normalizeRequiredText(updates.apelido);
 
       const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
       if (error) throw error;
@@ -105,7 +102,7 @@ export function useUpdateCliente() {
       qc.invalidateQueries({ queryKey: ['clientes'] });
       toast.success('Cliente atualizado!');
     },
-    onError: (e: Error) => toast.error(formatClienteSchemaCacheError(e)),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
