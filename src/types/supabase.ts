@@ -7,8 +7,8 @@ export interface Cliente {
   tipo: ClienteTipoDB;
   email: string | null;
   telefone: string | null;
-  nome_contador: string | null;
-  apelido: string | null;
+  nome_contador: string;
+  apelido: string;
   dia_vencimento_mensal: number;
   created_at: string;
   updated_at: string;
