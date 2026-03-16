@@ -22,8 +22,8 @@ const INITIAL_CLIENTE = {
   // Avulso-specific
   valor_base: '',
   desconto_tier2: '',
+  dia_cobranca: 'D+4',
   // Mensalista-specific
-  qtd_processos_contratados: '',
   valor_mensalidade: '',
 };
 
