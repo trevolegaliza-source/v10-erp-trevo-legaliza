@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   ArrowUpRight,
   FileText,
@@ -6,20 +7,34 @@ import {
   AlertTriangle,
   TrendingUp,
   Clock,
+  Filter,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PROCESS_TYPE_LABELS } from '@/types/process';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboardStats } from '@/hooks/useProcessos';
+import { useClientes } from '@/hooks/useFinanceiro';
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useDashboardStats();
+  const { data: clientes } = useClientes();
+  const [filterClienteId, setFilterClienteId] = useState<string>('all');
+
+  // Filter data by selected client
+  const filteredRecentes = filterClienteId === 'all'
+    ? (stats?.recentes || [])
+    : (stats?.recentes || []).filter(p => p.cliente_id === filterClienteId);
+
+  const filteredUrgentes = filterClienteId === 'all'
+    ? (stats?.urgentes || [])
+    : (stats?.urgentes || []).filter(p => p.cliente_id === filterClienteId);
 
   const kpis = [
     {
       label: 'Processos Ativos',
-      value: stats?.processosAtivos ?? 0,
+      value: filterClienteId === 'all' ? (stats?.processosAtivos ?? 0) : filteredRecentes.length,
       icon: FileText,
     },
     {
@@ -34,16 +49,32 @@ export default function Dashboard() {
     },
     {
       label: 'SLA em Risco',
-      value: stats?.urgentes?.length ?? 0,
+      value: filteredUrgentes.length,
       icon: AlertTriangle,
     },
   ];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Visão geral da operação Trevo Legaliza</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Visão geral da operação Trevo Legaliza</p>
+        </div>
+        <Select value={filterClienteId} onValueChange={setFilterClienteId}>
+          <SelectTrigger className="w-56 h-9 text-sm">
+            <Filter className="h-3.5 w-3.5 mr-1.5" />
+            <SelectValue placeholder="Filtrar por contabilidade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as Contabilidades</SelectItem>
+            {(clientes || []).map(c => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.apelido || c.nome} {c.nome_contador ? `(${c.nome_contador})` : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Stats Cards */}
@@ -82,12 +113,12 @@ export default function Dashboard() {
                 Array.from({ length: 4 }).map((_, i) => (
                   <Skeleton key={i} className="h-14 w-full rounded-lg" />
                 ))
-              ) : (stats?.recentes || []).length === 0 ? (
+              ) : filteredRecentes.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
                   Nenhum processo encontrado. Crie um no Cadastro Rápido.
                 </p>
               ) : (
-                (stats?.recentes || []).map((proc) => (
+                filteredRecentes.map((proc) => (
                   <div
                     key={proc.id}
                     className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-4 py-3"
@@ -102,7 +133,7 @@ export default function Dashboard() {
                       </Badge>
                       {proc.prioridade === 'urgente' && (
                         <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">
-                          Urgente
+                          Urgente (+50%)
                         </Badge>
                       )}
                     </div>
@@ -127,10 +158,10 @@ export default function Dashboard() {
                 Array.from({ length: 2 }).map((_, i) => (
                   <Skeleton key={i} className="h-16 w-full rounded-lg" />
                 ))
-              ) : (stats?.urgentes || []).length === 0 ? (
+              ) : filteredUrgentes.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
               ) : (
-                (stats?.urgentes || []).map((proc) => (
+                filteredUrgentes.map((proc) => (
                   <div key={proc.id} className="rounded-lg border border-warning/20 bg-warning/5 p-3">
                     <p className="text-sm font-medium">{proc.razao_social}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">

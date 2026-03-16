@@ -1,29 +1,22 @@
 import { Outlet } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
-import { Bell, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+import { NotificationPopover } from '@/components/NotificationPopover';
 
 export function AppLayout() {
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar />
       <div className="ml-60 flex min-h-screen flex-col">
-        {/* Top bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-card px-6">
           <div className="relative w-80">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Buscar processos, clientes..." className="pl-9 bg-muted/50 border-0" />
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-4.5 w-4.5" />
-              <Badge className="absolute -right-0.5 -top-0.5 h-4.5 min-w-[18px] rounded-full px-1 text-[10px] bg-destructive text-destructive-foreground border-0">
-                3
-              </Badge>
-            </Button>
+            <NotificationPopover />
             <div className="flex items-center gap-2.5">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
@@ -37,7 +30,6 @@ export function AppLayout() {
             </div>
           </div>
         </header>
-        {/* Page Content */}
         <main className="flex-1 p-6">
           <Outlet />
         </main>

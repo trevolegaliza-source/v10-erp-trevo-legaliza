@@ -34,6 +34,42 @@ export function useCreateCliente() {
   });
 }
 
+export function useUpdateCliente() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<ClienteDB> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('clientes')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ClienteDB;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+      toast.success('Cliente atualizado!');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteCliente() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('clientes').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+      toast.success('Cliente excluído!');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 // ---- PROCESSOS ----
 export function useProcessos() {
   return useQuery({
@@ -58,19 +94,30 @@ export function useCreateProcesso() {
       tipo: TipoProcesso;
       prioridade?: string;
       responsavel?: string;
+      valor_manual?: number; // for avulso/orcamento
     }) => {
-      // 1. Calculate price via tiered pricing
-      const { data: preco } = await supabase.rpc('calcular_preco_processo', {
-        p_cliente_id: input.cliente_id,
-        p_tipo: input.tipo,
-      });
+      let preco = input.valor_manual || 0;
+      const isManualPrice = input.tipo === 'avulso' || input.tipo === 'orcamento';
 
-      // 2. Calculate due date
+      // Calculate price via tiered pricing (only for standard types)
+      if (!isManualPrice) {
+        const { data: precoCalc } = await supabase.rpc('calcular_preco_processo', {
+          p_cliente_id: input.cliente_id,
+          p_tipo: input.tipo,
+        });
+        preco = precoCalc || 0;
+      }
+
+      // Priority surcharge: Valor_Final = Valor_Base × 1.5
+      const isUrgente = input.prioridade === 'urgente';
+      const valorFinal = isUrgente ? preco * 1.5 : preco;
+
+      // Calculate due date
       const { data: vencimento } = await supabase.rpc('calcular_vencimento', {
         p_cliente_id: input.cliente_id,
       });
 
-      // 3. Create process
+      // Create process
       const { data: processo, error } = await supabase
         .from('processos')
         .insert({
@@ -79,20 +126,24 @@ export function useCreateProcesso() {
           tipo: input.tipo,
           prioridade: input.prioridade || 'normal',
           responsavel: input.responsavel || null,
-          valor: preco || 0,
+          valor: valorFinal,
         })
         .select('*, cliente:clientes(*)')
         .single();
       if (error) throw error;
 
-      // 4. Create financial entry (contas a receber)
-      const clienteNome = (processo as any).cliente?.nome || 'Cliente';
+      // Create financial entry (contas a receber)
+      const descParts = [
+        `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`,
+      ];
+      if (isUrgente) descParts.push('(+50% Prioridade)');
+
       const { error: lancError } = await supabase.from('lancamentos').insert({
         tipo: 'receber',
         cliente_id: input.cliente_id,
         processo_id: processo.id,
-        descricao: `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`,
-        valor: preco || 0,
+        descricao: descParts.join(' '),
+        valor: valorFinal,
         status: 'pendente',
         data_vencimento: vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
       });
@@ -103,6 +154,7 @@ export function useCreateProcesso() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['processos_db'] });
       qc.invalidateQueries({ queryKey: ['lancamentos'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_stats'] });
       toast.success('Processo criado e lançamento financeiro gerado!');
     },
     onError: (e: Error) => toast.error(e.message),
@@ -173,7 +225,6 @@ export function useFinanceiroDashboard() {
       const in7days = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
       const today = now.toISOString().split('T')[0];
 
-      // Receita prevista do mês
       const { data: receitaMes } = await supabase
         .from('lancamentos')
         .select('valor')
@@ -181,7 +232,6 @@ export function useFinanceiroDashboard() {
         .gte('data_vencimento', startOfMonth)
         .in('status', ['pendente', 'pago']);
 
-      // A receber nos próximos 7 dias
       const { data: receber7d } = await supabase
         .from('lancamentos')
         .select('valor')
@@ -190,7 +240,6 @@ export function useFinanceiroDashboard() {
         .gte('data_vencimento', today)
         .lte('data_vencimento', in7days);
 
-      // Taxas reembolsáveis
       const { data: taxasReemb } = await supabase
         .from('lancamentos')
         .select('valor')

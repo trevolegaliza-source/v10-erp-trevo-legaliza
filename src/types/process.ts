@@ -1,4 +1,4 @@
-export type ProcessType = 'abertura' | 'alteracao' | 'transformacao' | 'baixa';
+export type ProcessType = 'abertura' | 'alteracao' | 'transformacao' | 'baixa' | 'avulso' | 'orcamento';
 
 export type KanbanStage =
   | 'recebidos'
@@ -46,6 +46,8 @@ export const PROCESS_TYPE_LABELS: Record<ProcessType, string> = {
   alteracao: 'Alteração',
   transformacao: 'Transformação',
   baixa: 'Baixa',
+  avulso: 'Avulso',
+  orcamento: 'Orçamento',
 };
 
 export interface Process {
