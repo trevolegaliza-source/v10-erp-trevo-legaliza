@@ -14,15 +14,15 @@ import type { ClienteDB, TipoCliente } from '@/types/financial';
 import { Link } from 'react-router-dom';
 
 export default function Clientes() {
-  const { data: clientes, isLoading } = useClientes();
+  const [search, setSearch] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+  const [editClient, setEditClient] = useState<ClienteDB | null>(null);
+  const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
+
+  const { data: clientes, isLoading } = useClientes(search);
   const { data: processos } = useProcessos();
   const updateCliente = useUpdateCliente();
   const deleteCliente = useDeleteCliente();
-
-  const [editClient, setEditClient] = useState<ClienteDB | null>(null);
-  const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
-  const [search, setSearch] = useState('');
-  const [showInactive, setShowInactive] = useState(false);
 
   // Count processes per client
   const processCount = (clienteId: string) =>
