@@ -22,8 +22,8 @@ const INITIAL_CLIENTE = {
   // Avulso-specific
   valor_base: '',
   desconto_tier2: '',
+  dia_cobranca: 'D+4',
   // Mensalista-specific
-  qtd_processos_contratados: '',
   valor_mensalidade: '',
 };
 
@@ -68,8 +68,8 @@ export default function CadastroRapido() {
         tipo: clienteForm.tipo,
         email: clienteForm.email || null,
         telefone: clienteForm.telefone || null,
-        nome_contador: clienteForm.nome_contador || null,
-        apelido: clienteForm.apelido || null,
+        nome_contador: clienteForm.nome_contador || '',
+        apelido: clienteForm.apelido || '',
         dia_vencimento_mensal: isMensalista ? clienteForm.dia_vencimento_mensal : 0,
       },
       {
@@ -185,19 +185,20 @@ export default function CadastroRapido() {
                 {isAvulso && (
                   <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-4">
                     <p className="text-xs font-medium text-warning">Configuração Avulso (D+4)</p>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="grid gap-1.5">
                         <Label>Valor Base (R$)</Label>
                         <Input type="number" step="0.01" min="0" placeholder="0,00" value={clienteForm.valor_base} onChange={(e) => update('valor_base', e.target.value)} />
                       </div>
                       <div className="grid gap-1.5">
-                        <Label>Desconto Progressivo - Tier 2 (%)</Label>
+                        <Label>Desconto Progressivo (Tier 2)</Label>
                         <Input type="number" step="0.1" min="0" max="100" placeholder="0" value={clienteForm.desconto_tier2} onChange={(e) => update('desconto_tier2', e.target.value)} />
                       </div>
+                      <div className="grid gap-1.5">
+                        <Label>Dia de Cobrança (D+4)</Label>
+                        <Input value={clienteForm.dia_cobranca} readOnly aria-readonly="true" />
+                      </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Regra de vencimento: D+4 após solicitação do processo.
-                    </p>
                   </div>
                 )}
 
@@ -205,11 +206,7 @@ export default function CadastroRapido() {
                 {isMensalista && (
                   <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
                     <p className="text-xs font-medium text-primary">Configuração Mensalista</p>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="grid gap-1.5">
-                        <Label>Qtd. Processos Contratados</Label>
-                        <Input type="number" min="1" placeholder="10" value={clienteForm.qtd_processos_contratados} onChange={(e) => update('qtd_processos_contratados', e.target.value)} />
-                      </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-1.5">
                         <Label>Valor Mensalidade (R$)</Label>
                         <Input type="number" step="0.01" min="0" placeholder="0,00" value={clienteForm.valor_mensalidade} onChange={(e) => update('valor_mensalidade', e.target.value)} />

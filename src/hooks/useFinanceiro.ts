@@ -9,6 +9,8 @@ const normalizeNullableText = (value: string | null | undefined) => {
   return trimmed ? trimmed : null;
 };
 
+const normalizeRequiredText = (value: string | null | undefined) => value?.trim() || '';
+
 const normalizeOptionalNullableText = (value: string | null | undefined) => {
   if (value === undefined) return undefined;
   return normalizeNullableText(value);
@@ -16,25 +18,14 @@ const normalizeOptionalNullableText = (value: string | null | undefined) => {
 
 const sanitizeSearch = (value: string) => value.replace(/[,%]/g, '').trim();
 
-const formatClienteSchemaCacheError = (error: Error) => {
-  const message = error.message || 'Erro ao processar cliente.';
-  const lowered = message.toLowerCase();
-
-  if (lowered.includes('schema cache') && (lowered.includes('apelido') || lowered.includes('nome_contador'))) {
-    return 'A API conectada ainda não reconhece apelido/nome_contador. Confirme se o SQL foi executado no mesmo projeto conectado no frontend e reinicie o projeto no painel do Supabase.';
-  }
-
-  return message;
-};
-
 const normalizeClienteInsert = (cliente: ClienteInsert): ClienteInsert => ({
   ...cliente,
   codigo_identificador: cliente.codigo_identificador.trim(),
   nome: cliente.nome.trim(),
   email: normalizeNullableText(cliente.email),
   telefone: normalizeNullableText(cliente.telefone),
-  nome_contador: normalizeNullableText(cliente.nome_contador),
-  apelido: normalizeNullableText(cliente.apelido),
+  nome_contador: normalizeRequiredText(cliente.nome_contador),
+  apelido: normalizeRequiredText(cliente.apelido),
 });
 
 // ---- CLIENTES ----
@@ -78,7 +69,7 @@ export function useCreateCliente() {
       qc.invalidateQueries({ queryKey: ['clientes'] });
       toast.success('Cliente criado com sucesso!');
     },
-    onError: (e: Error) => toast.error(formatClienteSchemaCacheError(e)),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
@@ -100,11 +91,8 @@ export function useUpdateCliente() {
       const telefone = normalizeOptionalNullableText(updates.telefone);
       if (telefone !== undefined) payload.telefone = telefone;
 
-      const nomeContador = normalizeOptionalNullableText(updates.nome_contador);
-      if (nomeContador !== undefined) payload.nome_contador = nomeContador;
-
-      const apelido = normalizeOptionalNullableText(updates.apelido);
-      if (apelido !== undefined) payload.apelido = apelido;
+      if (updates.nome_contador !== undefined) payload.nome_contador = normalizeRequiredText(updates.nome_contador);
+      if (updates.apelido !== undefined) payload.apelido = normalizeRequiredText(updates.apelido);
 
       const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
       if (error) throw error;
@@ -114,7 +102,7 @@ export function useUpdateCliente() {
       qc.invalidateQueries({ queryKey: ['clientes'] });
       toast.success('Cliente atualizado!');
     },
-    onError: (e: Error) => toast.error(formatClienteSchemaCacheError(e)),
+    onError: (e: Error) => toast.error(e.message),
   });
 }
 
