@@ -205,11 +205,7 @@ export default function CadastroRapido() {
                 {isMensalista && (
                   <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
                     <p className="text-xs font-medium text-primary">Configuração Mensalista</p>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="grid gap-1.5">
-                        <Label>Qtd. Processos Contratados</Label>
-                        <Input type="number" min="1" placeholder="10" value={clienteForm.qtd_processos_contratados} onChange={(e) => update('qtd_processos_contratados', e.target.value)} />
-                      </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-1.5">
                         <Label>Valor Mensalidade (R$)</Label>
                         <Input type="number" step="0.01" min="0" placeholder="0,00" value={clienteForm.valor_mensalidade} onChange={(e) => update('valor_mensalidade', e.target.value)} />
