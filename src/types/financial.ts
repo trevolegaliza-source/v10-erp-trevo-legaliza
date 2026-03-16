@@ -1,0 +1,81 @@
+export type TipoCliente = 'MENSALISTA' | 'AVULSO_4D';
+export type TipoProcesso = 'abertura' | 'alteracao' | 'transformacao' | 'baixa';
+export type StatusFinanceiro = 'pendente' | 'pago' | 'atrasado' | 'cancelado';
+export type TipoLancamento = 'receber' | 'pagar';
+
+export interface ClienteDB {
+  id: string;
+  codigo_identificador: string;
+  nome: string;
+  tipo: TipoCliente;
+  email: string | null;
+  telefone: string | null;
+  dia_vencimento_mensal: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProcessoDB {
+  id: string;
+  cliente_id: string;
+  razao_social: string;
+  tipo: TipoProcesso;
+  etapa: string;
+  prioridade: string;
+  responsavel: string | null;
+  valor: number | null;
+  notas: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined
+  cliente?: ClienteDB;
+}
+
+export interface Lancamento {
+  id: string;
+  tipo: TipoLancamento;
+  cliente_id: string | null;
+  processo_id: string | null;
+  descricao: string;
+  valor: number;
+  status: StatusFinanceiro;
+  data_vencimento: string;
+  data_pagamento: string | null;
+  is_taxa_reembolsavel: boolean;
+  comprovante_url: string | null;
+  categoria: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined
+  cliente?: ClienteDB;
+  processo?: ProcessoDB;
+}
+
+export interface PrecoTier {
+  id: string;
+  tipo_processo: TipoProcesso;
+  tier: number;
+  valor: number;
+  descricao: string | null;
+}
+
+export const TIPO_PROCESSO_LABELS: Record<TipoProcesso, string> = {
+  abertura: 'Abertura',
+  alteracao: 'Alteração',
+  transformacao: 'Transformação',
+  baixa: 'Baixa',
+};
+
+export const STATUS_LABELS: Record<StatusFinanceiro, string> = {
+  pendente: 'Pendente',
+  pago: 'Pago',
+  atrasado: 'Atrasado',
+  cancelado: 'Cancelado',
+};
+
+export const STATUS_STYLES: Record<StatusFinanceiro, string> = {
+  pago: 'bg-success/10 text-success',
+  pendente: 'bg-warning/10 text-warning',
+  atrasado: 'bg-destructive/10 text-destructive',
+  cancelado: 'bg-muted text-muted-foreground',
+};
