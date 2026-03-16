@@ -17,11 +17,11 @@ const normalizeOptionalNullableText = (value: string | null | undefined) => {
 const sanitizeSearch = (value: string) => value.replace(/[,%]/g, '').trim();
 
 const formatClienteSchemaCacheError = (error: Error) => {
-  const message = error.message || '';
+  const message = error.message || 'Erro ao processar cliente.';
   const lowered = message.toLowerCase();
 
   if (lowered.includes('schema cache') && (lowered.includes('apelido') || lowered.includes('nome_contador'))) {
-    return "Schema cache da API desatualizado para 'clientes'. Execute no Supabase SQL Editor: NOTIFY pgrst, 'reload schema';";
+    return `A API conectada ainda não reconhece apelido/nome_contador. Confirme se o SQL foi executado no projeto ${new URL(supabase.supabaseUrl).host.split('.')[0]} e reinicie o projeto no painel do Supabase.`;
   }
 
   return message;
