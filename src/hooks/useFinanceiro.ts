@@ -21,7 +21,7 @@ const formatClienteSchemaCacheError = (error: Error) => {
   const lowered = message.toLowerCase();
 
   if (lowered.includes('schema cache') && (lowered.includes('apelido') || lowered.includes('nome_contador'))) {
-    return `A API conectada ainda não reconhece apelido/nome_contador. Confirme se o SQL foi executado no projeto ${new URL(supabase.supabaseUrl).host.split('.')[0]} e reinicie o projeto no painel do Supabase.`;
+    return 'A API conectada ainda não reconhece apelido/nome_contador. Confirme se o SQL foi executado no mesmo projeto conectado no frontend e reinicie o projeto no painel do Supabase.';
   }
 
   return message;
