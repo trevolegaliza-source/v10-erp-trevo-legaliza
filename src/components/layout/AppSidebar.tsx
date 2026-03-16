@@ -9,6 +9,9 @@ import {
   Clover,
   ChevronLeft,
   ChevronRight,
+  PlusCircle,
+  ArrowDownCircle,
+  ArrowUpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -16,9 +19,12 @@ import { Button } from '@/components/ui/button';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/cadastro-rapido', label: 'Cadastro Rápido', icon: PlusCircle },
   { path: '/processos', label: 'Processos', icon: Kanban },
   { path: '/clientes', label: 'Clientes', icon: Users },
   { path: '/financeiro', label: 'Financeiro', icon: DollarSign },
+  { path: '/contas-receber', label: 'Contas a Receber', icon: ArrowDownCircle },
+  { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle },
   { path: '/documentos', label: 'Documentos', icon: FileText },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];

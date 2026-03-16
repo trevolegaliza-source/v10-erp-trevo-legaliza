@@ -8,6 +8,9 @@ import Dashboard from "./pages/Dashboard";
 import Processos from "./pages/Processos";
 import Clientes from "./pages/Clientes";
 import Financeiro from "./pages/Financeiro";
+import ContasReceber from "./pages/ContasReceber";
+import ContasPagar from "./pages/ContasPagar";
+import CadastroRapido from "./pages/CadastroRapido";
 import Documentos from "./pages/Documentos";
 import Configuracoes from "./pages/Configuracoes";
 import NotFound from "./pages/NotFound";
@@ -25,7 +28,10 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/processos" element={<Processos />} />
             <Route path="/clientes" element={<Clientes />} />
+            <Route path="/cadastro-rapido" element={<CadastroRapido />} />
             <Route path="/financeiro" element={<Financeiro />} />
+            <Route path="/contas-receber" element={<ContasReceber />} />
+            <Route path="/contas-pagar" element={<ContasPagar />} />
             <Route path="/documentos" element={<Documentos />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
           </Route>
