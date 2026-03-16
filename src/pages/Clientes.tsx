@@ -14,15 +14,15 @@ import type { ClienteDB, TipoCliente } from '@/types/financial';
 import { Link } from 'react-router-dom';
 
 export default function Clientes() {
-  const { data: clientes, isLoading } = useClientes();
+  const [search, setSearch] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+  const [editClient, setEditClient] = useState<ClienteDB | null>(null);
+  const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
+
+  const { data: clientes, isLoading } = useClientes(search);
   const { data: processos } = useProcessos();
   const updateCliente = useUpdateCliente();
   const deleteCliente = useDeleteCliente();
-
-  const [editClient, setEditClient] = useState<ClienteDB | null>(null);
-  const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
-  const [search, setSearch] = useState('');
-  const [showInactive, setShowInactive] = useState(false);
 
   // Count processes per client
   const processCount = (clienteId: string) =>
@@ -38,16 +38,7 @@ export default function Clientes() {
     return !clientProcesses.some(p => p.created_at >= tenDaysAgo);
   };
 
-  let filtered = (clientes || []).filter(c => {
-    if (search) {
-      const s = search.toLowerCase();
-      const match = c.nome.toLowerCase().includes(s) ||
-        c.codigo_identificador.toLowerCase().includes(s) ||
-        (c.nome_contador || '').toLowerCase().includes(s) ||
-        (c.apelido || '').toLowerCase().includes(s) ||
-        (c.email || '').toLowerCase().includes(s);
-      if (!match) return false;
-    }
+  const filtered = (clientes || []).filter(c => {
     if (showInactive) return isInactive(c.id);
     return true;
   });

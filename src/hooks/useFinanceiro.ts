@@ -1,17 +1,60 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Cliente, ClienteInsert, ClienteUpdate } from '@/types/supabase';
 import type { ClienteDB, ProcessoDB, Lancamento, TipoProcesso } from '@/types/financial';
 import { toast } from 'sonner';
 
+const CLIENTE_SELECT_FIELDS =
+  'id,codigo_identificador,nome,tipo,email,telefone,nome_contador,apelido,dia_vencimento_mensal,created_at,updated_at';
+
+const normalizeNullableText = (value: string | null | undefined) => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
+
+const normalizeOptionalNullableText = (value: string | null | undefined) => {
+  if (value === undefined) return undefined;
+  return normalizeNullableText(value);
+};
+
+const sanitizeSearch = (value: string) => value.replace(/[,%]/g, '').trim();
+
+const formatClienteSchemaCacheError = (error: Error) => {
+  const message = error.message || '';
+  const lowered = message.toLowerCase();
+
+  if (lowered.includes('schema cache') && (lowered.includes('apelido') || lowered.includes('nome_contador'))) {
+    return "Schema cache da API desatualizado para 'clientes'. Execute no Supabase SQL Editor: NOTIFY pgrst, 'reload schema';";
+  }
+
+  return message;
+};
+
+const normalizeClienteInsert = (cliente: ClienteInsert): ClienteInsert => ({
+  ...cliente,
+  codigo_identificador: cliente.codigo_identificador.trim(),
+  nome: cliente.nome.trim(),
+  email: normalizeNullableText(cliente.email),
+  telefone: normalizeNullableText(cliente.telefone),
+  nome_contador: normalizeNullableText(cliente.nome_contador),
+  apelido: normalizeNullableText(cliente.apelido),
+});
+
 // ---- CLIENTES ----
-export function useClientes() {
+export function useClientes(searchTerm?: string) {
   return useQuery({
-    queryKey: ['clientes'],
+    queryKey: ['clientes', searchTerm ?? ''],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('clientes')
-        .select('*')
-        .order('nome');
+      let query = supabase.from('clientes').select(CLIENTE_SELECT_FIELDS).order('nome');
+
+      const normalizedSearch = searchTerm ? sanitizeSearch(searchTerm) : '';
+      if (normalizedSearch) {
+        query = query.or(
+          `nome.ilike.%${normalizedSearch}%,codigo_identificador.ilike.%${normalizedSearch}%,nome_contador.ilike.%${normalizedSearch}%,apelido.ilike.%${normalizedSearch}%`,
+        );
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data as ClienteDB[];
     },
@@ -22,7 +65,12 @@ export function useCreateCliente() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (cliente: Omit<ClienteDB, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase.from('clientes').insert(cliente).select().single();
+      const payload = normalizeClienteInsert(cliente as ClienteInsert);
+      const { data, error } = await supabase
+        .from('clientes')
+        .insert(payload)
+        .select(CLIENTE_SELECT_FIELDS)
+        .single();
       if (error) throw error;
       return data as ClienteDB;
     },
@@ -30,7 +78,7 @@ export function useCreateCliente() {
       qc.invalidateQueries({ queryKey: ['clientes'] });
       toast.success('Cliente criado com sucesso!');
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatClienteSchemaCacheError(e)),
   });
 }
 
@@ -38,20 +86,40 @@ export function useUpdateCliente() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ClienteDB> & { id: string }) => {
+      const payload: Partial<ClienteUpdate> = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.codigo_identificador !== undefined) payload.codigo_identificador = updates.codigo_identificador.trim();
+      if (updates.nome !== undefined) payload.nome = updates.nome.trim();
+
+      const email = normalizeOptionalNullableText(updates.email);
+      if (email !== undefined) payload.email = email;
+
+      const telefone = normalizeOptionalNullableText(updates.telefone);
+      if (telefone !== undefined) payload.telefone = telefone;
+
+      const nomeContador = normalizeOptionalNullableText(updates.nome_contador);
+      if (nomeContador !== undefined) payload.nome_contador = nomeContador;
+
+      const apelido = normalizeOptionalNullableText(updates.apelido);
+      if (apelido !== undefined) payload.apelido = apelido;
+
       const { data, error } = await supabase
         .from('clientes')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update(payload)
         .eq('id', id)
-        .select()
+        .select(CLIENTE_SELECT_FIELDS)
         .single();
       if (error) throw error;
-      return data as ClienteDB;
+      return data as Cliente;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clientes'] });
       toast.success('Cliente atualizado!');
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(formatClienteSchemaCacheError(e)),
   });
 }
 

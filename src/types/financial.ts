@@ -1,21 +1,11 @@
+import type { Cliente as SupabaseCliente } from '@/types/supabase';
+
 export type TipoCliente = 'MENSALISTA' | 'AVULSO_4D';
 export type TipoProcesso = 'abertura' | 'alteracao' | 'transformacao' | 'baixa' | 'avulso' | 'orcamento';
 export type StatusFinanceiro = 'pendente' | 'pago' | 'atrasado' | 'cancelado';
 export type TipoLancamento = 'receber' | 'pagar';
 
-export interface ClienteDB {
-  id: string;
-  codigo_identificador: string;
-  nome: string;
-  tipo: TipoCliente;
-  email: string | null;
-  telefone: string | null;
-  nome_contador: string | null;
-  apelido: string | null;
-  dia_vencimento_mensal: number;
-  created_at: string;
-  updated_at: string;
-}
+export interface ClienteDB extends SupabaseCliente {}
 
 export interface ProcessoDB {
   id: string;

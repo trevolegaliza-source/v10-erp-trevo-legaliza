@@ -31,24 +31,23 @@ export default function CadastroRapido() {
     valor_manual: '',
   });
   const createProcesso = useCreateProcesso();
-  const { data: clientes } = useClientes();
   const [clientSearch, setClientSearch] = useState('');
+  const { data: clientes } = useClientes(clientSearch);
 
   const isManualPrice = processoForm.tipo === 'avulso' || processoForm.tipo === 'orcamento';
 
-  const filteredClientes = (clientes || []).filter(c => {
-    if (!clientSearch) return true;
-    const s = clientSearch.toLowerCase();
-    return c.nome.toLowerCase().includes(s) ||
-      c.codigo_identificador.toLowerCase().includes(s) ||
-      (c.nome_contador || '').toLowerCase().includes(s) ||
-      (c.apelido || '').toLowerCase().includes(s) ||
-      (c.email || '').toLowerCase().includes(s);
-  });
-
   const handleCreateCliente = (e: React.FormEvent) => {
     e.preventDefault();
-    createCliente.mutate(clienteForm as any, {
+    createCliente.mutate({
+      codigo_identificador: clienteForm.codigo_identificador,
+      nome: clienteForm.nome,
+      tipo: clienteForm.tipo,
+      email: clienteForm.email || null,
+      telefone: clienteForm.telefone || null,
+      nome_contador: clienteForm.nome_contador || null,
+      apelido: clienteForm.apelido || null,
+      dia_vencimento_mensal: clienteForm.dia_vencimento_mensal,
+    }, {
       onSuccess: () => setClienteForm({ codigo_identificador: '', nome: '', tipo: 'AVULSO_4D', email: '', telefone: '', nome_contador: '', apelido: '', dia_vencimento_mensal: 15 }),
     });
   };
@@ -168,7 +167,7 @@ export default function CadastroRapido() {
                   <Select value={processoForm.cliente_id} onValueChange={(v) => setProcessoForm(f => ({ ...f, cliente_id: v }))}>
                     <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                     <SelectContent>
-                      {filteredClientes.map(c => (
+                      {(clientes || []).map(c => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.nome} ({c.codigo_identificador}) {c.nome_contador ? `- ${c.nome_contador}` : ''}
                         </SelectItem>
