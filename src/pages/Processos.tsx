@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { KANBAN_STAGES, PROCESS_TYPE_LABELS, type KanbanStage } from '@/types/process';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, GripVertical, Loader2 } from 'lucide-react';
+import { Plus, Filter, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select,
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useProcessosDB, type ProcessoDB } from '@/hooks/useProcessos';
+import { useProcessosDB, useUpdateProcessoEtapa, type ProcessoDB } from '@/hooks/useProcessos';
 import { Skeleton } from '@/components/ui/skeleton';
 
 function ProcessCard({ process }: { process: ProcessoDB }) {
@@ -64,7 +64,6 @@ export default function Processos() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Processos</h1>
@@ -84,6 +83,8 @@ export default function Processos() {
               <SelectItem value="alteracao">Alteração</SelectItem>
               <SelectItem value="transformacao">Transformação</SelectItem>
               <SelectItem value="baixa">Baixa</SelectItem>
+              <SelectItem value="avulso">Avulso</SelectItem>
+              <SelectItem value="orcamento">Orçamento</SelectItem>
             </SelectContent>
           </Select>
 
@@ -96,7 +97,6 @@ export default function Processos() {
         </div>
       </div>
 
-      {/* Kanban Board */}
       {isLoading ? (
         <div className="flex gap-3 overflow-x-auto pb-4">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -109,18 +109,13 @@ export default function Processos() {
             {KANBAN_STAGES.map((stage) => {
               const stageProcesses = filtered.filter((p) => p.etapa === stage.key);
               return (
-                <div
-                  key={stage.key}
-                  className="w-[230px] shrink-0 rounded-xl bg-muted/40 border border-border/40"
-                >
+                <div key={stage.key} className="w-[230px] shrink-0 rounded-xl bg-muted/40 border border-border/40">
                   <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/30">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold">{stage.label}</span>
                       <span className={cn(
                         "flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold",
-                        stageProcesses.length > 0
-                          ? "bg-primary/15 text-primary"
-                          : "bg-muted text-muted-foreground"
+                        stageProcesses.length > 0 ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
                       )}>
                         {stageProcesses.length}
                       </span>

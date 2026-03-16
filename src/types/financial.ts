@@ -1,5 +1,5 @@
 export type TipoCliente = 'MENSALISTA' | 'AVULSO_4D';
-export type TipoProcesso = 'abertura' | 'alteracao' | 'transformacao' | 'baixa';
+export type TipoProcesso = 'abertura' | 'alteracao' | 'transformacao' | 'baixa' | 'avulso' | 'orcamento';
 export type StatusFinanceiro = 'pendente' | 'pago' | 'atrasado' | 'cancelado';
 export type TipoLancamento = 'receber' | 'pagar';
 
@@ -10,6 +10,8 @@ export interface ClienteDB {
   tipo: TipoCliente;
   email: string | null;
   telefone: string | null;
+  nome_contador: string | null;
+  apelido: string | null;
   dia_vencimento_mensal: number;
   created_at: string;
   updated_at: string;
@@ -27,7 +29,6 @@ export interface ProcessoDB {
   notas: string | null;
   created_at: string;
   updated_at: string;
-  // joined
   cliente?: ClienteDB;
 }
 
@@ -46,7 +47,6 @@ export interface Lancamento {
   categoria: string | null;
   created_at: string;
   updated_at: string;
-  // joined
   cliente?: ClienteDB;
   processo?: ProcessoDB;
 }
@@ -64,6 +64,8 @@ export const TIPO_PROCESSO_LABELS: Record<TipoProcesso, string> = {
   alteracao: 'Alteração',
   transformacao: 'Transformação',
   baixa: 'Baixa',
+  avulso: 'Avulso',
+  orcamento: 'Orçamento',
 };
 
 export const STATUS_LABELS: Record<StatusFinanceiro, string> = {
