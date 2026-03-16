@@ -9,23 +9,14 @@ const normalizeNullableText = (value: string | null | undefined) => {
   return trimmed ? trimmed : null;
 };
 
+const normalizeRequiredText = (value: string | null | undefined) => value?.trim() || '';
+
 const normalizeOptionalNullableText = (value: string | null | undefined) => {
   if (value === undefined) return undefined;
   return normalizeNullableText(value);
 };
 
 const sanitizeSearch = (value: string) => value.replace(/[,%]/g, '').trim();
-
-const formatClienteSchemaCacheError = (error: Error) => {
-  const message = error.message || 'Erro ao processar cliente.';
-  const lowered = message.toLowerCase();
-
-  if (lowered.includes('schema cache') && (lowered.includes('apelido') || lowered.includes('nome_contador'))) {
-    return 'A API conectada ainda não reconhece apelido/nome_contador. Confirme se o SQL foi executado no mesmo projeto conectado no frontend e reinicie o projeto no painel do Supabase.';
-  }
-
-  return message;
-};
 
 const normalizeClienteInsert = (cliente: ClienteInsert): ClienteInsert => ({
   ...cliente,
