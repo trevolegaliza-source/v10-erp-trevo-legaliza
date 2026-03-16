@@ -24,8 +24,8 @@ const normalizeClienteInsert = (cliente: ClienteInsert): ClienteInsert => ({
   nome: cliente.nome.trim(),
   email: normalizeNullableText(cliente.email),
   telefone: normalizeNullableText(cliente.telefone),
-  nome_contador: normalizeNullableText(cliente.nome_contador),
-  apelido: normalizeNullableText(cliente.apelido),
+  nome_contador: normalizeRequiredText(cliente.nome_contador),
+  apelido: normalizeRequiredText(cliente.apelido),
 });
 
 // ---- CLIENTES ----
