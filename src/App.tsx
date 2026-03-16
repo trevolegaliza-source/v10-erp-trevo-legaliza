@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Processos from "./pages/Processos";
+import ProcessosAtivosDetalhe from "./pages/ProcessosAtivosDetalhe";
+import FaturamentoDetalhe from "./pages/FaturamentoDetalhe";
 import Clientes from "./pages/Clientes";
 import Financeiro from "./pages/Financeiro";
 import ContasReceber from "./pages/ContasReceber";
@@ -27,6 +29,8 @@ const App = () => (
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/processos" element={<Processos />} />
+            <Route path="/processos-ativos" element={<ProcessosAtivosDetalhe />} />
+            <Route path="/faturamento" element={<FaturamentoDetalhe />} />
             <Route path="/clientes" element={<Clientes />} />
             <Route path="/cadastro-rapido" element={<CadastroRapido />} />
             <Route path="/financeiro" element={<Financeiro />} />

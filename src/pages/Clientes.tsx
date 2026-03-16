@@ -211,7 +211,7 @@ export default function Clientes() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="MENSALISTA">Mensalista</SelectItem>
-                  <SelectItem value="AVULSO_4D">Avulso (4 dias)</SelectItem>
+                  <SelectItem value="AVULSO_4D">Avulso</SelectItem>
                 </SelectContent>
               </Select>
             </div>
