@@ -167,7 +167,7 @@ export default function CadastroRapido() {
                   <Select value={processoForm.cliente_id} onValueChange={(v) => setProcessoForm(f => ({ ...f, cliente_id: v }))}>
                     <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
                     <SelectContent>
-                      {filteredClientes.map(c => (
+                      {(clientes || []).map(c => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.nome} ({c.codigo_identificador}) {c.nome_contador ? `- ${c.nome_contador}` : ''}
                         </SelectItem>

@@ -38,16 +38,7 @@ export default function Clientes() {
     return !clientProcesses.some(p => p.created_at >= tenDaysAgo);
   };
 
-  let filtered = (clientes || []).filter(c => {
-    if (search) {
-      const s = search.toLowerCase();
-      const match = c.nome.toLowerCase().includes(s) ||
-        c.codigo_identificador.toLowerCase().includes(s) ||
-        (c.nome_contador || '').toLowerCase().includes(s) ||
-        (c.apelido || '').toLowerCase().includes(s) ||
-        (c.email || '').toLowerCase().includes(s);
-      if (!match) return false;
-    }
+  const filtered = (clientes || []).filter(c => {
     if (showInactive) return isInactive(c.id);
     return true;
   });
