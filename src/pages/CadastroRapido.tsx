@@ -22,9 +22,11 @@ const INITIAL_CLIENTE = {
   // Avulso-specific
   valor_base: '',
   desconto_tier2: '',
-  dia_cobranca: 'D+4',
+  dia_cobranca: '4',
+  valor_limite_desconto: '',
   // Mensalista-specific
   valor_mensalidade: '',
+  qtd_processos_inclusos: '',
 };
 
 export default function CadastroRapido() {
@@ -76,7 +78,6 @@ export default function CadastroRapido() {
         onSuccess: () => {
           setClienteForm(INITIAL_CLIENTE);
           setContratoFile(null);
-          // TODO: upload contratoFile to storage bucket when configured
           if (contratoFile) {
             toast.info('Contrato será vinculado após configuração do storage.');
           }
@@ -167,7 +168,7 @@ export default function CadastroRapido() {
                   </div>
                 </div>
 
-                {/* Client Type Selector */}
+                {/* Client Type Selector - NO D+4 suffix */}
                 <div className="grid gap-1.5">
                   <Label>Tipo de Cliente *</Label>
                   <Select value={clienteForm.tipo} onValueChange={(v) => update('tipo', v)}>
@@ -175,7 +176,7 @@ export default function CadastroRapido() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="AVULSO_4D">Avulso (D+4)</SelectItem>
+                      <SelectItem value="AVULSO_4D">Avulso</SelectItem>
                       <SelectItem value="MENSALISTA">Mensalista</SelectItem>
                     </SelectContent>
                   </Select>
@@ -184,19 +185,26 @@ export default function CadastroRapido() {
                 {/* ── Conditional: AVULSO ── */}
                 {isAvulso && (
                   <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-4">
-                    <p className="text-xs font-medium text-warning">Configuração Avulso (D+4)</p>
-                    <div className="grid grid-cols-3 gap-4">
+                    <p className="text-xs font-medium text-warning">Configuração Avulso</p>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-1.5">
                         <Label>Valor Base (R$)</Label>
                         <Input type="number" step="0.01" min="0" placeholder="0,00" value={clienteForm.valor_base} onChange={(e) => update('valor_base', e.target.value)} />
                       </div>
                       <div className="grid gap-1.5">
-                        <Label>Desconto Progressivo (Tier 2)</Label>
+                        <Label>Desconto Progressivo (%)</Label>
                         <Input type="number" step="0.1" min="0" max="100" placeholder="0" value={clienteForm.desconto_tier2} onChange={(e) => update('desconto_tier2', e.target.value)} />
                       </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-1.5">
-                        <Label>Dia de Cobrança (D+4)</Label>
-                        <Input value={clienteForm.dia_cobranca} readOnly aria-readonly="true" />
+                        <Label>Dia de Cobrança (dias após solicitação)</Label>
+                        <Input type="number" min={1} max={30} placeholder="4" value={clienteForm.dia_cobranca} onChange={(e) => update('dia_cobranca', e.target.value)} />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label>Valor Limite de Desconto (R$) *</Label>
+                        <Input type="number" step="0.01" min="0" placeholder="Piso mínimo do valor" value={clienteForm.valor_limite_desconto} onChange={(e) => update('valor_limite_desconto', e.target.value)} />
+                        <p className="text-[10px] text-muted-foreground">O valor final nunca será inferior a este limite, mesmo com desconto progressivo.</p>
                       </div>
                     </div>
                   </div>
@@ -206,7 +214,7 @@ export default function CadastroRapido() {
                 {isMensalista && (
                   <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
                     <p className="text-xs font-medium text-primary">Configuração Mensalista</p>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="grid gap-1.5">
                         <Label>Valor Mensalidade (R$)</Label>
                         <Input type="number" step="0.01" min="0" placeholder="0,00" value={clienteForm.valor_mensalidade} onChange={(e) => update('valor_mensalidade', e.target.value)} />
@@ -214,6 +222,11 @@ export default function CadastroRapido() {
                       <div className="grid gap-1.5">
                         <Label>Dia de Vencimento</Label>
                         <Input type="number" min={1} max={28} value={clienteForm.dia_vencimento_mensal} onChange={(e) => update('dia_vencimento_mensal', Number(e.target.value))} />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label>Qtd Processos Inclusos</Label>
+                        <Input type="number" min={0} placeholder="Ex: 5" value={clienteForm.qtd_processos_inclusos} onChange={(e) => update('qtd_processos_inclusos', e.target.value)} />
+                        <p className="text-[10px] text-muted-foreground">Processos inclusos no contrato mensal.</p>
                       </div>
                     </div>
                   </div>
@@ -252,7 +265,7 @@ export default function CadastroRapido() {
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Novo Processo</CardTitle>
-              <p className="text-xs text-muted-foreground">Valor calculado automaticamente. Prioridade urgente adiciona +50% (×1.5).</p>
+              <p className="text-xs text-muted-foreground">Valor calculado automaticamente. Prioridade urgente adiciona +50% (×1.5). Para Avulso/Orçamento, o valor manual tem prioridade.</p>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCreateProcesso} className="grid gap-4 max-w-lg">
@@ -310,7 +323,7 @@ export default function CadastroRapido() {
                   <div className="grid gap-2">
                     <Label>Valor Manual (R$) *</Label>
                     <Input required type="number" step="0.01" min="0" placeholder="Informe o valor" value={processoForm.valor_manual} onChange={(e) => setProcessoForm((f) => ({ ...f, valor_manual: e.target.value }))} />
-                    <p className="text-[11px] text-muted-foreground">Para tipos Avulso/Orçamento o valor é informado manualmente.</p>
+                    <p className="text-[11px] text-muted-foreground">Para Avulso/Orçamento o valor digitado tem prioridade sobre regras automáticas.</p>
                   </div>
                 )}
                 <div className="grid gap-2">

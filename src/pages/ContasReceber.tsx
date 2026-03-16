@@ -5,22 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { DollarSign, TrendingUp, CreditCard, Receipt, Plus, Search, CheckCircle } from 'lucide-react';
-import { useLancamentos, useUpdateLancamento, useCreateLancamento, useClientes } from '@/hooks/useFinanceiro';
+import { DollarSign, TrendingUp, CreditCard, Receipt, Search, CheckCircle } from 'lucide-react';
+import { useLancamentos, useUpdateLancamento, useClientes } from '@/hooks/useFinanceiro';
 import { STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
 import type { StatusFinanceiro } from '@/types/financial';
 
 export default function ContasReceber() {
   const { data: lancamentos, isLoading } = useLancamentos('receber');
-  const { data: clientes } = useClientes();
   const updateLancamento = useUpdateLancamento();
-  const createLancamento = useCreateLancamento();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [taxaDialog, setTaxaDialog] = useState(false);
-  const [taxaForm, setTaxaForm] = useState({ cliente_id: '', descricao: '', valor: '', processo_id: '' });
 
   const filtered = (lancamentos || []).filter(l => {
     if (filterStatus !== 'all' && l.status !== filterStatus) return false;
@@ -31,25 +26,6 @@ export default function ContasReceber() {
   const totalByStatus = (status: StatusFinanceiro) =>
     (lancamentos || []).filter(l => l.status === status).reduce((s, l) => s + Number(l.valor), 0);
 
-  const handleAddTaxa = (e: React.FormEvent) => {
-    e.preventDefault();
-    createLancamento.mutate({
-      tipo: 'receber',
-      cliente_id: taxaForm.cliente_id || null,
-      processo_id: taxaForm.processo_id || null,
-      descricao: `Taxa Reembolsável - ${taxaForm.descricao}`,
-      valor: Number(taxaForm.valor),
-      status: 'pendente',
-      is_taxa_reembolsavel: true,
-      data_vencimento: new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
-    } as any, {
-      onSuccess: () => {
-        setTaxaDialog(false);
-        setTaxaForm({ cliente_id: '', descricao: '', valor: '', processo_id: '' });
-      },
-    });
-  };
-
   const totalGeral = (lancamentos || []).reduce((s, l) => s + Number(l.valor), 0);
 
   return (
@@ -59,42 +35,6 @@ export default function ContasReceber() {
           <h1 className="text-2xl font-bold tracking-tight">Contas a Receber</h1>
           <p className="text-sm text-muted-foreground">{(lancamentos || []).length} lançamentos</p>
         </div>
-        <Dialog open={taxaDialog} onOpenChange={setTaxaDialog}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="h-9">
-              <Plus className="h-4 w-4 mr-1" />
-              Taxa Reembolsável
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Adicionar Taxa Reembolsável</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAddTaxa} className="grid gap-4 py-2">
-              <div className="grid gap-2">
-                <Label>Cliente</Label>
-                <Select value={taxaForm.cliente_id} onValueChange={v => setTaxaForm(f => ({ ...f, cliente_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    {(clientes || []).map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Descrição *</Label>
-                <Input required value={taxaForm.descricao} onChange={e => setTaxaForm(f => ({ ...f, descricao: e.target.value }))} placeholder="Ex: Taxa DARE, IPTU..." />
-              </div>
-              <div className="grid gap-2">
-                <Label>Valor (sem desconto) *</Label>
-                <Input required type="number" step="0.01" min="0" value={taxaForm.valor} onChange={e => setTaxaForm(f => ({ ...f, valor: e.target.value }))} />
-              </div>
-              <p className="text-xs text-muted-foreground">Taxas reembolsáveis são cobradas pelo valor total, sem desconto de tier.</p>
-              <Button type="submit" disabled={createLancamento.isPending}>Adicionar Taxa</Button>
-            </form>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Stats */}
@@ -151,49 +91,63 @@ export default function ContasReceber() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="text-right">Taxa Reemb.</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-center">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map(l => (
-                  <TableRow key={l.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {l.descricao}
-                        {l.is_taxa_reembolsavel && (
-                          <Badge className="bg-info/10 text-info border-0 text-[10px]">Reembolsável</Badge>
+                {filtered.map(l => {
+                  const taxa = l.is_taxa_reembolsavel ? Number(l.valor) : 0;
+                  const valorBase = Number(l.valor);
+                  return (
+                    <TableRow key={l.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {l.descricao}
+                          {l.is_taxa_reembolsavel && (
+                            <Badge className="bg-info/10 text-info border-0 text-[10px]">Reembolsável</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">{(l as any).cliente?.nome || '-'}</TableCell>
+                      <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {taxa > 0
+                          ? taxa.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                          : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-primary">
+                        {(valorBase + (l.is_taxa_reembolsavel ? 0 : taxa)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge className={`${STATUS_STYLES[l.status as StatusFinanceiro]} border-0 text-[10px]`}>
+                          {STATUS_LABELS[l.status as StatusFinanceiro]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {l.status === 'pendente' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-success hover:text-success"
+                            onClick={() => updateLancamento.mutate({ id: l.id, status: 'pago', data_pagamento: new Date().toISOString().split('T')[0] })}
+                          >
+                            <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                            Confirmar
+                          </Button>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{(l as any).cliente?.nome || '-'}</TableCell>
-                    <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge className={`${STATUS_STYLES[l.status as StatusFinanceiro]} border-0 text-[10px]`}>
-                        {STATUS_LABELS[l.status as StatusFinanceiro]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {l.status === 'pendente' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs text-success hover:text-success"
-                          onClick={() => updateLancamento.mutate({ id: l.id, status: 'pago', data_pagamento: new Date().toISOString().split('T')[0] })}
-                        >
-                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                          Confirmar
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Nenhum lançamento encontrado
                     </TableCell>
                   </TableRow>
@@ -203,6 +157,9 @@ export default function ContasReceber() {
           )}
         </CardContent>
       </Card>
+      <p className="text-[11px] text-muted-foreground">
+        💡 Taxas reembolsáveis agora são adicionadas individualmente na edição de cada processo.
+      </p>
     </div>
   );
 }
