@@ -109,12 +109,7 @@ export function useUpdateCliente() {
       const apelido = normalizeOptionalNullableText(updates.apelido);
       if (apelido !== undefined) payload.apelido = apelido;
 
-      const { data, error } = await supabase
-        .from('clientes')
-        .update(payload)
-        .eq('id', id)
-        .select(CLIENTE_SELECT_FIELDS)
-        .single();
+      const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
       if (error) throw error;
       return data as Cliente;
     },
