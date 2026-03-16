@@ -68,8 +68,8 @@ export default function CadastroRapido() {
         tipo: clienteForm.tipo,
         email: clienteForm.email || null,
         telefone: clienteForm.telefone || null,
-        nome_contador: clienteForm.nome_contador || null,
-        apelido: clienteForm.apelido || null,
+        nome_contador: clienteForm.nome_contador || '',
+        apelido: clienteForm.apelido || '',
         dia_vencimento_mensal: isMensalista ? clienteForm.dia_vencimento_mensal : 0,
       },
       {
