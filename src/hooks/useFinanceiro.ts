@@ -4,9 +4,6 @@ import type { Cliente, ClienteInsert, ClienteUpdate } from '@/types/supabase';
 import type { ClienteDB, ProcessoDB, Lancamento, TipoProcesso } from '@/types/financial';
 import { toast } from 'sonner';
 
-const CLIENTE_SELECT_FIELDS =
-  'id,codigo_identificador,nome,tipo,email,telefone,nome_contador,apelido,dia_vencimento_mensal,created_at,updated_at';
-
 const normalizeNullableText = (value: string | null | undefined) => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
@@ -20,11 +17,11 @@ const normalizeOptionalNullableText = (value: string | null | undefined) => {
 const sanitizeSearch = (value: string) => value.replace(/[,%]/g, '').trim();
 
 const formatClienteSchemaCacheError = (error: Error) => {
-  const message = error.message || '';
+  const message = error.message || 'Erro ao processar cliente.';
   const lowered = message.toLowerCase();
 
   if (lowered.includes('schema cache') && (lowered.includes('apelido') || lowered.includes('nome_contador'))) {
-    return "Schema cache da API desatualizado para 'clientes'. Execute no Supabase SQL Editor: NOTIFY pgrst, 'reload schema';";
+    return 'A API conectada ainda não reconhece apelido/nome_contador. Confirme se o SQL foi executado no mesmo projeto conectado no frontend e reinicie o projeto no painel do Supabase.';
   }
 
   return message;
@@ -45,18 +42,25 @@ export function useClientes(searchTerm?: string) {
   return useQuery({
     queryKey: ['clientes', searchTerm ?? ''],
     queryFn: async () => {
-      let query = supabase.from('clientes').select(CLIENTE_SELECT_FIELDS).order('nome');
-
-      const normalizedSearch = searchTerm ? sanitizeSearch(searchTerm) : '';
-      if (normalizedSearch) {
-        query = query.or(
-          `nome.ilike.%${normalizedSearch}%,codigo_identificador.ilike.%${normalizedSearch}%,nome_contador.ilike.%${normalizedSearch}%,apelido.ilike.%${normalizedSearch}%`,
-        );
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await supabase.from('clientes').select('*').order('nome');
       if (error) throw error;
-      return data as ClienteDB[];
+
+      const clientes = (data || []) as ClienteDB[];
+      const normalizedSearch = searchTerm ? sanitizeSearch(searchTerm).toLowerCase() : '';
+      if (!normalizedSearch) return clientes;
+
+      return clientes.filter((cliente) => {
+        const searchable = [
+          cliente.nome,
+          cliente.codigo_identificador,
+          cliente.nome_contador || '',
+          cliente.apelido || '',
+        ]
+          .join(' ')
+          .toLowerCase();
+
+        return searchable.includes(normalizedSearch);
+      });
     },
   });
 }
@@ -66,11 +70,7 @@ export function useCreateCliente() {
   return useMutation({
     mutationFn: async (cliente: Omit<ClienteDB, 'id' | 'created_at' | 'updated_at'>) => {
       const payload = normalizeClienteInsert(cliente as ClienteInsert);
-      const { data, error } = await supabase
-        .from('clientes')
-        .insert(payload)
-        .select(CLIENTE_SELECT_FIELDS)
-        .single();
+      const { data, error } = await supabase.from('clientes').insert(payload).select('*').single();
       if (error) throw error;
       return data as ClienteDB;
     },
@@ -106,12 +106,7 @@ export function useUpdateCliente() {
       const apelido = normalizeOptionalNullableText(updates.apelido);
       if (apelido !== undefined) payload.apelido = apelido;
 
-      const { data, error } = await supabase
-        .from('clientes')
-        .update(payload)
-        .eq('id', id)
-        .select(CLIENTE_SELECT_FIELDS)
-        .single();
+      const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
       if (error) throw error;
       return data as Cliente;
     },
