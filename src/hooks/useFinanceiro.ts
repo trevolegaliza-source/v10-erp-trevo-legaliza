@@ -4,9 +4,6 @@ import type { Cliente, ClienteInsert, ClienteUpdate } from '@/types/supabase';
 import type { ClienteDB, ProcessoDB, Lancamento, TipoProcesso } from '@/types/financial';
 import { toast } from 'sonner';
 
-const CLIENTE_SELECT_FIELDS =
-  'id,codigo_identificador,nome,tipo,email,telefone,nome_contador,apelido,dia_vencimento_mensal,created_at,updated_at';
-
 const normalizeNullableText = (value: string | null | undefined) => {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
