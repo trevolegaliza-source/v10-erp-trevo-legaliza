@@ -20,6 +20,8 @@ export interface ProcessoDB {
     nome: string;
     codigo_identificador: string;
     tipo: string;
+    nome_contador: string | null;
+    apelido: string | null;
   };
 }
 
@@ -75,18 +77,15 @@ export function useDashboardStats() {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      // Total processos ativos (não finalizados/arquivo)
       const { count: processosAtivos } = await supabase
         .from('processos')
         .select('*', { count: 'exact', head: true })
         .not('etapa', 'in', '("finalizados","arquivo")');
 
-      // Total clientes
       const { count: totalClientes } = await supabase
         .from('clientes')
         .select('*', { count: 'exact', head: true });
 
-      // Faturamento do mês (lançamentos a receber)
       const { data: faturamento } = await supabase
         .from('lancamentos')
         .select('valor')
@@ -95,21 +94,18 @@ export function useDashboardStats() {
 
       const faturamentoMes = (faturamento || []).reduce((s, r) => s + Number(r.valor), 0);
 
-      // Processos urgentes
       const { data: urgentes } = await supabase
         .from('processos')
         .select('*, cliente:clientes(*)')
         .eq('prioridade', 'urgente')
         .not('etapa', 'in', '("finalizados","arquivo")');
 
-      // Processos recentes
       const { data: recentes } = await supabase
         .from('processos')
         .select('*, cliente:clientes(*)')
         .order('created_at', { ascending: false })
         .limit(6);
 
-      // Top clientes by process count
       const { data: allProcessos } = await supabase
         .from('processos')
         .select('cliente_id, cliente:clientes(nome)');
