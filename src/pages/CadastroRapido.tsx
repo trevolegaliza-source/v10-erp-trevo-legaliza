@@ -185,19 +185,20 @@ export default function CadastroRapido() {
                 {isAvulso && (
                   <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-4">
                     <p className="text-xs font-medium text-warning">Configuração Avulso (D+4)</p>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="grid gap-1.5">
                         <Label>Valor Base (R$)</Label>
                         <Input type="number" step="0.01" min="0" placeholder="0,00" value={clienteForm.valor_base} onChange={(e) => update('valor_base', e.target.value)} />
                       </div>
                       <div className="grid gap-1.5">
-                        <Label>Desconto Progressivo - Tier 2 (%)</Label>
+                        <Label>Desconto Progressivo (Tier 2)</Label>
                         <Input type="number" step="0.1" min="0" max="100" placeholder="0" value={clienteForm.desconto_tier2} onChange={(e) => update('desconto_tier2', e.target.value)} />
                       </div>
+                      <div className="grid gap-1.5">
+                        <Label>Dia de Cobrança (D+4)</Label>
+                        <Input value={clienteForm.dia_cobranca} readOnly aria-readonly="true" />
+                      </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      Regra de vencimento: D+4 após solicitação do processo.
-                    </p>
                   </div>
                 )}
 
