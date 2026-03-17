@@ -62,6 +62,20 @@ export default function CadastroRapido() {
     }
   };
 
+  const uploadContrato = useCallback(async (clienteId: string) => {
+    if (!contratoFile) return;
+    const ext = contratoFile.name.split('.').pop();
+    const path = `${clienteId}/contrato_${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from('contratos')
+      .upload(path, contratoFile, { upsert: true });
+    if (error) {
+      toast.error('Erro ao enviar contrato: ' + error.message);
+    } else {
+      toast.success('Contrato anexado com sucesso!');
+    }
+  }, [contratoFile]);
+
   const handleCreateCliente = (e: React.FormEvent) => {
     e.preventDefault();
     createCliente.mutate(
@@ -76,12 +90,13 @@ export default function CadastroRapido() {
         dia_vencimento_mensal: isMensalista ? clienteForm.dia_vencimento_mensal : 0,
       },
       {
-        onSuccess: () => {
+        onSuccess: (data: any) => {
+          const clienteId = data?.id || data?.[0]?.id;
+          if (contratoFile && clienteId) {
+            uploadContrato(clienteId);
+          }
           setClienteForm(INITIAL_CLIENTE);
           setContratoFile(null);
-          if (contratoFile) {
-            toast.info('Contrato será vinculado após configuração do storage.');
-          }
         },
       },
     );
