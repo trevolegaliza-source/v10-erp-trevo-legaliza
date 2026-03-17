@@ -56,6 +56,25 @@ export function useUpdateProcessoEtapa() {
   });
 }
 
+export function useDeleteProcesso() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('processos')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['processos_db'] });
+      qc.invalidateQueries({ queryKey: ['dashboard_stats'] });
+      toast.success('Processo excluído com sucesso');
+    },
+    onError: (e: Error) => toast.error('Erro ao excluir: ' + e.message),
+  });
+}
+
 export function useClientesDB() {
   return useQuery({
     queryKey: ['clientes'],

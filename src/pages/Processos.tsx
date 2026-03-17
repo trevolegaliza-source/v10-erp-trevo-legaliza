@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 
 type ViewMode = 'kanban' | 'list';
 
-function QuickActionsMenu({ process }: { process: ProcessoDB }) {
+function QuickActionsMenu({ process, onDelete }: { process: ProcessoDB; onDelete: (id: string) => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -34,7 +34,7 @@ function QuickActionsMenu({ process }: { process: ProcessoDB }) {
           <EyeOff className="h-3.5 w-3.5 mr-2" /> Ocultar
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => toast.info('Excluir processo')} className="text-destructive">
+        <DropdownMenuItem onClick={() => onDelete(process.id)} className="text-destructive">
           <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir
         </DropdownMenuItem>
       </DropdownMenuContent>
