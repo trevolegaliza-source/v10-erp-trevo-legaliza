@@ -211,12 +211,38 @@ export default function ClienteDetalhe() {
                 Fatura no Deferimento
               </Badge>
             )}
+            {isArchived && (
+              <Badge variant="outline" className="text-xs border-muted-foreground/30 text-muted-foreground">
+                Arquivado
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1"><Building2 className="h-3.5 w-3.5" />{cliente.nome}</span>
             {cliente.nome_contador && <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{cliente.nome_contador}</span>}
             <span className="text-xs">Código: {cliente.codigo_identificador}</span>
           </div>
+        </div>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedRelatorioProcessos(new Set()); setShowRelatorioDialog(true); }}>
+            <FileBarChart className="h-3.5 w-3.5" /> Gerar Relatório
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedCobrancaProcessos(new Set()); setShowCobrancaDialog(true); }}>
+            <Receipt className="h-3.5 w-3.5" /> Gerar Cobrança
+          </Button>
+          {isArchived ? (
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs text-primary" onClick={() => setShowArchivePassword(true)}>
+              <ArchiveRestore className="h-3.5 w-3.5" /> Desarquivar
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs text-warning" onClick={() => setShowArchivePassword(true)}>
+              <Archive className="h-3.5 w-3.5" /> Arquivar
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs text-destructive" onClick={() => setShowDeleteClientePassword(true)}>
+            <Trash2 className="h-3.5 w-3.5" /> Excluir
+          </Button>
         </div>
       </div>
 
