@@ -145,12 +145,11 @@ export function useCreateProcesso() {
       tipo: TipoProcesso;
       prioridade?: string;
       responsavel?: string;
-      valor_manual?: number; // for avulso/orcamento
+      valor_manual?: number;
     }) => {
       let preco = input.valor_manual || 0;
       const isManualPrice = input.tipo === 'avulso' || input.tipo === 'orcamento';
 
-      // Calculate price via tiered pricing (only for standard types)
       if (!isManualPrice) {
         const { data: precoCalc } = await supabase.rpc('calcular_preco_processo', {
           p_cliente_id: input.cliente_id,
@@ -159,16 +158,13 @@ export function useCreateProcesso() {
         preco = precoCalc || 0;
       }
 
-      // Priority surcharge: Valor_Final = Valor_Base × 1.5
       const isUrgente = input.prioridade === 'urgente';
       const valorFinal = isUrgente ? preco * 1.5 : preco;
 
-      // Calculate due date
       const { data: vencimento } = await supabase.rpc('calcular_vencimento', {
         p_cliente_id: input.cliente_id,
       });
 
-      // Create process
       const { data: processo, error } = await supabase
         .from('processos')
         .insert({
@@ -183,22 +179,29 @@ export function useCreateProcesso() {
         .single();
       if (error) throw error;
 
-      // Create financial entry (contas a receber)
-      const descParts = [
-        `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`,
-      ];
-      if (isUrgente) descParts.push('(+50% Prioridade)');
+      // Check momento_faturamento from client
+      const cliente = processo.cliente as ClienteDB | null;
+      const momentoFat = (cliente as any)?.momento_faturamento || 'na_solicitacao';
 
-      const { error: lancError } = await supabase.from('lancamentos').insert({
-        tipo: 'receber',
-        cliente_id: input.cliente_id,
-        processo_id: processo.id,
-        descricao: descParts.join(' '),
-        valor: valorFinal,
-        status: 'pendente',
-        data_vencimento: vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
-      });
-      if (lancError) throw lancError;
+      if (momentoFat === 'na_solicitacao') {
+        // Generate billing immediately
+        const descParts = [
+          `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`,
+        ];
+        if (isUrgente) descParts.push('(+50% Prioridade)');
+
+        const { error: lancError } = await supabase.from('lancamentos').insert({
+          tipo: 'receber',
+          cliente_id: input.cliente_id,
+          processo_id: processo.id,
+          descricao: descParts.join(' '),
+          valor: valorFinal,
+          status: 'pendente',
+          data_vencimento: vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
+        });
+        if (lancError) throw lancError;
+      }
+      // If 'no_deferimento', no billing created now — will be triggered on stage change
 
       return processo as ProcessoDB;
     },
@@ -206,10 +209,40 @@ export function useCreateProcesso() {
       qc.invalidateQueries({ queryKey: ['processos_db'] });
       qc.invalidateQueries({ queryKey: ['lancamentos'] });
       qc.invalidateQueries({ queryKey: ['dashboard_stats'] });
-      toast.success('Processo criado e lançamento financeiro gerado!');
+      toast.success('Processo criado!');
     },
     onError: (e: Error) => toast.error(e.message),
   });
+}
+
+// Generate billing when process is deferred (for 'no_deferimento' clients)
+export async function gerarFaturamentoDeferimento(processo: ProcessoDB) {
+  const clienteId = processo.cliente_id;
+  // Fetch client to get momento_faturamento
+  const { data: cliente } = await supabase.from('clientes').select('*').eq('id', clienteId).single();
+  if (!cliente) return;
+  const momentoFat = (cliente as any)?.momento_faturamento || 'na_solicitacao';
+  if (momentoFat !== 'no_deferimento') return;
+
+  // Check if billing already exists for this process
+  const { data: existing } = await supabase.from('lancamentos').select('id').eq('processo_id', processo.id).eq('tipo', 'receber');
+  if (existing && existing.length > 0) return; // Already billed
+
+  const { data: vencimento } = await supabase.rpc('calcular_vencimento', { p_cliente_id: clienteId });
+  const valorFinal = Number(processo.valor) || 0;
+  const desc = `${processo.tipo.charAt(0).toUpperCase() + processo.tipo.slice(1)} - ${processo.razao_social} (Deferido)`;
+
+  const { error } = await supabase.from('lancamentos').insert({
+    tipo: 'receber',
+    cliente_id: clienteId,
+    processo_id: processo.id,
+    descricao: desc,
+    valor: valorFinal,
+    status: 'pendente',
+    data_vencimento: vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
+  });
+  if (error) toast.error('Erro ao gerar faturamento: ' + error.message);
+  else toast.success('Faturamento gerado automaticamente (Deferimento)!');
 }
 
 // ---- LANÇAMENTOS ----
