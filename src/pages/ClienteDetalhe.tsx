@@ -8,10 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X } from 'lucide-react';
+import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { useUpdateCliente } from '@/hooks/useFinanceiro';
+import { useUpdateCliente, useCreateProcesso } from '@/hooks/useFinanceiro';
 import { KANBAN_STAGES } from '@/types/process';
 import { STATUS_LABELS, STATUS_STYLES, TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso } from '@/types/financial';
@@ -31,6 +33,40 @@ export default function ClienteDetalhe() {
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
   const updateCliente = useUpdateCliente();
+  const createProcesso = useCreateProcesso();
+  const [showNovoProcesso, setShowNovoProcesso] = useState(false);
+  const [processoForm, setProcessoForm] = useState({
+    razao_social: '',
+    tipo: 'abertura' as TipoProcesso,
+    prioridade: 'normal',
+    responsavel: '',
+    valor_manual: '',
+  });
+  const isManualPrice = processoForm.tipo === 'avulso' || processoForm.tipo === 'orcamento';
+
+  const handleCreateProcesso = () => {
+    if (!cliente || !processoForm.razao_social.trim()) {
+      toast.error('Preencha a Razão Social');
+      return;
+    }
+    createProcesso.mutate(
+      {
+        cliente_id: cliente.id,
+        razao_social: processoForm.razao_social.trim(),
+        tipo: processoForm.tipo,
+        prioridade: processoForm.prioridade,
+        responsavel: processoForm.responsavel || undefined,
+        valor_manual: isManualPrice && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined,
+      },
+      {
+        onSuccess: () => {
+          setShowNovoProcesso(false);
+          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '' });
+          loadAll(cliente.id);
+        },
+      }
+    );
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -320,8 +356,11 @@ export default function ClienteDetalhe() {
           )}
 
           <Card className="border-border/60">
-            <CardHeader className="pb-3">
+            <CardHeader className="flex-row items-center justify-between pb-3">
               <CardTitle className="text-base">Histórico de Processos ({totalProcessos})</CardTitle>
+              <Button size="sm" className="gap-1.5" onClick={() => setShowNovoProcesso(true)}>
+                <Plus className="h-3.5 w-3.5" /> Novo Processo
+              </Button>
             </CardHeader>
             <CardContent>
               {processos.length > 0 ? (
@@ -461,6 +500,60 @@ export default function ClienteDetalhe() {
         onOpenChange={setShowDeletePassword}
         onConfirm={() => { pendingDeleteAction?.(); setPendingDeleteAction(null); }}
       />
+
+      {/* Dialog Novo Processo */}
+      <Dialog open={showNovoProcesso} onOpenChange={setShowNovoProcesso}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Processo — {cliente.nome}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-1.5">
+              <Label>Razão Social *</Label>
+              <Input value={processoForm.razao_social} onChange={e => setProcessoForm(f => ({ ...f, razao_social: e.target.value }))} placeholder="Nome da empresa" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label>Tipo</Label>
+                <Select value={processoForm.tipo} onValueChange={v => setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TIPO_PROCESSO_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Prioridade</Label>
+                <Select value={processoForm.prioridade} onValueChange={v => setProcessoForm(f => ({ ...f, prioridade: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="urgente">Urgente (+50%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Responsável</Label>
+              <Input value={processoForm.responsavel} onChange={e => setProcessoForm(f => ({ ...f, responsavel: e.target.value }))} placeholder="Opcional" />
+            </div>
+            {isManualPrice && (
+              <div className="grid gap-1.5">
+                <Label>Valor Manual (R$)</Label>
+                <Input type="number" step="0.01" value={processoForm.valor_manual} onChange={e => setProcessoForm(f => ({ ...f, valor_manual: e.target.value }))} placeholder="0,00" />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNovoProcesso(false)}>Cancelar</Button>
+            <Button onClick={handleCreateProcesso} disabled={createProcesso.isPending}>
+              {createProcesso.isPending ? 'Criando...' : 'Criar Processo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
