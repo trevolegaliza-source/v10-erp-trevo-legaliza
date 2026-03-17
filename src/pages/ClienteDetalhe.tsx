@@ -233,11 +233,11 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Dia de Vencimento</Label>
+                      <Label className="text-xs text-muted-foreground">Vencimento</Label>
                       {editing ? (
-                        <Input type="number" min={1} max={28} value={editForm.dia_vencimento_mensal || 15} onChange={e => setEditForm(f => ({ ...f, dia_vencimento_mensal: Number(e.target.value) }))} />
+                        <Input type="number" min={1} max={31} value={(editForm as any).vencimento ?? (editForm as any).dia_vencimento_mensal ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : null; setEditForm(f => ({ ...f, vencimento: v, dia_vencimento_mensal: v ?? undefined })); }} />
                       ) : (
-                        <p className="font-medium">Dia {cliente.dia_vencimento_mensal || 15}</p>
+                        <p className="font-medium">Dia {(cliente as any).vencimento ?? cliente.dia_vencimento_mensal ?? 0}</p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
