@@ -20,6 +20,7 @@ export default function Clientes() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [editClient, setEditClient] = useState<ClienteDB | null>(null);
   const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
   const [showDeletePassword, setShowDeletePassword] = useState(false);
@@ -29,6 +30,8 @@ export default function Clientes() {
   const { data: processos } = useProcessos();
   const updateCliente = useUpdateCliente();
   const deleteCliente = useDeleteCliente();
+  const archiveCliente = useArchiveCliente();
+  const unarchiveCliente = useUnarchiveCliente();
 
   // Count processes per client
   const processCount = (clienteId: string) =>
