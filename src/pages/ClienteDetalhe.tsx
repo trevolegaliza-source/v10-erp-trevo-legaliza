@@ -37,7 +37,11 @@ export default function ClienteDetalhe() {
   const loadAll = async (clienteId: string) => {
     setLoading(true);
     const [cRes, pRes, lRes] = await Promise.all([
-      supabase.from('clientes').select('*').eq('id', clienteId).single(),
+      supabase
+        .from('clientes')
+        .select('id,codigo_identificador,nome,tipo,email,telefone,nome_contador,apelido,dia_vencimento_mensal,momento_faturamento,valor_base,desconto_progressivo,dia_cobranca,valor_limite_desconto,mensalidade,vencimento,qtd_processos,created_at,updated_at')
+        .eq('id', clienteId)
+        .single(),
       supabase.from('processos').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }),
       supabase.from('lancamentos').select('*').eq('cliente_id', clienteId).order('data_vencimento', { ascending: false }),
     ]);
@@ -56,7 +60,7 @@ export default function ClienteDetalhe() {
   const handleSaveParams = () => {
     if (!cliente) return;
     const payload: Record<string, any> = { id: cliente.id };
-    const fields = ['dia_vencimento_mensal', 'valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'momento_faturamento'] as const;
+    const fields = ['valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'momento_faturamento', 'dia_vencimento_mensal'] as const;
     for (const f of fields) {
       if ((editForm as any)[f] !== undefined) payload[f] = (editForm as any)[f];
     }
@@ -121,8 +125,11 @@ export default function ClienteDetalhe() {
   const totalFaturado = lancamentos.filter(l => l.tipo === 'receber').reduce((s, l) => s + Number(l.valor), 0);
   const totalPago = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
   const totalPendente = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
+  const formatCurrencyOrZero = (value: number | null | undefined) =>
+    Number(value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatValueOrZero = (value: number | null | undefined) =>
+    value == null ? '0,00' : String(value);
 
-  // Processes awaiting deferimento for billing
   const DEFERIMENTO_STAGES = ['registro', 'finalizados'];
   const billedProcessIds = new Set(lancamentos.filter(l => l.tipo === 'receber' && l.processo_id).map(l => l.processo_id));
   const aguardandoDeferimento = isDeferimento
@@ -220,25 +227,25 @@ export default function ClienteDetalhe() {
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Valor da Mensalidade</Label>
                       {editing ? (
-                        <Input type="number" step="0.01" value={(editForm as any).mensalidade ?? ''} onChange={e => setEditForm(f => ({ ...f, mensalidade: e.target.value ? Number(e.target.value) : null }))} placeholder="R$ 0,00" />
+                        <Input type="number" step="0.01" value={(editForm as any).mensalidade ?? ''} onChange={e => setEditForm(f => ({ ...f, mensalidade: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{(cliente as any).mensalidade ? Number((cliente as any).mensalidade).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</p>
+                        <p className="font-medium">{formatCurrencyOrZero((cliente as any).mensalidade)}</p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Dia de Vencimento</Label>
+                      <Label className="text-xs text-muted-foreground">Vencimento</Label>
                       {editing ? (
-                        <Input type="number" min={1} max={28} value={editForm.dia_vencimento_mensal || 15} onChange={e => setEditForm(f => ({ ...f, dia_vencimento_mensal: Number(e.target.value) }))} />
+                        <Input type="number" min={1} max={31} value={(editForm as any).vencimento ?? (editForm as any).dia_vencimento_mensal ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : null; setEditForm(f => ({ ...f, vencimento: v, dia_vencimento_mensal: v ?? undefined })); }} />
                       ) : (
-                        <p className="font-medium">Dia {cliente.dia_vencimento_mensal || 15}</p>
+                        <p className="font-medium">Dia {(cliente as any).vencimento ?? cliente.dia_vencimento_mensal ?? 0}</p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Qtd Processos Inclusos</Label>
                       {editing ? (
-                        <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
+                        <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{(cliente as any).qtd_processos ?? '—'}</p>
+                        <p className="font-medium">{formatValueOrZero((cliente as any).qtd_processos)}</p>
                       )}
                     </div>
                   </>
@@ -247,33 +254,33 @@ export default function ClienteDetalhe() {
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Valor Base</Label>
                       {editing ? (
-                        <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="R$ 0,00" />
+                        <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{(cliente as any).valor_base ? Number((cliente as any).valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</p>
+                        <p className="font-medium">{formatCurrencyOrZero((cliente as any).valor_base)}</p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Desconto Progressivo (%)</Label>
                       {editing ? (
-                        <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} placeholder="0%" />
+                        <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{(cliente as any).desconto_progressivo != null ? `${(cliente as any).desconto_progressivo}%` : '—'}</p>
+                        <p className="font-medium">{formatValueOrZero((cliente as any).desconto_progressivo)}%</p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Valor Limite de Desconto</Label>
                       {editing ? (
-                        <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} placeholder="R$ 0,00" />
+                        <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{(cliente as any).valor_limite_desconto ? Number((cliente as any).valor_limite_desconto).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</p>
+                        <p className="font-medium">{formatCurrencyOrZero((cliente as any).valor_limite_desconto)}</p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Dia de Cobrança (D+X)</Label>
                       {editing ? (
-                        <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="4" />
+                        <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{(cliente as any).dia_cobranca != null ? `D+${(cliente as any).dia_cobranca}` : '—'}</p>
+                        <p className="font-medium">D+{(cliente as any).dia_cobranca ?? 0}</p>
                       )}
                     </div>
                   </>
