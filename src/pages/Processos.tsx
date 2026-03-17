@@ -216,7 +216,7 @@ export default function Processos() {
                         </div>
                         <div className="space-y-2 p-2 min-h-[120px]">
                           {stageProcesses.map((proc, idx) => (
-                            <ProcessCard key={proc.id} process={proc} index={idx} />
+                            <ProcessCard key={proc.id} process={proc} index={idx} onDelete={handleDelete} />
                           ))}
                           {provided.placeholder}
                           {stageProcesses.length === 0 && (
