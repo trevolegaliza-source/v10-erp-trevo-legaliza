@@ -217,8 +217,9 @@ export default function Clientes() {
                   <TableHead>Contador</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Contato</TableHead>
-                  <TableHead className="text-center">Processos</TableHead>
+                   <TableHead className="text-center">Processos</TableHead>
                   <TableHead className="text-center">Ativos</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
