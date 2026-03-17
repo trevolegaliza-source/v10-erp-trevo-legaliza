@@ -48,6 +48,9 @@ export default function Clientes() {
   };
 
   const filtered = (clientes || []).filter(c => {
+    const archived = !!(c as any).is_archived;
+    if (showArchived) return archived;
+    if (archived) return false; // hide archived by default
     if (showInactive) return isInactive(c.id);
     return true;
   });
