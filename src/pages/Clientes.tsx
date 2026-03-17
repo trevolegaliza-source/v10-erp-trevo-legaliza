@@ -118,6 +118,24 @@ export default function Clientes() {
     setShowDeletePassword(true);
   };
 
+  const handleArchive = (clientId: string) => {
+    setPendingDeleteAction(() => () => {
+      archiveCliente.mutate(clientId, {
+        onSuccess: () => setEditClient(null),
+      });
+    });
+    setShowDeletePassword(true);
+  };
+
+  const handleUnarchive = (clientId: string) => {
+    setPendingDeleteAction(() => () => {
+      unarchiveCliente.mutate(clientId, {
+        onSuccess: () => setEditClient(null),
+      });
+    });
+    setShowDeletePassword(true);
+  };
+
   const totalClientes = (clientes || []).length;
   const mensalistas = (clientes || []).filter(c => c.tipo === 'MENSALISTA').length;
   const avulsos = (clientes || []).filter(c => c.tipo === 'AVULSO_4D').length;
