@@ -12,10 +12,12 @@ import {
   PlusCircle,
   ArrowDownCircle,
   ArrowUpCircle,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
