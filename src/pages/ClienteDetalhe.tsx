@@ -23,6 +23,7 @@ import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [cliente, setCliente] = useState<ClienteDB | null>(null);
   const [processos, setProcessos] = useState<ProcessoDB[]>([]);
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
@@ -35,6 +36,18 @@ export default function ClienteDetalhe() {
   const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
   const updateCliente = useUpdateCliente();
   const createProcesso = useCreateProcesso();
+  const deleteCliente = useDeleteCliente();
+  const archiveCliente = useArchiveCliente();
+  const unarchiveCliente = useUnarchiveCliente();
+
+  // Action dialogs
+  const [showArchivePassword, setShowArchivePassword] = useState(false);
+  const [showDeleteClientePassword, setShowDeleteClientePassword] = useState(false);
+  const [showRelatorioDialog, setShowRelatorioDialog] = useState(false);
+  const [showCobrancaDialog, setShowCobrancaDialog] = useState(false);
+  const [selectedRelatorioProcessos, setSelectedRelatorioProcessos] = useState<Set<string>>(new Set());
+  const [selectedCobrancaProcessos, setSelectedCobrancaProcessos] = useState<Set<string>>(new Set());
+
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
     razao_social: '',
@@ -44,6 +57,7 @@ export default function ClienteDetalhe() {
     valor_manual: '',
   });
   const isManualPrice = processoForm.tipo === 'avulso' || processoForm.tipo === 'orcamento';
+  const isArchived = !!(cliente as any)?.is_archived;
 
   const handleCreateProcesso = () => {
     if (!cliente || !processoForm.razao_social.trim()) {
