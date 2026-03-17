@@ -100,9 +100,14 @@ function ProcessCard({ process, index, onDelete }: { process: ProcessoDB; index:
 export default function Processos() {
   const { data: processos, isLoading } = useProcessosDB();
   const updateEtapa = useUpdateProcessoEtapa();
+  const deleteProcesso = useDeleteProcesso();
   const [filterType, setFilterType] = useState<string>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [contextMenuProc, setContextMenuProc] = useState<ProcessoDB | null>(null);
+
+  const handleDelete = useCallback((id: string) => {
+    deleteProcesso.mutate(id);
+  }, [deleteProcesso]);
 
   const filtered = filterType === 'all'
     ? (processos || [])
