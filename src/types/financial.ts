@@ -22,6 +22,32 @@ export interface ProcessoDB {
   cliente?: ClienteDB;
 }
 
+export type EtapaFinanceiro = 'solicitacao_criada' | 'gerar_cobranca' | 'cobranca_gerada' | 'honorario_pago' | 'honorario_vencido';
+
+export const ETAPA_FINANCEIRO_LABELS: Record<EtapaFinanceiro, string> = {
+  solicitacao_criada: 'Solicitação Criada',
+  gerar_cobranca: 'Gerar Cobrança',
+  cobranca_gerada: 'Cobrança Gerada',
+  honorario_pago: 'Honorário Pago',
+  honorario_vencido: 'Honorário Vencido',
+};
+
+export const ETAPA_FINANCEIRO_COLORS: Record<EtapaFinanceiro, string> = {
+  solicitacao_criada: 'border-muted-foreground/40',
+  gerar_cobranca: 'border-warning',
+  cobranca_gerada: 'border-info',
+  honorario_pago: 'border-success',
+  honorario_vencido: 'border-destructive',
+};
+
+export const ETAPA_FINANCEIRO_ORDER: EtapaFinanceiro[] = [
+  'solicitacao_criada',
+  'gerar_cobranca',
+  'cobranca_gerada',
+  'honorario_pago',
+  'honorario_vencido',
+];
+
 export interface Lancamento {
   id: string;
   tipo: TipoLancamento;
@@ -35,6 +61,12 @@ export interface Lancamento {
   is_taxa_reembolsavel: boolean;
   comprovante_url: string | null;
   categoria: string | null;
+  etapa_financeiro: EtapaFinanceiro;
+  honorario_extra: number;
+  cobranca_encaminhada: boolean;
+  confirmado_recebimento: boolean;
+  observacoes_financeiro: string | null;
+  boleto_url: string | null;
   created_at: string;
   updated_at: string;
   cliente?: ClienteDB;
