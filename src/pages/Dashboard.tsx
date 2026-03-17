@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   ArrowUpRight, FileText, Users, DollarSign, AlertTriangle, TrendingUp, Clock, Filter,
-  MoreHorizontal, Eye, Receipt, CheckCircle, Tag, EyeOff,
+  MoreHorizontal, Eye, Receipt, CheckCircle, Tag, EyeOff, BarChart3,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,17 +10,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { PROCESS_TYPE_LABELS } from '@/types/process';
+import { KANBAN_STAGES, PROCESS_TYPE_LABELS } from '@/types/process';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDashboardStats } from '@/hooks/useProcessos';
-import { useClientes, useUpdateLancamento } from '@/hooks/useFinanceiro';
+import { useClientes } from '@/hooks/useFinanceiro';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { Progress } from '@/components/ui/progress';
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useDashboardStats();
   const { data: clientes } = useClientes();
-  const updateLancamento = useUpdateLancamento();
   const navigate = useNavigate();
   const [filterClienteId, setFilterClienteId] = useState<string>('all');
 
@@ -31,6 +31,19 @@ export default function Dashboard() {
   const filteredUrgentes = filterClienteId === 'all'
     ? (stats?.urgentes || [])
     : (stats?.urgentes || []).filter(p => p.cliente_id === filterClienteId);
+
+  const filteredSla = filterClienteId === 'all'
+    ? (stats?.slaProximos || [])
+    : (stats?.slaProximos || []).filter(p => p.cliente_id === filterClienteId);
+
+  const filteredPipeline = filterClienteId === 'all'
+    ? (stats?.pipelineCounts || {})
+    : (() => {
+        // When filtered, we can't easily recompute — show unfiltered with note
+        return stats?.pipelineCounts || {};
+      })();
+
+  const totalPipelineProcs = Object.values(filteredPipeline).reduce((s, n) => s + n, 0);
 
   const kpis = [
     {
@@ -43,13 +56,17 @@ export default function Dashboard() {
     { label: 'Clientes Ativos', value: stats?.totalClientes ?? 0, icon: Users },
     {
       label: 'Faturamento Mensal',
-      value: (stats?.faturamentoMes ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      value: null, // custom render
       icon: DollarSign,
       clickable: true,
       href: '/faturamento',
+      customRender: true,
     },
     { label: 'SLA em Risco', value: filteredUrgentes.length, icon: AlertTriangle },
   ];
+
+  const formatCurrency = (v: number) =>
+    v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const handleQuickAction = (action: string, procId: string) => {
     switch (action) {
@@ -71,6 +88,15 @@ export default function Dashboard() {
       default:
         break;
     }
+  };
+
+  // Pipeline stages to show (grouped for readability)
+  const pipelineStages = KANBAN_STAGES.filter(s => s.key !== 'finalizados' && s.key !== 'arquivo');
+  const maxPipelineCount = Math.max(1, ...pipelineStages.map(s => filteredPipeline[s.key] || 0));
+
+  const daysAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    return Math.floor(diff / 86400000);
   };
 
   return (
@@ -96,7 +122,7 @@ export default function Dashboard() {
         </Select>
       </div>
 
-      {/* Stats Cards - clickable */}
+      {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((stat) => (
           <Card
@@ -114,6 +140,20 @@ export default function Dashboard() {
               <div className="mt-3">
                 {isLoading ? (
                   <Skeleton className="h-7 w-20" />
+                ) : stat.customRender ? (
+                  <div>
+                    <p className="text-2xl font-bold">{formatCurrency(stats?.faturamentoRealizado ?? 0)}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">
+                        Realizado
+                      </span>
+                      {(stats?.faturamentoPotencial ?? 0) > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/10 text-warning font-medium">
+                          +{formatCurrency(stats?.faturamentoPotencial ?? 0)} potencial
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <p className="text-2xl font-bold">{stat.value}</p>
                 )}
@@ -124,8 +164,47 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Pipeline Funnel */}
+      <Card className="border-border/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            Pipeline de Processos
+            {totalPipelineProcs > 0 && (
+              <Badge variant="secondary" className="text-[10px] ml-auto">{totalPipelineProcs} ativos</Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+              {pipelineStages.map((stage) => {
+                const count = filteredPipeline[stage.key] || 0;
+                const pct = (count / maxPipelineCount) * 100;
+                return (
+                  <div key={stage.key} className="text-center space-y-1.5">
+                    <div className="h-16 flex items-end justify-center">
+                      <div
+                        className="w-8 rounded-t bg-primary/80 transition-all duration-300"
+                        style={{ height: `${Math.max(pct, 6)}%` }}
+                      />
+                    </div>
+                    <p className="text-lg font-bold leading-none">{count}</p>
+                    <p className="text-[9px] text-muted-foreground leading-tight truncate" title={stage.label}>
+                      {stage.label}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recent Processes with Quick Actions */}
+        {/* Recent Processes */}
         <Card className="lg:col-span-2 border-border/60">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -159,7 +238,7 @@ export default function Dashboard() {
                       </Badge>
                       {proc.prioridade === 'urgente' && (
                         <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">
-                          Urgente (+50%)
+                          Urgente
                         </Badge>
                       )}
                       <DropdownMenu>
@@ -196,62 +275,115 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Alerts + Top Clients */}
-        <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Clock className="h-4 w-4 text-warning" />
-              Alertas SLA
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {isLoading ? (
-                Array.from({ length: 2 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
-                ))
-              ) : filteredUrgentes.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
-              ) : (
-                filteredUrgentes.map((proc) => (
-                  <div key={proc.id} className="rounded-lg border border-warning/20 bg-warning/5 p-3">
-                    <p className="text-sm font-medium">{proc.razao_social}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {proc.cliente?.nome || '-'} · {PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo}
-                    </p>
-                    {proc.responsavel && (
-                      <p className="text-[11px] text-warning mt-1.5 font-medium">
-                        Responsável: {proc.responsavel}
-                      </p>
-                    )}
-                  </div>
-                ))
-              )}
-
-              {/* Top clients */}
-              <div className="mt-4 pt-4 border-t">
-                <p className="text-xs font-semibold text-muted-foreground mb-2.5 uppercase tracking-wider">
-                  Ranking de Clientes
-                </p>
+        {/* Right column: SLA + Ranking */}
+        <div className="space-y-6">
+          {/* SLA Alerts with proximity list */}
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Clock className="h-4 w-4 text-warning" />
+                Alertas SLA
+                {filteredUrgentes.length > 0 && (
+                  <Badge className="text-[10px] bg-destructive/10 text-destructive border-0 ml-auto">
+                    {filteredUrgentes.length}
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
                 {isLoading ? (
-                  <Skeleton className="h-16 w-full" />
-                ) : (stats?.topClientes || []).length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Sem dados</p>
-                ) : (
-                  (stats?.topClientes || []).map((client, i) => (
-                    <div key={client.id} className="flex items-center justify-between py-1.5">
-                      <span className="text-sm">
-                        <span className="text-muted-foreground mr-1.5">{i + 1}.</span>
-                        {client.nome}
-                      </span>
-                      <span className="text-xs font-medium text-primary">{client.total} proc.</span>
-                    </div>
+                  Array.from({ length: 2 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full rounded-lg" />
                   ))
+                ) : filteredUrgentes.length === 0 && filteredSla.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">Nenhum alerta</p>
+                ) : (
+                  <>
+                    {filteredUrgentes.slice(0, 3).map((proc) => (
+                      <div key={proc.id} className="rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+                        <p className="text-sm font-medium">{proc.razao_social}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {proc.cliente?.nome || '-'} · {PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo}
+                        </p>
+                        {proc.responsavel && (
+                          <p className="text-[11px] text-destructive mt-1 font-medium">
+                            Responsável: {proc.responsavel}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {/* SLA Proximity */}
+                {!isLoading && filteredSla.length > 0 && (
+                  <div className="mt-3 pt-3 border-t">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+                      Mais Antigos (Próximos do Limite)
+                    </p>
+                    {filteredSla.map((proc) => (
+                      <div
+                        key={proc.id}
+                        className="flex items-center justify-between py-2 cursor-pointer hover:bg-muted/50 rounded px-2 -mx-2"
+                        onClick={() => navigate('/processos')}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{proc.razao_social}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] shrink-0 border-warning/40 text-warning">
+                          {daysAgo(proc.created_at)}d
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Ranking by financial volume */}
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                Ranking de Clientes
+                <span className="text-[10px] text-muted-foreground font-normal ml-auto">vol. financeiro/mês</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : (stats?.topClientes || []).length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">Sem dados financeiros este mês</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {(stats?.topClientes || []).map((client, i) => {
+                    const maxVal = stats?.topClientes?.[0]?.total || 1;
+                    const pct = (client.total / maxVal) * 100;
+                    return (
+                      <div key={client.id} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">
+                            <span className="text-muted-foreground mr-1.5 font-mono text-xs">{i + 1}.</span>
+                            {client.nome}
+                          </span>
+                          <span className="text-xs font-semibold text-primary">
+                            {formatCurrency(client.total)}
+                          </span>
+                        </div>
+                        <Progress value={pct} className="h-1.5" />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

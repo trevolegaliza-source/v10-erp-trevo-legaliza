@@ -102,6 +102,7 @@ export function useDashboardStats() {
     queryFn: async () => {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const startOfMonthDate = startOfMonth.split('T')[0];
 
       const { count: processosAtivos } = await supabase
         .from('processos')
@@ -112,13 +113,47 @@ export function useDashboardStats() {
         .from('clientes')
         .select('*', { count: 'exact', head: true });
 
-      const { data: faturamento } = await supabase
+      // Faturamento realizado (paid this month)
+      const { data: fatRealizadoData } = await supabase
+        .from('lancamentos')
+        .select('valor')
+        .eq('tipo', 'receber')
+        .eq('status', 'pago')
+        .gte('data_vencimento', startOfMonthDate);
+      const faturamentoRealizado = (fatRealizadoData || []).reduce((s, r) => s + Number(r.valor), 0);
+
+      // Faturamento total do mês (all receivables)
+      const { data: fatTotalData } = await supabase
         .from('lancamentos')
         .select('valor')
         .eq('tipo', 'receber')
         .gte('created_at', startOfMonth);
+      const faturamentoMes = (fatTotalData || []).reduce((s, r) => s + Number(r.valor), 0);
 
-      const faturamentoMes = (faturamento || []).reduce((s, r) => s + Number(r.valor), 0);
+      // Faturamento potencial: processos ativos de clientes "no_deferimento" sem lançamento
+      const { data: allActiveProcs } = await supabase
+        .from('processos')
+        .select('id, cliente_id, valor, cliente:clientes(*)')
+        .not('etapa', 'in', '("finalizados","arquivo")');
+
+      let faturamentoPotencial = 0;
+      const activeProcsWithBilling: string[] = [];
+      if (allActiveProcs && allActiveProcs.length > 0) {
+        const procIds = allActiveProcs.map(p => p.id);
+        const { data: existingLanc } = await supabase
+          .from('lancamentos')
+          .select('processo_id')
+          .eq('tipo', 'receber')
+          .in('processo_id', procIds);
+        const billedIds = new Set((existingLanc || []).map(l => l.processo_id));
+
+        for (const proc of allActiveProcs) {
+          const momento = (proc.cliente as any)?.momento_faturamento;
+          if (momento === 'no_deferimento' && !billedIds.has(proc.id)) {
+            faturamentoPotencial += Number(proc.valor) || 0;
+          }
+        }
+      }
 
       const { data: urgentes } = await supabase
         .from('processos')
@@ -132,28 +167,55 @@ export function useDashboardStats() {
         .order('created_at', { ascending: false })
         .limit(6);
 
+      // Pipeline counts by stage
       const { data: allProcessos } = await supabase
         .from('processos')
-        .select('cliente_id, cliente:clientes(nome)');
+        .select('id, etapa, cliente_id, valor, cliente:clientes(nome, apelido)')
+        .not('etapa', 'in', '("finalizados","arquivo")');
 
-      const clientCounts: Record<string, { nome: string; count: number }> = {};
+      const pipelineCounts: Record<string, number> = {};
       (allProcessos || []).forEach((p: any) => {
-        const nome = p.cliente?.nome || 'Desconhecido';
-        if (!clientCounts[p.cliente_id]) clientCounts[p.cliente_id] = { nome, count: 0 };
-        clientCounts[p.cliente_id].count++;
+        pipelineCounts[p.etapa] = (pipelineCounts[p.etapa] || 0) + 1;
       });
-      const topClientes = Object.entries(clientCounts)
-        .map(([id, v]) => ({ id, nome: v.nome, total: v.count }))
+
+      // Top clientes by financial volume this month
+      const { data: lancMes } = await supabase
+        .from('lancamentos')
+        .select('cliente_id, valor, cliente:clientes(nome, apelido)')
+        .eq('tipo', 'receber')
+        .gte('created_at', startOfMonth);
+
+      const clientFinancials: Record<string, { nome: string; apelido: string | null; total: number }> = {};
+      (lancMes || []).forEach((l: any) => {
+        const nome = l.cliente?.nome || 'Desconhecido';
+        const apelido = l.cliente?.apelido || null;
+        if (!clientFinancials[l.cliente_id]) clientFinancials[l.cliente_id] = { nome, apelido, total: 0 };
+        clientFinancials[l.cliente_id].total += Number(l.valor);
+      });
+      const topClientes = Object.entries(clientFinancials)
+        .map(([id, v]) => ({ id, nome: v.apelido || v.nome, total: v.total }))
         .sort((a, b) => b.total - a.total)
-        .slice(0, 3);
+        .slice(0, 5);
+
+      // SLA proximity: processes closest to deadline (by created_at age, oldest active first)
+      const { data: slaProcs } = await supabase
+        .from('processos')
+        .select('*, cliente:clientes(*)')
+        .not('etapa', 'in', '("finalizados","arquivo")')
+        .order('created_at', { ascending: true })
+        .limit(3);
 
       return {
         processosAtivos: processosAtivos || 0,
         totalClientes: totalClientes || 0,
         faturamentoMes,
+        faturamentoRealizado,
+        faturamentoPotencial,
         urgentes: (urgentes || []) as ProcessoDB[],
         recentes: (recentes || []) as ProcessoDB[],
         topClientes,
+        pipelineCounts,
+        slaProximos: (slaProcs || []) as ProcessoDB[],
       };
     },
   });
