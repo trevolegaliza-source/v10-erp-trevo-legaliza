@@ -11,13 +11,18 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      toast.error(error.message);
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) toast.error(error.message);
+      else toast.success('Conta criada! Você já está logado.');
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) toast.error(error.message);
     }
     setLoading(false);
   };
@@ -30,10 +35,10 @@ export default function Login() {
             <span className="text-xl font-bold text-primary">T</span>
           </div>
           <CardTitle className="text-xl">Trevo Legaliza</CardTitle>
-          <p className="text-sm text-muted-foreground">Acesse o sistema ERP</p>
+          <p className="text-sm text-muted-foreground">{isSignUp ? 'Crie sua conta' : 'Acesse o sistema ERP'}</p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
               <Input
@@ -58,7 +63,10 @@ export default function Login() {
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <LogIn className="h-4 w-4 mr-2" />}
-              Entrar
+              {isSignUp ? 'Criar Conta' : 'Entrar'}
+            </Button>
+            <Button type="button" variant="link" className="w-full text-xs" onClick={() => setIsSignUp(!isSignUp)}>
+              {isSignUp ? 'Já tem conta? Faça login' : 'Primeiro acesso? Crie sua conta'}
             </Button>
           </form>
         </CardContent>
