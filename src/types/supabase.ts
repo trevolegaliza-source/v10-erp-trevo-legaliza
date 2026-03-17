@@ -1,4 +1,5 @@
 export type ClienteTipoDB = 'MENSALISTA' | 'AVULSO_4D';
+export type MomentoFaturamento = 'na_solicitacao' | 'no_deferimento';
 
 export interface Cliente {
   id: string;
@@ -10,6 +11,7 @@ export interface Cliente {
   nome_contador: string;
   apelido: string;
   dia_vencimento_mensal: number;
+  momento_faturamento: MomentoFaturamento;
   created_at: string;
   updated_at: string;
 }

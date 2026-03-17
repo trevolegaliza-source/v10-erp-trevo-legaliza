@@ -89,6 +89,7 @@ export default function CadastroRapido() {
         nome_contador: clienteForm.nome_contador || '',
         apelido: clienteForm.apelido || '',
         dia_vencimento_mensal: isMensalista ? clienteForm.dia_vencimento_mensal : 0,
+        momento_faturamento: clienteForm.momento_faturamento,
       },
       {
         onSuccess: (data: any) => {
