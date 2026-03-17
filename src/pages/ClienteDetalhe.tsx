@@ -672,7 +672,7 @@ export default function ClienteDetalhe() {
                   `Código: ${cliente.codigo_identificador}`,
                   '',
                   'PROCESSOS:',
-                  ...selected.map((p, i) => `${i + 1}. ${p.razao_social} | ${TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo} | ${Number(p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} | Etapa: ${KANBAN_STAGES.find(s => s.id === p.etapa)?.label || p.etapa}`),
+                  ...selected.map((p, i) => `${i + 1}. ${p.razao_social} | ${TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo} | ${Number(p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} | Etapa: ${KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa}`),
                   '',
                   `TOTAL: ${selected.reduce((s, p) => s + Number(p.valor || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
                 ];
