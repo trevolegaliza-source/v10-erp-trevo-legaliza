@@ -262,9 +262,9 @@ export default function ClienteDetalhe() {
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Desconto Progressivo (%)</Label>
                       {editing ? (
-                        <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} placeholder="0%" />
+                        <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{(cliente as any).desconto_progressivo != null ? `${(cliente as any).desconto_progressivo}%` : '—'}</p>
+                        <p className="font-medium">{formatValueOrZero((cliente as any).desconto_progressivo)}%</p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
