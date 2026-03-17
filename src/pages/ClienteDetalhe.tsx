@@ -125,8 +125,11 @@ export default function ClienteDetalhe() {
   const totalFaturado = lancamentos.filter(l => l.tipo === 'receber').reduce((s, l) => s + Number(l.valor), 0);
   const totalPago = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
   const totalPendente = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
+  const formatCurrencyOrZero = (value: number | null | undefined) =>
+    Number(value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatValueOrZero = (value: number | null | undefined) =>
+    value == null ? '0,00' : String(value);
 
-  // Processes awaiting deferimento for billing
   const DEFERIMENTO_STAGES = ['registro', 'finalizados'];
   const billedProcessIds = new Set(lancamentos.filter(l => l.tipo === 'receber' && l.processo_id).map(l => l.processo_id));
   const aguardandoDeferimento = isDeferimento
