@@ -271,6 +271,34 @@ export default function Clientes() {
                 <Input type="number" min={1} max={28} value={editForm.dia_vencimento_mensal || 15} onChange={e => setEditForm(f => ({ ...f, dia_vencimento_mensal: Number(e.target.value) }))} />
               </div>
             )}
+            {/* Contratos */}
+            <div className="grid gap-2 border-t border-border/40 pt-3">
+              <Label className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Contratos Anexados</Label>
+              {contracts.length > 0 ? (
+                <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  {contracts.map((c) => (
+                    <div key={c.name} className="flex items-center gap-2 text-sm bg-muted/30 rounded-md px-3 py-1.5">
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate">{c.name}</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDownloadContract(c.name)}>
+                        <Download className="h-3 w-3" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => handleDeleteContract(c.name)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Nenhum contrato anexado</p>
+              )}
+              <label className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-3 text-sm text-muted-foreground cursor-pointer hover:bg-muted/40 transition-colors">
+                <Upload className="h-4 w-4" />
+                {uploadingContract ? 'Enviando...' : 'Anexar Contrato (PDF, DOC — máx. 10MB)'}
+                <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleUploadContract} disabled={uploadingContract} />
+              </label>
+            </div>
+
             <div className="flex items-center justify-between pt-2">
               <Button variant="destructive" size="sm" onClick={handleDelete}>Excluir</Button>
               <div className="flex gap-2">
