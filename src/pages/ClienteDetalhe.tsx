@@ -136,6 +136,11 @@ export default function ClienteDetalhe() {
             <Badge className={cn('text-xs', isMensalista ? 'bg-primary/10 text-primary border-primary/30' : 'bg-warning/10 text-warning border-warning/30')} variant="outline">
               {isMensalista ? 'Mensalista' : 'Avulso'}
             </Badge>
+            {isDeferimento && (
+              <Badge variant="outline" className="text-xs border-warning/30 text-warning">
+                Fatura no Deferimento
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1"><Building2 className="h-3.5 w-3.5" />{cliente.nome}</span>
