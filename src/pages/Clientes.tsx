@@ -357,7 +357,14 @@ export default function Clientes() {
             </div>
 
             <div className="flex items-center justify-between pt-2">
-              <Button variant="destructive" size="sm" onClick={handleDelete}>Excluir</Button>
+              <div className="flex gap-2">
+                <Button variant="destructive" size="sm" onClick={handleDelete}><Trash2 className="h-3.5 w-3.5 mr-1" />Excluir</Button>
+                {!(editClient as any)?.is_archived ? (
+                  <Button variant="outline" size="sm" onClick={() => editClient && handleArchive(editClient.id)}><Archive className="h-3.5 w-3.5 mr-1" />Arquivar</Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => editClient && handleUnarchive(editClient.id)}><ArchiveRestore className="h-3.5 w-3.5 mr-1" />Desarquivar</Button>
+                )}
+              </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => setEditClient(null)}>Cancelar</Button>
                 <Button size="sm" onClick={handleSave} disabled={updateCliente.isPending}>Salvar</Button>

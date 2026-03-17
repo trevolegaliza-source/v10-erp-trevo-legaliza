@@ -116,12 +116,50 @@ export function useDeleteCliente() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      // processos are deleted via ON DELETE CASCADE
       const { error } = await supabase.from('clientes').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clientes'] });
-      toast.success('Cliente excluído!');
+      qc.invalidateQueries({ queryKey: ['processos_db'] });
+      toast.success('Cliente e processos excluídos!');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useArchiveCliente() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error: cErr } = await supabase.from('clientes').update({ is_archived: true, updated_at: new Date().toISOString() } as any).eq('id', id);
+      if (cErr) throw cErr;
+      const { error: pErr } = await supabase.from('processos').update({ is_archived: true, updated_at: new Date().toISOString() } as any).eq('cliente_id', id);
+      if (pErr) throw pErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+      qc.invalidateQueries({ queryKey: ['processos_db'] });
+      toast.success('Cliente arquivado!');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useUnarchiveCliente() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error: cErr } = await supabase.from('clientes').update({ is_archived: false, updated_at: new Date().toISOString() } as any).eq('id', id);
+      if (cErr) throw cErr;
+      const { error: pErr } = await supabase.from('processos').update({ is_archived: false, updated_at: new Date().toISOString() } as any).eq('cliente_id', id);
+      if (pErr) throw pErr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+      qc.invalidateQueries({ queryKey: ['processos_db'] });
+      toast.success('Cliente desarquivado!');
     },
     onError: (e: Error) => toast.error(e.message),
   });
