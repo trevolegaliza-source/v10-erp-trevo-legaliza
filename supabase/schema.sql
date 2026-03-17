@@ -219,3 +219,26 @@ BEGIN
     ALTER TABLE public.clientes ADD COLUMN cnpj TEXT;
   END IF;
 END $$;
+
+-- MIGRATION: Add financial kanban columns to lancamentos
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lancamentos' AND column_name = 'etapa_financeiro') THEN
+    ALTER TABLE public.lancamentos ADD COLUMN etapa_financeiro TEXT NOT NULL DEFAULT 'solicitacao_criada';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lancamentos' AND column_name = 'honorario_extra') THEN
+    ALTER TABLE public.lancamentos ADD COLUMN honorario_extra NUMERIC(12,2) DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lancamentos' AND column_name = 'cobranca_encaminhada') THEN
+    ALTER TABLE public.lancamentos ADD COLUMN cobranca_encaminhada BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lancamentos' AND column_name = 'confirmado_recebimento') THEN
+    ALTER TABLE public.lancamentos ADD COLUMN confirmado_recebimento BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lancamentos' AND column_name = 'observacoes_financeiro') THEN
+    ALTER TABLE public.lancamentos ADD COLUMN observacoes_financeiro TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lancamentos' AND column_name = 'boleto_url') THEN
+    ALTER TABLE public.lancamentos ADD COLUMN boleto_url TEXT;
+  END IF;
+END $$;

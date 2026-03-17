@@ -312,7 +312,7 @@ export function useLancamentos(tipo?: 'receber' | 'pagar') {
     queryFn: async () => {
       let query = supabase
         .from('lancamentos')
-        .select('*, cliente:clientes(*)')
+        .select('*, cliente:clientes(*), processo:processos(*)')
         .order('data_vencimento', { ascending: true });
       if (tipo) query = query.eq('tipo', tipo);
       const { data, error } = await query;
