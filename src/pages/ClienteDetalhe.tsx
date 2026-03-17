@@ -356,8 +356,11 @@ export default function ClienteDetalhe() {
           )}
 
           <Card className="border-border/60">
-            <CardHeader className="pb-3">
+            <CardHeader className="flex-row items-center justify-between pb-3">
               <CardTitle className="text-base">Histórico de Processos ({totalProcessos})</CardTitle>
+              <Button size="sm" className="gap-1.5" onClick={() => setShowNovoProcesso(true)}>
+                <Plus className="h-3.5 w-3.5" /> Novo Processo
+              </Button>
             </CardHeader>
             <CardContent>
               {processos.length > 0 ? (
