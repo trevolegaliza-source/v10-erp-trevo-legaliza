@@ -60,6 +60,13 @@ export function useDeleteProcesso() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      // Delete related lancamentos first to avoid FK constraint
+      const { error: lancError } = await supabase
+        .from('lancamentos')
+        .delete()
+        .eq('processo_id', id);
+      if (lancError) throw lancError;
+
       const { error } = await supabase
         .from('processos')
         .delete()
