@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { useUpdateCliente } from '@/hooks/useFinanceiro';
+import { useUpdateCliente, useCreateProcesso } from '@/hooks/useFinanceiro';
 import { KANBAN_STAGES } from '@/types/process';
 import { STATUS_LABELS, STATUS_STYLES, TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso } from '@/types/financial';
