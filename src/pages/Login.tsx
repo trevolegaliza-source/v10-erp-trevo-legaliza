@@ -63,7 +63,10 @@ export default function Login() {
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <LogIn className="h-4 w-4 mr-2" />}
-              Entrar
+              {isSignUp ? 'Criar Conta' : 'Entrar'}
+            </Button>
+            <Button type="button" variant="link" className="w-full text-xs" onClick={() => setIsSignUp(!isSignUp)}>
+              {isSignUp ? 'Já tem conta? Faça login' : 'Primeiro acesso? Crie sua conta'}
             </Button>
           </form>
         </CardContent>
