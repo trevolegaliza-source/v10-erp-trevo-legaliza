@@ -319,6 +319,12 @@ export default function Clientes() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <PasswordConfirmDialog
+        open={showDeletePassword}
+        onOpenChange={setShowDeletePassword}
+        onConfirm={() => { pendingDeleteAction?.(); setPendingDeleteAction(null); }}
+      />
     </div>
   );
 }
