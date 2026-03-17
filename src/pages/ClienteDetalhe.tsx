@@ -28,6 +28,8 @@ export default function ClienteDetalhe() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
   const [uploadingContract, setUploadingContract] = useState(false);
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
   const updateCliente = useUpdateCliente();
 
   useEffect(() => {
