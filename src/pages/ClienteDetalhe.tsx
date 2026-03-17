@@ -455,6 +455,12 @@ export default function ClienteDetalhe() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <PasswordConfirmDialog
+        open={showDeletePassword}
+        onOpenChange={setShowDeletePassword}
+        onConfirm={() => { pendingDeleteAction?.(); setPendingDeleteAction(null); }}
+      />
     </div>
   );
 }
