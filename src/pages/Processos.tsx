@@ -114,12 +114,23 @@ export default function Processos() {
     ? (processos || [])
     : (processos || []).filter((p) => p.tipo === filterType);
 
-  const handleDragEnd = useCallback((result: DropResult) => {
+  // Stages that represent "deferimento" (success)
+  const DEFERIMENTO_STAGES: KanbanStage[] = ['registro', 'finalizados'];
+
+  const handleDragEnd = useCallback(async (result: DropResult) => {
     if (!result.destination) return;
     const newEtapa = result.destination.droppableId as KanbanStage;
     const procId = result.draggableId;
     updateEtapa.mutate({ id: procId, etapa: newEtapa });
-  }, [updateEtapa]);
+
+    // If moved to a deferimento stage, trigger billing for 'no_deferimento' clients
+    if (DEFERIMENTO_STAGES.includes(newEtapa)) {
+      const proc = (processos || []).find(p => p.id === procId);
+      if (proc) {
+        await gerarFaturamentoDeferimento(proc as any);
+      }
+    }
+  }, [updateEtapa, processos]);
 
   const handleListDblClick = (proc: ProcessoDB) => {
     setContextMenuProc(proc);
