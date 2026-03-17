@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useProcessosDB, useUpdateProcessoEtapa, useDeleteProcesso, type ProcessoDB } from '@/hooks/useProcessos';
+import { gerarFaturamentoDeferimento } from '@/hooks/useFinanceiro';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
