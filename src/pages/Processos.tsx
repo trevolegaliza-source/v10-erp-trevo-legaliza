@@ -274,7 +274,7 @@ export default function Processos() {
                     {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                   </TableCell>
                   <TableCell className="text-center">
-                    <QuickActionsMenu process={proc} />
+                    <QuickActionsMenu process={proc} onDelete={handleDelete} />
                   </TableCell>
                 </TableRow>
               ))}
