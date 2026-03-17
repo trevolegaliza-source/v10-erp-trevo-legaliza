@@ -108,11 +108,20 @@ export default function ClienteDetalhe() {
   }
 
   const isMensalista = cliente.tipo === 'MENSALISTA';
+  const momentoFat = (cliente as any).momento_faturamento || 'na_solicitacao';
+  const isDeferimento = momentoFat === 'no_deferimento';
   const totalProcessos = processos.length;
   const processosAtivos = processos.filter(p => p.etapa !== 'finalizados' && p.etapa !== 'arquivo').length;
   const totalFaturado = lancamentos.filter(l => l.tipo === 'receber').reduce((s, l) => s + Number(l.valor), 0);
   const totalPago = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
   const totalPendente = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
+
+  // Processes awaiting deferimento for billing
+  const DEFERIMENTO_STAGES = ['registro', 'finalizados'];
+  const billedProcessIds = new Set(lancamentos.filter(l => l.tipo === 'receber' && l.processo_id).map(l => l.processo_id));
+  const aguardandoDeferimento = isDeferimento
+    ? processos.filter(p => !DEFERIMENTO_STAGES.includes(p.etapa) && p.etapa !== 'arquivo' && !billedProcessIds.has(p.id))
+    : [];
 
   return (
     <div className="space-y-6">
