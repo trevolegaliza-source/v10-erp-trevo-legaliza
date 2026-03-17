@@ -254,9 +254,9 @@ export default function ClienteDetalhe() {
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Valor Base</Label>
                       {editing ? (
-                        <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="R$ 0,00" />
+                        <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{(cliente as any).valor_base ? Number((cliente as any).valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</p>
+                        <p className="font-medium">{formatCurrencyOrZero((cliente as any).valor_base)}</p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
