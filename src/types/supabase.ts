@@ -12,6 +12,13 @@ export interface Cliente {
   apelido: string;
   dia_vencimento_mensal: number;
   momento_faturamento: MomentoFaturamento;
+  valor_base: number | null;
+  desconto_progressivo: number | null;
+  dia_cobranca: number | null;
+  valor_limite_desconto: number | null;
+  mensalidade: number | null;
+  vencimento: number | null;
+  qtd_processos: number | null;
   created_at: string;
   updated_at: string;
 }

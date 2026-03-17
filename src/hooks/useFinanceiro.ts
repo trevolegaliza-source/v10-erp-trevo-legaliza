@@ -77,13 +77,12 @@ export function useUpdateCliente() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<ClienteDB> & { id: string }) => {
-      const payload: Partial<ClienteUpdate> = {
-        ...updates,
+      const payload: Record<string, any> = {
         updated_at: new Date().toISOString(),
       };
 
-      if (updates.codigo_identificador !== undefined) payload.codigo_identificador = updates.codigo_identificador.trim();
-      if (updates.nome !== undefined) payload.nome = updates.nome.trim();
+      if (updates.codigo_identificador !== undefined) payload.codigo_identificador = updates.codigo_identificador?.trim();
+      if (updates.nome !== undefined) payload.nome = updates.nome?.trim();
 
       const email = normalizeOptionalNullableText(updates.email);
       if (email !== undefined) payload.email = email;
@@ -93,6 +92,13 @@ export function useUpdateCliente() {
 
       if (updates.nome_contador !== undefined) payload.nome_contador = normalizeRequiredText(updates.nome_contador);
       if (updates.apelido !== undefined) payload.apelido = normalizeRequiredText(updates.apelido);
+
+      // Financial columns
+      const numericFields = ['valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'dia_vencimento_mensal'] as const;
+      for (const field of numericFields) {
+        if ((updates as any)[field] !== undefined) payload[field] = (updates as any)[field];
+      }
+      if (updates.momento_faturamento !== undefined) payload.momento_faturamento = updates.momento_faturamento;
 
       const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
       if (error) throw error;
