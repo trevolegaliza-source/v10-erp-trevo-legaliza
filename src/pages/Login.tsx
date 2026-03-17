@@ -35,7 +35,7 @@ export default function Login() {
             <span className="text-xl font-bold text-primary">T</span>
           </div>
           <CardTitle className="text-xl">Trevo Legaliza</CardTitle>
-          <p className="text-sm text-muted-foreground">Acesse o sistema ERP</p>
+          <p className="text-sm text-muted-foreground">{isSignUp ? 'Crie sua conta' : 'Acesse o sistema ERP'}</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
