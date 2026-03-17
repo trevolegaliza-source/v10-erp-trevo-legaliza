@@ -11,14 +11,14 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useProcessosDB, useUpdateProcessoEtapa, type ProcessoDB } from '@/hooks/useProcessos';
+import { useProcessosDB, useUpdateProcessoEtapa, useDeleteProcesso, type ProcessoDB } from '@/hooks/useProcessos';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
 
 type ViewMode = 'kanban' | 'list';
 
-function QuickActionsMenu({ process }: { process: ProcessoDB }) {
+function QuickActionsMenu({ process, onDelete }: { process: ProcessoDB; onDelete: (id: string) => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -34,7 +34,7 @@ function QuickActionsMenu({ process }: { process: ProcessoDB }) {
           <EyeOff className="h-3.5 w-3.5 mr-2" /> Ocultar
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => toast.info('Excluir processo')} className="text-destructive">
+        <DropdownMenuItem onClick={() => onDelete(process.id)} className="text-destructive">
           <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -42,7 +42,7 @@ function QuickActionsMenu({ process }: { process: ProcessoDB }) {
   );
 }
 
-function ProcessCard({ process, index }: { process: ProcessoDB; index: number }) {
+function ProcessCard({ process, index, onDelete }: { process: ProcessoDB; index: number; onDelete: (id: string) => void }) {
   const clientName = process.cliente?.nome || 'Cliente';
   const typeLabel = PROCESS_TYPE_LABELS[process.tipo] || process.tipo;
 
@@ -64,7 +64,7 @@ function ProcessCard({ process, index }: { process: ProcessoDB; index: number })
               <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{clientName}</p>
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
-              <QuickActionsMenu process={process} />
+              <QuickActionsMenu process={process} onDelete={onDelete} />
               <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           </div>
@@ -100,9 +100,14 @@ function ProcessCard({ process, index }: { process: ProcessoDB; index: number })
 export default function Processos() {
   const { data: processos, isLoading } = useProcessosDB();
   const updateEtapa = useUpdateProcessoEtapa();
+  const deleteProcesso = useDeleteProcesso();
   const [filterType, setFilterType] = useState<string>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [contextMenuProc, setContextMenuProc] = useState<ProcessoDB | null>(null);
+
+  const handleDelete = useCallback((id: string) => {
+    deleteProcesso.mutate(id);
+  }, [deleteProcesso]);
 
   const filtered = filterType === 'all'
     ? (processos || [])
@@ -211,7 +216,7 @@ export default function Processos() {
                         </div>
                         <div className="space-y-2 p-2 min-h-[120px]">
                           {stageProcesses.map((proc, idx) => (
-                            <ProcessCard key={proc.id} process={proc} index={idx} />
+                            <ProcessCard key={proc.id} process={proc} index={idx} onDelete={handleDelete} />
                           ))}
                           {provided.placeholder}
                           {stageProcesses.length === 0 && (
@@ -269,7 +274,7 @@ export default function Processos() {
                     {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                   </TableCell>
                   <TableCell className="text-center">
-                    <QuickActionsMenu process={proc} />
+                    <QuickActionsMenu process={proc} onDelete={handleDelete} />
                   </TableCell>
                 </TableRow>
               ))}
