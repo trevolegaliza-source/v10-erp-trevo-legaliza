@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export default function Clientes() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [editClient, setEditClient] = useState<ClienteDB | null>(null);
