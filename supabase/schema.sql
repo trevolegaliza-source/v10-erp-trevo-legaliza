@@ -200,3 +200,14 @@ BEGIN
   ALTER TYPE public.tipo_processo ADD VALUE IF NOT EXISTS 'orcamento';
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;
+
+-- MIGRATION: Add is_archived column to clientes and processos
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'is_archived') THEN
+    ALTER TABLE public.clientes ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'processos' AND column_name = 'is_archived') THEN
+    ALTER TABLE public.processos ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;
+  END IF;
+END $$;

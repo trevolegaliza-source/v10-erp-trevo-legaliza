@@ -6,10 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Users, Mail, Phone, Search, UserX, Upload, FileText, Download, Trash2 } from 'lucide-react';
+import { Plus, Users, Mail, Phone, Search, UserX, Upload, FileText, Download, Trash2, Archive, ArchiveRestore } from 'lucide-react';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useClientes, useUpdateCliente, useDeleteCliente } from '@/hooks/useFinanceiro';
+import { useClientes, useUpdateCliente, useDeleteCliente, useArchiveCliente, useUnarchiveCliente } from '@/hooks/useFinanceiro';
 import { useProcessos } from '@/hooks/useFinanceiro';
 import type { ClienteDB, TipoCliente } from '@/types/financial';
 import { Link, useNavigate } from 'react-router-dom';
@@ -20,6 +20,7 @@ export default function Clientes() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [editClient, setEditClient] = useState<ClienteDB | null>(null);
   const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
   const [showDeletePassword, setShowDeletePassword] = useState(false);
@@ -29,6 +30,8 @@ export default function Clientes() {
   const { data: processos } = useProcessos();
   const updateCliente = useUpdateCliente();
   const deleteCliente = useDeleteCliente();
+  const archiveCliente = useArchiveCliente();
+  const unarchiveCliente = useUnarchiveCliente();
 
   // Count processes per client
   const processCount = (clienteId: string) =>
@@ -45,6 +48,9 @@ export default function Clientes() {
   };
 
   const filtered = (clientes || []).filter(c => {
+    const archived = !!(c as any).is_archived;
+    if (showArchived) return archived;
+    if (archived) return false; // hide archived by default
     if (showInactive) return isInactive(c.id);
     return true;
   });
@@ -112,6 +118,24 @@ export default function Clientes() {
     setShowDeletePassword(true);
   };
 
+  const handleArchive = (clientId: string) => {
+    setPendingDeleteAction(() => () => {
+      archiveCliente.mutate(clientId, {
+        onSuccess: () => setEditClient(null),
+      });
+    });
+    setShowDeletePassword(true);
+  };
+
+  const handleUnarchive = (clientId: string) => {
+    setPendingDeleteAction(() => () => {
+      unarchiveCliente.mutate(clientId, {
+        onSuccess: () => setEditClient(null),
+      });
+    });
+    setShowDeletePassword(true);
+  };
+
   const totalClientes = (clientes || []).length;
   const mensalistas = (clientes || []).filter(c => c.tipo === 'MENSALISTA').length;
   const avulsos = (clientes || []).filter(c => c.tipo === 'AVULSO_4D').length;
@@ -163,10 +187,19 @@ export default function Clientes() {
           variant={showInactive ? 'default' : 'outline'}
           size="sm"
           className="h-9 gap-1.5"
-          onClick={() => setShowInactive(!showInactive)}
+          onClick={() => { setShowInactive(!showInactive); setShowArchived(false); }}
         >
           <UserX className="h-3.5 w-3.5" />
-          Inativos ({(clientes || []).filter(c => isInactive(c.id)).length})
+          Inativos ({(clientes || []).filter(c => !(c as any).is_archived && isInactive(c.id)).length})
+        </Button>
+        <Button
+          variant={showArchived ? 'default' : 'outline'}
+          size="sm"
+          className="h-9 gap-1.5"
+          onClick={() => { setShowArchived(!showArchived); setShowInactive(false); }}
+        >
+          <Archive className="h-3.5 w-3.5" />
+          Arquivados ({(clientes || []).filter(c => (c as any).is_archived).length})
         </Button>
       </div>
 
@@ -184,8 +217,9 @@ export default function Clientes() {
                   <TableHead>Contador</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Contato</TableHead>
-                  <TableHead className="text-center">Processos</TableHead>
+                   <TableHead className="text-center">Processos</TableHead>
                   <TableHead className="text-center">Ativos</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -218,11 +252,24 @@ export default function Clientes() {
                     <TableCell className="text-center">
                       <Badge className="bg-primary/10 text-primary border-0">{activeCount(client.id)}</Badge>
                     </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+                        {(client as any).is_archived ? (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Desarquivar" onClick={() => handleUnarchive(client.id)}>
+                            <ArchiveRestore className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Arquivar" onClick={() => handleArchive(client.id)}>
+                            <Archive className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       {showInactive ? 'Nenhum cliente inativo' : 'Nenhum cliente encontrado'}
                     </TableCell>
                   </TableRow>
@@ -310,7 +357,14 @@ export default function Clientes() {
             </div>
 
             <div className="flex items-center justify-between pt-2">
-              <Button variant="destructive" size="sm" onClick={handleDelete}>Excluir</Button>
+              <div className="flex gap-2">
+                <Button variant="destructive" size="sm" onClick={handleDelete}><Trash2 className="h-3.5 w-3.5 mr-1" />Excluir</Button>
+                {!(editClient as any)?.is_archived ? (
+                  <Button variant="outline" size="sm" onClick={() => editClient && handleArchive(editClient.id)}><Archive className="h-3.5 w-3.5 mr-1" />Arquivar</Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => editClient && handleUnarchive(editClient.id)}><ArchiveRestore className="h-3.5 w-3.5 mr-1" />Desarquivar</Button>
+                )}
+              </div>
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={() => setEditClient(null)}>Cancelar</Button>
                 <Button size="sm" onClick={handleSave} disabled={updateCliente.isPending}>Salvar</Button>
