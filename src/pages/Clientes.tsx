@@ -187,10 +187,19 @@ export default function Clientes() {
           variant={showInactive ? 'default' : 'outline'}
           size="sm"
           className="h-9 gap-1.5"
-          onClick={() => setShowInactive(!showInactive)}
+          onClick={() => { setShowInactive(!showInactive); setShowArchived(false); }}
         >
           <UserX className="h-3.5 w-3.5" />
-          Inativos ({(clientes || []).filter(c => isInactive(c.id)).length})
+          Inativos ({(clientes || []).filter(c => !(c as any).is_archived && isInactive(c.id)).length})
+        </Button>
+        <Button
+          variant={showArchived ? 'default' : 'outline'}
+          size="sm"
+          className="h-9 gap-1.5"
+          onClick={() => { setShowArchived(!showArchived); setShowInactive(false); }}
+        >
+          <Archive className="h-3.5 w-3.5" />
+          Arquivados ({(clientes || []).filter(c => (c as any).is_archived).length})
         </Button>
       </div>
 
