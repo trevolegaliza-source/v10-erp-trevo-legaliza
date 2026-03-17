@@ -11,6 +11,7 @@ import Processos from "./pages/Processos";
 import ProcessosAtivosDetalhe from "./pages/ProcessosAtivosDetalhe";
 import FaturamentoDetalhe from "./pages/FaturamentoDetalhe";
 import Clientes from "./pages/Clientes";
+import ClienteDetalhe from "./pages/ClienteDetalhe";
 import Financeiro from "./pages/Financeiro";
 import ContasReceber from "./pages/ContasReceber";
 import ContasPagar from "./pages/ContasPagar";
