@@ -108,11 +108,20 @@ export default function ClienteDetalhe() {
   }
 
   const isMensalista = cliente.tipo === 'MENSALISTA';
+  const momentoFat = (cliente as any).momento_faturamento || 'na_solicitacao';
+  const isDeferimento = momentoFat === 'no_deferimento';
   const totalProcessos = processos.length;
   const processosAtivos = processos.filter(p => p.etapa !== 'finalizados' && p.etapa !== 'arquivo').length;
   const totalFaturado = lancamentos.filter(l => l.tipo === 'receber').reduce((s, l) => s + Number(l.valor), 0);
   const totalPago = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
   const totalPendente = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
+
+  // Processes awaiting deferimento for billing
+  const DEFERIMENTO_STAGES = ['registro', 'finalizados'];
+  const billedProcessIds = new Set(lancamentos.filter(l => l.tipo === 'receber' && l.processo_id).map(l => l.processo_id));
+  const aguardandoDeferimento = isDeferimento
+    ? processos.filter(p => !DEFERIMENTO_STAGES.includes(p.etapa) && p.etapa !== 'arquivo' && !billedProcessIds.has(p.id))
+    : [];
 
   return (
     <div className="space-y-6">
@@ -127,6 +136,11 @@ export default function ClienteDetalhe() {
             <Badge className={cn('text-xs', isMensalista ? 'bg-primary/10 text-primary border-primary/30' : 'bg-warning/10 text-warning border-warning/30')} variant="outline">
               {isMensalista ? 'Mensalista' : 'Avulso'}
             </Badge>
+            {isDeferimento && (
+              <Badge variant="outline" className="text-xs border-warning/30 text-warning">
+                Fatura no Deferimento
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1"><Building2 className="h-3.5 w-3.5" />{cliente.nome}</span>
@@ -248,6 +262,27 @@ export default function ClienteDetalhe() {
 
         {/* ── Processos ── */}
         <TabsContent value="processos">
+          {/* Aguardando Deferimento Banner */}
+          {aguardandoDeferimento.length > 0 && (
+            <div className="mb-4 rounded-lg border border-warning/40 bg-warning/5 p-4">
+              <p className="text-xs font-semibold text-warning mb-2">⏳ Aguardando Deferimento para Cobrança ({aguardandoDeferimento.length})</p>
+              <div className="space-y-1">
+                {aguardandoDeferimento.map(p => (
+                  <div key={p.id} className="flex items-center justify-between text-sm">
+                    <span>{p.razao_social}</span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px]">{KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {p.valor ? Number(p.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-2">A cobrança será gerada automaticamente ao mover para "Registro" ou "Finalizados" no Kanban.</p>
+            </div>
+          )}
+
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Histórico de Processos ({totalProcessos})</CardTitle>

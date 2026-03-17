@@ -20,6 +20,7 @@ const INITIAL_CLIENTE = {
   nome_contador: '',
   apelido: '',
   dia_vencimento_mensal: 15,
+  momento_faturamento: 'na_solicitacao' as 'na_solicitacao' | 'no_deferimento',
   // Avulso-specific
   valor_base: '',
   desconto_tier2: '',
@@ -88,6 +89,7 @@ export default function CadastroRapido() {
         nome_contador: clienteForm.nome_contador || '',
         apelido: clienteForm.apelido || '',
         dia_vencimento_mensal: isMensalista ? clienteForm.dia_vencimento_mensal : 0,
+        momento_faturamento: clienteForm.momento_faturamento,
       },
       {
         onSuccess: (data: any) => {
@@ -196,6 +198,25 @@ export default function CadastroRapido() {
                       <SelectItem value="MENSALISTA">Mensalista</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Momento do Faturamento */}
+                <div className="grid gap-1.5">
+                  <Label>Momento do Faturamento *</Label>
+                  <Select value={clienteForm.momento_faturamento} onValueChange={(v) => update('momento_faturamento', v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>
+                      <SelectItem value="no_deferimento">No Deferimento (Sucesso)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    {clienteForm.momento_faturamento === 'no_deferimento'
+                      ? 'A cobrança será gerada somente quando o processo for deferido.'
+                      : 'A cobrança será gerada no momento da criação do processo.'}
+                  </p>
                 </div>
 
                 {/* ── Conditional: AVULSO ── */}

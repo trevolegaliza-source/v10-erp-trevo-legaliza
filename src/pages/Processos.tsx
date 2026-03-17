@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useProcessosDB, useUpdateProcessoEtapa, useDeleteProcesso, type ProcessoDB } from '@/hooks/useProcessos';
+import { gerarFaturamentoDeferimento } from '@/hooks/useFinanceiro';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
@@ -113,12 +114,23 @@ export default function Processos() {
     ? (processos || [])
     : (processos || []).filter((p) => p.tipo === filterType);
 
-  const handleDragEnd = useCallback((result: DropResult) => {
+  // Stages that represent "deferimento" (success)
+  const DEFERIMENTO_STAGES: KanbanStage[] = ['registro', 'finalizados'];
+
+  const handleDragEnd = useCallback(async (result: DropResult) => {
     if (!result.destination) return;
     const newEtapa = result.destination.droppableId as KanbanStage;
     const procId = result.draggableId;
     updateEtapa.mutate({ id: procId, etapa: newEtapa });
-  }, [updateEtapa]);
+
+    // If moved to a deferimento stage, trigger billing for 'no_deferimento' clients
+    if (DEFERIMENTO_STAGES.includes(newEtapa)) {
+      const proc = (processos || []).find(p => p.id === procId);
+      if (proc) {
+        await gerarFaturamentoDeferimento(proc as any);
+      }
+    }
+  }, [updateEtapa, processos]);
 
   const handleListDblClick = (proc: ProcessoDB) => {
     setContextMenuProc(proc);
