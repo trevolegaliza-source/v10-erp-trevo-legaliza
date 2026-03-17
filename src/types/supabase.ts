@@ -23,5 +23,13 @@ export interface Cliente {
   updated_at: string;
 }
 
-export type ClienteInsert = Omit<Cliente, 'id' | 'created_at' | 'updated_at'>;
+export type ClienteInsert = Omit<Cliente, 'id' | 'created_at' | 'updated_at' | 'valor_base' | 'desconto_progressivo' | 'dia_cobranca' | 'valor_limite_desconto' | 'mensalidade' | 'vencimento' | 'qtd_processos'> & {
+  valor_base?: number | null;
+  desconto_progressivo?: number | null;
+  dia_cobranca?: number | null;
+  valor_limite_desconto?: number | null;
+  mensalidade?: number | null;
+  vencimento?: number | null;
+  qtd_processos?: number | null;
+};
 export type ClienteUpdate = Partial<ClienteInsert> & { updated_at?: string };
