@@ -20,6 +20,7 @@ const INITIAL_CLIENTE = {
   nome_contador: '',
   apelido: '',
   dia_vencimento_mensal: 15,
+  momento_faturamento: 'na_solicitacao' as 'na_solicitacao' | 'no_deferimento',
   // Avulso-specific
   valor_base: '',
   desconto_tier2: '',
