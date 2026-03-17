@@ -241,4 +241,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lancamentos' AND column_name = 'boleto_url') THEN
     ALTER TABLE public.lancamentos ADD COLUMN boleto_url TEXT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lancamentos' AND column_name = 'url_comprovante') THEN
+    ALTER TABLE public.lancamentos ADD COLUMN url_comprovante TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lancamentos' AND column_name = 'url_recibo_taxa') THEN
+    ALTER TABLE public.lancamentos ADD COLUMN url_recibo_taxa TEXT;
+  END IF;
 END $$;
