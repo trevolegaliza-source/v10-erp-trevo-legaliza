@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, FileText, Upload, CheckCircle2, Paperclip, ExternalLink } from 'lucide-react';
+import { AlertTriangle, FileText, Upload, CheckCircle2, ExternalLink, PlusCircle } from 'lucide-react';
 import type { EtapaFinanceiro } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
+import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
+import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import { cn } from '@/lib/utils';
 
 interface FinanceiroCardProps {
@@ -20,14 +21,16 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
   const updateLanc = useUpdateLancamentoFinanceiro();
   const lanc = processo.lancamento;
 
-  const [extraValue, setExtraValue] = useState(String(lanc?.honorario_extra || 0));
   const [notes, setNotes] = useState(lanc?.observacoes_financeiro || '');
+  const [valoresOpen, setValoresOpen] = useState(false);
+
+  const { data: valoresAdicionais = [] } = useValoresAdicionais(processo.id);
+  const somaAdicionais = valoresAdicionais.reduce((s, i) => s + Number(i.valor), 0);
 
   const isOverdue = processo.etapa_financeiro === 'honorario_vencido';
   const isUrgente = processo.prioridade === 'urgente';
   const baseValue = Number(lanc?.valor ?? processo.valor ?? 0);
-  const extraNum = Number(lanc?.honorario_extra || 0);
-  const totalValue = baseValue + extraNum;
+  const totalValue = baseValue + somaAdicionais;
   const clienteApelido = (processo.cliente as any)?.apelido || (processo.cliente as any)?.nome || '-';
   const vencimento = lanc?.data_vencimento;
 
@@ -39,13 +42,6 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
       valor: baseValue,
       updates,
     });
-  };
-
-  const handleExtraBlur = () => {
-    const parsed = parseFloat(extraValue.replace(',', '.')) || 0;
-    if (parsed !== extraNum) {
-      mutateField({ honorario_extra: parsed });
-    }
   };
 
   const handleCheckbox = (field: string, checked: boolean) => {
@@ -86,118 +82,125 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
     );
   };
 
+  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
   return (
-    <Card className={cn(
-      'border-l-4 transition-shadow hover:shadow-md',
-      isOverdue ? 'border-l-destructive bg-destructive/5' : 'border-l-border',
-    )}>
-      <CardContent className="p-3 space-y-2.5">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
-              <p className="text-sm font-semibold truncate">{clienteApelido}</p>
+    <>
+      <Card className={cn(
+        'border-l-4 transition-shadow hover:shadow-md',
+        isOverdue ? 'border-l-destructive bg-destructive/5' : 'border-l-border',
+      )}>
+        <CardContent className="p-3 space-y-2.5">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
+                <p className="text-sm font-semibold truncate">{clienteApelido}</p>
+              </div>
+              <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
             </div>
-            <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
+            <div className="text-right shrink-0">
+              <span className="text-sm font-bold text-primary whitespace-nowrap">
+                {fmt(totalValue)}
+              </span>
+              {isUrgente && (
+                <Badge variant="outline" className="text-[9px] border-warning text-warning ml-1">
+                  +50%
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="text-right shrink-0">
-            <span className="text-sm font-bold text-primary whitespace-nowrap">
-              {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </span>
-            {isUrgente && (
-              <Badge variant="outline" className="text-[9px] border-warning text-warning ml-1">
-                +50%
+
+          {/* Due date */}
+          {vencimento && (
+            <Badge variant="outline" className={cn('text-[10px]', isOverdue && 'border-destructive text-destructive')}>
+              Venc: {new Date(vencimento).toLocaleDateString('pt-BR')}
+            </Badge>
+          )}
+
+          {/* Valores Adicionais button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-xs h-7 justify-start"
+            onClick={() => setValoresOpen(true)}
+          >
+            <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
+            Valores Adicionais
+            {somaAdicionais > 0 && (
+              <Badge variant="secondary" className="ml-auto text-[10px] h-4 px-1.5">
+                {fmt(somaAdicionais)}
               </Badge>
             )}
-          </div>
-        </div>
-
-        {/* Due date */}
-        {vencimento && (
-          <Badge variant="outline" className={cn('text-[10px]', isOverdue && 'border-destructive text-destructive')}>
-            Venc: {new Date(vencimento).toLocaleDateString('pt-BR')}
-          </Badge>
-        )}
-
-        {/* Honorário Extra + DARE */}
-        <div className="flex items-center gap-2">
-          <label className="text-[11px] text-muted-foreground whitespace-nowrap">Hon. Extra:</label>
-          <Input
-            type="text"
-            value={extraValue}
-            onChange={(e) => setExtraValue(e.target.value)}
-            onBlur={handleExtraBlur}
-            className="h-7 text-xs w-24"
-            placeholder="0,00"
-          />
-          <button
-            title="Anexar Recibo Taxa/DARE"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            onClick={() => {/* TODO: upload url_recibo_taxa */}}
-          >
-            <Paperclip className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        {/* Checkboxes */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={`enc-${processo.id}`}
-              checked={!!lanc?.cobranca_encaminhada}
-              onCheckedChange={(c) => handleCheckbox('cobranca_encaminhada', !!c)}
-            />
-            <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
-              Cobrança encaminhada ao cliente
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={`rec-${processo.id}`}
-              checked={!!lanc?.confirmado_recebimento}
-              onCheckedChange={(c) => handleCheckbox('confirmado_recebimento', !!c)}
-            />
-            <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
-              Confirmado recebimento
-            </label>
-          </div>
-        </div>
-
-        {/* Attachments: Boleto + Comprovante */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
-            <AttachmentLink url={lanc?.boleto_url} label="Boleto" />
-          </div>
-          <div className="flex items-center gap-2">
-            <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
-            <AttachmentLink url={(lanc as any)?.url_comprovante} label="Comprovante Pgto" />
-          </div>
-        </div>
-
-        {/* Notes */}
-        <Textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          onBlur={handleNotesBlur}
-          placeholder="Observações..."
-          className="text-[11px] min-h-[40px] resize-none"
-          rows={2}
-        />
-
-        {/* Move button */}
-        {nextEtapa && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full text-xs h-7"
-            onClick={() => onMoveRequest(processo, nextEtapa)}
-          >
-            {nextLabels[nextEtapa] || 'Avançar →'}
           </Button>
-        )}
-      </CardContent>
-    </Card>
+
+          {/* Checkboxes */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={`enc-${processo.id}`}
+                checked={!!lanc?.cobranca_encaminhada}
+                onCheckedChange={(c) => handleCheckbox('cobranca_encaminhada', !!c)}
+              />
+              <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
+                Cobrança encaminhada ao cliente
+              </label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={`rec-${processo.id}`}
+                checked={!!lanc?.confirmado_recebimento}
+                onCheckedChange={(c) => handleCheckbox('confirmado_recebimento', !!c)}
+              />
+              <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
+                Confirmado recebimento
+              </label>
+            </div>
+          </div>
+
+          {/* Attachments */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+              <AttachmentLink url={lanc?.boleto_url} label="Boleto" />
+            </div>
+            <div className="flex items-center gap-2">
+              <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+              <AttachmentLink url={(lanc as any)?.url_comprovante} label="Comprovante Pgto" />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onBlur={handleNotesBlur}
+            placeholder="Observações..."
+            className="text-[11px] min-h-[40px] resize-none"
+            rows={2}
+          />
+
+          {/* Move button */}
+          {nextEtapa && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full text-xs h-7"
+              onClick={() => onMoveRequest(processo, nextEtapa)}
+            >
+              {nextLabels[nextEtapa] || 'Avançar →'}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      <ValoresAdicionaisModal
+        open={valoresOpen}
+        onOpenChange={setValoresOpen}
+        processoId={processo.id}
+        clienteApelido={clienteApelido}
+      />
+    </>
   );
 }

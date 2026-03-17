@@ -248,3 +248,18 @@ BEGIN
     ALTER TABLE public.lancamentos ADD COLUMN url_recibo_taxa TEXT;
   END IF;
 END $$;
+
+-- 9. VALORES ADICIONAIS (linked to processos)
+CREATE TABLE IF NOT EXISTS public.valores_adicionais (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  processo_id UUID REFERENCES public.processos(id) ON DELETE CASCADE NOT NULL,
+  descricao TEXT NOT NULL,
+  valor NUMERIC(12,2) NOT NULL DEFAULT 0,
+  anexo_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.valores_adicionais ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "valores_adicionais_all" ON public.valores_adicionais;
+CREATE POLICY "valores_adicionais_all" ON public.valores_adicionais FOR ALL USING (true) WITH CHECK (true);
