@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Users, Mail, Phone, Search, UserX, Upload, FileText, Download, Trash2 } from 'lucide-react';
+import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useClientes, useUpdateCliente, useDeleteCliente } from '@/hooks/useFinanceiro';
 import { useProcessos } from '@/hooks/useFinanceiro';
@@ -21,6 +22,8 @@ export default function Clientes() {
   const [showInactive, setShowInactive] = useState(false);
   const [editClient, setEditClient] = useState<ClienteDB | null>(null);
   const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
 
   const { data: clientes, isLoading } = useClientes(search);
   const { data: processos } = useProcessos();
@@ -84,9 +87,12 @@ export default function Clientes() {
 
   const handleDeleteContract = async (fileName: string) => {
     if (!editClient) return;
-    const { error } = await supabase.storage.from('contratos').remove([`${editClient.id}/${fileName}`]);
-    if (error) toast.error('Erro ao excluir');
-    else { toast.success('Contrato removido'); loadContracts(editClient.id); }
+    setPendingDeleteAction(() => async () => {
+      const { error } = await supabase.storage.from('contratos').remove([`${editClient.id}/${fileName}`]);
+      if (error) toast.error('Erro ao excluir');
+      else { toast.success('Contrato removido'); loadContracts(editClient.id); }
+    });
+    setShowDeletePassword(true);
   };
 
   const handleSave = () => {
@@ -98,10 +104,12 @@ export default function Clientes() {
 
   const handleDelete = () => {
     if (!editClient) return;
-    if (!window.confirm(`Excluir ${editClient.nome}?`)) return;
-    deleteCliente.mutate(editClient.id, {
-      onSuccess: () => setEditClient(null),
+    setPendingDeleteAction(() => () => {
+      deleteCliente.mutate(editClient.id, {
+        onSuccess: () => setEditClient(null),
+      });
     });
+    setShowDeletePassword(true);
   };
 
   const totalClientes = (clientes || []).length;
@@ -311,6 +319,12 @@ export default function Clientes() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <PasswordConfirmDialog
+        open={showDeletePassword}
+        onOpenChange={setShowDeletePassword}
+        onConfirm={() => { pendingDeleteAction?.(); setPendingDeleteAction(null); }}
+      />
     </div>
   );
 }

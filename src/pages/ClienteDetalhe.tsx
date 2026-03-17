@@ -16,6 +16,7 @@ import { KANBAN_STAGES } from '@/types/process';
 import { STATUS_LABELS, STATUS_STYLES, TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso } from '@/types/financial';
 import { cn } from '@/lib/utils';
+import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +28,8 @@ export default function ClienteDetalhe() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
   const [uploadingContract, setUploadingContract] = useState(false);
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
   const updateCliente = useUpdateCliente();
 
   useEffect(() => {
@@ -91,11 +94,14 @@ export default function ClienteDetalhe() {
     URL.revokeObjectURL(url);
   };
 
-  const handleDeleteContract = async (fileName: string) => {
+  const handleDeleteContract = (fileName: string) => {
     if (!cliente) return;
-    const { error } = await supabase.storage.from('contratos').remove([`${cliente.id}/${fileName}`]);
-    if (error) toast.error('Erro ao excluir');
-    else { toast.success('Removido'); loadContracts(cliente.id); }
+    setPendingDeleteAction(() => async () => {
+      const { error } = await supabase.storage.from('contratos').remove([`${cliente.id}/${fileName}`]);
+      if (error) toast.error('Erro ao excluir');
+      else { toast.success('Removido'); loadContracts(cliente.id); }
+    });
+    setShowDeletePassword(true);
   };
 
   if (loading) {
@@ -449,6 +455,12 @@ export default function ClienteDetalhe() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <PasswordConfirmDialog
+        open={showDeletePassword}
+        onOpenChange={setShowDeletePassword}
+        onConfirm={() => { pendingDeleteAction?.(); setPendingDeleteAction(null); }}
+      />
     </div>
   );
 }
