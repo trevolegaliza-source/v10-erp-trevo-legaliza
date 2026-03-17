@@ -1,28 +1,35 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, FileText, Upload, CheckCircle2, ExternalLink, PlusCircle } from 'lucide-react';
+import { AlertTriangle, FileText, Upload, CheckCircle2, Download, PlusCircle } from 'lucide-react';
 import type { EtapaFinanceiro } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
+import { uploadFile, viewFile } from '@/hooks/useStorageUpload';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface FinanceiroCardProps {
   processo: ProcessoFinanceiro;
   onMoveRequest: (processo: ProcessoFinanceiro, targetEtapa: EtapaFinanceiro) => void;
+  onDoubleClick?: (processo: ProcessoFinanceiro) => void;
 }
 
-export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCardProps) {
+export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick }: FinanceiroCardProps) {
   const updateLanc = useUpdateLancamentoFinanceiro();
   const lanc = processo.lancamento;
 
   const [notes, setNotes] = useState(lanc?.observacoes_financeiro || '');
   const [valoresOpen, setValoresOpen] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
+
+  const boletoRef = useRef<HTMLInputElement>(null);
+  const comprovanteRef = useRef<HTMLInputElement>(null);
 
   const { data: valoresAdicionais = [] } = useValoresAdicionais(processo.id);
   const somaAdicionais = valoresAdicionais.reduce((s, i) => s + Number(i.valor), 0);
@@ -54,6 +61,19 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
     }
   };
 
+  const handleUpload = async (field: string, file: File, folder: string) => {
+    try {
+      setUploading(field);
+      const path = await uploadFile(file, folder, processo.id);
+      mutateField({ [field]: path });
+      toast.success('Arquivo enviado');
+    } catch {
+      // handled in uploadFile
+    } finally {
+      setUploading(null);
+    }
+  };
+
   const nextEtapaMap: Partial<Record<EtapaFinanceiro, EtapaFinanceiro>> = {
     solicitacao_criada: 'gerar_cobranca',
     gerar_cobranca: 'cobranca_gerada',
@@ -67,29 +87,60 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
     honorario_pago: 'Marcar Pago ✓',
   };
 
-  const AttachmentLink = ({ url, label }: { url: string | null | undefined; label: string }) => {
-    if (url) {
-      return (
-        <a href={url} target="_blank" rel="noreferrer" className="text-[11px] text-info underline flex items-center gap-1">
-          <CheckCircle2 className="h-3 w-3 text-success" /> {label} <ExternalLink className="h-3 w-3" />
-        </a>
-      );
-    }
-    return (
-      <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-        <Upload className="h-3 w-3" /> {label}
-      </span>
-    );
-  };
+  const AttachBtn = ({
+    storagePath, label, field, inputRef, folder,
+  }: {
+    storagePath: string | null | undefined;
+    label: string;
+    field: string;
+    inputRef: React.RefObject<HTMLInputElement | null>;
+    folder: string;
+  }) => (
+    <div className="flex items-center gap-1.5">
+      <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+      {storagePath ? (
+        <button
+          onClick={() => viewFile(storagePath)}
+          className="text-[11px] text-info underline flex items-center gap-1 hover:text-info/80"
+        >
+          <CheckCircle2 className="h-3 w-3 text-success" /> {label}
+          <Download className="h-3 w-3" />
+        </button>
+      ) : (
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading === field}
+          className="text-[11px] text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
+        >
+          <Upload className="h-3 w-3" />
+          {uploading === field ? 'Enviando...' : label}
+        </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        accept=".pdf,.jpg,.jpeg,.png,.webp"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleUpload(field, f, folder);
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
 
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <>
-      <Card className={cn(
-        'border-l-4 transition-shadow hover:shadow-md',
-        isOverdue ? 'border-l-destructive bg-destructive/5' : 'border-l-border',
-      )}>
+      <Card
+        className={cn(
+          'border-l-4 transition-shadow hover:shadow-md cursor-pointer',
+          isOverdue ? 'border-l-destructive bg-destructive/5' : 'border-l-border',
+        )}
+        onDoubleClick={() => onDoubleClick?.(processo)}
+      >
         <CardContent className="p-3 space-y-2.5">
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
@@ -159,16 +210,22 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
             </div>
           </div>
 
-          {/* Attachments */}
+          {/* Attachments with real upload */}
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
-              <AttachmentLink url={lanc?.boleto_url} label="Boleto" />
-            </div>
-            <div className="flex items-center gap-2">
-              <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
-              <AttachmentLink url={(lanc as any)?.url_comprovante} label="Comprovante Pgto" />
-            </div>
+            <AttachBtn
+              storagePath={lanc?.boleto_url}
+              label="Boleto"
+              field="boleto_url"
+              inputRef={boletoRef}
+              folder="boletos"
+            />
+            <AttachBtn
+              storagePath={(lanc as any)?.url_comprovante}
+              label="Comprovante Pgto"
+              field="url_comprovante"
+              inputRef={comprovanteRef}
+              folder="comprovantes"
+            />
           </div>
 
           {/* Notes */}
@@ -192,6 +249,8 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
               {nextLabels[nextEtapa] || 'Avançar →'}
             </Button>
           )}
+
+          <p className="text-[9px] text-muted-foreground/60 text-center">Duplo clique para edição completa</p>
         </CardContent>
       </Card>
 
