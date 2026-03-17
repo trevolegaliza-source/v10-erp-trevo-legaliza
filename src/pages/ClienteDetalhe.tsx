@@ -278,9 +278,9 @@ export default function ClienteDetalhe() {
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Dia de Cobrança (D+X)</Label>
                       {editing ? (
-                        <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="4" />
+                        <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{(cliente as any).dia_cobranca != null ? `D+${(cliente as any).dia_cobranca}` : '—'}</p>
+                        <p className="font-medium">D+{(cliente as any).dia_cobranca ?? 0}</p>
                       )}
                     </div>
                   </>
