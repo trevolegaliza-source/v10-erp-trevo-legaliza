@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import FinanceiroCard from './FinanceiroCard';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
+import GerarCobrancaModal from './GerarCobrancaModal';
 import { useMoveEtapaFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import type { EtapaFinanceiro } from '@/types/financial';
@@ -21,6 +22,10 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
   const [pendingMove, setPendingMove] = useState<{ processo: ProcessoFinanceiro; target: EtapaFinanceiro } | null>(null);
   const [passwordTitle, setPasswordTitle] = useState('');
   const [passwordDesc, setPasswordDesc] = useState('');
+
+  // Gerar Cobrança confirmation modal
+  const [cobrancaModalOpen, setCobrancaModalOpen] = useState(false);
+  const [cobrancaProcesso, setCobrancaProcesso] = useState<ProcessoFinanceiro | null>(null);
 
   const handleMoveRequest = (processo: ProcessoFinanceiro, targetEtapa: EtapaFinanceiro) => {
     const cliente = processo.cliente as any;
@@ -48,6 +53,13 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
       return;
     }
 
+    // Gerar Cobrança → show summary modal first
+    if (targetEtapa === 'cobranca_gerada' && processo.etapa_financeiro === 'gerar_cobranca') {
+      setCobrancaProcesso(processo);
+      setCobrancaModalOpen(true);
+      return;
+    }
+
     executeMove(processo, targetEtapa);
   };
 
@@ -60,8 +72,21 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
 
   const handlePasswordConfirm = () => {
     if (pendingMove) {
-      executeMove(pendingMove.processo, pendingMove.target);
+      // If pending move target is gerar_cobranca, after password show summary modal
+      if (pendingMove.target === 'gerar_cobranca') {
+        // Move to gerar_cobranca directly (antecipação approved)
+        executeMove(pendingMove.processo, pendingMove.target);
+      } else {
+        executeMove(pendingMove.processo, pendingMove.target);
+      }
       setPendingMove(null);
+    }
+  };
+
+  const handleCobrancaConfirm = () => {
+    if (cobrancaProcesso) {
+      executeMove(cobrancaProcesso, 'cobranca_gerada');
+      setCobrancaProcesso(null);
     }
   };
 
@@ -108,6 +133,13 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
         onConfirm={handlePasswordConfirm}
         title={passwordTitle}
         description={passwordDesc}
+      />
+
+      <GerarCobrancaModal
+        open={cobrancaModalOpen}
+        onOpenChange={setCobrancaModalOpen}
+        processo={cobrancaProcesso}
+        onConfirm={handleCobrancaConfirm}
       />
     </>
   );

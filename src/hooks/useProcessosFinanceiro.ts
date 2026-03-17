@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { ProcessoDB, EtapaFinanceiro, Lancamento } from '@/types/financial';
 import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 export interface ProcessoFinanceiro extends ProcessoDB {
   lancamento?: Lancamento | null;
@@ -10,27 +11,43 @@ export interface ProcessoFinanceiro extends ProcessoDB {
 
 /** Fetch all non-archived processos with their first 'receber' lancamento */
 export function useProcessosFinanceiro() {
+  const qc = useQueryClient();
+
+  // Realtime subscription for sync
+  useEffect(() => {
+    const channel = supabase
+      .channel('financeiro_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'processos' }, () => {
+        qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lancamentos' }, () => {
+        qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
+        qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc]);
+
   return useQuery({
     queryKey: ['processos_financeiro'],
     queryFn: async () => {
-      // Fetch processos with client
       const { data: processos, error: pErr } = await supabase
         .from('processos')
         .select('*, cliente:clientes(*)')
         .order('created_at', { ascending: false });
       if (pErr) throw pErr;
 
-      // Fetch all receber lancamentos
       const { data: lancamentos, error: lErr } = await supabase
         .from('lancamentos')
         .select('*, cliente:clientes(*)')
         .eq('tipo', 'receber');
       if (lErr) throw lErr;
 
-      // Build a map processo_id -> lancamento
       const lancMap = new Map<string, any>();
       (lancamentos || []).forEach((l: any) => {
-        // Keep first lancamento per processo
         if (!lancMap.has(l.processo_id)) {
           lancMap.set(l.processo_id, l);
         }
@@ -43,11 +60,9 @@ export function useProcessosFinanceiro() {
         .map((p): ProcessoFinanceiro => {
           const lanc = lancMap.get(p.id) || null;
 
-          // Determine etapa
           let etapa: EtapaFinanceiro = 'solicitacao_criada';
           if (lanc) {
             etapa = lanc.etapa_financeiro || 'solicitacao_criada';
-            // Auto-overdue check
             if (
               lanc.status !== 'pago' &&
               etapa !== 'honorario_vencido' &&
@@ -58,17 +73,13 @@ export function useProcessosFinanceiro() {
             }
           }
 
-          return {
-            ...p,
-            lancamento: lanc,
-            etapa_financeiro: etapa,
-          };
+          return { ...p, lancamento: lanc, etapa_financeiro: etapa };
         });
     },
   });
 }
 
-/** Move a processo's financial stage — updates or creates the lancamento */
+/** Move a processo's financial stage */
 export function useMoveEtapaFinanceiro() {
   const qc = useQueryClient();
   return useMutation({
@@ -80,7 +91,6 @@ export function useMoveEtapaFinanceiro() {
       targetEtapa: EtapaFinanceiro;
     }) => {
       if (processo.lancamento) {
-        // Update existing lancamento
         const updates: any = {
           etapa_financeiro: targetEtapa,
           updated_at: new Date().toISOString(),
@@ -98,7 +108,6 @@ export function useMoveEtapaFinanceiro() {
           .eq('id', processo.lancamento.id);
         if (error) throw error;
       } else {
-        // Create a lancamento for this processo
         const vencimento = new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0];
         const { error } = await supabase.from('lancamentos').insert({
           tipo: 'receber',
@@ -112,17 +121,26 @@ export function useMoveEtapaFinanceiro() {
         });
         if (error) throw error;
       }
+
+      // If marked as paid, also update processo
+      if (targetEtapa === 'honorario_pago') {
+        await supabase
+          .from('processos')
+          .update({ etapa: 'concluido', updated_at: new Date().toISOString() })
+          .eq('id', processo.id);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
       qc.invalidateQueries({ queryKey: ['lancamentos'] });
       qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+      qc.invalidateQueries({ queryKey: ['processos_db'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 }
 
-/** Update lancamento fields (honorario_extra, checkboxes, notes) */
+/** Update lancamento fields */
 export function useUpdateLancamentoFinanceiro() {
   const qc = useQueryClient();
   return useMutation({
@@ -146,7 +164,6 @@ export function useUpdateLancamentoFinanceiro() {
           .eq('id', lancamentoId);
         if (error) throw error;
       } else {
-        // Create lancamento on-the-fly
         const { error } = await supabase.from('lancamentos').insert({
           tipo: 'receber' as const,
           cliente_id: clienteId,
