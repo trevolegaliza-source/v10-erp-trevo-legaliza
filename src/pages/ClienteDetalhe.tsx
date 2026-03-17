@@ -257,6 +257,27 @@ export default function ClienteDetalhe() {
 
         {/* ── Processos ── */}
         <TabsContent value="processos">
+          {/* Aguardando Deferimento Banner */}
+          {aguardandoDeferimento.length > 0 && (
+            <div className="mb-4 rounded-lg border border-warning/40 bg-warning/5 p-4">
+              <p className="text-xs font-semibold text-warning mb-2">⏳ Aguardando Deferimento para Cobrança ({aguardandoDeferimento.length})</p>
+              <div className="space-y-1">
+                {aguardandoDeferimento.map(p => (
+                  <div key={p.id} className="flex items-center justify-between text-sm">
+                    <span>{p.razao_social}</span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px]">{KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {p.valor ? Number(p.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-2">A cobrança será gerada automaticamente ao mover para "Registro" ou "Finalizados" no Kanban.</p>
+            </div>
+          )}
+
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Histórico de Processos ({totalProcessos})</CardTitle>
