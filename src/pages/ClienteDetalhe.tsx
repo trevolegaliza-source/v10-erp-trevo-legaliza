@@ -37,7 +37,11 @@ export default function ClienteDetalhe() {
   const loadAll = async (clienteId: string) => {
     setLoading(true);
     const [cRes, pRes, lRes] = await Promise.all([
-      supabase.from('clientes').select('*').eq('id', clienteId).single(),
+      supabase
+        .from('clientes')
+        .select('id,codigo_identificador,nome,tipo,email,telefone,nome_contador,apelido,dia_vencimento_mensal,momento_faturamento,valor_base,desconto_progressivo,dia_cobranca,valor_limite_desconto,mensalidade,vencimento,qtd_processos,created_at,updated_at')
+        .eq('id', clienteId)
+        .single(),
       supabase.from('processos').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }),
       supabase.from('lancamentos').select('*').eq('cliente_id', clienteId).order('data_vencimento', { ascending: false }),
     ]);
