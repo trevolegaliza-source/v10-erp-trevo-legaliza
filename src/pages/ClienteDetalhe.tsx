@@ -94,11 +94,14 @@ export default function ClienteDetalhe() {
     URL.revokeObjectURL(url);
   };
 
-  const handleDeleteContract = async (fileName: string) => {
+  const handleDeleteContract = (fileName: string) => {
     if (!cliente) return;
-    const { error } = await supabase.storage.from('contratos').remove([`${cliente.id}/${fileName}`]);
-    if (error) toast.error('Erro ao excluir');
-    else { toast.success('Removido'); loadContracts(cliente.id); }
+    setPendingDeleteAction(() => async () => {
+      const { error } = await supabase.storage.from('contratos').remove([`${cliente.id}/${fileName}`]);
+      if (error) toast.error('Erro ao excluir');
+      else { toast.success('Removido'); loadContracts(cliente.id); }
+    });
+    setShowDeletePassword(true);
   };
 
   if (loading) {
