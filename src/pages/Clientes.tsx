@@ -136,9 +136,10 @@ export default function Clientes() {
     setShowDeletePassword(true);
   };
 
-  const totalClientes = (clientes || []).length;
-  const mensalistas = (clientes || []).filter(c => c.tipo === 'MENSALISTA').length;
-  const avulsos = (clientes || []).filter(c => c.tipo === 'AVULSO_4D').length;
+  const activeClientes = (clientes || []).filter(c => !(c as any).is_archived);
+  const totalClientes = activeClientes.length;
+  const mensalistas = activeClientes.filter(c => c.tipo === 'MENSALISTA').length;
+  const avulsos = activeClientes.filter(c => c.tipo === 'AVULSO_4D').length;
 
   return (
     <div className="space-y-6">
