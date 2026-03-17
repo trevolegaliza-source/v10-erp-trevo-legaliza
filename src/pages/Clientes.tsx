@@ -185,7 +185,7 @@ export default function Clientes() {
                   <TableRow
                     key={client.id}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => window.location.href = `/clientes/${client.id}`}
+                    onClick={() => navigate(`/clientes/${client.id}`)}
                     onDoubleClick={() => openEdit(client)}
                   >
                     <TableCell>
