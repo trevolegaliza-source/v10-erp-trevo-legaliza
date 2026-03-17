@@ -130,14 +130,13 @@ export function useDashboardStats() {
         .gte('created_at', startOfMonth);
       const faturamentoMes = (fatTotalData || []).reduce((s, r) => s + Number(r.valor), 0);
 
-      // Faturamento potencial: processos ativos de clientes "no_deferimento" sem lançamento
+      // Faturamento potencial
       const { data: allActiveProcs } = await supabase
         .from('processos')
         .select('id, cliente_id, valor, cliente:clientes(*)')
         .not('etapa', 'in', '("finalizados","arquivo")');
 
       let faturamentoPotencial = 0;
-      const activeProcsWithBilling: string[] = [];
       if (allActiveProcs && allActiveProcs.length > 0) {
         const procIds = allActiveProcs.map(p => p.id);
         const { data: existingLanc } = await supabase
@@ -154,6 +153,23 @@ export function useDashboardStats() {
           }
         }
       }
+
+      // COBRANÇAS A GERAR: lancamentos in 'gerar_cobranca' stage
+      const { data: cobrancasGerar } = await supabase
+        .from('lancamentos')
+        .select('valor')
+        .eq('tipo', 'receber')
+        .eq('etapa_financeiro', 'gerar_cobranca');
+      const totalCobrancasGerar = (cobrancasGerar || []).reduce((s, r) => s + Number(r.valor), 0);
+
+      // Also count processos without lancamento (they default to solicitacao_criada)
+      // For "cobranças a gerar" we sum valor of processos in gerar_cobranca stage
+
+      // VALORES REEMBOLSÁVEIS: sum of all valores_adicionais not yet paid
+      const { data: valoresReemb } = await supabase
+        .from('valores_adicionais')
+        .select('valor');
+      const totalValoresReembolsaveis = (valoresReemb || []).reduce((s, r) => s + Number(r.valor), 0);
 
       const { data: urgentes } = await supabase
         .from('processos')
@@ -197,7 +213,7 @@ export function useDashboardStats() {
         .sort((a, b) => b.total - a.total)
         .slice(0, 5);
 
-      // SLA proximity: processes closest to deadline (by created_at age, oldest active first)
+      // SLA proximity
       const { data: slaProcs } = await supabase
         .from('processos')
         .select('*, cliente:clientes(*)')
@@ -211,6 +227,8 @@ export function useDashboardStats() {
         faturamentoMes,
         faturamentoRealizado,
         faturamentoPotencial,
+        totalCobrancasGerar,
+        totalValoresReembolsaveis,
         urgentes: (urgentes || []) as ProcessoDB[],
         recentes: (recentes || []) as ProcessoDB[],
         topClientes,

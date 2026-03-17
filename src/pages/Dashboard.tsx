@@ -164,6 +164,44 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Financial stat cards */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="border-border/60 border-l-4 border-l-warning">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div className="rounded-lg bg-warning/10 p-2 w-fit">
+                <CreditCard className="h-4.5 w-4.5 text-warning" />
+              </div>
+            </div>
+            <div className="mt-3">
+              {isLoading ? (
+                <Skeleton className="h-7 w-24" />
+              ) : (
+                <p className="text-2xl font-bold">{formatCurrency(stats?.totalCobrancasGerar ?? 0)}</p>
+              )}
+              <p className="text-xs text-muted-foreground">Cobranças a Gerar</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/60 border-l-4 border-l-info">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div className="rounded-lg bg-info/10 p-2 w-fit">
+                <Coins className="h-4.5 w-4.5 text-info" />
+              </div>
+            </div>
+            <div className="mt-3">
+              {isLoading ? (
+                <Skeleton className="h-7 w-24" />
+              ) : (
+                <p className="text-2xl font-bold">{formatCurrency(stats?.totalValoresReembolsaveis ?? 0)}</p>
+              )}
+              <p className="text-xs text-muted-foreground">Valores Reembolsáveis</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Pipeline Funnel */}
       <Card className="border-border/60">
         <CardHeader className="pb-3">
