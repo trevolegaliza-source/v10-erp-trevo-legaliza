@@ -12,10 +12,12 @@ import {
   PlusCircle,
   ArrowDownCircle,
   ArrowUpCircle,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -32,6 +34,7 @@ const navItems = [
 export function AppSidebar() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const { signOut, user } = useAuth();
 
   return (
     <aside
@@ -75,8 +78,20 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Collapse Button */}
-      <div className="border-t border-sidebar-border p-2">
+      {/* User & Actions */}
+      <div className="border-t border-sidebar-border p-2 space-y-1">
+        {!collapsed && user && (
+          <p className="text-[10px] text-sidebar-foreground/50 px-3 truncate">{user.email}</p>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={signOut}
+          className="w-full justify-start gap-2 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          {!collapsed && <span className="text-xs">Sair</span>}
+        </Button>
         <Button
           variant="ghost"
           size="icon"
