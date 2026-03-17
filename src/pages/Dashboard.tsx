@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   ArrowUpRight, FileText, Users, DollarSign, AlertTriangle, TrendingUp, Clock, Filter,
-  MoreHorizontal, Eye, Receipt, CheckCircle, Tag, EyeOff, BarChart3,
+  MoreHorizontal, Eye, Receipt, CheckCircle, Tag, EyeOff, BarChart3, CreditCard, Coins,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
