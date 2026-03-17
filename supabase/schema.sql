@@ -211,3 +211,11 @@ BEGIN
     ALTER TABLE public.processos ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;
   END IF;
 END $$;
+
+-- MIGRATION: Add cnpj column to clientes
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'cnpj') THEN
+    ALTER TABLE public.clientes ADD COLUMN cnpj TEXT;
+  END IF;
+END $$;

@@ -5,6 +5,7 @@ export interface Cliente {
   id: string;
   codigo_identificador: string;
   nome: string;
+  cnpj: string | null;
   tipo: ClienteTipoDB;
   email: string | null;
   telefone: string | null;
