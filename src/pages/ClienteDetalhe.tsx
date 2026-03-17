@@ -243,9 +243,9 @@ export default function ClienteDetalhe() {
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Qtd Processos Inclusos</Label>
                       {editing ? (
-                        <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
+                        <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{(cliente as any).qtd_processos ?? '—'}</p>
+                        <p className="font-medium">{formatValueOrZero((cliente as any).qtd_processos)}</p>
                       )}
                     </div>
                   </>
