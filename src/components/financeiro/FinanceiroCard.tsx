@@ -6,38 +6,54 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Paperclip, ExternalLink } from 'lucide-react';
-import type { Lancamento, EtapaFinanceiro } from '@/types/financial';
-import { useUpdateLancamento } from '@/hooks/useFinanceiro';
+import type { EtapaFinanceiro } from '@/types/financial';
+import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
+import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { cn } from '@/lib/utils';
 
 interface FinanceiroCardProps {
-  lancamento: Lancamento;
-  onMoveRequest: (lancamento: Lancamento, targetEtapa: EtapaFinanceiro) => void;
+  processo: ProcessoFinanceiro;
+  onMoveRequest: (processo: ProcessoFinanceiro, targetEtapa: EtapaFinanceiro) => void;
 }
 
-export default function FinanceiroCard({ lancamento, onMoveRequest }: FinanceiroCardProps) {
-  const updateLancamento = useUpdateLancamento();
-  const [extraValue, setExtraValue] = useState(String(lancamento.honorario_extra || 0));
-  const [notes, setNotes] = useState(lancamento.observacoes_financeiro || '');
+export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCardProps) {
+  const updateLanc = useUpdateLancamentoFinanceiro();
+  const lanc = processo.lancamento;
 
-  const isOverdue = lancamento.etapa_financeiro === 'honorario_vencido';
-  const totalValue = Number(lancamento.valor) + Number(lancamento.honorario_extra || 0);
-  const clienteApelido = (lancamento as any).cliente?.apelido || (lancamento as any).cliente?.nome || '-';
+  const [extraValue, setExtraValue] = useState(String(lanc?.honorario_extra || 0));
+  const [notes, setNotes] = useState(lanc?.observacoes_financeiro || '');
+
+  const isOverdue = processo.etapa_financeiro === 'honorario_vencido';
+  const baseValue = Number(lanc?.valor ?? processo.valor ?? 0);
+  const extraNum = Number(lanc?.honorario_extra || 0);
+  const totalValue = baseValue + extraNum;
+  const clienteApelido = (processo.cliente as any)?.apelido || (processo.cliente as any)?.nome || '-';
+  const vencimento = lanc?.data_vencimento;
+
+  const mutateField = (updates: Record<string, any>) => {
+    updateLanc.mutate({
+      processoId: processo.id,
+      lancamentoId: lanc?.id,
+      clienteId: processo.cliente_id,
+      valor: baseValue,
+      updates,
+    });
+  };
 
   const handleExtraBlur = () => {
     const parsed = parseFloat(extraValue.replace(',', '.')) || 0;
-    if (parsed !== Number(lancamento.honorario_extra || 0)) {
-      updateLancamento.mutate({ id: lancamento.id, honorario_extra: parsed } as any);
+    if (parsed !== extraNum) {
+      mutateField({ honorario_extra: parsed });
     }
   };
 
-  const handleCheckbox = (field: 'cobranca_encaminhada' | 'confirmado_recebimento', checked: boolean) => {
-    updateLancamento.mutate({ id: lancamento.id, [field]: checked } as any);
+  const handleCheckbox = (field: string, checked: boolean) => {
+    mutateField({ [field]: checked });
   };
 
   const handleNotesBlur = () => {
-    if (notes !== (lancamento.observacoes_financeiro || '')) {
-      updateLancamento.mutate({ id: lancamento.id, observacoes_financeiro: notes } as any);
+    if (notes !== (lanc?.observacoes_financeiro || '')) {
+      mutateField({ observacoes_financeiro: notes });
     }
   };
 
@@ -47,8 +63,7 @@ export default function FinanceiroCard({ lancamento, onMoveRequest }: Financeiro
     cobranca_gerada: 'honorario_pago',
   };
 
-  const nextEtapa = nextEtapaMap[lancamento.etapa_financeiro as EtapaFinanceiro];
-
+  const nextEtapa = nextEtapaMap[processo.etapa_financeiro];
   const nextLabels: Record<string, string> = {
     gerar_cobranca: 'Gerar Cobrança →',
     cobranca_gerada: 'Cobrança Gerada →',
@@ -61,14 +76,14 @@ export default function FinanceiroCard({ lancamento, onMoveRequest }: Financeiro
       isOverdue ? 'border-l-destructive bg-destructive/5' : 'border-l-border',
     )}>
       <CardContent className="p-3 space-y-2.5">
-        {/* Header: apelido + value */}
+        {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
               <p className="text-sm font-semibold truncate">{clienteApelido}</p>
             </div>
-            <p className="text-[11px] text-muted-foreground truncate">{lancamento.descricao}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
           </div>
           <span className="text-sm font-bold text-primary whitespace-nowrap">
             {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -76,11 +91,11 @@ export default function FinanceiroCard({ lancamento, onMoveRequest }: Financeiro
         </div>
 
         {/* Due date */}
-        <div className="flex items-center gap-2">
+        {vencimento && (
           <Badge variant="outline" className={cn('text-[10px]', isOverdue && 'border-destructive text-destructive')}>
-            Venc: {new Date(lancamento.data_vencimento).toLocaleDateString('pt-BR')}
+            Venc: {new Date(vencimento).toLocaleDateString('pt-BR')}
           </Badge>
-        </div>
+        )}
 
         {/* Honorário Extra */}
         <div className="flex items-center gap-2">
@@ -99,21 +114,21 @@ export default function FinanceiroCard({ lancamento, onMoveRequest }: Financeiro
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
             <Checkbox
-              id={`enc-${lancamento.id}`}
-              checked={lancamento.cobranca_encaminhada}
+              id={`enc-${processo.id}`}
+              checked={!!lanc?.cobranca_encaminhada}
               onCheckedChange={(c) => handleCheckbox('cobranca_encaminhada', !!c)}
             />
-            <label htmlFor={`enc-${lancamento.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
+            <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
               Cobrança encaminhada ao cliente
             </label>
           </div>
           <div className="flex items-center gap-2">
             <Checkbox
-              id={`rec-${lancamento.id}`}
-              checked={lancamento.confirmado_recebimento}
+              id={`rec-${processo.id}`}
+              checked={!!lanc?.confirmado_recebimento}
               onCheckedChange={(c) => handleCheckbox('confirmado_recebimento', !!c)}
             />
-            <label htmlFor={`rec-${lancamento.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
+            <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
               Confirmado recebimento
             </label>
           </div>
@@ -122,8 +137,8 @@ export default function FinanceiroCard({ lancamento, onMoveRequest }: Financeiro
         {/* Attachment */}
         <div className="flex items-center gap-2">
           <Paperclip className="h-3 w-3 text-muted-foreground" />
-          {lancamento.boleto_url ? (
-            <a href={lancamento.boleto_url} target="_blank" rel="noreferrer" className="text-[11px] text-info underline flex items-center gap-1">
+          {lanc?.boleto_url ? (
+            <a href={lanc.boleto_url} target="_blank" rel="noreferrer" className="text-[11px] text-info underline flex items-center gap-1">
               Ver Boleto <ExternalLink className="h-3 w-3" />
             </a>
           ) : (
@@ -147,7 +162,7 @@ export default function FinanceiroCard({ lancamento, onMoveRequest }: Financeiro
             size="sm"
             variant="outline"
             className="w-full text-xs h-7"
-            onClick={() => onMoveRequest(lancamento, nextEtapa)}
+            onClick={() => onMoveRequest(processo, nextEtapa)}
           >
             {nextLabels[nextEtapa] || 'Avançar →'}
           </Button>

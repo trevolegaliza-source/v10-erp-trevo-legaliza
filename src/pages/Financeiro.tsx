@@ -3,17 +3,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DollarSign, Clock, Receipt, LayoutGrid, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { useFinanceiroDashboard, useLancamentos } from '@/hooks/useFinanceiro';
+import { useFinanceiroDashboard } from '@/hooks/useFinanceiro';
+import { useProcessosFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { Toggle } from '@/components/ui/toggle';
 import FinanceiroKanban from '@/components/financeiro/FinanceiroKanban';
 import FinanceiroList from '@/components/financeiro/FinanceiroList';
 
 export default function Financeiro() {
   const { data: stats, isLoading: loadingStats } = useFinanceiroDashboard();
-  const { data: allLancamentos } = useLancamentos('receber');
+  const { data: processos } = useProcessosFinanceiro();
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
 
-  const lancamentos = allLancamentos || [];
+  const items = processos || [];
 
   const kpis = [
     {
@@ -41,7 +42,6 @@ export default function Financeiro() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Financeiro</h1>
@@ -77,7 +77,6 @@ export default function Financeiro() {
         </div>
       </div>
 
-      {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-3">
         {kpis.map((kpi) => (
           <Card key={kpi.label} className="border-border/60">
@@ -94,11 +93,10 @@ export default function Financeiro() {
         ))}
       </div>
 
-      {/* Kanban or List */}
       {viewMode === 'kanban' ? (
-        <FinanceiroKanban lancamentos={lancamentos} />
+        <FinanceiroKanban processos={items} />
       ) : (
-        <FinanceiroList lancamentos={lancamentos} />
+        <FinanceiroList processos={items} />
       )}
     </div>
   );
