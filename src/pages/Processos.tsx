@@ -42,7 +42,7 @@ function QuickActionsMenu({ process, onDelete }: { process: ProcessoDB; onDelete
   );
 }
 
-function ProcessCard({ process, index }: { process: ProcessoDB; index: number }) {
+function ProcessCard({ process, index, onDelete }: { process: ProcessoDB; index: number; onDelete: (id: string) => void }) {
   const clientName = process.cliente?.nome || 'Cliente';
   const typeLabel = PROCESS_TYPE_LABELS[process.tipo] || process.tipo;
 
