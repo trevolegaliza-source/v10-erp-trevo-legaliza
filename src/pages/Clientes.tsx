@@ -104,10 +104,12 @@ export default function Clientes() {
 
   const handleDelete = () => {
     if (!editClient) return;
-    if (!window.confirm(`Excluir ${editClient.nome}?`)) return;
-    deleteCliente.mutate(editClient.id, {
-      onSuccess: () => setEditClient(null),
+    setPendingDeleteAction(() => () => {
+      deleteCliente.mutate(editClient.id, {
+        onSuccess: () => setEditClient(null),
+      });
     });
+    setShowDeletePassword(true);
   };
 
   const totalClientes = (clientes || []).length;
