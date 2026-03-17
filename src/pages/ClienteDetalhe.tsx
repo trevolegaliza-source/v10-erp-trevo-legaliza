@@ -33,6 +33,40 @@ export default function ClienteDetalhe() {
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
   const updateCliente = useUpdateCliente();
+  const createProcesso = useCreateProcesso();
+  const [showNovoProcesso, setShowNovoProcesso] = useState(false);
+  const [processoForm, setProcessoForm] = useState({
+    razao_social: '',
+    tipo: 'abertura' as TipoProcesso,
+    prioridade: 'normal',
+    responsavel: '',
+    valor_manual: '',
+  });
+  const isManualPrice = processoForm.tipo === 'avulso' || processoForm.tipo === 'orcamento';
+
+  const handleCreateProcesso = () => {
+    if (!cliente || !processoForm.razao_social.trim()) {
+      toast.error('Preencha a Razão Social');
+      return;
+    }
+    createProcesso.mutate(
+      {
+        cliente_id: cliente.id,
+        razao_social: processoForm.razao_social.trim(),
+        tipo: processoForm.tipo,
+        prioridade: processoForm.prioridade,
+        responsavel: processoForm.responsavel || undefined,
+        valor_manual: isManualPrice && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined,
+      },
+      {
+        onSuccess: () => {
+          setShowNovoProcesso(false);
+          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '' });
+          loadAll(cliente.id);
+        },
+      }
+    );
+  };
 
   useEffect(() => {
     if (!id) return;
