@@ -11,6 +11,7 @@ import Processos from "./pages/Processos";
 import ProcessosAtivosDetalhe from "./pages/ProcessosAtivosDetalhe";
 import FaturamentoDetalhe from "./pages/FaturamentoDetalhe";
 import Clientes from "./pages/Clientes";
+import ClienteDetalhe from "./pages/ClienteDetalhe";
 import Financeiro from "./pages/Financeiro";
 import ContasReceber from "./pages/ContasReceber";
 import ContasPagar from "./pages/ContasPagar";
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="/processos-ativos" element={<ProcessosAtivosDetalhe />} />
               <Route path="/faturamento" element={<FaturamentoDetalhe />} />
               <Route path="/clientes" element={<Clientes />} />
+              <Route path="/clientes/:id" element={<ClienteDetalhe />} />
               <Route path="/cadastro-rapido" element={<CadastroRapido />} />
               <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/contas-receber" element={<ContasReceber />} />

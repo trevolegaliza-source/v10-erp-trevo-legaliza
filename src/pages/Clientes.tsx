@@ -11,11 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useClientes, useUpdateCliente, useDeleteCliente } from '@/hooks/useFinanceiro';
 import { useProcessos } from '@/hooks/useFinanceiro';
 import type { ClienteDB, TipoCliente } from '@/types/financial';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export default function Clientes() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [editClient, setEditClient] = useState<ClienteDB | null>(null);
@@ -184,6 +185,7 @@ export default function Clientes() {
                   <TableRow
                     key={client.id}
                     className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate(`/clientes/${client.id}`)}
                     onDoubleClick={() => openEdit(client)}
                   >
                     <TableCell>
