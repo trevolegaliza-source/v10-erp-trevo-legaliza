@@ -90,7 +90,7 @@ export default function CadastroRapido() {
         apelido: clienteForm.apelido || '',
         dia_vencimento_mensal: isMensalista ? clienteForm.dia_vencimento_mensal : 0,
         momento_faturamento: clienteForm.momento_faturamento,
-      },
+      } as any,
       {
         onSuccess: (data: any) => {
           const clienteId = data?.id || data?.[0]?.id;

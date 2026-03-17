@@ -56,14 +56,10 @@ export default function ClienteDetalhe() {
   const handleSaveParams = () => {
     if (!cliente) return;
     const payload: Record<string, any> = { id: cliente.id };
-    // Only send editable fields
-    if (editForm.dia_vencimento_mensal !== undefined) payload.dia_vencimento_mensal = editForm.dia_vencimento_mensal;
-    if (editForm.nome !== undefined) payload.nome = editForm.nome;
-    if (editForm.apelido !== undefined) payload.apelido = editForm.apelido;
-    if (editForm.nome_contador !== undefined) payload.nome_contador = editForm.nome_contador;
-    if (editForm.email !== undefined) payload.email = editForm.email;
-    if (editForm.telefone !== undefined) payload.telefone = editForm.telefone;
-    if (editForm.codigo_identificador !== undefined) payload.codigo_identificador = editForm.codigo_identificador;
+    const fields = ['dia_vencimento_mensal', 'valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'momento_faturamento'] as const;
+    for (const f of fields) {
+      if ((editForm as any)[f] !== undefined) payload[f] = (editForm as any)[f];
+    }
     updateCliente.mutate(payload as any, {
       onSuccess: () => { setEditing(false); loadAll(cliente.id); toast.success('Parâmetros atualizados!'); },
       onError: (err: any) => { toast.error('Erro ao salvar: ' + (err?.message || 'Erro desconhecido')); },
@@ -224,9 +220,9 @@ export default function ClienteDetalhe() {
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Valor da Mensalidade</Label>
                       {editing ? (
-                        <Input type="number" value={editForm.dia_vencimento_mensal || ''} onChange={e => setEditForm(f => ({ ...f }))} placeholder="R$ 0,00" />
+                        <Input type="number" step="0.01" value={(editForm as any).mensalidade ?? ''} onChange={e => setEditForm(f => ({ ...f, mensalidade: e.target.value ? Number(e.target.value) : null }))} placeholder="R$ 0,00" />
                       ) : (
-                        <p className="font-medium">—</p>
+                        <p className="font-medium">{(cliente as any).mensalidade ? Number((cliente as any).mensalidade).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
@@ -239,33 +235,50 @@ export default function ClienteDetalhe() {
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Qtd Processos Inclusos</Label>
-                      <p className="font-medium">—</p>
+                      {editing ? (
+                        <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
+                      ) : (
+                        <p className="font-medium">{(cliente as any).qtd_processos ?? '—'}</p>
+                      )}
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Valor Base</Label>
-                      <p className="font-medium">—</p>
+                      {editing ? (
+                        <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="R$ 0,00" />
+                      ) : (
+                        <p className="font-medium">{(cliente as any).valor_base ? Number((cliente as any).valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</p>
+                      )}
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Desconto Progressivo (%)</Label>
-                      <p className="font-medium">—</p>
+                      {editing ? (
+                        <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} placeholder="0%" />
+                      ) : (
+                        <p className="font-medium">{(cliente as any).desconto_progressivo != null ? `${(cliente as any).desconto_progressivo}%` : '—'}</p>
+                      )}
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Valor Limite de Desconto</Label>
-                      <p className="font-medium">—</p>
+                      {editing ? (
+                        <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} placeholder="R$ 0,00" />
+                      ) : (
+                        <p className="font-medium">{(cliente as any).valor_limite_desconto ? Number((cliente as any).valor_limite_desconto).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</p>
+                      )}
                     </div>
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Dia de Cobrança (D+X)</Label>
-                      <p className="font-medium">—</p>
+                      {editing ? (
+                        <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="4" />
+                      ) : (
+                        <p className="font-medium">{(cliente as any).dia_cobranca != null ? `D+${(cliente as any).dia_cobranca}` : '—'}</p>
+                      )}
                     </div>
                   </>
                 )}
               </div>
-              <p className="text-[10px] text-muted-foreground">
-                💡 Campos financeiros avançados (valor base, desconto, etc.) serão editáveis após migração das colunas no banco de dados.
-              </p>
             </CardContent>
           </Card>
         </TabsContent>
