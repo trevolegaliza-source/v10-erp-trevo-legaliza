@@ -45,9 +45,47 @@ export default function Clientes() {
     return true;
   });
 
+  const [contracts, setContracts] = useState<{ name: string; id: string }[]>([]);
+  const [uploadingContract, setUploadingContract] = useState(false);
+
   const openEdit = (client: ClienteDB) => {
     setEditClient(client);
     setEditForm({ ...client });
+    loadContracts(client.id);
+  };
+
+  const loadContracts = async (clienteId: string) => {
+    const { data } = await supabase.storage.from('contratos').list(clienteId);
+    setContracts((data || []).map(f => ({ name: f.name, id: f.id })));
+  };
+
+  const handleUploadContract = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!editClient || !e.target.files?.[0]) return;
+    const file = e.target.files[0];
+    if (file.size > 10 * 1024 * 1024) { toast.error('Máx. 10MB'); return; }
+    setUploadingContract(true);
+    const ext = file.name.split('.').pop();
+    const path = `${editClient.id}/${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from('contratos').upload(path, file);
+    if (error) toast.error('Erro: ' + error.message);
+    else { toast.success('Contrato anexado!'); loadContracts(editClient.id); }
+    setUploadingContract(false);
+  };
+
+  const handleDownloadContract = async (fileName: string) => {
+    if (!editClient) return;
+    const { data, error } = await supabase.storage.from('contratos').download(`${editClient.id}/${fileName}`);
+    if (error) { toast.error('Erro ao baixar'); return; }
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteContract = async (fileName: string) => {
+    if (!editClient) return;
+    const { error } = await supabase.storage.from('contratos').remove([`${editClient.id}/${fileName}`]);
+    if (error) toast.error('Erro ao excluir');
+    else { toast.success('Contrato removido'); loadContracts(editClient.id); }
   };
 
   const handleSave = () => {
