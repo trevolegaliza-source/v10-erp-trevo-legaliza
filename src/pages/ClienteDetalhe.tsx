@@ -16,6 +16,7 @@ import { KANBAN_STAGES } from '@/types/process';
 import { STATUS_LABELS, STATUS_STYLES, TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso } from '@/types/financial';
 import { cn } from '@/lib/utils';
+import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
