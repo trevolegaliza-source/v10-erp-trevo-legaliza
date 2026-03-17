@@ -652,7 +652,7 @@ export default function ClienteDetalhe() {
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{p.razao_social}</p>
-                      <p className="text-xs text-muted-foreground">{TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo} · {KANBAN_STAGES.find(s => s.id === p.etapa)?.label || p.etapa}</p>
+                      <p className="text-xs text-muted-foreground">{TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo} · {KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa}</p>
                     </div>
                     <span className="text-xs font-medium">{Number(p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                   </label>
