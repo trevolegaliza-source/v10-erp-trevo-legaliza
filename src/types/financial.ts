@@ -67,6 +67,8 @@ export interface Lancamento {
   confirmado_recebimento: boolean;
   observacoes_financeiro: string | null;
   boleto_url: string | null;
+  url_comprovante: string | null;
+  url_recibo_taxa: string | null;
   created_at: string;
   updated_at: string;
   cliente?: ClienteDB;

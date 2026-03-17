@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, Paperclip, ExternalLink } from 'lucide-react';
+import { AlertTriangle, FileText, Upload, CheckCircle2, Paperclip, ExternalLink } from 'lucide-react';
 import type { EtapaFinanceiro } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
@@ -24,6 +24,7 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
   const [notes, setNotes] = useState(lanc?.observacoes_financeiro || '');
 
   const isOverdue = processo.etapa_financeiro === 'honorario_vencido';
+  const isUrgente = processo.prioridade === 'urgente';
   const baseValue = Number(lanc?.valor ?? processo.valor ?? 0);
   const extraNum = Number(lanc?.honorario_extra || 0);
   const totalValue = baseValue + extraNum;
@@ -70,6 +71,21 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
     honorario_pago: 'Marcar Pago ✓',
   };
 
+  const AttachmentLink = ({ url, label }: { url: string | null | undefined; label: string }) => {
+    if (url) {
+      return (
+        <a href={url} target="_blank" rel="noreferrer" className="text-[11px] text-info underline flex items-center gap-1">
+          <CheckCircle2 className="h-3 w-3 text-success" /> {label} <ExternalLink className="h-3 w-3" />
+        </a>
+      );
+    }
+    return (
+      <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+        <Upload className="h-3 w-3" /> {label}
+      </span>
+    );
+  };
+
   return (
     <Card className={cn(
       'border-l-4 transition-shadow hover:shadow-md',
@@ -85,9 +101,16 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
             </div>
             <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
           </div>
-          <span className="text-sm font-bold text-primary whitespace-nowrap">
-            {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          </span>
+          <div className="text-right shrink-0">
+            <span className="text-sm font-bold text-primary whitespace-nowrap">
+              {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </span>
+            {isUrgente && (
+              <Badge variant="outline" className="text-[9px] border-warning text-warning ml-1">
+                +50%
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Due date */}
@@ -97,7 +120,7 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
           </Badge>
         )}
 
-        {/* Honorário Extra */}
+        {/* Honorário Extra + DARE */}
         <div className="flex items-center gap-2">
           <label className="text-[11px] text-muted-foreground whitespace-nowrap">Hon. Extra:</label>
           <Input
@@ -108,6 +131,13 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
             className="h-7 text-xs w-24"
             placeholder="0,00"
           />
+          <button
+            title="Anexar Recibo Taxa/DARE"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => {/* TODO: upload url_recibo_taxa */}}
+          >
+            <Paperclip className="h-3.5 w-3.5" />
+          </button>
         </div>
 
         {/* Checkboxes */}
@@ -134,16 +164,16 @@ export default function FinanceiroCard({ processo, onMoveRequest }: FinanceiroCa
           </div>
         </div>
 
-        {/* Attachment */}
-        <div className="flex items-center gap-2">
-          <Paperclip className="h-3 w-3 text-muted-foreground" />
-          {lanc?.boleto_url ? (
-            <a href={lanc.boleto_url} target="_blank" rel="noreferrer" className="text-[11px] text-info underline flex items-center gap-1">
-              Ver Boleto <ExternalLink className="h-3 w-3" />
-            </a>
-          ) : (
-            <span className="text-[11px] text-muted-foreground">Sem anexo</span>
-          )}
+        {/* Attachments: Boleto + Comprovante */}
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+            <AttachmentLink url={lanc?.boleto_url} label="Boleto" />
+          </div>
+          <div className="flex items-center gap-2">
+            <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+            <AttachmentLink url={(lanc as any)?.url_comprovante} label="Comprovante Pgto" />
+          </div>
         </div>
 
         {/* Notes */}
