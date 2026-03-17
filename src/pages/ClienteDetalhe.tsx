@@ -500,6 +500,60 @@ export default function ClienteDetalhe() {
         onOpenChange={setShowDeletePassword}
         onConfirm={() => { pendingDeleteAction?.(); setPendingDeleteAction(null); }}
       />
+
+      {/* Dialog Novo Processo */}
+      <Dialog open={showNovoProcesso} onOpenChange={setShowNovoProcesso}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Processo — {cliente.nome}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-1.5">
+              <Label>Razão Social *</Label>
+              <Input value={processoForm.razao_social} onChange={e => setProcessoForm(f => ({ ...f, razao_social: e.target.value }))} placeholder="Nome da empresa" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-1.5">
+                <Label>Tipo</Label>
+                <Select value={processoForm.tipo} onValueChange={v => setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(TIPO_PROCESSO_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Prioridade</Label>
+                <Select value={processoForm.prioridade} onValueChange={v => setProcessoForm(f => ({ ...f, prioridade: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="urgente">Urgente (+50%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Responsável</Label>
+              <Input value={processoForm.responsavel} onChange={e => setProcessoForm(f => ({ ...f, responsavel: e.target.value }))} placeholder="Opcional" />
+            </div>
+            {isManualPrice && (
+              <div className="grid gap-1.5">
+                <Label>Valor Manual (R$)</Label>
+                <Input type="number" step="0.01" value={processoForm.valor_manual} onChange={e => setProcessoForm(f => ({ ...f, valor_manual: e.target.value }))} placeholder="0,00" />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNovoProcesso(false)}>Cancelar</Button>
+            <Button onClick={handleCreateProcesso} disabled={createProcesso.isPending}>
+              {createProcesso.isPending ? 'Criando...' : 'Criar Processo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
