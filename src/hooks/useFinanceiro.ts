@@ -116,16 +116,32 @@ export function useDeleteCliente() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      // processos are deleted via ON DELETE CASCADE
+      // Delete lancamentos referencing this client's processes first
+      const { data: procs } = await supabase.from('processos').select('id').eq('cliente_id', id);
+      if (procs && procs.length > 0) {
+        const procIds = procs.map(p => p.id);
+        const { error: lErr } = await supabase.from('lancamentos').delete().in('processo_id', procIds);
+        if (lErr) throw lErr;
+      }
+      // Delete lancamentos referencing client directly
+      const { error: lcErr } = await supabase.from('lancamentos').delete().eq('cliente_id', id);
+      if (lcErr) throw lcErr;
+      // Delete documentos for processes
+      if (procs && procs.length > 0) {
+        const procIds = procs.map(p => p.id);
+        await supabase.from('documentos').delete().in('processo_id', procIds);
+      }
+      // Now delete client (processos cascade)
       const { error } = await supabase.from('clientes').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clientes'] });
       qc.invalidateQueries({ queryKey: ['processos_db'] });
+      qc.invalidateQueries({ queryKey: ['lancamentos'] });
       toast.success('Cliente e processos excluídos!');
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error('Erro ao excluir: ' + e.message),
   });
 }
 
