@@ -22,6 +22,8 @@ export default function Clientes() {
   const [showInactive, setShowInactive] = useState(false);
   const [editClient, setEditClient] = useState<ClienteDB | null>(null);
   const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
+  const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
 
   const { data: clientes, isLoading } = useClientes(search);
   const { data: processos } = useProcessos();
