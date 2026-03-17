@@ -249,7 +249,18 @@ BEGIN
   END IF;
 END $$;
 
--- 9. VALORES ADICIONAIS (linked to processos)
+-- 9. STORAGE BUCKET for documents
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('documentos', 'documentos', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage RLS: allow all authenticated and anon for now
+CREATE POLICY "documentos_upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'documentos');
+CREATE POLICY "documentos_select" ON storage.objects FOR SELECT USING (bucket_id = 'documentos');
+CREATE POLICY "documentos_update" ON storage.objects FOR UPDATE USING (bucket_id = 'documentos');
+CREATE POLICY "documentos_delete" ON storage.objects FOR DELETE USING (bucket_id = 'documentos');
+
+-- 10. VALORES ADICIONAIS (linked to processos)
 CREATE TABLE IF NOT EXISTS public.valores_adicionais (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   processo_id UUID REFERENCES public.processos(id) ON DELETE CASCADE NOT NULL,
