@@ -87,9 +87,12 @@ export default function Clientes() {
 
   const handleDeleteContract = async (fileName: string) => {
     if (!editClient) return;
-    const { error } = await supabase.storage.from('contratos').remove([`${editClient.id}/${fileName}`]);
-    if (error) toast.error('Erro ao excluir');
-    else { toast.success('Contrato removido'); loadContracts(editClient.id); }
+    setPendingDeleteAction(() => async () => {
+      const { error } = await supabase.storage.from('contratos').remove([`${editClient.id}/${fileName}`]);
+      if (error) toast.error('Erro ao excluir');
+      else { toast.success('Contrato removido'); loadContracts(editClient.id); }
+    });
+    setShowDeletePassword(true);
   };
 
   const handleSave = () => {
