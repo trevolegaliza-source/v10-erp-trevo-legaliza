@@ -595,6 +595,175 @@ export default function ClienteDetalhe() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Archive Password Dialog */}
+      <PasswordConfirmDialog
+        open={showArchivePassword}
+        onOpenChange={setShowArchivePassword}
+        title={isArchived ? 'Desarquivar Cliente' : 'Arquivar Cliente'}
+        description={isArchived ? 'Digite a senha para desarquivar este cliente e seus processos.' : 'Digite a senha para arquivar este cliente e seus processos. Eles ficarão ocultos mas não serão excluídos.'}
+        onConfirm={() => {
+          if (!cliente) return;
+          if (isArchived) {
+            unarchiveCliente.mutate(cliente.id, { onSuccess: () => loadAll(cliente.id) });
+          } else {
+            archiveCliente.mutate(cliente.id, { onSuccess: () => loadAll(cliente.id) });
+          }
+        }}
+      />
+
+      {/* Delete Cliente Password Dialog */}
+      <PasswordConfirmDialog
+        open={showDeleteClientePassword}
+        onOpenChange={setShowDeleteClientePassword}
+        title="Excluir Cliente"
+        description={`Tem certeza? Isso excluirá permanentemente "${cliente.nome}" e todos os seus ${processos.length} processos e lançamentos.`}
+        onConfirm={() => {
+          if (!cliente) return;
+          deleteCliente.mutate(cliente.id, { onSuccess: () => navigate('/clientes') });
+        }}
+      />
+
+      {/* Gerar Relatório Dialog */}
+      <Dialog open={showRelatorioDialog} onOpenChange={setShowRelatorioDialog}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><FileBarChart className="h-5 w-5" /> Gerar Relatório</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Selecione os processos que deseja incluir no relatório:</p>
+            <div className="flex gap-2 mb-2">
+              <Button variant="outline" size="sm" className="text-xs" onClick={() => setSelectedRelatorioProcessos(new Set(processos.map(p => p.id)))}>Selecionar Todos</Button>
+              <Button variant="outline" size="sm" className="text-xs" onClick={() => setSelectedRelatorioProcessos(new Set())}>Limpar</Button>
+            </div>
+            {processos.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">Nenhum processo encontrado.</p>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-2">
+                {processos.map(p => (
+                  <label key={p.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer">
+                    <Checkbox
+                      checked={selectedRelatorioProcessos.has(p.id)}
+                      onCheckedChange={(checked) => {
+                        const next = new Set(selectedRelatorioProcessos);
+                        if (checked) next.add(p.id); else next.delete(p.id);
+                        setSelectedRelatorioProcessos(next);
+                      }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{p.razao_social}</p>
+                      <p className="text-xs text-muted-foreground">{TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo} · {KANBAN_STAGES.find(s => s.id === p.etapa)?.label || p.etapa}</p>
+                    </div>
+                    <span className="text-xs font-medium">{Number(p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRelatorioDialog(false)}>Cancelar</Button>
+            <Button
+              disabled={selectedRelatorioProcessos.size === 0}
+              onClick={() => {
+                const selected = processos.filter(p => selectedRelatorioProcessos.has(p.id));
+                const lines = [
+                  `RELATÓRIO - ${cliente.nome}`,
+                  `Data: ${new Date().toLocaleDateString('pt-BR')}`,
+                  `Código: ${cliente.codigo_identificador}`,
+                  '',
+                  'PROCESSOS:',
+                  ...selected.map((p, i) => `${i + 1}. ${p.razao_social} | ${TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo} | ${Number(p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} | Etapa: ${KANBAN_STAGES.find(s => s.id === p.etapa)?.label || p.etapa}`),
+                  '',
+                  `TOTAL: ${selected.reduce((s, p) => s + Number(p.valor || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+                ];
+                const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = `relatorio_${cliente.codigo_identificador}_${Date.now()}.txt`; a.click();
+                URL.revokeObjectURL(url);
+                toast.success(`Relatório gerado com ${selected.length} processo(s)`);
+                setShowRelatorioDialog(false);
+              }}
+            >
+              Gerar Relatório ({selectedRelatorioProcessos.size})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Gerar Cobrança Dialog */}
+      <Dialog open={showCobrancaDialog} onOpenChange={setShowCobrancaDialog}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" /> Gerar Cobrança</DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const pendentes = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente');
+            return (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Processos com cobrança pendente para envio de boleto:</p>
+                {pendentes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma cobrança pendente.</p>
+                ) : (
+                  <>
+                    <div className="flex gap-2 mb-2">
+                      <Button variant="outline" size="sm" className="text-xs" onClick={() => setSelectedCobrancaProcessos(new Set(pendentes.map(l => l.id)))}>Selecionar Todos</Button>
+                      <Button variant="outline" size="sm" className="text-xs" onClick={() => setSelectedCobrancaProcessos(new Set())}>Limpar</Button>
+                    </div>
+                    <div className="space-y-2 max-h-60 overflow-y-auto border rounded-md p-2">
+                      {pendentes.map(l => (
+                        <label key={l.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 cursor-pointer">
+                          <Checkbox
+                            checked={selectedCobrancaProcessos.has(l.id)}
+                            onCheckedChange={(checked) => {
+                              const next = new Set(selectedCobrancaProcessos);
+                              if (checked) next.add(l.id); else next.delete(l.id);
+                              setSelectedCobrancaProcessos(next);
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{l.descricao}</p>
+                            <p className="text-xs text-muted-foreground">Venc: {l.data_vencimento ? new Date(l.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}</p>
+                          </div>
+                          <span className="text-sm font-semibold text-warning">{Number(l.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowCobrancaDialog(false)}>Cancelar</Button>
+                  <Button
+                    disabled={selectedCobrancaProcessos.size === 0}
+                    onClick={() => {
+                      const selected = pendentes.filter(l => selectedCobrancaProcessos.has(l.id));
+                      const total = selected.reduce((s, l) => s + Number(l.valor || 0), 0);
+                      const lines = [
+                        `COBRANÇA - ${cliente.nome}`,
+                        `Data: ${new Date().toLocaleDateString('pt-BR')}`,
+                        `Código: ${cliente.codigo_identificador}`,
+                        cliente.email ? `E-mail: ${cliente.email}` : '',
+                        '',
+                        'ITENS:',
+                        ...selected.map((l, i) => `${i + 1}. ${l.descricao} | Vencimento: ${l.data_vencimento ? new Date(l.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'} | ${Number(l.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`),
+                        '',
+                        `TOTAL: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+                      ].filter(Boolean);
+                      const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a'); a.href = url; a.download = `cobranca_${cliente.codigo_identificador}_${Date.now()}.txt`; a.click();
+                      URL.revokeObjectURL(url);
+                      toast.success(`Cobrança gerada: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+                      setShowCobrancaDialog(false);
+                    }}
+                  >
+                    Gerar Cobrança ({selectedCobrancaProcessos.size})
+                  </Button>
+                </DialogFooter>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
