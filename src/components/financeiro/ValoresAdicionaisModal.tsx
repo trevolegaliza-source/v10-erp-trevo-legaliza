@@ -1,22 +1,17 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Trash2, Paperclip, CheckCircle2, Pencil, X, Check } from 'lucide-react';
+import { Plus, Trash2, Paperclip, CheckCircle2, Pencil, X, Check, Upload, Download } from 'lucide-react';
 import {
-  useValoresAdicionais,
-  useAddValorAdicional,
-  useUpdateValorAdicional,
-  useDeleteValorAdicional,
+  useValoresAdicionais, useAddValorAdicional, useUpdateValorAdicional, useDeleteValorAdicional,
 } from '@/hooks/useValoresAdicionais';
+import { uploadFile, viewFile } from '@/hooks/useStorageUpload';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
+import { toast } from 'sonner';
 
 interface ValoresAdicionaisModalProps {
   open: boolean;
@@ -26,10 +21,7 @@ interface ValoresAdicionaisModalProps {
 }
 
 export default function ValoresAdicionaisModal({
-  open,
-  onOpenChange,
-  processoId,
-  clienteApelido,
+  open, onOpenChange, processoId, clienteApelido,
 }: ValoresAdicionaisModalProps) {
   const { data: items = [], isLoading } = useValoresAdicionais(processoId);
   const addMut = useAddValorAdicional();
@@ -38,13 +30,15 @@ export default function ValoresAdicionaisModal({
 
   const [newDesc, setNewDesc] = useState('');
   const [newValor, setNewValor] = useState('');
-
   const [editId, setEditId] = useState<string | null>(null);
   const [editDesc, setEditDesc] = useState('');
   const [editValor, setEditValor] = useState('');
-
   const [deleteTarget, setDeleteTarget] = useState<{ id: string } | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
+
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadTargetId, setUploadTargetId] = useState<string | null>(null);
 
   const subtotal = items.reduce((s, i) => s + Number(i.valor), 0);
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -60,8 +54,7 @@ export default function ValoresAdicionaisModal({
   const handleSaveEdit = (id: string) => {
     const valor = parseFloat(editValor.replace(',', '.')) || 0;
     updateMut.mutate({
-      id,
-      processo_id: processoId,
+      id, processo_id: processoId,
       updates: { descricao: editDesc.trim(), valor },
     });
     setEditId(null);
@@ -83,6 +76,27 @@ export default function ValoresAdicionaisModal({
     setEditId(item.id);
     setEditDesc(item.descricao);
     setEditValor(String(item.valor));
+  };
+
+  const handleFileUpload = async (itemId: string, file: File) => {
+    try {
+      setUploading(itemId);
+      const path = await uploadFile(file, 'valores_adicionais', processoId);
+      updateMut.mutate({
+        id: itemId, processo_id: processoId,
+        updates: { anexo_url: path },
+      });
+      toast.success('Guia/Recibo anexado');
+    } catch {
+      // handled
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const triggerUpload = (itemId: string) => {
+    setUploadTargetId(itemId);
+    setTimeout(() => fileRef.current?.click(), 0);
   };
 
   return (
@@ -117,17 +131,25 @@ export default function ValoresAdicionaisModal({
                 className="h-8 text-xs"
               />
             </div>
-            <Button
-              size="sm"
-              className="h-8 px-3"
-              onClick={handleAdd}
-              disabled={addMut.isPending}
-            >
+            <Button size="sm" className="h-8 px-3" onClick={handleAdd} disabled={addMut.isPending}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar
             </Button>
           </div>
 
           <Separator />
+
+          {/* Hidden file input */}
+          <input
+            ref={fileRef}
+            type="file"
+            className="hidden"
+            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f && uploadTargetId) handleFileUpload(uploadTargetId, f);
+              e.target.value = '';
+            }}
+          />
 
           {/* List */}
           <div className="flex-1 overflow-y-auto space-y-1.5 min-h-[100px]">
@@ -144,16 +166,8 @@ export default function ValoresAdicionaisModal({
               >
                 {editId === item.id ? (
                   <>
-                    <Input
-                      value={editDesc}
-                      onChange={(e) => setEditDesc(e.target.value)}
-                      className="h-7 text-xs flex-1"
-                    />
-                    <Input
-                      value={editValor}
-                      onChange={(e) => setEditValor(e.target.value)}
-                      className="h-7 text-xs w-24"
-                    />
+                    <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="h-7 text-xs flex-1" />
+                    <Input value={editValor} onChange={(e) => setEditValor(e.target.value)} className="h-7 text-xs w-24" />
                     <button onClick={() => handleSaveEdit(item.id)} className="text-success hover:text-success/80">
                       <Check className="h-3.5 w-3.5" />
                     </button>
@@ -167,12 +181,28 @@ export default function ValoresAdicionaisModal({
                     <span className="text-xs font-semibold text-primary whitespace-nowrap">
                       {fmt(Number(item.valor))}
                     </span>
+                    {/* Attach guia/recibo */}
                     {item.anexo_url ? (
-                      <a href={item.anexo_url} target="_blank" rel="noreferrer" title="Ver anexo">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                      </a>
+                      <button
+                        onClick={() => viewFile(item.anexo_url!)}
+                        title="Ver Guia/Recibo"
+                        className="text-success hover:text-success/80"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      </button>
                     ) : (
-                      <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                      <button
+                        onClick={() => triggerUpload(item.id)}
+                        title="Anexar Guia/Recibo"
+                        disabled={uploading === item.id}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {uploading === item.id ? (
+                          <Upload className="h-3.5 w-3.5 animate-pulse" />
+                        ) : (
+                          <Paperclip className="h-3.5 w-3.5" />
+                        )}
+                      </button>
                     )}
                     <button
                       onClick={() => startEdit(item)}

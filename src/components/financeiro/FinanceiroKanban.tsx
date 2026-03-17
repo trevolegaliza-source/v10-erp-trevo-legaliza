@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import FinanceiroCard from './FinanceiroCard';
+import ProcessoEditModal from './ProcessoEditModal';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import GerarCobrancaModal from './GerarCobrancaModal';
 import { useMoveEtapaFinanceiro } from '@/hooks/useProcessosFinanceiro';
@@ -23,15 +24,22 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
   const [passwordTitle, setPasswordTitle] = useState('');
   const [passwordDesc, setPasswordDesc] = useState('');
 
-  // Gerar Cobrança confirmation modal
   const [cobrancaModalOpen, setCobrancaModalOpen] = useState(false);
   const [cobrancaProcesso, setCobrancaProcesso] = useState<ProcessoFinanceiro | null>(null);
+
+  // Double-click edit modal
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
+
+  const handleDoubleClick = (processo: ProcessoFinanceiro) => {
+    setEditProcesso(processo);
+    setEditModalOpen(true);
+  };
 
   const handleMoveRequest = (processo: ProcessoFinanceiro, targetEtapa: EtapaFinanceiro) => {
     const cliente = processo.cliente as any;
     const momentoFat = cliente?.momento_faturamento || 'na_solicitacao';
 
-    // Trava de Antecipação
     if (
       processo.etapa_financeiro === 'solicitacao_criada' &&
       targetEtapa === 'gerar_cobranca' &&
@@ -44,7 +52,6 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
       return;
     }
 
-    // Trava de Inadimplência
     if (processo.etapa_financeiro === 'honorario_vencido') {
       setPasswordTitle('Trava de Inadimplência');
       setPasswordDesc('Para mover um honorário vencido, insira a senha master.');
@@ -53,7 +60,6 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
       return;
     }
 
-    // Gerar Cobrança → show summary modal first
     if (targetEtapa === 'cobranca_gerada' && processo.etapa_financeiro === 'gerar_cobranca') {
       setCobrancaProcesso(processo);
       setCobrancaModalOpen(true);
@@ -72,13 +78,7 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
 
   const handlePasswordConfirm = () => {
     if (pendingMove) {
-      // If pending move target is gerar_cobranca, after password show summary modal
-      if (pendingMove.target === 'gerar_cobranca') {
-        // Move to gerar_cobranca directly (antecipação approved)
-        executeMove(pendingMove.processo, pendingMove.target);
-      } else {
-        executeMove(pendingMove.processo, pendingMove.target);
-      }
+      executeMove(pendingMove.processo, pendingMove.target);
       setPendingMove(null);
     }
   };
@@ -116,7 +116,12 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
             <ScrollArea className="h-[calc(100vh-320px)]">
               <div className="space-y-2 pr-2">
                 {col.items.map((p) => (
-                  <FinanceiroCard key={p.id} processo={p} onMoveRequest={handleMoveRequest} />
+                  <FinanceiroCard
+                    key={p.id}
+                    processo={p}
+                    onMoveRequest={handleMoveRequest}
+                    onDoubleClick={handleDoubleClick}
+                  />
                 ))}
                 {col.items.length === 0 && (
                   <p className="text-xs text-muted-foreground text-center py-8">Nenhum item</p>
@@ -140,6 +145,12 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
         onOpenChange={setCobrancaModalOpen}
         processo={cobrancaProcesso}
         onConfirm={handleCobrancaConfirm}
+      />
+
+      <ProcessoEditModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        processo={editProcesso}
       />
     </>
   );

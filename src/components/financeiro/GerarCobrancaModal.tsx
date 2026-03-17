@@ -1,13 +1,10 @@
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
+import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
 
 interface GerarCobrancaModalProps {
   open: boolean;
@@ -22,11 +19,12 @@ export default function GerarCobrancaModal({ open, onOpenChange, processo, onCon
   const lanc = processo.lancamento;
   const baseValue = Number(lanc?.valor ?? processo.valor ?? 0);
   const isUrgente = processo.prioridade === 'urgente';
-  // Base before urgency: if urgent, base = baseValue / 1.5
   const rawBase = isUrgente ? baseValue / 1.5 : baseValue;
   const urgencyAddon = isUrgente ? rawBase * 0.5 : 0;
-  const extraHon = Number(lanc?.honorario_extra || 0);
-  const total = baseValue + extraHon;
+
+  const { data: valoresAdicionais = [] } = useValoresAdicionais(processo.id);
+  const somaAdicionais = valoresAdicionais.reduce((s, i) => s + Number(i.valor), 0);
+  const total = baseValue + somaAdicionais;
 
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -54,11 +52,17 @@ export default function GerarCobrancaModal({ open, onOpenChange, processo, onCon
               <span className="text-warning">{fmt(urgencyAddon)}</span>
             </div>
           )}
-          {extraHon > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Honorários Extras / Reembolsos</span>
-              <span>{fmt(extraHon)}</span>
-            </div>
+          {valoresAdicionais.length > 0 && (
+            <>
+              <Separator />
+              <p className="text-xs font-semibold text-muted-foreground uppercase">Valores Adicionais</p>
+              {valoresAdicionais.map((item) => (
+                <div key={item.id} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{item.descricao}</span>
+                  <span>{fmt(Number(item.valor))}</span>
+                </div>
+              ))}
+            </>
           )}
           <Separator />
           <div className="flex justify-between text-base font-bold">
