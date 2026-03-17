@@ -55,8 +55,18 @@ export default function ClienteDetalhe() {
 
   const handleSaveParams = () => {
     if (!cliente) return;
-    updateCliente.mutate({ id: cliente.id, ...editForm } as any, {
+    const payload: Record<string, any> = { id: cliente.id };
+    // Only send editable fields
+    if (editForm.dia_vencimento_mensal !== undefined) payload.dia_vencimento_mensal = editForm.dia_vencimento_mensal;
+    if (editForm.nome !== undefined) payload.nome = editForm.nome;
+    if (editForm.apelido !== undefined) payload.apelido = editForm.apelido;
+    if (editForm.nome_contador !== undefined) payload.nome_contador = editForm.nome_contador;
+    if (editForm.email !== undefined) payload.email = editForm.email;
+    if (editForm.telefone !== undefined) payload.telefone = editForm.telefone;
+    if (editForm.codigo_identificador !== undefined) payload.codigo_identificador = editForm.codigo_identificador;
+    updateCliente.mutate(payload as any, {
       onSuccess: () => { setEditing(false); loadAll(cliente.id); toast.success('Parâmetros atualizados!'); },
+      onError: (err: any) => { toast.error('Erro ao salvar: ' + (err?.message || 'Erro desconhecido')); },
     });
   };
 
