@@ -64,7 +64,7 @@ function ProcessCard({ process, index, onDelete }: { process: ProcessoDB; index:
               <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{clientName}</p>
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
-              <QuickActionsMenu process={process} />
+              <QuickActionsMenu process={process} onDelete={onDelete} />
               <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           </div>
