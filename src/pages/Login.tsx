@@ -38,7 +38,7 @@ export default function Login() {
           <p className="text-sm text-muted-foreground">{isSignUp ? 'Crie sua conta' : 'Acesse o sistema ERP'}</p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
               <Input
