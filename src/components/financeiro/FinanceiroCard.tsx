@@ -177,13 +177,10 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                   </TooltipTrigger>
                   <TooltipContent side="left" className="text-xs max-w-[220px]">
                     <div className="space-y-0.5">
-                      <p>Valor Base: {formatBRL(calculo.valorBase)}</p>
-                      {calculo.descontoValor > 0 && <p>Desconto ({calculo.descontoPercent}%): -{formatBRL(calculo.descontoValor)}</p>}
-                      {calculo.urgencia > 0 && <p>Urgência +50%: +{formatBRL(calculo.urgencia)}</p>}
-                      <p>Serviço: {formatBRL(calculo.valorServico)}</p>
-                      {calculo.somaAdicionais > 0 && <p>Adicionais: +{formatBRL(calculo.somaAdicionais)}</p>}
-                      <p className="font-semibold border-t border-border pt-0.5 mt-1">Total: {formatBRL(calculo.totalFinal)}</p>
-                      {calculo.isMensalista && <p className="text-info">Incluso na franquia mensal</p>}
+                      <p>Valor Serviço: {formatBRL(valorArmazenado)}</p>
+                      {isUrgente && <p className="text-warning">Inclui Urgência +50%</p>}
+                      {somaAdicionais > 0 && <p>Adicionais: +{formatBRL(somaAdicionais)}</p>}
+                      <p className="font-semibold border-t border-border pt-0.5 mt-1">Total: {formatBRL(totalValue)}</p>
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -191,7 +188,10 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
               {isUrgente && (
                 <Badge variant="outline" className="text-[9px] border-warning text-warning ml-1">+50%</Badge>
               )}
-              {calculo.isMensalista && (
+              {momentoFat === 'no_deferimento' && (
+                <Badge variant="outline" className="text-[9px] border-info text-info ml-1">Deferimento</Badge>
+              )}
+              {cliente?.tipo === 'MENSALISTA' && (
                 <Badge variant="outline" className="text-[9px] border-info text-info block mt-0.5">Mensalista</Badge>
               )}
             </div>
