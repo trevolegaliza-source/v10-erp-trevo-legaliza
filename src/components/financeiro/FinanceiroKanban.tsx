@@ -99,9 +99,9 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
 
   return (
     <>
-      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
+      <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-thin w-full">
         {columns.map((col) => (
-          <div key={col.etapa} className="flex-shrink-0 w-72">
+          <div key={col.etapa} className="flex-1 min-w-[260px]">
             <div className={cn('rounded-t-lg border-t-4 bg-card p-3 mb-2', col.color)}>
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">

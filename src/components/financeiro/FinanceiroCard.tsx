@@ -15,7 +15,7 @@ import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
 import { uploadFile, viewFile, getSignedUrl } from '@/hooks/useStorageUpload';
-import { calcularPrecoProcesso, formatBRL } from '@/lib/pricing-engine';
+import { formatBRL } from '@/lib/pricing-engine';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
