@@ -13,6 +13,7 @@ import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
 import { uploadFile, viewFile, getSignedUrl } from '@/hooks/useStorageUpload';
+import { formatBRL } from '@/lib/pricing-engine';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { useDeleteProcesso } from '@/hooks/useProcessos';
@@ -40,8 +41,8 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   if (!processo) return null;
 
   const lanc = processo.lancamento;
-  const clienteApelido = (processo.cliente as any)?.apelido || (processo.cliente as any)?.nome || '-';
-
+  const cliente = processo.cliente as any;
+  const clienteApelido = cliente?.apelido || cliente?.nome || '-';
   const currentNotes = lanc?.observacoes_financeiro || '';
 
   const handleNotesBlur = () => {
@@ -88,8 +89,6 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
     });
   };
 
-  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
   const DocRow = ({
     label, storagePath, field, inputRef, folder,
   }: {
@@ -108,31 +107,15 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
       <div className="flex items-center gap-1.5">
         {storagePath && (
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => viewFile(storagePath)}
-            >
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => viewFile(storagePath)}>
               <Eye className="h-3 w-3 mr-1" /> Ver
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={() => handleDownload(storagePath)}
-            >
+            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleDownload(storagePath)}>
               <Download className="h-3 w-3 mr-1" /> Baixar
             </Button>
           </>
         )}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs"
-          disabled={uploading === field}
-          onClick={() => inputRef.current?.click()}
-        >
+        <Button variant="outline" size="sm" className="h-7 text-xs" disabled={uploading === field} onClick={() => inputRef.current?.click()}>
           <Upload className="h-3 w-3 mr-1" />
           {uploading === field ? 'Enviando...' : storagePath ? 'Substituir' : 'Enviar'}
         </Button>
@@ -164,6 +147,9 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
             <DialogTitle className="flex items-center gap-2">
               Editar Processo
               <Badge variant="outline" className="text-[10px]">{processo.tipo}</Badge>
+              {cliente?.tipo === 'MENSALISTA' && (
+                <Badge variant="outline" className="text-[10px] border-info text-info">Mensalista</Badge>
+              )}
             </DialogTitle>
             <DialogDescription>
               {processo.razao_social} — <span className="font-semibold text-foreground">{clienteApelido}</span>
@@ -175,18 +161,24 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
             <div className="rounded-lg border border-border bg-muted/30 p-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Valor Base</span>
-                <span>{fmt(baseValue)}</span>
+                <span>{formatBRL(baseValue)}</span>
               </div>
+              {cliente?.desconto_progressivo > 0 && (
+                <div className="flex justify-between text-sm mt-1">
+                  <span className="text-info">Desconto Progressivo</span>
+                  <span className="text-info">{cliente.desconto_progressivo}%</span>
+                </div>
+              )}
               {somaAdicionais > 0 && (
                 <div className="flex justify-between text-sm mt-1">
-                  <span className="text-muted-foreground">Valores Adicionais</span>
-                  <span className="text-primary">{fmt(somaAdicionais)}</span>
+                  <span className="text-muted-foreground">Valores Adicionais ({valoresAdicionais.length})</span>
+                  <span className="text-primary">{formatBRL(somaAdicionais)}</span>
                 </div>
               )}
               <Separator className="my-2" />
               <div className="flex justify-between font-bold">
                 <span>Total</span>
-                <span className="text-primary">{fmt(totalValue)}</span>
+                <span className="text-primary">{formatBRL(totalValue)}</span>
               </div>
             </div>
 
@@ -216,7 +208,7 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
                 Gerenciar Valores Adicionais
                 {somaAdicionais > 0 && (
                   <Badge variant="secondary" className="ml-auto text-[10px] h-4 px-1.5">
-                    {valoresAdicionais.length} itens · {fmt(somaAdicionais)}
+                    {valoresAdicionais.length} itens · {formatBRL(somaAdicionais)}
                   </Badge>
                 )}
               </Button>
@@ -227,50 +219,22 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
             {/* Documents */}
             <div className="space-y-1">
               <label className="text-xs font-medium">Documentos Anexados</label>
-              <DocRow
-                label="Boleto"
-                storagePath={lanc?.boleto_url}
-                field="boleto_url"
-                inputRef={boletoRef}
-                folder="boletos"
-              />
-              <DocRow
-                label="Comprovante de Pagamento"
-                storagePath={(lanc as any)?.url_comprovante}
-                field="url_comprovante"
-                inputRef={comprovanteRef}
-                folder="comprovantes"
-              />
-              <DocRow
-                label="Guia / Recibo de Taxa"
-                storagePath={(lanc as any)?.url_recibo_taxa}
-                field="url_recibo_taxa"
-                inputRef={reciboRef}
-                folder="recibos"
-              />
+              <DocRow label="Boleto" storagePath={lanc?.boleto_url} field="boleto_url" inputRef={boletoRef} folder="boletos" />
+              <DocRow label="Comprovante de Pagamento" storagePath={(lanc as any)?.url_comprovante} field="url_comprovante" inputRef={comprovanteRef} folder="comprovantes" />
+              <DocRow label="Guia / Recibo de Taxa" storagePath={(lanc as any)?.url_recibo_taxa} field="url_recibo_taxa" inputRef={reciboRef} folder="recibos" />
             </div>
 
             <Separator />
 
             {/* Delete */}
-            <Button
-              variant="destructive"
-              size="sm"
-              className="w-full"
-              onClick={() => setDeleteOpen(true)}
-            >
+            <Button variant="destructive" size="sm" className="w-full" onClick={() => setDeleteOpen(true)}>
               <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Excluir Processo
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <ValoresAdicionaisModal
-        open={valoresOpen}
-        onOpenChange={setValoresOpen}
-        processoId={processo.id}
-        clienteApelido={clienteApelido}
-      />
+      <ValoresAdicionaisModal open={valoresOpen} onOpenChange={setValoresOpen} processoId={processo.id} clienteApelido={clienteApelido} />
 
       <PasswordConfirmDialog
         open={deleteOpen}

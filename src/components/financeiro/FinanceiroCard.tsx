@@ -14,6 +14,7 @@ import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
 import { uploadFile, viewFile, getSignedUrl } from '@/hooks/useStorageUpload';
+import { calcularPrecoProcesso, formatBRL } from '@/lib/pricing-engine';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -40,9 +41,26 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
 
   const isOverdue = processo.etapa_financeiro === 'honorario_vencido';
   const isUrgente = processo.prioridade === 'urgente';
-  const baseValue = Number(lanc?.valor ?? processo.valor ?? 0);
-  const totalValue = baseValue + somaAdicionais;
-  const clienteApelido = (processo.cliente as any)?.apelido || (processo.cliente as any)?.nome || '-';
+  const cliente = processo.cliente as any;
+
+  // Use pricing engine for calculation
+  const calculo = calcularPrecoProcesso({
+    cliente: cliente ? {
+      tipo: cliente.tipo || 'AVULSO_4D',
+      valor_base: cliente.valor_base,
+      desconto_progressivo: cliente.desconto_progressivo,
+      valor_limite_desconto: cliente.valor_limite_desconto,
+      mensalidade: cliente.mensalidade,
+      qtd_processos: cliente.qtd_processos,
+    } : null,
+    baseOverride: Number(lanc?.valor ?? processo.valor ?? 0),
+    processosNoMes: 0, // Already calculated server-side
+    isUrgente: false, // Already applied to base value
+    somaAdicionais,
+  });
+
+  const totalValue = calculo.totalFinal;
+  const clienteApelido = cliente?.apelido || cliente?.nome || '-';
   const vencimento = lanc?.data_vencimento;
 
   const mutateField = (updates: Record<string, any>) => {
@@ -50,7 +68,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
       processoId: processo.id,
       lancamentoId: lanc?.id,
       clienteId: processo.cliente_id,
-      valor: baseValue,
+      valor: Number(lanc?.valor ?? processo.valor ?? 0),
       updates,
     });
   };
@@ -107,18 +125,10 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
         <div className="flex items-center gap-1">
           <CheckCircle2 className="h-3 w-3 text-success" />
           <span className="text-[11px] font-medium">{label}</span>
-          <button
-            onClick={() => viewFile(storagePath)}
-            className="text-info hover:text-info/80 p-0.5"
-            title="Visualizar"
-          >
+          <button onClick={() => viewFile(storagePath)} className="text-info hover:text-info/80 p-0.5" title="Visualizar">
             <Eye className="h-3 w-3" />
           </button>
-          <button
-            onClick={() => handleDownload(storagePath)}
-            className="text-primary hover:text-primary/80 p-0.5"
-            title="Download"
-          >
+          <button onClick={() => handleDownload(storagePath)} className="text-primary hover:text-primary/80 p-0.5" title="Download">
             <Download className="h-3 w-3" />
           </button>
         </div>
@@ -146,8 +156,6 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
     </div>
   );
 
-  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
   return (
     <>
       <Card
@@ -169,15 +177,24 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
             </div>
             <div className="text-right shrink-0">
               <span className="text-sm font-bold text-primary whitespace-nowrap">
-                {fmt(totalValue)}
+                {formatBRL(totalValue)}
               </span>
               {isUrgente && (
-                <Badge variant="outline" className="text-[9px] border-warning text-warning ml-1">
-                  +50%
-                </Badge>
+                <Badge variant="outline" className="text-[9px] border-warning text-warning ml-1">+50%</Badge>
+              )}
+              {calculo.isMensalista && (
+                <Badge variant="outline" className="text-[9px] border-info text-info block mt-0.5">Mensalista</Badge>
               )}
             </div>
           </div>
+
+          {/* Discount info */}
+          {cliente?.desconto_progressivo > 0 && !calculo.isMensalista && (
+            <div className="text-[10px] text-muted-foreground bg-muted/50 rounded px-2 py-1">
+              Desc. {cliente.desconto_progressivo}% progressivo
+              {cliente.valor_limite_desconto && ` (mín. ${formatBRL(cliente.valor_limite_desconto)})`}
+            </div>
+          )}
 
           {/* Due date */}
           {vencimento && (
@@ -197,7 +214,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
             Valores Adicionais
             {somaAdicionais > 0 && (
               <Badge variant="secondary" className="ml-auto text-[10px] h-4 px-1.5">
-                {fmt(somaAdicionais)}
+                {formatBRL(somaAdicionais)}
               </Badge>
             )}
           </Button>
@@ -228,20 +245,8 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
 
           {/* Attachments with download */}
           <div className="space-y-1">
-            <AttachBtn
-              storagePath={lanc?.boleto_url}
-              label="Boleto"
-              field="boleto_url"
-              inputRef={boletoRef}
-              folder="boletos"
-            />
-            <AttachBtn
-              storagePath={(lanc as any)?.url_comprovante}
-              label="Comprovante Pgto"
-              field="url_comprovante"
-              inputRef={comprovanteRef}
-              folder="comprovantes"
-            />
+            <AttachBtn storagePath={lanc?.boleto_url} label="Boleto" field="boleto_url" inputRef={boletoRef} folder="boletos" />
+            <AttachBtn storagePath={(lanc as any)?.url_comprovante} label="Comprovante Pgto" field="url_comprovante" inputRef={comprovanteRef} folder="comprovantes" />
           </div>
 
           {/* Notes */}
@@ -257,23 +262,13 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
           {/* Navigation arrows */}
           <div className="flex items-center justify-between gap-1">
             {prevEtapa ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-[10px] px-2 flex-1"
-                onClick={() => onMoveRequest(processo, prevEtapa)}
-              >
+              <Button variant="ghost" size="sm" className="h-7 text-[10px] px-2 flex-1" onClick={() => onMoveRequest(processo, prevEtapa)}>
                 <ChevronLeft className="h-3 w-3 mr-0.5" />
                 {ETAPA_FINANCEIRO_LABELS[prevEtapa]}
               </Button>
             ) : <div className="flex-1" />}
             {nextEtapa ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-[10px] px-2 flex-1"
-                onClick={() => onMoveRequest(processo, nextEtapa)}
-              >
+              <Button variant="outline" size="sm" className="h-7 text-[10px] px-2 flex-1" onClick={() => onMoveRequest(processo, nextEtapa)}>
                 {ETAPA_FINANCEIRO_LABELS[nextEtapa]}
                 <ChevronRight className="h-3 w-3 ml-0.5" />
               </Button>
