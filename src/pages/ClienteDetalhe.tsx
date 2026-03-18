@@ -56,8 +56,9 @@ export default function ClienteDetalhe() {
     prioridade: 'normal',
     responsavel: '',
     valor_manual: '',
+    definir_manual: false,
   });
-  const isManualPrice = processoForm.tipo === 'avulso' || processoForm.tipo === 'orcamento';
+  const isManualPrice = processoForm.definir_manual;
   const isArchived = !!(cliente as any)?.is_archived;
 
   const handleCreateProcesso = () => {
