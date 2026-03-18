@@ -127,7 +127,7 @@ export default function Dashboard() {
         {kpis.map((stat) => (
           <Card
             key={stat.label}
-            className={`border-border/60 transition-colors ${stat.clickable ? 'cursor-pointer hover:border-primary/40 hover:shadow-md' : ''}`}
+            className={`border-border/60 card-hover ${stat.clickable ? 'cursor-pointer hover:border-primary/40' : ''}`}
             onClick={() => stat.clickable && stat.href && navigate(stat.href)}
           >
             <CardContent className="p-5">
