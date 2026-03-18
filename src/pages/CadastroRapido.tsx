@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 const INITIAL_CLIENTE = {
   codigo_identificador: '',
   nome: '',
+  cnpj: '',
   tipo: 'AVULSO_4D' as TipoCliente,
   email: '',
   telefone: '',
