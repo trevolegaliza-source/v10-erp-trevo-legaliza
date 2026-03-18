@@ -250,6 +250,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'momento_faturamento') THEN
     ALTER TABLE public.clientes ADD COLUMN momento_faturamento TEXT DEFAULT 'na_solicitacao';
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'observacoes') THEN
+    ALTER TABLE public.clientes ADD COLUMN observacoes TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'contrato_url') THEN
+    ALTER TABLE public.clientes ADD COLUMN contrato_url TEXT;
+  END IF;
 END $$;
 
 -- FUNCTION: Pricing engine v2 with per-client discounts

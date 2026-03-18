@@ -210,23 +210,23 @@ export function useCreateProcesso() {
       valor_manual?: number;
     }) => {
       const isManualPrice = !!input.valor_manual && input.valor_manual > 0;
-      let preco = 0;
-
-      if (isManualPrice) {
-        // Manual price takes priority — use exactly what the user typed
-        preco = input.valor_manual!;
-      } else {
-        // Calculate from client methodology via RPC
-        const { data: precoCalc } = await supabase.rpc('calcular_preco_processo', {
-          p_cliente_id: input.cliente_id,
-          p_tipo: input.tipo,
-        });
-        preco = precoCalc || 0;
-      }
-
-      // Apply urgency ONLY if not manual price (manual = user typed exactly what they want)
       const isUrgente = input.prioridade === 'urgente';
-      const valorFinal = (!isManualPrice && isUrgente) ? preco * 1.5 : preco;
+
+      const { data: clienteData, error: clienteError } = await supabase
+        .from('clientes')
+        .select('id, tipo, valor_base, momento_faturamento')
+        .eq('id', input.cliente_id)
+        .single();
+      if (clienteError) throw clienteError;
+
+      const cliente = clienteData as Pick<ClienteDB, 'id' | 'tipo' | 'valor_base'> & { momento_faturamento?: string };
+      const valorBaseCliente = cliente.tipo === 'MENSALISTA' ? 0 : Number(cliente.valor_base ?? 0);
+      const valorBaseProcesso = isManualPrice ? Number(input.valor_manual) : valorBaseCliente;
+      const valorFinal = isManualPrice
+        ? valorBaseProcesso
+        : isUrgente
+          ? valorBaseProcesso * 1.5
+          : valorBaseProcesso;
 
       const { data: vencimento } = await supabase.rpc('calcular_vencimento', {
         p_cliente_id: input.cliente_id,
@@ -246,14 +246,9 @@ export function useCreateProcesso() {
         .single();
       if (error) throw error;
 
-      // Check momento_faturamento from client
-      const cliente = processo.cliente as ClienteDB | null;
-      const momentoFat = (cliente as any)?.momento_faturamento || 'na_solicitacao';
-
+      const momentoFat = cliente.momento_faturamento || 'na_solicitacao';
       if (momentoFat === 'na_solicitacao') {
-        const descParts = [
-          `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`,
-        ];
+        const descParts = [`${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`];
         if (isUrgente && !isManualPrice) descParts.push('(+50% Urgência)');
         if (isManualPrice) descParts.push('(Valor Manual)');
 
