@@ -16,6 +16,33 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+function ContractButton({ clienteId }: { clienteId: string }) {
+  const [hasContract, setHasContract] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    supabase.storage.from('contratos').list(clienteId).then(({ data }) => {
+      setHasContract(!!(data && data.length > 0));
+    });
+  }, [clienteId]);
+
+  if (hasContract === null) return <span className="text-muted-foreground text-xs">...</span>;
+  if (!hasContract) return <span className="text-muted-foreground text-xs">—</span>;
+
+  const handleView = async () => {
+    const { data } = await supabase.storage.from('contratos').list(clienteId);
+    if (!data || data.length === 0) return;
+    const fileName = data[0].name;
+    const { data: signed } = await supabase.storage.from('contratos').createSignedUrl(`${clienteId}/${fileName}`, 3600);
+    if (signed?.signedUrl) window.open(signed.signedUrl, '_blank');
+  };
+
+  return (
+    <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-primary" onClick={handleView}>
+      <ExternalLink className="h-3 w-3" /> Ver Contrato
+    </Button>
+  );
+}
+
 export default function Clientes() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
