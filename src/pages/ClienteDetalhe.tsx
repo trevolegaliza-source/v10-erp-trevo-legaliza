@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore } from 'lucide-react';
+import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { useUpdateCliente, useCreateProcesso, useDeleteCliente, useArchiveCliente, useUnarchiveCliente } from '@/hooks/useFinanceiro';
@@ -55,8 +56,9 @@ export default function ClienteDetalhe() {
     prioridade: 'normal',
     responsavel: '',
     valor_manual: '',
+    definir_manual: false,
   });
-  const isManualPrice = processoForm.tipo === 'avulso' || processoForm.tipo === 'orcamento';
+  const isManualPrice = processoForm.definir_manual;
   const isArchived = !!(cliente as any)?.is_archived;
 
   const handleCreateProcesso = () => {
@@ -76,7 +78,7 @@ export default function ClienteDetalhe() {
       {
         onSuccess: () => {
           setShowNovoProcesso(false);
-          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '' });
+          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false });
           loadAll(cliente.id);
         },
       }
@@ -143,6 +145,16 @@ export default function ClienteDetalhe() {
     const url = URL.createObjectURL(data);
     const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleViewContract = async (fileName: string) => {
+    if (!cliente) return;
+    const { data } = await supabase.storage.from('contratos').createSignedUrl(`${cliente.id}/${fileName}`, 3600);
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    } else {
+      toast.error('Erro ao gerar link de visualização');
+    }
   };
 
   const handleDeleteContract = (fileName: string) => {
@@ -277,11 +289,12 @@ export default function ClienteDetalhe() {
 
       {/* Tabs */}
       <Tabs defaultValue="financeiro-config" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="financeiro-config" className="text-xs gap-1"><Settings className="h-3.5 w-3.5" />Config. Financeira</TabsTrigger>
           <TabsTrigger value="processos" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Processos</TabsTrigger>
           <TabsTrigger value="faturas" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Financeiro</TabsTrigger>
           <TabsTrigger value="contratos" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Contratos</TabsTrigger>
+          <TabsTrigger value="observacoes" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Observações</TabsTrigger>
         </TabsList>
 
         {/* ── Config Financeira ── */}
@@ -515,6 +528,9 @@ export default function ClienteDetalhe() {
                     <div key={c.name} className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-3 border border-border/40">
                       <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span className="flex-1 text-sm truncate">{c.name}</span>
+                      <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => handleViewContract(c.name)}>
+                        <ExternalLink className="h-3 w-3" /> Ver
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => handleDownload(c.name)}>
                         <Download className="h-3 w-3" /> Baixar
                       </Button>
@@ -532,6 +548,43 @@ export default function ClienteDetalhe() {
                 {uploadingContract ? 'Enviando...' : 'Clique para anexar contrato (PDF, DOC — máx. 10MB)'}
                 <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleUpload} disabled={uploadingContract} />
               </label>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Observações ── */}
+        <TabsContent value="observacoes">
+          <Card className="border-border/60">
+            <CardHeader className="flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base">Observações Adicionais</CardTitle>
+              {!editing ? (
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(true)}>
+                  <Edit2 className="h-3.5 w-3.5" /> Editar
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setEditForm(cliente); }}><X className="h-3.5 w-3.5 mr-1" />Cancelar</Button>
+                  <Button size="sm" className="gap-1.5" onClick={() => {
+                    if (!cliente) return;
+                    const payload: any = { id: cliente.id, observacoes: (editForm as any).observacoes || null };
+                    updateCliente.mutate(payload, {
+                      onSuccess: () => { setEditing(false); loadAll(cliente.id); toast.success('Observações salvas!'); },
+                    });
+                  }} disabled={updateCliente.isPending}><Save className="h-3.5 w-3.5" />Salvar</Button>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent>
+              {editing ? (
+                <textarea
+                  className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+                  placeholder="Observações sobre o cliente, condições especiais, etc."
+                  value={(editForm as any).observacoes || ''}
+                  onChange={(e) => setEditForm(f => ({ ...f, observacoes: e.target.value }))}
+                />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{(cliente as any).observacoes || 'Nenhuma observação registrada.'}</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -580,6 +633,19 @@ export default function ClienteDetalhe() {
             <div className="grid gap-1.5">
               <Label>Responsável</Label>
               <Input value={processoForm.responsavel} onChange={e => setProcessoForm(f => ({ ...f, responsavel: e.target.value }))} placeholder="Opcional" />
+            </div>
+            {/* Manual value toggle */}
+            <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+              <div>
+                <Label className="text-sm font-medium">Definir Valor Manualmente</Label>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {processoForm.definir_manual ? 'Valor digitado abaixo será usado.' : 'Sistema calcula pela Metodologia de Cobrança.'}
+                </p>
+              </div>
+              <Switch
+                checked={processoForm.definir_manual}
+                onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, definir_manual: checked }))}
+              />
             </div>
             {isManualPrice && (
               <div className="grid gap-1.5">
