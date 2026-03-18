@@ -44,23 +44,11 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
   const isUrgente = processo.prioridade === 'urgente';
   const cliente = processo.cliente as any;
 
-  // Use pricing engine for calculation
-  const calculo = calcularPrecoProcesso({
-    cliente: cliente ? {
-      tipo: cliente.tipo || 'AVULSO_4D',
-      valor_base: cliente.valor_base,
-      desconto_progressivo: cliente.desconto_progressivo,
-      valor_limite_desconto: cliente.valor_limite_desconto,
-      mensalidade: cliente.mensalidade,
-      qtd_processos: cliente.qtd_processos,
-    } : null,
-    baseOverride: Number(lanc?.valor ?? processo.valor ?? 0),
-    processosNoMes: 0, // Already calculated server-side
-    isUrgente: false, // Already applied to base value
-    somaAdicionais,
-  });
-
-  const totalValue = calculo.totalFinal;
+  // The stored valor already includes urgency/discounts calculated at creation time.
+  // Do NOT re-run pricing engine — just use stored value + adicionais from popup.
+  const valorArmazenado = Number(lanc?.valor ?? processo.valor ?? 0);
+  const totalValue = valorArmazenado + somaAdicionais;
+  const momentoFat = cliente?.momento_faturamento || 'na_solicitacao';
   const clienteApelido = cliente?.apelido || cliente?.nome || '-';
   const vencimento = lanc?.data_vencimento;
 
