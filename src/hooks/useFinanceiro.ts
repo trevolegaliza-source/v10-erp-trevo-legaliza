@@ -18,15 +18,16 @@ const normalizeOptionalNullableText = (value: string | null | undefined) => {
 
 const sanitizeSearch = (value: string) => value.replace(/[,%]/g, '').trim();
 
-const normalizeClienteInsert = (cliente: ClienteInsert): ClienteInsert => ({
-  ...cliente,
-  codigo_identificador: cliente.codigo_identificador.trim(),
-  nome: cliente.nome.trim(),
-  email: normalizeNullableText(cliente.email),
-  telefone: normalizeNullableText(cliente.telefone),
-  nome_contador: normalizeRequiredText(cliente.nome_contador),
-  apelido: normalizeRequiredText(cliente.apelido),
-});
+const normalizeClienteInsert = (cliente: Record<string, any>): Record<string, any> => {
+  const normalized: Record<string, any> = { ...cliente };
+  if (normalized.codigo_identificador) normalized.codigo_identificador = normalized.codigo_identificador.trim();
+  if (normalized.nome) normalized.nome = normalized.nome.trim();
+  normalized.email = normalizeNullableText(normalized.email);
+  normalized.telefone = normalizeNullableText(normalized.telefone);
+  normalized.nome_contador = normalizeRequiredText(normalized.nome_contador);
+  normalized.apelido = normalizeRequiredText(normalized.apelido);
+  return normalized;
+};
 
 // ---- CLIENTES ----
 export function useClientes(searchTerm?: string) {
@@ -59,8 +60,8 @@ export function useClientes(searchTerm?: string) {
 export function useCreateCliente() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (cliente: Omit<ClienteDB, 'id' | 'created_at' | 'updated_at'>) => {
-      const payload = normalizeClienteInsert(cliente as ClienteInsert);
+    mutationFn: async (cliente: Record<string, any>) => {
+      const payload = normalizeClienteInsert(cliente);
       const { data, error } = await supabase.from('clientes').insert(payload).select('*').single();
       if (error) throw error;
       return data as ClienteDB;

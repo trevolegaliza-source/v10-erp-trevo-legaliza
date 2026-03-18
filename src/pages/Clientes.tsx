@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Users, Mail, Phone, Search, UserX, Upload, FileText, Download, Trash2, Archive, ArchiveRestore } from 'lucide-react';
+import { Plus, Users, Mail, Phone, Search, UserX, Upload, FileText, Download, Trash2, Archive, ArchiveRestore, ExternalLink } from 'lucide-react';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useClientes, useUpdateCliente, useDeleteCliente, useArchiveCliente, useUnarchiveCliente } from '@/hooks/useFinanceiro';
@@ -15,6 +15,33 @@ import type { ClienteDB, TipoCliente } from '@/types/financial';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+function ContractButton({ clienteId }: { clienteId: string }) {
+  const [hasContract, setHasContract] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    supabase.storage.from('contratos').list(clienteId).then(({ data }) => {
+      setHasContract(!!(data && data.length > 0));
+    });
+  }, [clienteId]);
+
+  if (hasContract === null) return <span className="text-muted-foreground text-xs">...</span>;
+  if (!hasContract) return <span className="text-muted-foreground text-xs">—</span>;
+
+  const handleView = async () => {
+    const { data } = await supabase.storage.from('contratos').list(clienteId);
+    if (!data || data.length === 0) return;
+    const fileName = data[0].name;
+    const { data: signed } = await supabase.storage.from('contratos').createSignedUrl(`${clienteId}/${fileName}`, 3600);
+    if (signed?.signedUrl) window.open(signed.signedUrl, '_blank');
+  };
+
+  return (
+    <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-primary" onClick={handleView}>
+      <ExternalLink className="h-3 w-3" /> Ver Contrato
+    </Button>
+  );
+}
 
 export default function Clientes() {
   const navigate = useNavigate();
@@ -215,62 +242,93 @@ export default function Clientes() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome / Apelido</TableHead>
-                  <TableHead>Contador</TableHead>
+                  <TableHead>CNPJ</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Contato</TableHead>
-                   <TableHead className="text-center">Processos</TableHead>
-                  <TableHead className="text-center">Ativos</TableHead>
+                  <TableHead>Valor Base / Mensalidade</TableHead>
+                  <TableHead>Desconto</TableHead>
+                  <TableHead className="text-center">Processos</TableHead>
+                  <TableHead className="text-center">Contrato</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((client) => (
-                  <TableRow
-                    key={client.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/clientes/${client.id}`)}
-                    onDoubleClick={() => openEdit(client)}
-                  >
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{client.nome}</p>
-                        {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{client.nome_contador || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={client.tipo === 'MENSALISTA' ? 'border-primary/30 text-primary' : 'border-warning/30 text-warning'}>
-                        {client.tipo === 'MENSALISTA' ? 'Mensalista' : 'Avulso'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-0.5">
-                        {client.email && <div className="flex items-center gap-1.5 text-xs"><Mail className="h-3 w-3 text-muted-foreground" />{client.email}</div>}
-                        {client.telefone && <div className="flex items-center gap-1.5 text-xs"><Phone className="h-3 w-3 text-muted-foreground" />{client.telefone}</div>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center font-medium">{processCount(client.id)}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge className="bg-primary/10 text-primary border-0">{activeCount(client.id)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
-                        {(client as any).is_archived ? (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Desarquivar" onClick={() => handleUnarchive(client.id)}>
-                            <ArchiveRestore className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Arquivar" onClick={() => handleArchive(client.id)}>
-                            <Archive className="h-3.5 w-3.5" />
-                          </Button>
+                {filtered.map((client) => {
+                  const isMens = client.tipo === 'MENSALISTA';
+                  const valorExibir = isMens
+                    ? (client as any).mensalidade
+                    : (client as any).valor_base;
+                  const descontoExibir = (client as any).desconto_progressivo;
+                  const limiteExibir = (client as any).valor_limite_desconto;
+
+                  return (
+                    <TableRow
+                      key={client.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/clientes/${client.id}`)}
+                      onDoubleClick={() => openEdit(client)}
+                    >
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{client.nome}</p>
+                          {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
+                          {client.nome_contador && <p className="text-[10px] text-muted-foreground">Contador: {client.nome_contador}</p>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">{(client as any).cnpj || '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={isMens ? 'border-primary/30 text-primary' : 'border-warning/30 text-warning'}>
+                          {isMens ? 'Mensalista' : 'Avulso'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium">
+                          {valorExibir != null
+                            ? Number(valorExibir).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                            : '—'}
+                        </span>
+                        {isMens && (client as any).qtd_processos != null && (
+                          <p className="text-[10px] text-muted-foreground">{(client as any).qtd_processos} proc. inclusos</p>
                         )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        {descontoExibir != null && descontoExibir > 0 ? (
+                          <div>
+                            <span className="text-sm font-medium">{descontoExibir}%</span>
+                            {limiteExibir != null && (
+                              <p className="text-[10px] text-muted-foreground">
+                                Mín. {Number(limiteExibir).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge className="bg-primary/10 text-primary border-0">{activeCount(client.id)}/{processCount(client.id)}</Badge>
+                      </TableCell>
+                      <TableCell className="text-center" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+                        <ContractButton clienteId={client.id} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+                          {(client as any).is_archived ? (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Desarquivar" onClick={() => handleUnarchive(client.id)}>
+                              <ArchiveRestore className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Arquivar" onClick={() => handleArchive(client.id)}>
+                              <Archive className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       {showInactive ? 'Nenhum cliente inativo' : 'Nenhum cliente encontrado'}
                     </TableCell>
                   </TableRow>
@@ -323,10 +381,46 @@ export default function Clientes() {
                 <Input value={editForm.telefone || ''} onChange={e => setEditForm(f => ({ ...f, telefone: e.target.value }))} />
               </div>
             </div>
-            {editForm.tipo === 'MENSALISTA' && (
-              <div className="grid gap-2">
-                <Label>Dia de Vencimento</Label>
-                <Input type="number" min={1} max={28} value={editForm.dia_vencimento_mensal || 15} onChange={e => setEditForm(f => ({ ...f, dia_vencimento_mensal: Number(e.target.value) }))} />
+            {/* Financial params in edit modal */}
+            {editForm.tipo === 'MENSALISTA' ? (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
+                <p className="text-xs font-medium text-primary">Configuração Mensalista</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Mensalidade (R$)</Label>
+                    <Input type="number" step="0.01" value={(editForm as any).mensalidade ?? ''} onChange={e => setEditForm(f => ({ ...f, mensalidade: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Dia Vencimento</Label>
+                    <Input type="number" min={1} max={31} value={(editForm as any).vencimento ?? editForm.dia_vencimento_mensal ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : null; setEditForm(f => ({ ...f, vencimento: v, dia_vencimento_mensal: v ?? undefined })); }} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Processos Inclusos</Label>
+                    <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 space-y-3">
+                <p className="text-xs font-medium text-warning">Configuração Avulso</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Valor Base (R$)</Label>
+                    <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Desconto (%)</Label>
+                    <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Limite Desconto (R$)</Label>
+                    <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Dia Cobrança (D+X)</Label>
+                    <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                </div>
               </div>
             )}
             {/* Contratos */}

@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 const INITIAL_CLIENTE = {
   codigo_identificador: '',
   nome: '',
+  cnpj: '',
   tipo: 'AVULSO_4D' as TipoCliente,
   email: '',
   telefone: '',
@@ -79,18 +80,33 @@ export default function CadastroRapido() {
 
   const handleCreateCliente = (e: React.FormEvent) => {
     e.preventDefault();
+    const payload: Record<string, any> = {
+      codigo_identificador: clienteForm.codigo_identificador,
+      nome: clienteForm.nome,
+      cnpj: clienteForm.cnpj || null,
+      tipo: clienteForm.tipo,
+      email: clienteForm.email || null,
+      telefone: clienteForm.telefone || null,
+      nome_contador: clienteForm.nome_contador || '',
+      apelido: clienteForm.apelido || '',
+      momento_faturamento: clienteForm.momento_faturamento,
+    };
+
+    if (isAvulso) {
+      payload.valor_base = clienteForm.valor_base ? Number(clienteForm.valor_base) : null;
+      payload.desconto_progressivo = clienteForm.desconto_tier2 ? Number(clienteForm.desconto_tier2) : null;
+      payload.dia_cobranca = clienteForm.dia_cobranca ? Number(clienteForm.dia_cobranca) : null;
+      payload.valor_limite_desconto = clienteForm.valor_limite_desconto ? Number(clienteForm.valor_limite_desconto) : null;
+      payload.dia_vencimento_mensal = 0;
+    } else {
+      payload.mensalidade = clienteForm.valor_mensalidade ? Number(clienteForm.valor_mensalidade) : null;
+      payload.vencimento = clienteForm.dia_vencimento_mensal;
+      payload.dia_vencimento_mensal = clienteForm.dia_vencimento_mensal;
+      payload.qtd_processos = clienteForm.qtd_processos_inclusos ? Number(clienteForm.qtd_processos_inclusos) : null;
+    }
+
     createCliente.mutate(
-      {
-        codigo_identificador: clienteForm.codigo_identificador,
-        nome: clienteForm.nome,
-        tipo: clienteForm.tipo,
-        email: clienteForm.email || null,
-        telefone: clienteForm.telefone || null,
-        nome_contador: clienteForm.nome_contador || '',
-        apelido: clienteForm.apelido || '',
-        dia_vencimento_mensal: isMensalista ? clienteForm.dia_vencimento_mensal : 0,
-        momento_faturamento: clienteForm.momento_faturamento,
-      } as any,
+      payload as any,
       {
         onSuccess: (data: any) => {
           const clienteId = data?.id || data?.[0]?.id;
@@ -161,6 +177,11 @@ export default function CadastroRapido() {
                     <Label>Nome *</Label>
                     <Input required placeholder="Nome da contabilidade" value={clienteForm.nome} onChange={(e) => update('nome', e.target.value)} />
                   </div>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label>CNPJ</Label>
+                  <Input placeholder="00.000.000/0000-00" value={clienteForm.cnpj} onChange={(e) => update('cnpj', e.target.value)} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
