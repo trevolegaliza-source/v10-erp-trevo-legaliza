@@ -215,62 +215,93 @@ export default function Clientes() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome / Apelido</TableHead>
-                  <TableHead>Contador</TableHead>
+                  <TableHead>CNPJ</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Contato</TableHead>
-                   <TableHead className="text-center">Processos</TableHead>
-                  <TableHead className="text-center">Ativos</TableHead>
+                  <TableHead>Valor Base / Mensalidade</TableHead>
+                  <TableHead>Desconto</TableHead>
+                  <TableHead className="text-center">Processos</TableHead>
+                  <TableHead className="text-center">Contrato</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((client) => (
-                  <TableRow
-                    key={client.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/clientes/${client.id}`)}
-                    onDoubleClick={() => openEdit(client)}
-                  >
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{client.nome}</p>
-                        {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{client.nome_contador || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={client.tipo === 'MENSALISTA' ? 'border-primary/30 text-primary' : 'border-warning/30 text-warning'}>
-                        {client.tipo === 'MENSALISTA' ? 'Mensalista' : 'Avulso'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-0.5">
-                        {client.email && <div className="flex items-center gap-1.5 text-xs"><Mail className="h-3 w-3 text-muted-foreground" />{client.email}</div>}
-                        {client.telefone && <div className="flex items-center gap-1.5 text-xs"><Phone className="h-3 w-3 text-muted-foreground" />{client.telefone}</div>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center font-medium">{processCount(client.id)}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge className="bg-primary/10 text-primary border-0">{activeCount(client.id)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
-                        {(client as any).is_archived ? (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Desarquivar" onClick={() => handleUnarchive(client.id)}>
-                            <ArchiveRestore className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="icon" className="h-7 w-7" title="Arquivar" onClick={() => handleArchive(client.id)}>
-                            <Archive className="h-3.5 w-3.5" />
-                          </Button>
+                {filtered.map((client) => {
+                  const isMens = client.tipo === 'MENSALISTA';
+                  const valorExibir = isMens
+                    ? (client as any).mensalidade
+                    : (client as any).valor_base;
+                  const descontoExibir = (client as any).desconto_progressivo;
+                  const limiteExibir = (client as any).valor_limite_desconto;
+
+                  return (
+                    <TableRow
+                      key={client.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/clientes/${client.id}`)}
+                      onDoubleClick={() => openEdit(client)}
+                    >
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{client.nome}</p>
+                          {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
+                          {client.nome_contador && <p className="text-[10px] text-muted-foreground">Contador: {client.nome_contador}</p>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">{(client as any).cnpj || '—'}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={isMens ? 'border-primary/30 text-primary' : 'border-warning/30 text-warning'}>
+                          {isMens ? 'Mensalista' : 'Avulso'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-medium">
+                          {valorExibir != null
+                            ? Number(valorExibir).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                            : '—'}
+                        </span>
+                        {isMens && (client as any).qtd_processos != null && (
+                          <p className="text-[10px] text-muted-foreground">{(client as any).qtd_processos} proc. inclusos</p>
                         )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        {descontoExibir != null && descontoExibir > 0 ? (
+                          <div>
+                            <span className="text-sm font-medium">{descontoExibir}%</span>
+                            {limiteExibir != null && (
+                              <p className="text-[10px] text-muted-foreground">
+                                Mín. {Number(limiteExibir).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge className="bg-primary/10 text-primary border-0">{activeCount(client.id)}/{processCount(client.id)}</Badge>
+                      </TableCell>
+                      <TableCell className="text-center" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+                        <ContractButton clienteId={client.id} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+                          {(client as any).is_archived ? (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Desarquivar" onClick={() => handleUnarchive(client.id)}>
+                              <ArchiveRestore className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Arquivar" onClick={() => handleArchive(client.id)}>
+                              <Archive className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       {showInactive ? 'Nenhum cliente inativo' : 'Nenhum cliente encontrado'}
                     </TableCell>
                   </TableRow>
