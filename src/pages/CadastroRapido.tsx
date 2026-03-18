@@ -251,11 +251,13 @@ export default function CadastroRapido() {
                         <Input type="number" step="0.1" min="0" max="100" placeholder="0" value={clienteForm.desconto_tier2} onChange={(e) => update('desconto_tier2', e.target.value)} />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-1.5">
-                        <Label>Dia de Cobrança (dias após solicitação)</Label>
-                        <Input type="number" min={1} max={30} placeholder="4" value={clienteForm.dia_cobranca} onChange={(e) => update('dia_cobranca', e.target.value)} />
-                      </div>
+                    <div className={cn("grid gap-4", clienteForm.momento_faturamento === 'no_deferimento' ? 'grid-cols-1' : 'grid-cols-2')}>
+                      {clienteForm.momento_faturamento !== 'no_deferimento' && (
+                        <div className="grid gap-1.5">
+                          <Label>Dia de Cobrança (dias após solicitação)</Label>
+                          <Input type="number" min={1} max={30} placeholder="4" value={clienteForm.dia_cobranca} onChange={(e) => update('dia_cobranca', e.target.value)} />
+                        </div>
+                      )}
                       <div className="grid gap-1.5">
                         <Label>Valor Limite de Desconto (R$) *</Label>
                         <Input type="number" step="0.01" min="0" placeholder="Piso mínimo do valor" value={clienteForm.valor_limite_desconto} onChange={(e) => update('valor_limite_desconto', e.target.value)} />

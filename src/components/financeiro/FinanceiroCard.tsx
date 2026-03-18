@@ -15,7 +15,7 @@ import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
 import { uploadFile, viewFile, getSignedUrl } from '@/hooks/useStorageUpload';
-import { calcularPrecoProcesso, formatBRL } from '@/lib/pricing-engine';
+import { formatBRL } from '@/lib/pricing-engine';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -44,23 +44,11 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
   const isUrgente = processo.prioridade === 'urgente';
   const cliente = processo.cliente as any;
 
-  // Use pricing engine for calculation
-  const calculo = calcularPrecoProcesso({
-    cliente: cliente ? {
-      tipo: cliente.tipo || 'AVULSO_4D',
-      valor_base: cliente.valor_base,
-      desconto_progressivo: cliente.desconto_progressivo,
-      valor_limite_desconto: cliente.valor_limite_desconto,
-      mensalidade: cliente.mensalidade,
-      qtd_processos: cliente.qtd_processos,
-    } : null,
-    baseOverride: Number(lanc?.valor ?? processo.valor ?? 0),
-    processosNoMes: 0, // Already calculated server-side
-    isUrgente: false, // Already applied to base value
-    somaAdicionais,
-  });
-
-  const totalValue = calculo.totalFinal;
+  // The stored valor already includes urgency/discounts calculated at creation time.
+  // Do NOT re-run pricing engine — just use stored value + adicionais from popup.
+  const valorArmazenado = Number(lanc?.valor ?? processo.valor ?? 0);
+  const totalValue = valorArmazenado + somaAdicionais;
+  const momentoFat = cliente?.momento_faturamento || 'na_solicitacao';
   const clienteApelido = cliente?.apelido || cliente?.nome || '-';
   const vencimento = lanc?.data_vencimento;
 
@@ -189,13 +177,10 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                   </TooltipTrigger>
                   <TooltipContent side="left" className="text-xs max-w-[220px]">
                     <div className="space-y-0.5">
-                      <p>Valor Base: {formatBRL(calculo.valorBase)}</p>
-                      {calculo.descontoValor > 0 && <p>Desconto ({calculo.descontoPercent}%): -{formatBRL(calculo.descontoValor)}</p>}
-                      {calculo.urgencia > 0 && <p>Urgência +50%: +{formatBRL(calculo.urgencia)}</p>}
-                      <p>Serviço: {formatBRL(calculo.valorServico)}</p>
-                      {calculo.somaAdicionais > 0 && <p>Adicionais: +{formatBRL(calculo.somaAdicionais)}</p>}
-                      <p className="font-semibold border-t border-border pt-0.5 mt-1">Total: {formatBRL(calculo.totalFinal)}</p>
-                      {calculo.isMensalista && <p className="text-info">Incluso na franquia mensal</p>}
+                      <p>Valor Serviço: {formatBRL(valorArmazenado)}</p>
+                      {isUrgente && <p className="text-warning">Inclui Urgência +50%</p>}
+                      {somaAdicionais > 0 && <p>Adicionais: +{formatBRL(somaAdicionais)}</p>}
+                      <p className="font-semibold border-t border-border pt-0.5 mt-1">Total: {formatBRL(totalValue)}</p>
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -203,14 +188,24 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
               {isUrgente && (
                 <Badge variant="outline" className="text-[9px] border-warning text-warning ml-1">+50%</Badge>
               )}
-              {calculo.isMensalista && (
+              {momentoFat === 'no_deferimento' && (
+                <Badge variant="outline" className="text-[9px] border-info text-info ml-1">Deferimento</Badge>
+              )}
+              {cliente?.tipo === 'MENSALISTA' && (
                 <Badge variant="outline" className="text-[9px] border-info text-info block mt-0.5">Mensalista</Badge>
               )}
             </div>
           </div>
 
+          {/* Faturamento info */}
+          {momentoFat === 'no_deferimento' && (
+            <div className="text-[10px] text-info bg-info/10 rounded px-2 py-1">
+              Faturamento condicionado ao sucesso do processo
+            </div>
+          )}
+
           {/* Discount info */}
-          {cliente?.desconto_progressivo > 0 && !calculo.isMensalista && (
+          {cliente?.desconto_progressivo > 0 && cliente?.tipo !== 'MENSALISTA' && (
             <div className="text-[10px] text-muted-foreground bg-muted/50 rounded px-2 py-1">
               Desc. {cliente.desconto_progressivo}% progressivo
               {cliente.valor_limite_desconto && ` (mín. ${formatBRL(cliente.valor_limite_desconto)})`}
