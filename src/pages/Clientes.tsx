@@ -381,10 +381,46 @@ export default function Clientes() {
                 <Input value={editForm.telefone || ''} onChange={e => setEditForm(f => ({ ...f, telefone: e.target.value }))} />
               </div>
             </div>
-            {editForm.tipo === 'MENSALISTA' && (
-              <div className="grid gap-2">
-                <Label>Dia de Vencimento</Label>
-                <Input type="number" min={1} max={28} value={editForm.dia_vencimento_mensal || 15} onChange={e => setEditForm(f => ({ ...f, dia_vencimento_mensal: Number(e.target.value) }))} />
+            {/* Financial params in edit modal */}
+            {editForm.tipo === 'MENSALISTA' ? (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
+                <p className="text-xs font-medium text-primary">Configuração Mensalista</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Mensalidade (R$)</Label>
+                    <Input type="number" step="0.01" value={(editForm as any).mensalidade ?? ''} onChange={e => setEditForm(f => ({ ...f, mensalidade: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Dia Vencimento</Label>
+                    <Input type="number" min={1} max={31} value={(editForm as any).vencimento ?? editForm.dia_vencimento_mensal ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : null; setEditForm(f => ({ ...f, vencimento: v, dia_vencimento_mensal: v ?? undefined })); }} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Processos Inclusos</Label>
+                    <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 space-y-3">
+                <p className="text-xs font-medium text-warning">Configuração Avulso</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Valor Base (R$)</Label>
+                    <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Desconto (%)</Label>
+                    <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Limite Desconto (R$)</Label>
+                    <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label className="text-xs">Dia Cobrança (D+X)</Label>
+                    <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} />
+                  </div>
+                </div>
               </div>
             )}
             {/* Contratos */}
