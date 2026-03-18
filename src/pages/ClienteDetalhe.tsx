@@ -78,7 +78,7 @@ export default function ClienteDetalhe() {
       {
         onSuccess: () => {
           setShowNovoProcesso(false);
-          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '' });
+          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false });
           loadAll(cliente.id);
         },
       }
