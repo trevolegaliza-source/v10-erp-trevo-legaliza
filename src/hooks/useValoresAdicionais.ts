@@ -8,6 +8,7 @@ export interface ValorAdicional {
   descricao: string;
   valor: number;
   anexo_url: string | null;
+  comprovante_url: string | null;
   created_at: string;
   updated_at: string;
 }

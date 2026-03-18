@@ -7,17 +7,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import {
-  FileText, Upload, CheckCircle2, Trash2, PlusCircle, Download,
+  FileText, Upload, CheckCircle2, Trash2, PlusCircle, Download, Eye,
 } from 'lucide-react';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
-import { uploadFile, viewFile } from '@/hooks/useStorageUpload';
+import { uploadFile, viewFile, getSignedUrl } from '@/hooks/useStorageUpload';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { useDeleteProcesso } from '@/hooks/useProcessos';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 
 interface ProcessoEditModalProps {
   open: boolean;
@@ -43,7 +42,6 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   const lanc = processo.lancamento;
   const clienteApelido = (processo.cliente as any)?.apelido || (processo.cliente as any)?.nome || '-';
 
-  // Sync notes when processo changes
   const currentNotes = lanc?.observacoes_financeiro || '';
 
   const handleNotesBlur = () => {
@@ -75,6 +73,15 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
     }
   };
 
+  const handleDownload = async (storagePath: string) => {
+    const url = await getSignedUrl(storagePath);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = storagePath.split('/').pop() || 'arquivo';
+    a.target = '_blank';
+    a.click();
+  };
+
   const handleDeleteConfirm = () => {
     deleteProcesso.mutate(processo.id, {
       onSuccess: () => onOpenChange(false),
@@ -100,14 +107,24 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
       </div>
       <div className="flex items-center gap-1.5">
         {storagePath && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs"
-            onClick={() => viewFile(storagePath)}
-          >
-            <Download className="h-3 w-3 mr-1" /> Ver
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => viewFile(storagePath)}
+            >
+              <Eye className="h-3 w-3 mr-1" /> Ver
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => handleDownload(storagePath)}
+            >
+              <Download className="h-3 w-3 mr-1" /> Baixar
+            </Button>
+          </>
         )}
         <Button
           variant="outline"
