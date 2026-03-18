@@ -127,7 +127,7 @@ export default function Dashboard() {
         {kpis.map((stat) => (
           <Card
             key={stat.label}
-            className={`border-border/60 transition-colors ${stat.clickable ? 'cursor-pointer hover:border-primary/40 hover:shadow-md' : ''}`}
+            className={`border-border/60 card-hover ${stat.clickable ? 'cursor-pointer hover:border-primary/40' : ''}`}
             onClick={() => stat.clickable && stat.href && navigate(stat.href)}
           >
             <CardContent className="p-5">
@@ -166,7 +166,7 @@ export default function Dashboard() {
 
       {/* Financial stat cards */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="border-border/60 border-l-4 border-l-warning">
+        <Card className="border-border/60 border-l-4 border-l-warning card-hover">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div className="rounded-lg bg-warning/10 p-2 w-fit">
@@ -183,7 +183,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/60 border-l-4 border-l-info">
+        <Card className="border-border/60 border-l-4 border-l-info card-hover">
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div className="rounded-lg bg-info/10 p-2 w-fit">

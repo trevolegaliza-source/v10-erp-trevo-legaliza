@@ -1,9 +1,17 @@
 Design system and architecture notes for ERP Trevo Legaliza
 
 ## Brand Colors (HSL)
-- Primary: 152 55% 33% (green)
-- Sidebar: 200 18% 14% (dark gray)
+- Primary: 142 71% 45% (green neon #22c55e)
+- Sidebar: glassmorphism with bg-sidebar/80 + backdrop-blur
+- Dark mode forced via `dark` class on AppLayout and Login
 - Success/Warning/Info/Destructive semantic tokens in index.css
+
+## Visual Identity
+- Dark mode high-contrast is the default theme
+- Cards use `.card-hover` class: translateY(-4px) + green shadow on hover
+- Sidebar has `.glass` (backdrop-blur-12px) + `.icon-glow` on active item
+- Logo has `.neon-pulse` box-shadow
+- SLA progress bar on process cards (green→warning→red based on days elapsed)
 
 ## Architecture
 - Multi-tenant: Contabilidades are main clients
@@ -24,8 +32,13 @@ Design system and architecture notes for ERP Trevo Legaliza
 - Document validation station (approve/reject impacts Kanban)
 - RBAC levels: Master, Colaborador, Financeiro, Operacional, Cliente
 
+## Pricing Engine Rules (CRITICAL)
+- Valor Final = Valor_Base (or manual override) + Urgência (+50% only if checkbox) + Valores Adicionais popup
+- NEVER read from text/observações fields for pricing
+- momento_faturamento=no_deferimento: hide D+X, show "Deferimento" badge
+
 ## Pending
-- Auth system not yet implemented
+- Auth system basic (email/password) — no RBAC yet
 - PDF export for consolidated billing reports
 - n8n Edge Function webhook endpoint
 - Storage bucket for comprovantes

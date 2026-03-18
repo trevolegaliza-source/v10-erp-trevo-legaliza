@@ -79,7 +79,7 @@ function ProcessCard({
           {...provided.dragHandleProps}
           onDoubleClick={() => onDoubleClick(process)}
           className={cn(
-            'group rounded-lg border border-border/50 bg-card p-3 shadow-sm transition-shadow hover:shadow-md cursor-pointer',
+            'group rounded-lg border border-border/50 bg-card p-3 shadow-sm card-hover cursor-pointer',
             snapshot.isDragging && 'shadow-lg ring-2 ring-primary/30'
           )}
         >
@@ -116,6 +116,18 @@ function ProcessCard({
               {Number(process.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </p>
           )}
+          {/* SLA Progress Bar */}
+          {(() => {
+            const daysSince = Math.floor((Date.now() - new Date(process.created_at).getTime()) / 86400000);
+            const slaMax = process.prioridade === 'urgente' ? 5 : 10;
+            const pct = Math.min((daysSince / slaMax) * 100, 100);
+            const color = pct >= 80 ? 'bg-destructive' : pct >= 50 ? 'bg-warning' : 'bg-primary';
+            return (
+              <div className="mt-2 w-full h-1 rounded-full bg-muted overflow-hidden">
+                <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
+              </div>
+            );
+          })()}
         </div>
       )}
     </Draggable>
