@@ -634,6 +634,19 @@ export default function ClienteDetalhe() {
               <Label>Responsável</Label>
               <Input value={processoForm.responsavel} onChange={e => setProcessoForm(f => ({ ...f, responsavel: e.target.value }))} placeholder="Opcional" />
             </div>
+            {/* Manual value toggle */}
+            <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+              <div>
+                <Label className="text-sm font-medium">Definir Valor Manualmente</Label>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {processoForm.definir_manual ? 'Valor digitado abaixo será usado.' : 'Sistema calcula pela Metodologia de Cobrança.'}
+                </p>
+              </div>
+              <Switch
+                checked={processoForm.definir_manual}
+                onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, definir_manual: checked }))}
+              />
+            </div>
             {isManualPrice && (
               <div className="grid gap-1.5">
                 <Label>Valor Manual (R$)</Label>
