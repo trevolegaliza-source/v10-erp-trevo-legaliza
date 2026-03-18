@@ -147,6 +147,16 @@ export default function ClienteDetalhe() {
     URL.revokeObjectURL(url);
   };
 
+  const handleViewContract = async (fileName: string) => {
+    if (!cliente) return;
+    const { data } = await supabase.storage.from('contratos').createSignedUrl(`${cliente.id}/${fileName}`, 3600);
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
+    } else {
+      toast.error('Erro ao gerar link de visualização');
+    }
+  };
+
   const handleDeleteContract = (fileName: string) => {
     if (!cliente) return;
     setPendingDeleteAction(() => async () => {
