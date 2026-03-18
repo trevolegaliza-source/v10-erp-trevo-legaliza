@@ -4,9 +4,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertTriangle, FileText, Upload, CheckCircle2, Download, PlusCircle,
-  ChevronLeft, ChevronRight, Eye,
+  ChevronLeft, ChevronRight, Eye, Info,
 } from 'lucide-react';
 import type { EtapaFinanceiro } from '@/types/financial';
 import { ETAPA_FINANCEIRO_ORDER, ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
