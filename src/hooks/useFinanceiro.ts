@@ -208,10 +208,14 @@ export function useCreateProcesso() {
       responsavel?: string;
       valor_manual?: number;
     }) => {
-      let preco = input.valor_manual || 0;
-      const isManualPrice = input.tipo === 'avulso' || input.tipo === 'orcamento';
+      const isManualPrice = !!input.valor_manual && input.valor_manual > 0;
+      let preco = 0;
 
-      if (!isManualPrice) {
+      if (isManualPrice) {
+        // Manual price takes priority — use exactly what the user typed
+        preco = input.valor_manual!;
+      } else {
+        // Calculate from client methodology via RPC
         const { data: precoCalc } = await supabase.rpc('calcular_preco_processo', {
           p_cliente_id: input.cliente_id,
           p_tipo: input.tipo,
@@ -219,8 +223,9 @@ export function useCreateProcesso() {
         preco = precoCalc || 0;
       }
 
+      // Apply urgency ONLY if not manual price (manual = user typed exactly what they want)
       const isUrgente = input.prioridade === 'urgente';
-      const valorFinal = isUrgente ? preco * 1.5 : preco;
+      const valorFinal = (!isManualPrice && isUrgente) ? preco * 1.5 : preco;
 
       const { data: vencimento } = await supabase.rpc('calcular_vencimento', {
         p_cliente_id: input.cliente_id,
@@ -245,11 +250,11 @@ export function useCreateProcesso() {
       const momentoFat = (cliente as any)?.momento_faturamento || 'na_solicitacao';
 
       if (momentoFat === 'na_solicitacao') {
-        // Generate billing immediately
         const descParts = [
           `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`,
         ];
-        if (isUrgente) descParts.push('(+50% Prioridade)');
+        if (isUrgente && !isManualPrice) descParts.push('(+50% Urgência)');
+        if (isManualPrice) descParts.push('(Valor Manual)');
 
         const { error: lancError } = await supabase.from('lancamentos').insert({
           tipo: 'receber',
@@ -262,7 +267,6 @@ export function useCreateProcesso() {
         });
         if (lancError) throw lancError;
       }
-      // If 'no_deferimento', no billing created now — will be triggered on stage change
 
       return processo as ProcessoDB;
     },

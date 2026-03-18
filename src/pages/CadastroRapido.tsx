@@ -6,10 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { UserPlus, FileText, Upload, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { UserPlus, FileText, Upload, X, Check, ChevronsUpDown } from 'lucide-react';
 import { useClientes, useCreateCliente, useCreateProcesso } from '@/hooks/useFinanceiro';
 import type { TipoCliente, TipoProcesso } from '@/types/financial';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 const INITIAL_CLIENTE = {
   codigo_identificador: '',
@@ -22,12 +26,11 @@ const INITIAL_CLIENTE = {
   apelido: '',
   dia_vencimento_mensal: 15,
   momento_faturamento: 'na_solicitacao' as 'na_solicitacao' | 'no_deferimento',
-  // Avulso-specific
+  observacoes: '',
   valor_base: '',
   desconto_tier2: '',
   dia_cobranca: '4',
   valor_limite_desconto: '',
-  // Mensalista-specific
   valor_mensalidade: '',
   qtd_processos_inclusos: '',
 };
@@ -44,12 +47,14 @@ export default function CadastroRapido() {
     prioridade: 'normal',
     responsavel: '',
     valor_manual: '',
+    definir_manual: false,
   });
   const createProcesso = useCreateProcesso();
-  const [clientSearch, setClientSearch] = useState('');
-  const { data: clientes } = useClientes(clientSearch);
+  const { data: clientes } = useClientes();
+  const [clienteComboOpen, setClienteComboOpen] = useState(false);
 
-  const isManualPrice = processoForm.tipo === 'avulso' || processoForm.tipo === 'orcamento';
+  const selectedCliente = (clientes || []).find(c => c.id === processoForm.cliente_id);
+
   const isAvulso = clienteForm.tipo === 'AVULSO_4D';
   const isMensalista = clienteForm.tipo === 'MENSALISTA';
 
@@ -90,6 +95,7 @@ export default function CadastroRapido() {
       nome_contador: clienteForm.nome_contador || '',
       apelido: clienteForm.apelido || '',
       momento_faturamento: clienteForm.momento_faturamento,
+      observacoes: clienteForm.observacoes || null,
     };
 
     if (isAvulso) {
@@ -129,11 +135,11 @@ export default function CadastroRapido() {
         tipo: processoForm.tipo,
         prioridade: processoForm.prioridade,
         responsavel: processoForm.responsavel,
-        valor_manual: isManualPrice ? Number(processoForm.valor_manual) : undefined,
+        valor_manual: processoForm.definir_manual && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined,
       },
       {
         onSuccess: () =>
-          setProcessoForm({ cliente_id: '', razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '' }),
+          setProcessoForm({ cliente_id: '', razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false }),
       },
     );
   };
@@ -167,7 +173,6 @@ export default function CadastroRapido() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCreateCliente} className="grid gap-5 max-w-xl">
-                {/* Identification */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
                     <Label>Código Identificador *</Label>
@@ -195,7 +200,6 @@ export default function CadastroRapido() {
                   </div>
                 </div>
 
-                {/* Contact */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
                     <Label>Email</Label>
@@ -207,13 +211,10 @@ export default function CadastroRapido() {
                   </div>
                 </div>
 
-                {/* Client Type Selector - NO D+4 suffix */}
                 <div className="grid gap-1.5">
                   <Label>Tipo de Cliente *</Label>
                   <Select value={clienteForm.tipo} onValueChange={(v) => update('tipo', v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="AVULSO_4D">Avulso</SelectItem>
                       <SelectItem value="MENSALISTA">Mensalista</SelectItem>
@@ -221,13 +222,10 @@ export default function CadastroRapido() {
                   </Select>
                 </div>
 
-                {/* Momento do Faturamento */}
                 <div className="grid gap-1.5">
                   <Label>Momento do Faturamento *</Label>
                   <Select value={clienteForm.momento_faturamento} onValueChange={(v) => update('momento_faturamento', v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>
                       <SelectItem value="no_deferimento">No Deferimento (Sucesso)</SelectItem>
@@ -240,7 +238,6 @@ export default function CadastroRapido() {
                   </p>
                 </div>
 
-                {/* ── Conditional: AVULSO ── */}
                 {isAvulso && (
                   <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-4">
                     <p className="text-xs font-medium text-warning">Configuração Avulso</p>
@@ -268,7 +265,6 @@ export default function CadastroRapido() {
                   </div>
                 )}
 
-                {/* ── Conditional: MENSALISTA ── */}
                 {isMensalista && (
                   <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
                     <p className="text-xs font-medium text-primary">Configuração Mensalista</p>
@@ -289,6 +285,17 @@ export default function CadastroRapido() {
                     </div>
                   </div>
                 )}
+
+                {/* Observações */}
+                <div className="grid gap-1.5">
+                  <Label>Observações Adicionais</Label>
+                  <textarea
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                    placeholder="Observações sobre o cliente, condições especiais, etc."
+                    value={clienteForm.observacoes}
+                    onChange={(e) => update('observacoes', e.target.value)}
+                  />
+                </div>
 
                 {/* Document Upload */}
                 <div className="grid gap-1.5">
@@ -323,26 +330,57 @@ export default function CadastroRapido() {
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Novo Processo</CardTitle>
-              <p className="text-xs text-muted-foreground">Valor calculado automaticamente. Prioridade urgente adiciona +50% (×1.5). Para Avulso/Orçamento, o valor manual tem prioridade.</p>
+              <p className="text-xs text-muted-foreground">Valor calculado automaticamente pela metodologia do cliente. Use o toggle para definir valor manual.</p>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleCreateProcesso} className="grid gap-4 max-w-lg">
+                {/* Searchable Client Combobox */}
                 <div className="grid gap-2">
-                  <Label>Cliente (Contabilidade) *</Label>
-                  <Input placeholder="Buscar por nome, código, contador, apelido..." value={clientSearch} onChange={(e) => setClientSearch(e.target.value)} className="mb-1" />
-                  <Select value={processoForm.cliente_id} onValueChange={(v) => setProcessoForm((f) => ({ ...f, cliente_id: v }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(clientes || []).map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.nome} ({c.codigo_identificador}) {c.nome_contador ? `- ${c.nome_contador}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Contabilidade / Cliente *</Label>
+                  <Popover open={clienteComboOpen} onOpenChange={setClienteComboOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={clienteComboOpen}
+                        className="w-full justify-between font-normal"
+                      >
+                        {selectedCliente
+                          ? `${selectedCliente.apelido || selectedCliente.nome} (${selectedCliente.codigo_identificador})`
+                          : 'Buscar por nome, código ou apelido...'}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Filtrar clientes..." />
+                        <CommandList>
+                          <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            {(clientes || []).map((c) => (
+                              <CommandItem
+                                key={c.id}
+                                value={`${c.nome} ${c.codigo_identificador} ${c.apelido || ''} ${c.nome_contador || ''}`}
+                                onSelect={() => {
+                                  setProcessoForm((f) => ({ ...f, cliente_id: c.id }));
+                                  setClienteComboOpen(false);
+                                }}
+                              >
+                                <Check className={cn('mr-2 h-4 w-4', processoForm.cliente_id === c.id ? 'opacity-100' : 'opacity-0')} />
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-medium">{c.apelido || c.nome}</span>
+                                  <span className="text-muted-foreground ml-1.5 text-xs">({c.codigo_identificador})</span>
+                                  {c.nome_contador && <span className="text-muted-foreground text-xs ml-1">· {c.nome_contador}</span>}
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
+
                 <div className="grid gap-2">
                   <Label>Razão Social *</Label>
                   <Input required placeholder="Nome da empresa" value={processoForm.razao_social} onChange={(e) => setProcessoForm((f) => ({ ...f, razao_social: e.target.value }))} />
@@ -351,9 +389,7 @@ export default function CadastroRapido() {
                   <div className="grid gap-2">
                     <Label>Tipo de Processo *</Label>
                     <Select value={processoForm.tipo} onValueChange={(v) => setProcessoForm((f) => ({ ...f, tipo: v as TipoProcesso }))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="abertura">Abertura</SelectItem>
                         <SelectItem value="alteracao">Alteração</SelectItem>
@@ -367,9 +403,7 @@ export default function CadastroRapido() {
                   <div className="grid gap-2">
                     <Label>Prioridade</Label>
                     <Select value={processoForm.prioridade} onValueChange={(v) => setProcessoForm((f) => ({ ...f, prioridade: v }))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="normal">Normal</SelectItem>
                         <SelectItem value="urgente">Urgente (+50%)</SelectItem>
@@ -377,13 +411,28 @@ export default function CadastroRapido() {
                     </Select>
                   </div>
                 </div>
-                {isManualPrice && (
+
+                {/* Manual value toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+                  <div>
+                    <Label className="text-sm font-medium">Definir Valor Manualmente</Label>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {processoForm.definir_manual ? 'Valor digitado abaixo será usado.' : 'O sistema calcula usando a Metodologia de Cobrança do cliente.'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={processoForm.definir_manual}
+                    onCheckedChange={(checked) => setProcessoForm((f) => ({ ...f, definir_manual: checked }))}
+                  />
+                </div>
+
+                {processoForm.definir_manual && (
                   <div className="grid gap-2">
                     <Label>Valor Manual (R$) *</Label>
-                    <Input required type="number" step="0.01" min="0" placeholder="Informe o valor" value={processoForm.valor_manual} onChange={(e) => setProcessoForm((f) => ({ ...f, valor_manual: e.target.value }))} />
-                    <p className="text-[11px] text-muted-foreground">Para Avulso/Orçamento o valor digitado tem prioridade sobre regras automáticas.</p>
+                    <Input required type="number" step="0.01" min="0" placeholder="Informe o valor exato" value={processoForm.valor_manual} onChange={(e) => setProcessoForm((f) => ({ ...f, valor_manual: e.target.value }))} />
                   </div>
                 )}
+
                 <div className="grid gap-2">
                   <Label>Responsável</Label>
                   <Input placeholder="Nome do responsável" value={processoForm.responsavel} onChange={(e) => setProcessoForm((f) => ({ ...f, responsavel: e.target.value }))} />

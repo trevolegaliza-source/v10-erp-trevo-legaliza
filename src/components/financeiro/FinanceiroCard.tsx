@@ -176,10 +176,30 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
               </div>
               <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
             </div>
-            <div className="text-right shrink-0">
+            <div className="text-right shrink-0 flex items-center gap-1">
               <span className="text-sm font-bold text-primary whitespace-nowrap">
                 {formatBRL(totalValue)}
               </span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground p-0.5">
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="text-xs max-w-[220px]">
+                    <div className="space-y-0.5">
+                      <p>Valor Base: {formatBRL(calculo.valorBase)}</p>
+                      {calculo.descontoValor > 0 && <p>Desconto ({calculo.descontoPercent}%): -{formatBRL(calculo.descontoValor)}</p>}
+                      {calculo.urgencia > 0 && <p>Urgência +50%: +{formatBRL(calculo.urgencia)}</p>}
+                      <p>Serviço: {formatBRL(calculo.valorServico)}</p>
+                      {calculo.somaAdicionais > 0 && <p>Adicionais: +{formatBRL(calculo.somaAdicionais)}</p>}
+                      <p className="font-semibold border-t border-border pt-0.5 mt-1">Total: {formatBRL(calculo.totalFinal)}</p>
+                      {calculo.isMensalista && <p className="text-info">Incluso na franquia mensal</p>}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               {isUrgente && (
                 <Badge variant="outline" className="text-[9px] border-warning text-warning ml-1">+50%</Badge>
               )}
