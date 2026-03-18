@@ -100,6 +100,7 @@ export function useUpdateCliente() {
         if ((updates as any)[field] !== undefined) payload[field] = (updates as any)[field];
       }
       if (updates.momento_faturamento !== undefined) payload.momento_faturamento = updates.momento_faturamento;
+      if ((updates as any).observacoes !== undefined) payload.observacoes = (updates as any).observacoes;
 
       const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
       if (error) throw error;
