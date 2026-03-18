@@ -14,6 +14,8 @@ export interface Cliente {
   apelido: string;
   dia_vencimento_mensal: number;
   momento_faturamento: MomentoFaturamento;
+  observacoes?: string | null;
+  contrato_url?: string | null;
   valor_base: number | null;
   desconto_progressivo: number | null;
   dia_cobranca: number | null;

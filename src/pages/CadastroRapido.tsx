@@ -76,11 +76,23 @@ export default function CadastroRapido() {
     const { error } = await supabase.storage
       .from('contratos')
       .upload(path, contratoFile, { upsert: true });
+
     if (error) {
       toast.error('Erro ao enviar contrato: ' + error.message);
-    } else {
-      toast.success('Contrato anexado com sucesso!');
+      return;
     }
+
+    const { error: updateError } = await supabase
+      .from('clientes')
+      .update({ contrato_url: path, updated_at: new Date().toISOString() } as any)
+      .eq('id', clienteId);
+
+    if (updateError) {
+      toast.error('Contrato enviado, mas não foi possível salvar o vínculo: ' + updateError.message);
+      return;
+    }
+
+    toast.success('Contrato anexado com sucesso!');
   }, [contratoFile]);
 
   const handleCreateCliente = (e: React.FormEvent) => {

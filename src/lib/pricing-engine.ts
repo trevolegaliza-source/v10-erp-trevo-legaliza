@@ -1,6 +1,6 @@
 /**
- * Motor Financeiro — Client-side calculation engine
- * Formula: (Base − Desconto Progressivo) × (1 + 50% se urgente) + Σ Valores Adicionais
+ * Motor Financeiro — cálculo explícito, sem heurísticas e sem leitura de texto livre.
+ * Fórmula: Valor Base (ou manual) + 50% de urgência, quando aplicável, + valores adicionais do popup.
  */
 
 export interface ClienteFinanceiro {
@@ -26,7 +26,10 @@ export interface CalculoPrecificacao {
 }
 
 /**
- * Calcula preço final com desconto progressivo, urgência e adicionais
+ * Mantido para compatibilidade, mas a regra foi simplificada:
+ * - nada é extraído de observações ou textos livres
+ * - não há desconto progressivo automático no cálculo do processo
+ * - urgência só adiciona 50% quando marcada explicitamente
  */
 export function calcularPrecoProcesso(params: {
   cliente: ClienteFinanceiro | null;
@@ -37,67 +40,23 @@ export function calcularPrecoProcesso(params: {
   isRetrabalho?: boolean;
   isTransferenciaUF?: boolean;
 }): CalculoPrecificacao {
-  const { cliente, baseOverride, processosNoMes, isUrgente, somaAdicionais, isRetrabalho, isTransferenciaUF } = params;
+  const { cliente, baseOverride, isUrgente, somaAdicionais } = params;
 
-  const isMensalista = cliente?.tipo === 'MENSALISTA' && (cliente.mensalidade ?? 0) > 0;
-  const franquia = cliente?.qtd_processos ?? 0;
-
-  // Mensalista with franchise
-  if (isMensalista) {
-    // Retrabalho = 1 extra process from franchise
-    // Transferência UF = 2 processes from franchise
-    const extraProcessos = (isRetrabalho ? 1 : 0) + (isTransferenciaUF ? 2 : 0);
-
-    return {
-      valorBase: cliente?.mensalidade ?? 0,
-      descontoPercent: 0,
-      descontoValor: 0,
-      valorComDesconto: 0,
-      urgencia: 0,
-      valorServico: 0,
-      somaAdicionais,
-      totalFinal: somaAdicionais, // Service included, only adicionais charged separately
-      isMensalista: true,
-      franquiaIncluida: processosNoMes <= franquia,
-    };
-  }
-
-  // AVULSO: calculate with discounts
-  const valorBase = baseOverride ?? (cliente?.valor_base ?? 0);
-  const descontoPercent = cliente?.desconto_progressivo ?? 0;
-  const limiteDesconto = cliente?.valor_limite_desconto ?? 0;
-
-  // Progressive discount: N% per process already done this month
-  let descontoValor = 0;
-  if (processosNoMes > 0 && descontoPercent > 0) {
-    descontoValor = valorBase * (descontoPercent / 100) * processosNoMes;
-    const valorComDesconto = valorBase - descontoValor;
-    if (limiteDesconto > 0 && valorComDesconto < limiteDesconto) {
-      descontoValor = valorBase - limiteDesconto;
-    }
-  }
-
-  let valorComDesconto = Math.max(valorBase - descontoValor, 0);
-
-  // Retrabalho: +50% over base
-  if (isRetrabalho) {
-    valorComDesconto = valorComDesconto * 1.5;
-  }
-
-  // Urgência (Fast Track < 24h): +50%
-  const urgencia = isUrgente ? valorComDesconto * 0.5 : 0;
-  const valorServico = valorComDesconto + urgencia;
+  const isMensalista = cliente?.tipo === 'MENSALISTA' && (cliente?.mensalidade ?? 0) > 0;
+  const valorBase = Number(baseOverride ?? cliente?.valor_base ?? 0);
+  const urgencia = isUrgente ? valorBase * 0.5 : 0;
+  const valorServico = isMensalista ? 0 : valorBase + urgencia;
 
   return {
     valorBase,
-    descontoPercent,
-    descontoValor,
-    valorComDesconto,
-    urgencia,
+    descontoPercent: 0,
+    descontoValor: 0,
+    valorComDesconto: valorBase,
+    urgencia: isMensalista ? 0 : urgencia,
     valorServico,
-    somaAdicionais,
-    totalFinal: valorServico + somaAdicionais,
-    isMensalista: false,
+    somaAdicionais: Number(somaAdicionais || 0),
+    totalFinal: valorServico + Number(somaAdicionais || 0),
+    isMensalista,
     franquiaIncluida: false,
   };
 }

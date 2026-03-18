@@ -99,37 +99,39 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
 
   return (
     <>
-      <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-thin w-full">
-        {columns.map((col) => (
-          <div key={col.etapa} className="flex-1 min-w-[260px]">
-            <div className={cn('rounded-t-lg border-t-4 bg-card p-3 mb-2', col.color)}>
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
-                  {col.etapa === 'honorario_vencido' && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
-                  {col.label}
-                </h3>
-                <span className="text-[10px] text-muted-foreground bg-muted rounded-full px-2 py-0.5">
-                  {col.items.length}
-                </span>
+      <div className="w-full overflow-x-auto pb-4 scrollbar-thin">
+        <div className="flex min-w-max gap-3">
+          {columns.map((col) => (
+            <div key={col.etapa} className="flex-1 min-w-[300px]">
+              <div className={cn('rounded-t-lg border-t-4 bg-card p-3 mb-2', col.color)}>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
+                    {col.etapa === 'honorario_vencido' && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
+                    {col.label}
+                  </h3>
+                  <span className="text-[10px] text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                    {col.items.length}
+                  </span>
+                </div>
               </div>
+              <ScrollArea className="h-[calc(100vh-320px)]">
+                <div className="space-y-2 pr-2">
+                  {col.items.map((p) => (
+                    <FinanceiroCard
+                      key={p.id}
+                      processo={p}
+                      onMoveRequest={handleMoveRequest}
+                      onDoubleClick={handleDoubleClick}
+                    />
+                  ))}
+                  {col.items.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-8">Nenhum item</p>
+                  )}
+                </div>
+              </ScrollArea>
             </div>
-            <ScrollArea className="h-[calc(100vh-320px)]">
-              <div className="space-y-2 pr-2">
-                {col.items.map((p) => (
-                  <FinanceiroCard
-                    key={p.id}
-                    processo={p}
-                    onMoveRequest={handleMoveRequest}
-                    onDoubleClick={handleDoubleClick}
-                  />
-                ))}
-                {col.items.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-8">Nenhum item</p>
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       <PasswordConfirmDialog
