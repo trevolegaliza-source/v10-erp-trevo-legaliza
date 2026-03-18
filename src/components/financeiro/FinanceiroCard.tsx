@@ -197,8 +197,15 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
             </div>
           </div>
 
+          {/* Faturamento info */}
+          {momentoFat === 'no_deferimento' && (
+            <div className="text-[10px] text-info bg-info/10 rounded px-2 py-1">
+              Faturamento condicionado ao sucesso do processo
+            </div>
+          )}
+
           {/* Discount info */}
-          {cliente?.desconto_progressivo > 0 && !calculo.isMensalista && (
+          {cliente?.desconto_progressivo > 0 && cliente?.tipo !== 'MENSALISTA' && (
             <div className="text-[10px] text-muted-foreground bg-muted/50 rounded px-2 py-1">
               Desc. {cliente.desconto_progressivo}% progressivo
               {cliente.valor_limite_desconto && ` (mín. ${formatBRL(cliente.valor_limite_desconto)})`}
