@@ -551,6 +551,43 @@ export default function ClienteDetalhe() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── Observações ── */}
+        <TabsContent value="observacoes">
+          <Card className="border-border/60">
+            <CardHeader className="flex-row items-center justify-between pb-3">
+              <CardTitle className="text-base">Observações Adicionais</CardTitle>
+              {!editing ? (
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(true)}>
+                  <Edit2 className="h-3.5 w-3.5" /> Editar
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setEditForm(cliente); }}><X className="h-3.5 w-3.5 mr-1" />Cancelar</Button>
+                  <Button size="sm" className="gap-1.5" onClick={() => {
+                    if (!cliente) return;
+                    const payload: any = { id: cliente.id, observacoes: (editForm as any).observacoes || null };
+                    updateCliente.mutate(payload, {
+                      onSuccess: () => { setEditing(false); loadAll(cliente.id); toast.success('Observações salvas!'); },
+                    });
+                  }} disabled={updateCliente.isPending}><Save className="h-3.5 w-3.5" />Salvar</Button>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent>
+              {editing ? (
+                <textarea
+                  className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+                  placeholder="Observações sobre o cliente, condições especiais, etc."
+                  value={(editForm as any).observacoes || ''}
+                  onChange={(e) => setEditForm(f => ({ ...f, observacoes: e.target.value }))}
+                />
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{(cliente as any).observacoes || 'Nenhuma observação registrada.'}</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <PasswordConfirmDialog
