@@ -179,6 +179,11 @@ export default function CadastroRapido() {
                   </div>
                 </div>
 
+                <div className="grid gap-1.5">
+                  <Label>CNPJ</Label>
+                  <Input placeholder="00.000.000/0000-00" value={clienteForm.cnpj} onChange={(e) => update('cnpj', e.target.value)} />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
                     <Label>Nome do Contador</Label>

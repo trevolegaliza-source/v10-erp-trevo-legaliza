@@ -60,8 +60,8 @@ export function useClientes(searchTerm?: string) {
 export function useCreateCliente() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (cliente: Omit<ClienteDB, 'id' | 'created_at' | 'updated_at'>) => {
-      const payload = normalizeClienteInsert(cliente as ClienteInsert);
+    mutationFn: async (cliente: Record<string, any>) => {
+      const payload = normalizeClienteInsert(cliente);
       const { data, error } = await supabase.from('clientes').insert(payload).select('*').single();
       if (error) throw error;
       return data as ClienteDB;
