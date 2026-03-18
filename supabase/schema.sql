@@ -220,6 +220,124 @@ BEGIN
   END IF;
 END $$;
 
+-- MIGRATION: Add financial engine columns to clientes
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'valor_base') THEN
+    ALTER TABLE public.clientes ADD COLUMN valor_base NUMERIC(12,2);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'desconto_progressivo') THEN
+    ALTER TABLE public.clientes ADD COLUMN desconto_progressivo NUMERIC(5,2) DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'valor_limite_desconto') THEN
+    ALTER TABLE public.clientes ADD COLUMN valor_limite_desconto NUMERIC(12,2);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'tipo_desconto') THEN
+    ALTER TABLE public.clientes ADD COLUMN tipo_desconto TEXT DEFAULT 'progressivo';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'mensalidade') THEN
+    ALTER TABLE public.clientes ADD COLUMN mensalidade NUMERIC(12,2);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'qtd_processos') THEN
+    ALTER TABLE public.clientes ADD COLUMN qtd_processos INTEGER;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'vencimento') THEN
+    ALTER TABLE public.clientes ADD COLUMN vencimento INTEGER;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'dia_cobranca') THEN
+    ALTER TABLE public.clientes ADD COLUMN dia_cobranca INTEGER;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'clientes' AND column_name = 'momento_faturamento') THEN
+    ALTER TABLE public.clientes ADD COLUMN momento_faturamento TEXT DEFAULT 'na_solicitacao';
+  END IF;
+END $$;
+
+-- FUNCTION: Pricing engine v2 with per-client discounts
+CREATE OR REPLACE FUNCTION public.calcular_preco_processo(
+  p_cliente_id UUID,
+  p_tipo tipo_processo
+)
+RETURNS NUMERIC
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  v_cliente RECORD;
+  v_count INTEGER;
+  v_base NUMERIC;
+  v_desconto NUMERIC;
+  v_preco NUMERIC;
+BEGIN
+  SELECT * INTO v_cliente FROM public.clientes WHERE id = p_cliente_id;
+  IF NOT FOUND THEN RETURN 0; END IF;
+
+  -- Mensalista: return 0 (included in monthly fee)
+  IF v_cliente.tipo = 'MENSALISTA' AND v_cliente.mensalidade IS NOT NULL THEN
+    RETURN 0;
+  END IF;
+
+  -- Use client valor_base if set, otherwise fall back to precos_tiers
+  IF v_cliente.valor_base IS NOT NULL THEN
+    v_base := v_cliente.valor_base;
+  ELSE
+    SELECT valor INTO v_base FROM public.precos_tiers
+    WHERE tipo_processo = p_tipo AND tier = 1;
+    v_base := COALESCE(v_base, 0);
+  END IF;
+
+  -- Count processes this month for progressive discount
+  SELECT COUNT(*) INTO v_count
+  FROM public.processos
+  WHERE cliente_id = p_cliente_id
+    AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW());
+
+  -- Apply progressive discount (percentage per process already done this month)
+  v_desconto := COALESCE(v_cliente.desconto_progressivo, 0);
+  IF v_count > 0 AND v_desconto > 0 THEN
+    v_preco := v_base * (1 - (v_desconto / 100.0) * v_count);
+    -- Enforce minimum if set
+    IF v_cliente.valor_limite_desconto IS NOT NULL AND v_preco < v_cliente.valor_limite_desconto THEN
+      v_preco := v_cliente.valor_limite_desconto;
+    END IF;
+  ELSE
+    v_preco := v_base;
+  END IF;
+
+  RETURN GREATEST(v_preco, 0);
+END;
+$$;
+
+-- FUNCTION: Calculate due date based on client rules
+CREATE OR REPLACE FUNCTION public.calcular_vencimento(
+  p_cliente_id UUID
+)
+RETURNS DATE
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  v_cliente RECORD;
+BEGIN
+  SELECT * INTO v_cliente FROM public.clientes WHERE id = p_cliente_id;
+  IF NOT FOUND THEN RETURN CURRENT_DATE + 4; END IF;
+
+  -- Mensalista: use dia_vencimento_mensal or vencimento
+  IF v_cliente.tipo = 'MENSALISTA' THEN
+    DECLARE v_dia INTEGER := COALESCE(v_cliente.vencimento, v_cliente.dia_vencimento_mensal, 10);
+    BEGIN
+      IF EXTRACT(DAY FROM CURRENT_DATE) < v_dia THEN
+        RETURN (DATE_TRUNC('month', CURRENT_DATE) + (v_dia - 1) * INTERVAL '1 day')::DATE;
+      ELSE
+        RETURN (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' + (v_dia - 1) * INTERVAL '1 day')::DATE;
+      END IF;
+    END;
+  END IF;
+
+  -- AVULSO: use dia_cobranca (D+N) or default D+3
+  RETURN CURRENT_DATE + COALESCE(v_cliente.dia_cobranca, 3);
+END;
+$$;
+
 -- MIGRATION: Add financial kanban columns to lancamentos
 DO $$
 BEGIN
