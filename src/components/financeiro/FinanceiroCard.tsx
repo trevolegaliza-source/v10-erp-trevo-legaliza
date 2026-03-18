@@ -4,12 +4,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, FileText, Upload, CheckCircle2, Download, PlusCircle } from 'lucide-react';
+import {
+  AlertTriangle, FileText, Upload, CheckCircle2, Download, PlusCircle,
+  ChevronLeft, ChevronRight, Eye,
+} from 'lucide-react';
 import type { EtapaFinanceiro } from '@/types/financial';
+import { ETAPA_FINANCEIRO_ORDER, ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
-import { uploadFile, viewFile } from '@/hooks/useStorageUpload';
+import { uploadFile, viewFile, getSignedUrl } from '@/hooks/useStorageUpload';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -74,18 +78,19 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
     }
   };
 
-  const nextEtapaMap: Partial<Record<EtapaFinanceiro, EtapaFinanceiro>> = {
-    solicitacao_criada: 'gerar_cobranca',
-    gerar_cobranca: 'cobranca_gerada',
-    cobranca_gerada: 'honorario_pago',
+  const handleDownload = async (storagePath: string) => {
+    const url = await getSignedUrl(storagePath);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = storagePath.split('/').pop() || 'arquivo';
+    a.target = '_blank';
+    a.click();
   };
 
-  const nextEtapa = nextEtapaMap[processo.etapa_financeiro];
-  const nextLabels: Record<string, string> = {
-    gerar_cobranca: 'Gerar Cobrança →',
-    cobranca_gerada: 'Cobrança Gerada →',
-    honorario_pago: 'Marcar Pago ✓',
-  };
+  // Navigation arrows
+  const currentIdx = ETAPA_FINANCEIRO_ORDER.indexOf(processo.etapa_financeiro);
+  const prevEtapa = currentIdx > 0 ? ETAPA_FINANCEIRO_ORDER[currentIdx - 1] : null;
+  const nextEtapa = currentIdx < ETAPA_FINANCEIRO_ORDER.length - 1 ? ETAPA_FINANCEIRO_ORDER[currentIdx + 1] : null;
 
   const AttachBtn = ({
     storagePath, label, field, inputRef, folder,
@@ -99,13 +104,24 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
     <div className="flex items-center gap-1.5">
       <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
       {storagePath ? (
-        <button
-          onClick={() => viewFile(storagePath)}
-          className="text-[11px] text-info underline flex items-center gap-1 hover:text-info/80"
-        >
-          <CheckCircle2 className="h-3 w-3 text-success" /> {label}
-          <Download className="h-3 w-3" />
-        </button>
+        <div className="flex items-center gap-1">
+          <CheckCircle2 className="h-3 w-3 text-success" />
+          <span className="text-[11px] font-medium">{label}</span>
+          <button
+            onClick={() => viewFile(storagePath)}
+            className="text-info hover:text-info/80 p-0.5"
+            title="Visualizar"
+          >
+            <Eye className="h-3 w-3" />
+          </button>
+          <button
+            onClick={() => handleDownload(storagePath)}
+            className="text-primary hover:text-primary/80 p-0.5"
+            title="Download"
+          >
+            <Download className="h-3 w-3" />
+          </button>
+        </div>
       ) : (
         <button
           onClick={() => inputRef.current?.click()}
@@ -210,7 +226,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
             </div>
           </div>
 
-          {/* Attachments with real upload */}
+          {/* Attachments with download */}
           <div className="space-y-1">
             <AttachBtn
               storagePath={lanc?.boleto_url}
@@ -238,17 +254,31 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
             rows={2}
           />
 
-          {/* Move button */}
-          {nextEtapa && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full text-xs h-7"
-              onClick={() => onMoveRequest(processo, nextEtapa)}
-            >
-              {nextLabels[nextEtapa] || 'Avançar →'}
-            </Button>
-          )}
+          {/* Navigation arrows */}
+          <div className="flex items-center justify-between gap-1">
+            {prevEtapa ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-[10px] px-2 flex-1"
+                onClick={() => onMoveRequest(processo, prevEtapa)}
+              >
+                <ChevronLeft className="h-3 w-3 mr-0.5" />
+                {ETAPA_FINANCEIRO_LABELS[prevEtapa]}
+              </Button>
+            ) : <div className="flex-1" />}
+            {nextEtapa ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-[10px] px-2 flex-1"
+                onClick={() => onMoveRequest(processo, nextEtapa)}
+              >
+                {ETAPA_FINANCEIRO_LABELS[nextEtapa]}
+                <ChevronRight className="h-3 w-3 ml-0.5" />
+              </Button>
+            ) : <div className="flex-1" />}
+          </div>
 
           <p className="text-[9px] text-muted-foreground/60 text-center">Duplo clique para edição completa</p>
         </CardContent>

@@ -267,6 +267,7 @@ CREATE TABLE IF NOT EXISTS public.valores_adicionais (
   descricao TEXT NOT NULL,
   valor NUMERIC(12,2) NOT NULL DEFAULT 0,
   anexo_url TEXT,
+  comprovante_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -274,3 +275,11 @@ CREATE TABLE IF NOT EXISTS public.valores_adicionais (
 ALTER TABLE public.valores_adicionais ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "valores_adicionais_all" ON public.valores_adicionais;
 CREATE POLICY "valores_adicionais_all" ON public.valores_adicionais FOR ALL USING (true) WITH CHECK (true);
+
+-- MIGRATION: Add comprovante_url to valores_adicionais
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'valores_adicionais' AND column_name = 'comprovante_url') THEN
+    ALTER TABLE public.valores_adicionais ADD COLUMN comprovante_url TEXT;
+  END IF;
+END $$;
