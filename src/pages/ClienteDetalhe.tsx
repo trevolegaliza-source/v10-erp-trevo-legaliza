@@ -528,6 +528,9 @@ export default function ClienteDetalhe() {
                     <div key={c.name} className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-3 border border-border/40">
                       <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                       <span className="flex-1 text-sm truncate">{c.name}</span>
+                      <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => handleViewContract(c.name)}>
+                        <ExternalLink className="h-3 w-3" /> Ver
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => handleDownload(c.name)}>
                         <Download className="h-3 w-3" /> Baixar
                       </Button>
