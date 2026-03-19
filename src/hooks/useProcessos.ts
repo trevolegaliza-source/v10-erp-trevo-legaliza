@@ -236,6 +236,7 @@ export function useDashboardStats() {
         recentes: (recentes || []) as ProcessoDB[],
         topClientes,
         pipelineCounts,
+        pipelineValues,
         slaProximos: (slaProcs || []) as ProcessoDB[],
       };
     },
