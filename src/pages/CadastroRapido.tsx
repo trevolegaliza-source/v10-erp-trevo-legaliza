@@ -15,6 +15,7 @@ import { useClientes, useCreateCliente, useCreateProcesso } from '@/hooks/useFin
 import type { TipoCliente, TipoProcesso } from '@/types/financial';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { STORAGE_BUCKETS } from '@/constants/storage';
 
 const INITIAL_CLIENTE = {
   codigo_identificador: '',
@@ -75,7 +76,7 @@ export default function CadastroRapido() {
     const ext = contratoFile.name.split('.').pop();
     const path = `${clienteId}/contrato_${Date.now()}.${ext}`;
     const { error } = await supabase.storage
-      .from('contratos')
+      .from(STORAGE_BUCKETS.CONTRACTS)
       .upload(path, contratoFile, { upsert: true });
 
     if (error) {
