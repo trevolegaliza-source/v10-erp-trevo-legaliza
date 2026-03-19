@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, Clock, Receipt, LayoutGrid, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { useProcessosFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { Toggle } from '@/components/ui/toggle';
 import FinanceiroKanban from '@/components/financeiro/FinanceiroKanban';
 import FinanceiroList from '@/components/financeiro/FinanceiroList';
+import { formatBRL } from '@/lib/pricing-engine';
 
 export default function Financeiro() {
   const { data: stats, isLoading: loadingStats } = useFinanceiroDashboard();
@@ -85,7 +86,7 @@ export default function Financeiro() {
                 <kpi.icon className={`h-4.5 w-4.5 ${kpi.iconClass}`} />
               </div>
               <p className="text-2xl font-bold mt-3">
-                {loadingStats ? '...' : kpi.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                {loadingStats ? '...' : formatBRL(kpi.value)}
               </p>
               <p className="text-xs text-muted-foreground">{kpi.label}</p>
             </CardContent>

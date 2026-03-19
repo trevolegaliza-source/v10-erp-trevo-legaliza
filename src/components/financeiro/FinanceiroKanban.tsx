@@ -27,7 +27,6 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
   const [cobrancaModalOpen, setCobrancaModalOpen] = useState(false);
   const [cobrancaProcesso, setCobrancaProcesso] = useState<ProcessoFinanceiro | null>(null);
 
-  // Double-click edit modal
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
 
@@ -40,6 +39,7 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
     const cliente = processo.cliente as any;
     const momentoFat = cliente?.momento_faturamento || 'na_solicitacao';
 
+    // Password gate: anticipation for 'no_deferimento' clients
     if (
       processo.etapa_financeiro === 'solicitacao_criada' &&
       targetEtapa === 'gerar_cobranca' &&
@@ -52,6 +52,7 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
       return;
     }
 
+    // Password gate: overdue invoices
     if (processo.etapa_financeiro === 'honorario_vencido') {
       setPasswordTitle('Trava de Inadimplência');
       setPasswordDesc('Para mover um honorário vencido, insira a senha master.');
@@ -60,9 +61,21 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
       return;
     }
 
+    // PASSWORD GATE: "Gerar Cobrança" action
     if (targetEtapa === 'cobranca_gerada' && processo.etapa_financeiro === 'gerar_cobranca') {
-      setCobrancaProcesso(processo);
-      setCobrancaModalOpen(true);
+      setPasswordTitle('Confirmar Geração de Cobrança');
+      setPasswordDesc('Insira a senha master para gerar a cobrança.');
+      setPendingMove({ processo, target: '__gerar_cobranca__' as any });
+      setPasswordOpen(true);
+      return;
+    }
+
+    // PASSWORD GATE: "Marcar como Pago" action
+    if (targetEtapa === 'honorario_pago') {
+      setPasswordTitle('Confirmar Pagamento');
+      setPasswordDesc('Insira a senha master para marcar como pago.');
+      setPendingMove({ processo, target: targetEtapa });
+      setPasswordOpen(true);
       return;
     }
 
@@ -78,7 +91,13 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
 
   const handlePasswordConfirm = () => {
     if (pendingMove) {
-      executeMove(pendingMove.processo, pendingMove.target);
+      // If it was a gerar_cobranca action, open the cobranca modal
+      if (pendingMove.target === '__gerar_cobranca__') {
+        setCobrancaProcesso(pendingMove.processo);
+        setCobrancaModalOpen(true);
+      } else {
+        executeMove(pendingMove.processo, pendingMove.target);
+      }
       setPendingMove(null);
     }
   };
