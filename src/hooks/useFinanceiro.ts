@@ -62,7 +62,7 @@ export function useCreateCliente() {
   return useMutation({
     mutationFn: async (cliente: Record<string, any>) => {
       const payload = normalizeClienteInsert(cliente);
-      const { data, error } = await supabase.from('clientes').insert(payload).select('*').single();
+      const { data, error } = await supabase.from('clientes').insert(payload as any).select('*').single();
       if (error) throw error;
       return data as ClienteDB;
     },
