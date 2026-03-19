@@ -183,15 +183,18 @@ export function useDashboardStats() {
         .order('created_at', { ascending: false })
         .limit(6);
 
-      // Pipeline counts by stage
+      // Pipeline counts and values by stage
       const { data: allProcessos } = await supabase
         .from('processos')
-        .select('id, etapa, cliente_id, valor, cliente:clientes(nome, apelido)')
+        .select('id, etapa, cliente_id, valor, cliente:clientes(nome, apelido, valor_base)')
         .not('etapa', 'in', '("finalizados","arquivo")');
 
       const pipelineCounts: Record<string, number> = {};
+      const pipelineValues: Record<string, number> = {};
       (allProcessos || []).forEach((p: any) => {
         pipelineCounts[p.etapa] = (pipelineCounts[p.etapa] || 0) + 1;
+        const val = Number(p.valor) || Number((p.cliente as any)?.valor_base) || 0;
+        pipelineValues[p.etapa] = (pipelineValues[p.etapa] || 0) + val;
       });
 
       // Top clientes by financial volume this month
