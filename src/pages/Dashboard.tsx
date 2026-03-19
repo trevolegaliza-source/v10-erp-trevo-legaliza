@@ -39,6 +39,7 @@ export default function Dashboard() {
     : (stats?.slaProximos || []).filter(p => p.cliente_id === filterClienteId);
 
   const filteredPipeline = stats?.pipelineCounts || {};
+  const filteredPipelineValues = stats?.pipelineValues || {};
   const totalPipelineProcs = Object.values(filteredPipeline).reduce((s, n) => s + n, 0);
 
   // KPI click filter: show filtered list
