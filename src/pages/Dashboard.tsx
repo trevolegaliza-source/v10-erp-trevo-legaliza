@@ -16,13 +16,15 @@ import { useDashboardStats } from '@/hooks/useProcessos';
 import { useClientes } from '@/hooks/useFinanceiro';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Progress } from '@/components/ui/progress';
+
+type DashFilter = 'all' | 'sla' | 'urgentes';
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useDashboardStats();
   const { data: clientes } = useClientes();
   const navigate = useNavigate();
   const [filterClienteId, setFilterClienteId] = useState<string>('all');
+  const [activeFilter, setActiveFilter] = useState<DashFilter>('all');
 
   const filteredRecentes = filterClienteId === 'all'
     ? (stats?.recentes || [])
@@ -36,33 +38,50 @@ export default function Dashboard() {
     ? (stats?.slaProximos || [])
     : (stats?.slaProximos || []).filter(p => p.cliente_id === filterClienteId);
 
-  const filteredPipeline = filterClienteId === 'all'
-    ? (stats?.pipelineCounts || {})
-    : (() => {
-        // When filtered, we can't easily recompute — show unfiltered with note
-        return stats?.pipelineCounts || {};
-      })();
-
+  const filteredPipeline = stats?.pipelineCounts || {};
   const totalPipelineProcs = Object.values(filteredPipeline).reduce((s, n) => s + n, 0);
+
+  // KPI click filter: show filtered list
+  const displayList = activeFilter === 'sla'
+    ? filteredUrgentes
+    : activeFilter === 'urgentes'
+      ? filteredUrgentes
+      : filteredRecentes;
 
   const kpis = [
     {
       label: 'Processos Ativos',
       value: filterClienteId === 'all' ? (stats?.processosAtivos ?? 0) : filteredRecentes.length,
       icon: FileText,
-      clickable: true,
-      href: '/processos-ativos',
+      bgClass: 'bg-primary/10',
+      iconClass: 'text-primary',
+      onClick: () => navigate('/processos'),
     },
-    { label: 'Clientes Ativos', value: stats?.totalClientes ?? 0, icon: Users },
+    {
+      label: 'Clientes Ativos',
+      value: stats?.totalClientes ?? 0,
+      icon: Users,
+      bgClass: 'bg-info/10',
+      iconClass: 'text-info',
+      onClick: () => navigate('/clientes'),
+    },
     {
       label: 'Faturamento Mensal',
-      value: null, // custom render
+      value: null,
       icon: DollarSign,
-      clickable: true,
-      href: '/faturamento',
+      bgClass: 'bg-success/10',
+      iconClass: 'text-success',
       customRender: true,
+      onClick: () => navigate('/faturamento'),
     },
-    { label: 'SLA em Risco', value: filteredUrgentes.length, icon: AlertTriangle },
+    {
+      label: 'SLA em Risco',
+      value: filteredUrgentes.length,
+      icon: AlertTriangle,
+      bgClass: 'bg-destructive/10',
+      iconClass: 'text-destructive',
+      onClick: () => setActiveFilter(prev => prev === 'sla' ? 'all' : 'sla'),
+    },
   ];
 
   const formatCurrency = (v: number) =>
@@ -90,7 +109,6 @@ export default function Dashboard() {
     }
   };
 
-  // Pipeline stages to show (grouped for readability)
   const pipelineStages = KANBAN_STAGES.filter(s => s.key !== 'finalizados' && s.key !== 'arquivo');
   const maxPipelineCount = Math.max(1, ...pipelineStages.map(s => filteredPipeline[s.key] || 0));
 
@@ -122,20 +140,20 @@ export default function Dashboard() {
         </Select>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards - all clickable */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {kpis.map((stat) => (
           <Card
             key={stat.label}
-            className={`border-border/60 card-hover ${stat.clickable ? 'cursor-pointer hover:border-primary/40' : ''}`}
-            onClick={() => stat.clickable && stat.href && navigate(stat.href)}
+            className="border-border/60 card-hover cursor-pointer hover:border-primary/40"
+            onClick={stat.onClick}
           >
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
-                <div className="rounded-lg bg-primary/10 p-2 w-fit">
-                  <stat.icon className="h-4.5 w-4.5 text-primary" />
+                <div className={`rounded-lg ${stat.bgClass} p-2 w-fit`}>
+                  <stat.icon className={`h-4.5 w-4.5 ${stat.iconClass}`} />
                 </div>
-                {stat.clickable && <ArrowUpRight className="h-4 w-4 text-muted-foreground" />}
+                <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="mt-3">
                 {isLoading ? (
@@ -166,12 +184,16 @@ export default function Dashboard() {
 
       {/* Financial stat cards */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="border-border/60 border-l-4 border-l-warning card-hover">
+        <Card
+          className="border-border/60 border-l-4 border-l-warning card-hover cursor-pointer hover:border-primary/40"
+          onClick={() => navigate('/financeiro')}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div className="rounded-lg bg-warning/10 p-2 w-fit">
                 <CreditCard className="h-4.5 w-4.5 text-warning" />
               </div>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="mt-3">
               {isLoading ? (
@@ -183,12 +205,16 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/60 border-l-4 border-l-info card-hover">
+        <Card
+          className="border-border/60 border-l-4 border-l-info card-hover cursor-pointer hover:border-primary/40"
+          onClick={() => navigate('/financeiro')}
+        >
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div className="rounded-lg bg-info/10 p-2 w-fit">
                 <Coins className="h-4.5 w-4.5 text-info" />
               </div>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="mt-3">
               {isLoading ? (
@@ -201,6 +227,18 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Active filter indicator */}
+      {activeFilter !== 'all' && (
+        <div className="flex items-center gap-2">
+          <Badge className="bg-destructive/10 text-destructive border-0">
+            Filtrando: {activeFilter === 'sla' ? 'SLA em Risco' : 'Urgentes'}
+          </Badge>
+          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => setActiveFilter('all')}>
+            Limpar filtro
+          </Button>
+        </div>
+      )}
 
       {/* Pipeline Funnel */}
       <Card className="border-border/60">
@@ -247,7 +285,7 @@ export default function Dashboard() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <TrendingUp className="h-4 w-4 text-primary" />
-              Processos Recentes
+              {activeFilter === 'sla' ? 'Processos com SLA em Risco' : 'Processos Recentes'}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -256,15 +294,16 @@ export default function Dashboard() {
                 Array.from({ length: 4 }).map((_, i) => (
                   <Skeleton key={i} className="h-14 w-full rounded-lg" />
                 ))
-              ) : filteredRecentes.length === 0 ? (
+              ) : displayList.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
-                  Nenhum processo encontrado. Crie um no Cadastro Rápido.
+                  {activeFilter !== 'all' ? 'Nenhum processo nesta categoria.' : 'Nenhum processo encontrado. Crie um no Cadastro Rápido.'}
                 </p>
               ) : (
-                filteredRecentes.map((proc) => (
+                displayList.map((proc) => (
                   <div
                     key={proc.id}
-                    className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-4 py-3 group"
+                    className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-4 py-3 group cursor-pointer hover:bg-muted/50"
+                    onClick={() => navigate('/processos')}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{proc.razao_social}</p>
@@ -315,7 +354,6 @@ export default function Dashboard() {
 
         {/* Right column: SLA + Ranking */}
         <div className="space-y-6">
-          {/* SLA Alerts with proximity list */}
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -354,7 +392,6 @@ export default function Dashboard() {
                   </>
                 )}
 
-                {/* SLA Proximity */}
                 {!isLoading && filteredSla.length > 0 && (
                   <div className="mt-3 pt-3 border-t">
                     <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
@@ -383,7 +420,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Ranking by financial volume */}
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -396,27 +432,18 @@ export default function Dashboard() {
               {isLoading ? (
                 <Skeleton className="h-20 w-full" />
               ) : (stats?.topClientes || []).length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">Sem dados financeiros este mês</p>
+                <p className="text-xs text-muted-foreground text-center py-4">Sem dados</p>
               ) : (
-                <div className="space-y-2.5">
-                  {(stats?.topClientes || []).map((client, i) => {
-                    const maxVal = stats?.topClientes?.[0]?.total || 1;
-                    const pct = (client.total / maxVal) * 100;
-                    return (
-                      <div key={client.id} className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">
-                            <span className="text-muted-foreground mr-1.5 font-mono text-xs">{i + 1}.</span>
-                            {client.nome}
-                          </span>
-                          <span className="text-xs font-semibold text-primary">
-                            {formatCurrency(client.total)}
-                          </span>
-                        </div>
-                        <Progress value={pct} className="h-1.5" />
+                <div className="space-y-2">
+                  {(stats?.topClientes || []).map((c, i) => (
+                    <div key={c.id} className="flex items-center justify-between py-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-muted-foreground w-4">{i + 1}.</span>
+                        <span className="text-sm font-medium">{c.nome}</span>
                       </div>
-                    );
-                  })}
+                      <span className="text-sm font-semibold text-primary">{formatCurrency(c.total)}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>

@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Search, CheckCircle, Wallet, Building2 } from 'lucide-react';
 import { useLancamentos, useCreateLancamento, useUpdateLancamento } from '@/hooks/useFinanceiro';
 import { STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
 import type { StatusFinanceiro } from '@/types/financial';
+import { toast } from 'sonner';
 
 export default function ContasPagar() {
   const { data: lancamentos, isLoading } = useLancamentos('pagar');
@@ -20,7 +21,15 @@ export default function ContasPagar() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState(false);
-  const [form, setForm] = useState({ descricao: '', valor: '', categoria: 'operacional', data_vencimento: '' });
+  const [form, setForm] = useState({
+    descricao: '',
+    valor: '',
+    categoria: 'operacional',
+    data_vencimento: '',
+    recorrente: false,
+    frequencia: 'mensal',
+    parcelas: '12',
+  });
 
   const filtered = (lancamentos || []).filter(l => {
     if (filterStatus !== 'all' && l.status !== filterStatus) return false;
@@ -33,19 +42,56 @@ export default function ContasPagar() {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    createLancamento.mutate({
-      tipo: 'pagar',
-      descricao: form.descricao,
-      valor: Number(form.valor),
-      categoria: form.categoria,
-      status: 'pendente',
-      data_vencimento: form.data_vencimento,
-    } as any, {
-      onSuccess: () => {
+    const valor = Number(form.valor);
+    if (!valor || !form.descricao || !form.data_vencimento) return;
+
+    if (form.recorrente) {
+      const parcelas = form.parcelas === 'indeterminado' ? 12 : Number(form.parcelas);
+      const baseDate = new Date(form.data_vencimento);
+      const promises: Promise<any>[] = [];
+
+      for (let i = 0; i < parcelas; i++) {
+        const venc = new Date(baseDate);
+        if (form.frequencia === 'mensal') venc.setMonth(venc.getMonth() + i);
+        else if (form.frequencia === 'semanal') venc.setDate(venc.getDate() + i * 7);
+
+        promises.push(
+          new Promise((resolve, reject) => {
+            createLancamento.mutate({
+              tipo: 'pagar',
+              descricao: `${form.descricao} (${i + 1}/${parcelas})`,
+              valor,
+              categoria: form.categoria,
+              status: 'pendente',
+              data_vencimento: venc.toISOString().split('T')[0],
+            } as any, {
+              onSuccess: resolve,
+              onError: reject,
+            });
+          })
+        );
+      }
+
+      Promise.all(promises).then(() => {
+        toast.success(`${parcelas} lançamentos recorrentes criados!`);
         setDialog(false);
-        setForm({ descricao: '', valor: '', categoria: 'operacional', data_vencimento: '' });
-      },
-    });
+        setForm({ descricao: '', valor: '', categoria: 'operacional', data_vencimento: '', recorrente: false, frequencia: 'mensal', parcelas: '12' });
+      });
+    } else {
+      createLancamento.mutate({
+        tipo: 'pagar',
+        descricao: form.descricao,
+        valor,
+        categoria: form.categoria,
+        status: 'pendente',
+        data_vencimento: form.data_vencimento,
+      } as any, {
+        onSuccess: () => {
+          setDialog(false);
+          setForm({ descricao: '', valor: '', categoria: 'operacional', data_vencimento: '', recorrente: false, frequencia: 'mensal', parcelas: '12' });
+        },
+      });
+    }
   };
 
   return (
@@ -91,6 +137,48 @@ export default function ContasPagar() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Recorrente */}
+              <div className="rounded-lg border border-border/60 p-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="recorrente"
+                    checked={form.recorrente}
+                    onCheckedChange={(c) => setForm(f => ({ ...f, recorrente: !!c }))}
+                  />
+                  <label htmlFor="recorrente" className="text-sm font-medium cursor-pointer">
+                    Lançamento Recorrente
+                  </label>
+                </div>
+                {form.recorrente && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Frequência</Label>
+                      <Select value={form.frequencia} onValueChange={v => setForm(f => ({ ...f, frequencia: v }))}>
+                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="mensal">Mensal</SelectItem>
+                          <SelectItem value="semanal">Semanal</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Parcelas</Label>
+                      <Select value={form.parcelas} onValueChange={v => setForm(f => ({ ...f, parcelas: v }))}>
+                        <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="3">3 parcelas</SelectItem>
+                          <SelectItem value="6">6 parcelas</SelectItem>
+                          <SelectItem value="12">12 parcelas</SelectItem>
+                          <SelectItem value="24">24 parcelas</SelectItem>
+                          <SelectItem value="indeterminado">Indeterminado (12)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Button type="submit" disabled={createLancamento.isPending}>Criar Lançamento</Button>
             </form>
           </DialogContent>
