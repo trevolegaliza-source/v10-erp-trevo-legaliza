@@ -39,6 +39,7 @@ export default function Dashboard() {
     : (stats?.slaProximos || []).filter(p => p.cliente_id === filterClienteId);
 
   const filteredPipeline = stats?.pipelineCounts || {};
+  const filteredPipelineValues = stats?.pipelineValues || {};
   const totalPipelineProcs = Object.values(filteredPipeline).reduce((s, n) => s + n, 0);
 
   // KPI click filter: show filtered list
@@ -258,12 +259,16 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
               {pipelineStages.map((stage) => {
                 const count = filteredPipeline[stage.key] || 0;
+                const stageValue = filteredPipelineValues[stage.key] || 0;
                 const pct = (count / maxPipelineCount) * 100;
                 return (
-                  <div key={stage.key} className="text-center space-y-1.5">
+                  <div key={stage.key} className="text-center space-y-1.5 group/bar">
+                    <p className="text-[9px] font-semibold text-primary opacity-0 group-hover/bar:opacity-100 transition-opacity">
+                      {formatCurrency(stageValue)}
+                    </p>
                     <div className="h-16 flex items-end justify-center">
                       <div
-                        className="w-8 rounded-t bg-primary/80 transition-all duration-300"
+                        className="w-8 rounded-t bg-primary/80 transition-all duration-300 group-hover/bar:bg-primary group-hover/bar:shadow-[0_0_12px_hsl(var(--primary)/0.5)]"
                         style={{ height: `${Math.max(pct, 6)}%` }}
                       />
                     </div>

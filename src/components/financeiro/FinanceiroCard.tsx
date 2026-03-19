@@ -109,11 +109,11 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
     folder: string;
   }) => (
     <div className="flex items-center gap-1.5">
-      <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+      <FileText className={cn('h-3 w-3 shrink-0', storagePath ? 'text-[#22c55e]' : 'text-muted-foreground')} />
       {storagePath ? (
         <div className="flex items-center gap-1">
-          <CheckCircle2 className="h-3 w-3 text-success" />
-          <span className="text-[11px] font-medium">{label}</span>
+          <CheckCircle2 className="h-3 w-3 text-[#22c55e]" />
+          <span className="text-[11px] font-medium text-[#22c55e]">{label}</span>
           <button onClick={() => viewFile(storagePath)} className="text-info hover:text-info/80 p-0.5" title="Visualizar">
             <Eye className="h-3 w-3" />
           </button>

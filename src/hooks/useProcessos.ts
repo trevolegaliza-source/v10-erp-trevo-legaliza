@@ -154,13 +154,33 @@ export function useDashboardStats() {
         }
       }
 
-      // COBRANÇAS A GERAR: lancamentos in 'gerar_cobranca' stage
+      // COBRANÇAS A GERAR: lancamentos in 'gerar_cobranca' stage + processos in registro/finalizados without billing
       const { data: cobrancasGerar } = await supabase
         .from('lancamentos')
         .select('valor')
         .eq('tipo', 'receber')
         .eq('etapa_financeiro', 'gerar_cobranca');
-      const totalCobrancasGerar = (cobrancasGerar || []).reduce((s, r) => s + Number(r.valor), 0);
+      let totalCobrancasGerar = (cobrancasGerar || []).reduce((s, r) => s + Number(r.valor), 0);
+
+      // Also add processos in registro/finalizados stages
+      const { data: procsRegistro } = await supabase
+        .from('processos')
+        .select('id, valor')
+        .in('etapa', ['registro', 'finalizados']);
+      if (procsRegistro && procsRegistro.length > 0) {
+        const regIds = procsRegistro.map(p => p.id);
+        const { data: existingBilled } = await supabase
+          .from('lancamentos')
+          .select('processo_id')
+          .eq('tipo', 'receber')
+          .in('processo_id', regIds);
+        const billedSet = new Set((existingBilled || []).map(l => l.processo_id));
+        for (const p of procsRegistro) {
+          if (!billedSet.has(p.id)) {
+            totalCobrancasGerar += Number(p.valor) || 0;
+          }
+        }
+      }
 
       // Also count processos without lancamento (they default to solicitacao_criada)
       // For "cobranças a gerar" we sum valor of processos in gerar_cobranca stage
@@ -183,15 +203,18 @@ export function useDashboardStats() {
         .order('created_at', { ascending: false })
         .limit(6);
 
-      // Pipeline counts by stage
+      // Pipeline counts and values by stage
       const { data: allProcessos } = await supabase
         .from('processos')
-        .select('id, etapa, cliente_id, valor, cliente:clientes(nome, apelido)')
+        .select('id, etapa, cliente_id, valor, cliente:clientes(nome, apelido, valor_base)')
         .not('etapa', 'in', '("finalizados","arquivo")');
 
       const pipelineCounts: Record<string, number> = {};
+      const pipelineValues: Record<string, number> = {};
       (allProcessos || []).forEach((p: any) => {
         pipelineCounts[p.etapa] = (pipelineCounts[p.etapa] || 0) + 1;
+        const val = Number(p.valor) || Number((p.cliente as any)?.valor_base) || 0;
+        pipelineValues[p.etapa] = (pipelineValues[p.etapa] || 0) + val;
       });
 
       // Top clientes by financial volume this month
@@ -233,6 +256,7 @@ export function useDashboardStats() {
         recentes: (recentes || []) as ProcessoDB[],
         topClientes,
         pipelineCounts,
+        pipelineValues,
         slaProximos: (slaProcs || []) as ProcessoDB[],
       };
     },
