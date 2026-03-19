@@ -15,12 +15,13 @@ import type { ClienteDB, TipoCliente } from '@/types/financial';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { STORAGE_BUCKETS } from '@/constants/storage';
 
 function ContractButton({ clienteId }: { clienteId: string }) {
   const [hasContract, setHasContract] = useState<boolean | null>(null);
 
   useEffect(() => {
-    supabase.storage.from('contratos').list(clienteId).then(({ data }) => {
+    supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(clienteId).then(({ data }) => {
       setHasContract(!!(data && data.length > 0));
     });
   }, [clienteId]);
@@ -29,10 +30,10 @@ function ContractButton({ clienteId }: { clienteId: string }) {
   if (!hasContract) return <span className="text-muted-foreground text-xs">—</span>;
 
   const handleView = async () => {
-    const { data } = await supabase.storage.from('contratos').list(clienteId);
+    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(clienteId);
     if (!data || data.length === 0) return;
     const fileName = data[0].name;
-    const { data: signed } = await supabase.storage.from('contratos').createSignedUrl(`${clienteId}/${fileName}`, 3600);
+    const { data: signed } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(`${clienteId}/${fileName}`, 3600);
     if (signed?.signedUrl) window.open(signed.signedUrl, '_blank');
   };
 
@@ -92,7 +93,7 @@ export default function Clientes() {
   };
 
   const loadContracts = async (clienteId: string) => {
-    const { data } = await supabase.storage.from('contratos').list(clienteId);
+    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(clienteId);
     setContracts((data || []).map(f => ({ name: f.name, id: f.id })));
   };
 
@@ -101,9 +102,8 @@ export default function Clientes() {
     const file = e.target.files[0];
     if (file.size > 10 * 1024 * 1024) { toast.error('Máx. 10MB'); return; }
     setUploadingContract(true);
-    const ext = file.name.split('.').pop();
     const path = `${editClient.id}/${Date.now()}_${file.name}`;
-    const { error } = await supabase.storage.from('contratos').upload(path, file);
+    const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(path, file);
     if (error) toast.error('Erro: ' + error.message);
     else { toast.success('Contrato anexado!'); loadContracts(editClient.id); }
     setUploadingContract(false);
@@ -111,7 +111,7 @@ export default function Clientes() {
 
   const handleDownloadContract = async (fileName: string) => {
     if (!editClient) return;
-    const { data, error } = await supabase.storage.from('contratos').download(`${editClient.id}/${fileName}`);
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).download(`${editClient.id}/${fileName}`);
     if (error) { toast.error('Erro ao baixar'); return; }
     const url = URL.createObjectURL(data);
     const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
@@ -121,7 +121,7 @@ export default function Clientes() {
   const handleDeleteContract = async (fileName: string) => {
     if (!editClient) return;
     setPendingDeleteAction(() => async () => {
-      const { error } = await supabase.storage.from('contratos').remove([`${editClient.id}/${fileName}`]);
+      const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).remove([`${editClient.id}/${fileName}`]);
       if (error) toast.error('Erro ao excluir');
       else { toast.success('Contrato removido'); loadContracts(editClient.id); }
     });

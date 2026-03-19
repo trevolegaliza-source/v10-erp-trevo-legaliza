@@ -1,7 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
+import { STORAGE_BUCKETS } from '@/constants/storage';
 import { toast } from 'sonner';
 
-const BUCKET = 'documentos';
+const BUCKET = STORAGE_BUCKETS.CONTRACTS;
 
 export async function uploadFile(
   file: File,
