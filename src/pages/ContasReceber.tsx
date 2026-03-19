@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Label } from '@/components/ui/label';
 import { DollarSign, TrendingUp, CreditCard, Receipt, Search, CheckCircle } from 'lucide-react';
-import { useLancamentos, useUpdateLancamento, useClientes } from '@/hooks/useFinanceiro';
+import { useLancamentos, useUpdateLancamento } from '@/hooks/useFinanceiro';
 import { STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
 import type { StatusFinanceiro } from '@/types/financial';
 
@@ -28,6 +27,13 @@ export default function ContasReceber() {
 
   const totalGeral = (lancamentos || []).reduce((s, l) => s + Number(l.valor), 0);
 
+  const kpis = [
+    { label: 'Total', value: totalGeral, icon: DollarSign, bgClass: 'bg-primary/10', iconClass: 'text-primary' },
+    { label: 'Recebido', value: totalByStatus('pago'), icon: TrendingUp, bgClass: 'bg-success/10', iconClass: 'text-success' },
+    { label: 'Pendente', value: totalByStatus('pendente'), icon: CreditCard, bgClass: 'bg-warning/10', iconClass: 'text-warning' },
+    { label: 'Atrasado', value: totalByStatus('atrasado'), icon: Receipt, bgClass: 'bg-destructive/10', iconClass: 'text-destructive' },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -39,16 +45,11 @@ export default function ContasReceber() {
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-4">
-        {[
-          { label: 'Total', value: totalGeral, icon: DollarSign, color: 'primary' },
-          { label: 'Recebido', value: totalByStatus('pago'), icon: TrendingUp, color: 'success' },
-          { label: 'Pendente', value: totalByStatus('pendente'), icon: CreditCard, color: 'warning' },
-          { label: 'Atrasado', value: totalByStatus('atrasado'), icon: Receipt, color: 'destructive' },
-        ].map(stat => (
+        {kpis.map(stat => (
           <Card key={stat.label} className="border-border/60">
             <CardContent className="p-5">
-              <div className={`rounded-lg bg-${stat.color}/10 p-2 w-fit`}>
-                <stat.icon className={`h-4.5 w-4.5 text-${stat.color}`} />
+              <div className={`rounded-lg ${stat.bgClass} p-2 w-fit`}>
+                <stat.icon className={`h-4.5 w-4.5 ${stat.iconClass}`} />
               </div>
               <p className="text-2xl font-bold mt-3">
                 {stat.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}

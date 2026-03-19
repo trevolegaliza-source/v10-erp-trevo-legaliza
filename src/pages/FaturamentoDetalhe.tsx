@@ -25,6 +25,12 @@ export default function FaturamentoDetalhe() {
   const sum = (items: typeof thisMonthLancamentos) => items.reduce((s, l) => s + Number(l.valor), 0);
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+  const kpis = [
+    { label: 'Receita Prevista', value: dashData?.receitaPrevistaMes ?? 0, icon: TrendingUp, bgClass: 'bg-primary/10', iconClass: 'text-primary' },
+    { label: 'Pendente', value: sum(pendentes), icon: CreditCard, bgClass: 'bg-warning/10', iconClass: 'text-warning' },
+    { label: 'Recebido', value: sum(pagos), icon: DollarSign, bgClass: 'bg-success/10', iconClass: 'text-success' },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -39,15 +45,11 @@ export default function FaturamentoDetalhe() {
 
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          { label: 'Receita Prevista', value: dashData?.receitaPrevistaMes ?? 0, icon: TrendingUp, color: 'primary' },
-          { label: 'Pendente', value: sum(pendentes), icon: CreditCard, color: 'warning' },
-          { label: 'Recebido', value: sum(pagos), icon: DollarSign, color: 'success' },
-        ].map((stat) => (
+        {kpis.map((stat) => (
           <Card key={stat.label} className="border-border/60">
             <CardContent className="p-5">
-              <div className={`rounded-lg bg-${stat.color}/10 p-2 w-fit`}>
-                <stat.icon className={`h-4.5 w-4.5 text-${stat.color}`} />
+              <div className={`rounded-lg ${stat.bgClass} p-2 w-fit`}>
+                <stat.icon className={`h-4.5 w-4.5 ${stat.iconClass}`} />
               </div>
               <div className="mt-3">
                 {isLoading ? <Skeleton className="h-7 w-24" /> : <p className="text-2xl font-bold">{fmt(stat.value)}</p>}
