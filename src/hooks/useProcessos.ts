@@ -154,13 +154,33 @@ export function useDashboardStats() {
         }
       }
 
-      // COBRANÇAS A GERAR: lancamentos in 'gerar_cobranca' stage
+      // COBRANÇAS A GERAR: lancamentos in 'gerar_cobranca' stage + processos in registro/finalizados without billing
       const { data: cobrancasGerar } = await supabase
         .from('lancamentos')
         .select('valor')
         .eq('tipo', 'receber')
         .eq('etapa_financeiro', 'gerar_cobranca');
-      const totalCobrancasGerar = (cobrancasGerar || []).reduce((s, r) => s + Number(r.valor), 0);
+      let totalCobrancasGerar = (cobrancasGerar || []).reduce((s, r) => s + Number(r.valor), 0);
+
+      // Also add processos in registro/finalizados stages
+      const { data: procsRegistro } = await supabase
+        .from('processos')
+        .select('id, valor')
+        .in('etapa', ['registro', 'finalizados']);
+      if (procsRegistro && procsRegistro.length > 0) {
+        const regIds = procsRegistro.map(p => p.id);
+        const { data: existingBilled } = await supabase
+          .from('lancamentos')
+          .select('processo_id')
+          .eq('tipo', 'receber')
+          .in('processo_id', regIds);
+        const billedSet = new Set((existingBilled || []).map(l => l.processo_id));
+        for (const p of procsRegistro) {
+          if (!billedSet.has(p.id)) {
+            totalCobrancasGerar += Number(p.valor) || 0;
+          }
+        }
+      }
 
       // Also count processos without lancamento (they default to solicitacao_criada)
       // For "cobranças a gerar" we sum valor of processos in gerar_cobranca stage
