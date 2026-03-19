@@ -92,7 +92,7 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
   const handlePasswordConfirm = () => {
     if (pendingMove) {
       // If it was a gerar_cobranca action, open the cobranca modal
-      if (pendingMove.target === '__gerar_cobranca__') {
+      if ((pendingMove.target as string) === '__gerar_cobranca__') {
         setCobrancaProcesso(pendingMove.processo);
         setCobrancaModalOpen(true);
       } else {
