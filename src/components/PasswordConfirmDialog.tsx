@@ -1,19 +1,13 @@
 import { useState } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-
-// Encoded deletion password — not stored in plain text
-const _k = atob('UG9ycmFkYTEwQGJ5cDRibXN4eDM=');
+import { supabase } from '@/integrations/supabase/client';
 
 interface PasswordConfirmDialogProps {
   open: boolean;
@@ -24,32 +18,41 @@ interface PasswordConfirmDialogProps {
 }
 
 export default function PasswordConfirmDialog({
-  open,
-  onOpenChange,
-  onConfirm,
-  title = 'Confirmar Exclusão',
+  open, onOpenChange, onConfirm,
+  title = 'Confirmar Ação',
   description = 'Digite a senha de administração para confirmar esta ação.',
 }: PasswordConfirmDialogProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleConfirm = () => {
-    if (password === _k) {
-      setPassword('');
-      setError(false);
-      onOpenChange(false);
-      onConfirm();
-    } else {
+  const handleConfirm = async () => {
+    if (!password) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('verify-master-password', {
+        body: { password },
+      });
+      if (fnError) throw fnError;
+      if (data?.valid) {
+        setPassword('');
+        onOpenChange(false);
+        onConfirm();
+      } else {
+        setError(true);
+        toast.error('Senha incorreta');
+      }
+    } catch {
       setError(true);
-      toast.error('Senha incorreta');
+      toast.error('Erro ao validar senha');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleClose = (o: boolean) => {
-    if (!o) {
-      setPassword('');
-      setError(false);
-    }
+    if (!o) { setPassword(''); setError(false); }
     onOpenChange(o);
   };
 
@@ -79,7 +82,10 @@ export default function PasswordConfirmDialog({
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => handleClose(false)}>Cancelar</Button>
-            <Button variant="destructive" size="sm" onClick={handleConfirm} disabled={!password}>Confirmar</Button>
+            <Button variant="destructive" size="sm" onClick={handleConfirm} disabled={!password || loading}>
+              {loading && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              Confirmar
+            </Button>
           </div>
         </div>
       </DialogContent>
