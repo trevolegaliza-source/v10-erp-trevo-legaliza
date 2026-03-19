@@ -376,9 +376,10 @@ export default function CadastroRapido() {
                                 key={c.id}
                                 value={`${c.nome} ${c.codigo_identificador} ${c.apelido || ''} ${c.nome_contador || ''}`}
                                 onSelect={() => {
+                                  const valorBase = c.tipo === 'MENSALISTA' ? 0 : Number((c as any).valor_base ?? 0);
                                   setProcessoForm((f) => ({ ...f, cliente_id: c.id }));
                                   setClienteComboOpen(false);
-                                }}
+                                }
                               >
                                 <Check className={cn('mr-2 h-4 w-4', processoForm.cliente_id === c.id ? 'opacity-100' : 'opacity-0')} />
                                 <div className="flex-1 min-w-0">
