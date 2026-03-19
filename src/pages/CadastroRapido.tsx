@@ -427,6 +427,24 @@ export default function CadastroRapido() {
                   </div>
                 </div>
 
+                {/* Valor Base info */}
+                {selectedCliente && !processoForm.definir_manual && (
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                    <p className="text-xs font-medium text-primary">Valor Base do Cliente</p>
+                    <p className="text-lg font-bold mt-1">
+                      {selectedCliente.tipo === 'MENSALISTA'
+                        ? 'Mensalista (franquia)'
+                        : Number((selectedCliente as any).valor_base ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                    {processoForm.prioridade === 'urgente' && selectedCliente.tipo !== 'MENSALISTA' && (
+                      <p className="text-[10px] text-warning mt-1">+50% urgência = {(Number((selectedCliente as any).valor_base ?? 0) * 1.5).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                    )}
+                    {(selectedCliente as any).momento_faturamento === 'no_deferimento' && (
+                      <Badge variant="outline" className="text-[9px] border-info text-info mt-1">Faturamento: Deferimento</Badge>
+                    )}
+                  </div>
+                )}
+
                 {/* Manual value toggle */}
                 <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
                   <div>
