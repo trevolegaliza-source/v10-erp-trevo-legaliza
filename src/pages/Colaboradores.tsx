@@ -207,7 +207,7 @@ export default function Colaboradores() {
                         <TableCell className="font-medium text-foreground">
                           <span className="flex items-center gap-1.5">
                             {c.nome}
-                            {birthday && <Cake className="h-3.5 w-3.5 text-pink-400" title="Aniversariante do mês! 🎂" />}
+                            {birthday && <span title="Aniversariante do mês! 🎂"><Cake className="h-3.5 w-3.5 text-pink-400" /></span>}
                           </span>
                           {c.email && <span className="block text-[10px] text-muted-foreground">{c.email}</span>}
                         </TableCell>
