@@ -418,6 +418,7 @@ export default function ContasPagar() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Stats */}
