@@ -10,6 +10,7 @@ import { useColaboradores, useCreateColaborador, useUpdateColaborador, useDelete
 import { getBusinessDaysInMonth, calcularCustoMensal } from '@/lib/business-days';
 import { gerarVerbasDoMes } from '@/lib/gerar-verbas';
 import ColaboradorForm, { EMPTY_FORM, type ColaboradorFormData } from '@/components/colaboradores/ColaboradorForm';
+import ColaboradorDetalheModal from '@/components/colaboradores/ColaboradorDetalheModal';
 import { toast } from 'sonner';
 
 export default function Colaboradores() {
@@ -22,6 +23,7 @@ export default function Colaboradores() {
   const [form, setForm] = useState<ColaboradorFormData>(EMPTY_FORM);
   const [search, setSearch] = useState('');
   const [gerando, setGerando] = useState(false);
+  const [detalheColab, setDetalheColab] = useState<Colaborador | null>(null);
 
   const diasUteis = getBusinessDaysInMonth();
 
@@ -35,7 +37,8 @@ export default function Colaboradores() {
   );
 
   const openCreate = () => { setEditId(null); setForm(EMPTY_FORM); setDialog(true); };
-  const openEdit = (c: Colaborador) => {
+  const openEdit = (c: Colaborador, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setEditId(c.id);
     setForm({
       nome: c.nome, email: c.email || '', regime: c.regime,
@@ -84,12 +87,17 @@ export default function Colaboradores() {
     try {
       const now = new Date();
       const total = await gerarVerbasDoMes(colaboradores, now.getFullYear(), now.getMonth());
-      toast.success(`${total} lançamentos gerados para ${totalAtivos.length} colaboradores!`);
+      if (total === 0) {
+        toast.info('Verbas já geradas para este mês. Valores atualizados se houve mudança.');
+      } else {
+        toast.success(`${total} novos lançamentos gerados para ${totalAtivos.length} colaboradores!`);
+      }
     } catch { /* handled */ }
     setGerando(false);
   };
 
-  const copyPix = (chave: string) => {
+  const copyPix = (chave: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     navigator.clipboard.writeText(chave);
     toast.success('Chave PIX copiada!');
   };
@@ -179,7 +187,7 @@ export default function Colaboradores() {
                   {filtered.map(c => {
                     const custo = calcularCustoMensal(Number(c.salario_base), Number(c.vt_diario), Number(c.vr_diario), diasUteis);
                     return (
-                      <TableRow key={c.id} className="group" onDoubleClick={() => openEdit(c)}>
+                      <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => setDetalheColab(c)}>
                         <TableCell className="font-medium text-foreground">
                           {c.nome}
                           {c.email && <span className="block text-[10px] text-muted-foreground">{c.email}</span>}
@@ -195,7 +203,7 @@ export default function Colaboradores() {
                           {c.pix_chave ? (
                             <button
                               className="flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer bg-transparent border-0 p-0"
-                              onClick={() => copyPix(c.pix_chave!)}
+                              onClick={(e) => copyPix(c.pix_chave!, e)}
                               title="Clique para copiar"
                             >
                               <span className="text-xs truncate max-w-[140px] text-foreground">{c.pix_chave}</span>
@@ -212,10 +220,11 @@ export default function Colaboradores() {
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(c)}>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={(e) => openEdit(c, e)}>
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => del.mutate(c.id)}>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                              onClick={(e) => { e.stopPropagation(); del.mutate(c.id); }}>
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
@@ -234,6 +243,13 @@ export default function Colaboradores() {
           )}
         </CardContent>
       </Card>
+
+      {/* Collaborator Detail Modal */}
+      <ColaboradorDetalheModal
+        colab={detalheColab}
+        open={!!detalheColab}
+        onOpenChange={(open) => { if (!open) setDetalheColab(null); }}
+      />
     </div>
   );
 }
