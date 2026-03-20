@@ -360,6 +360,21 @@ export function useUpdateLancamento() {
   });
 }
 
+export function useDeleteLancamento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('lancamentos').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lancamentos'] });
+      toast.success('Lançamento excluído!');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 // ---- DASHBOARD STATS ----
 export function useFinanceiroDashboard() {
   return useQuery({
