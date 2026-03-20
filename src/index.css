@@ -102,6 +102,32 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', sans-serif;
   }
+
+  /* Dark mode global contrast fixes */
+  .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+    color: hsl(var(--foreground));
+  }
+
+  .dark thead th, .dark [role="columnheader"] {
+    color: hsl(var(--foreground));
+  }
+
+  .dark label, .dark .label {
+    color: hsl(var(--foreground));
+  }
+
+  .dark input, .dark textarea, .dark select {
+    color: hsl(var(--foreground));
+  }
+
+  .dark input::placeholder, .dark textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .dark [role="dialog"] {
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+  }
 }
 
 @layer utilities {
