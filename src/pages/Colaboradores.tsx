@@ -5,13 +5,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Users, Search, Pencil, Trash2, Zap, Copy } from 'lucide-react';
+import { Plus, Users, Search, Pencil, Trash2, Zap, Copy, Cake } from 'lucide-react';
 import { useColaboradores, useCreateColaborador, useUpdateColaborador, useDeleteColaborador, type Colaborador } from '@/hooks/useColaboradores';
 import { getBusinessDaysInMonth, calcularCustoMensal } from '@/lib/business-days';
 import { gerarVerbasDoMes } from '@/lib/gerar-verbas';
 import ColaboradorForm, { EMPTY_FORM, type ColaboradorFormData } from '@/components/colaboradores/ColaboradorForm';
 import ColaboradorDetalheModal from '@/components/colaboradores/ColaboradorDetalheModal';
 import { toast } from 'sonner';
+
+function isBirthdayThisMonth(aniversario: string | null): boolean {
+  if (!aniversario) return false;
+  const d = new Date(aniversario + 'T12:00:00');
+  const now = new Date();
+  return d.getMonth() === now.getMonth();
+}
 
 export default function Colaboradores() {
   const { data: colaboradores, isLoading } = useColaboradores();
@@ -52,6 +59,8 @@ export default function Colaboradores() {
       valor_das: String(c.valor_das || 0),
       aumento_previsto_valor: String(c.aumento_previsto_valor || ''),
       aumento_previsto_data: c.aumento_previsto_data || '',
+      data_inicio: c.data_inicio || '',
+      aniversario: c.aniversario || '',
     });
     setDialog(true);
   };
@@ -72,9 +81,11 @@ export default function Colaboradores() {
       dia_pagamento_integral: form.possui_adiantamento ? null : (Number(form.dia_pagamento_integral) || 5),
       pix_tipo: form.pix_tipo || null,
       pix_chave: form.pix_chave || null,
-      valor_das: Number(form.valor_das) || 0,
+      valor_das: form.regime === 'INDEFINIDO' ? 0 : (Number(form.valor_das) || 0),
       aumento_previsto_valor: Number(form.aumento_previsto_valor) || 0,
       aumento_previsto_data: form.aumento_previsto_data || null,
+      data_inicio: form.data_inicio || null,
+      aniversario: form.aniversario || null,
     };
     if (!payload.nome) return toast.error('Nome é obrigatório');
 
@@ -190,14 +201,22 @@ export default function Colaboradores() {
                 <TableBody>
                   {filtered.map(c => {
                     const custo = calcularCustoMensal(Number(c.salario_base), Number(c.vt_diario), Number(c.vr_diario), diasUteis);
+                    const birthday = isBirthdayThisMonth(c.aniversario);
                     return (
                       <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => setDetalheColab(c)}>
                         <TableCell className="font-medium text-foreground">
-                          {c.nome}
+                          <span className="flex items-center gap-1.5">
+                            {c.nome}
+                            {birthday && <Cake className="h-3.5 w-3.5 text-pink-400" title="Aniversariante do mês! 🎂" />}
+                          </span>
                           {c.email && <span className="block text-[10px] text-muted-foreground">{c.email}</span>}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={c.regime === 'CLT' ? 'border-info/40 text-info' : 'border-warning/40 text-warning'}>
+                          <Badge variant="outline" className={
+                            c.regime === 'CLT' ? 'border-info/40 text-info' :
+                            c.regime === 'PJ' ? 'border-warning/40 text-warning' :
+                            'border-muted-foreground/40 text-muted-foreground'
+                          }>
                             {c.regime}
                           </Badge>
                         </TableCell>
