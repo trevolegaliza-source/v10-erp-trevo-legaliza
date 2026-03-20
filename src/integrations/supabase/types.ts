@@ -99,6 +99,8 @@ export type Database = {
         Row: {
           adiantamento_tipo: string
           adiantamento_valor: number
+          aumento_previsto_data: string | null
+          aumento_previsto_valor: number | null
           created_at: string | null
           email: string | null
           id: string
@@ -116,6 +118,8 @@ export type Database = {
         Insert: {
           adiantamento_tipo?: string
           adiantamento_valor?: number
+          aumento_previsto_data?: string | null
+          aumento_previsto_valor?: number | null
           created_at?: string | null
           email?: string | null
           id?: string
@@ -133,6 +137,8 @@ export type Database = {
         Update: {
           adiantamento_tipo?: string
           adiantamento_valor?: number
+          aumento_previsto_data?: string | null
+          aumento_previsto_valor?: number | null
           created_at?: string | null
           email?: string | null
           id?: string
