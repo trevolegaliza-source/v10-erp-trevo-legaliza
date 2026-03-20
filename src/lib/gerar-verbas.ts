@@ -96,7 +96,7 @@ function buildEntriesComAdiantamento(colab: Colaborador, year: number, month: nu
   const vt = Number(colab.vt_diario);
   const vr = Number(colab.vr_diario);
   const beneficios = (vt + vr) * diasUteis;
-  const das = Number(colab.valor_das) || 0;
+  const das = colab.regime === 'INDEFINIDO' ? 0 : (Number(colab.valor_das) || 0);
   const metadeSalario = sal / 2;
   const monthLabel = new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 

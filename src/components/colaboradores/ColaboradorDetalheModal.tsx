@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Copy, TrendingUp, FileText, AlertCircle, Wallet, Upload, Eye, CheckCircle2 } from 'lucide-react';
+import { Copy, TrendingUp, FileText, AlertCircle, Wallet, Upload, CheckCircle2, Star } from 'lucide-react';
 import type { Colaborador } from '@/hooks/useColaboradores';
 import { useUpdateColaborador } from '@/hooks/useColaboradores';
 import { useLancamentos, useUpdateLancamento } from '@/hooks/useFinanceiro';
+import { useAvaliacoes, useUpsertAvaliacao } from '@/hooks/useAvaliacoes';
 import { calcularCustoMensal, getBusinessDaysInMonth } from '@/lib/business-days';
 import { STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
 import type { StatusFinanceiro } from '@/types/financial';
@@ -25,13 +27,25 @@ interface Props {
   onOpenChange: (open: boolean) => void;
 }
 
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const TRIMESTRAL_MESES = [2, 5, 8, 11]; // Mar, Jun, Sep, Dec (0-indexed)
+
 export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: Props) {
   const { data: allLancamentos } = useLancamentos('pagar');
+  const { data: avaliacoes } = useAvaliacoes(colab?.id ?? null);
   const update = useUpdateColaborador();
   const updateLancamento = useUpdateLancamento();
+  const upsertAvaliacao = useUpsertAvaliacao();
   const [ocorrencia, setOcorrencia] = useState({ data: '', tipo: 'falta', desconto: true, obs: '' });
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Avaliação state
+  const now = new Date();
+  const [avalMes, setAvalMes] = useState(now.getMonth());
+  const [avalAno, setAvalAno] = useState(now.getFullYear());
+  const [avalFeedback, setAvalFeedback] = useState('');
+  const [avalTrimestral, setAvalTrimestral] = useState('');
 
   if (!colab) return null;
 
@@ -40,7 +54,6 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
   const custoAnual = custoMensal * 12;
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  // ALL lancamentos for this collaborator — no 5-day filter
   const lancamentos = (allLancamentos || []).filter(l => (l as any).colaborador_id === colab.id);
   const totalPago = lancamentos.filter(l => l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
   const totalPendente = lancamentos.filter(l => l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
@@ -91,6 +104,29 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
     e.target.value = '';
   };
 
+  // Load existing avaliacao when month/year changes
+  const existingAval = (avaliacoes || []).find(a => a.mes === avalMes && a.ano === avalAno);
+  const isTrimestral = TRIMESTRAL_MESES.includes(avalMes);
+
+  const handleSaveAvaliacao = () => {
+    if (!avalFeedback.trim() && !avalTrimestral.trim()) return toast.error('Preencha ao menos o feedback.');
+    upsertAvaliacao.mutate({
+      colaborador_id: colab.id,
+      mes: avalMes,
+      ano: avalAno,
+      feedback: avalFeedback.trim() || existingAval?.feedback || null,
+      conclusao_trimestral: isTrimestral ? (avalTrimestral.trim() || existingAval?.conclusao_trimestral || null) : null,
+    });
+  };
+
+  const loadAvaliacao = (mes: number, ano: number) => {
+    setAvalMes(mes);
+    setAvalAno(ano);
+    const existing = (avaliacoes || []).find(a => a.mes === mes && a.ano === ano);
+    setAvalFeedback(existing?.feedback || '');
+    setAvalTrimestral(existing?.conclusao_trimestral || '');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
@@ -102,7 +138,11 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
             <div>
               <span>{colab.nome}</span>
               <div className="flex items-center gap-2 mt-0.5">
-                <Badge variant="outline" className={colab.regime === 'CLT' ? 'border-info/40 text-info text-[10px]' : 'border-warning/40 text-warning text-[10px]'}>
+                <Badge variant="outline" className={
+                  colab.regime === 'CLT' ? 'border-info/40 text-info text-[10px]' :
+                  colab.regime === 'PJ' ? 'border-warning/40 text-warning text-[10px]' :
+                  'border-muted-foreground/40 text-muted-foreground text-[10px]'
+                }>
                   {colab.regime}
                 </Badge>
                 <Badge className={`border-0 text-[10px] ${colab.status === 'ativo' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
@@ -113,16 +153,16 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
           </DialogTitle>
         </DialogHeader>
 
-        {/* Hidden file input for recibo uploads */}
         <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={onFileSelected} />
 
         <Tabs defaultValue="dashboard" className="mt-2">
-          <TabsList className="w-full grid grid-cols-5 h-9">
+          <TabsList className="w-full grid grid-cols-6 h-9">
             <TabsTrigger value="dashboard" className="text-xs">Dashboard</TabsTrigger>
             <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
+            <TabsTrigger value="avaliacoes" className="text-xs">Avaliações</TabsTrigger>
             <TabsTrigger value="gestao" className="text-xs">Gestão</TabsTrigger>
             <TabsTrigger value="ocorrencias" className="text-xs">Ocorrências</TabsTrigger>
-            <TabsTrigger value="bancario" className="text-xs">Dados Bancários</TabsTrigger>
+            <TabsTrigger value="bancario" className="text-xs">Bancário</TabsTrigger>
           </TabsList>
 
           {/* Dashboard */}
@@ -168,9 +208,15 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
                 <p className="font-semibold text-foreground">{fmt(Number(colab.vr_diario))}</p>
               </div>
             </div>
+            {colab.data_inicio && (
+              <div className="rounded-lg border border-border/60 p-3">
+                <p className="text-xs text-muted-foreground">Data de Início</p>
+                <p className="font-semibold text-foreground">{new Date(colab.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+              </div>
+            )}
           </TabsContent>
 
-          {/* Histórico — ALL records, permanently visible */}
+          {/* Histórico */}
           <TabsContent value="historico" className="mt-4">
             <div className="rounded-lg border border-border/60 overflow-hidden">
               <Table>
@@ -205,38 +251,26 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
                         </TableCell>
                         <TableCell className="text-center">
                           <div className="flex items-center justify-center gap-1 flex-wrap">
-                            {/* Comprovante badge */}
                             {hasComprovante ? (
-                              <Button
-                                variant="ghost" size="sm"
-                                className="h-6 px-1.5 text-[10px] gap-1 text-success hover:text-success"
-                                onClick={() => viewComprovante((l as any).comprovante_url)}
-                                title="Ver comprovante bancário"
-                              >
-                                <CheckCircle2 className="h-3 w-3" /> Bancário
+                              <Button variant="ghost" size="sm"
+                                className="h-6 px-1.5 text-[10px] gap-1 text-[#22c55e] hover:text-[#22c55e]"
+                                onClick={() => viewComprovante((l as any).comprovante_url)}>
+                                <CheckCircle2 className="h-3 w-3" /> Bancário ✅
                               </Button>
                             ) : (
                               <span className="text-[10px] text-muted-foreground">—</span>
                             )}
-
-                            {/* Recibo badge or upload */}
                             {hasRecibo ? (
-                              <Button
-                                variant="ghost" size="sm"
-                                className="h-6 px-1.5 text-[10px] gap-1 text-success hover:text-success"
-                                onClick={() => viewComprovante((l as any).recibo_assinado_url)}
-                                title="Ver recibo assinado"
-                              >
-                                <FileText className="h-3 w-3" /> Recibo
+                              <Button variant="ghost" size="sm"
+                                className="h-6 px-1.5 text-[10px] gap-1 text-[#22c55e] hover:text-[#22c55e]"
+                                onClick={() => viewComprovante((l as any).recibo_assinado_url)}>
+                                <FileText className="h-3 w-3" /> Recibo 📄
                               </Button>
                             ) : isPago ? (
-                              <Button
-                                variant="ghost" size="sm"
+                              <Button variant="ghost" size="sm"
                                 className="h-6 px-1.5 text-[10px] gap-1 text-primary hover:text-primary"
                                 onClick={() => triggerReciboUpload(l.id)}
-                                disabled={uploadingId === l.id}
-                                title="Anexar recibo assinado"
-                              >
+                                disabled={uploadingId === l.id}>
                                 <Upload className="h-3 w-3" />
                                 {uploadingId === l.id ? '...' : 'Recibo'}
                               </Button>
@@ -249,6 +283,88 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
                 </TableBody>
               </Table>
             </div>
+          </TabsContent>
+
+          {/* Avaliações */}
+          <TabsContent value="avaliacoes" className="space-y-4 mt-4">
+            <Card className="border-border/60">
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Star className="h-4 w-4 text-primary" />
+                  <p className="text-sm font-semibold text-foreground">Feedback Mensal</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs text-foreground">Mês</Label>
+                    <Select value={String(avalMes)} onValueChange={v => loadAvaliacao(Number(v), avalAno)}>
+                      <SelectTrigger className="h-8 text-foreground"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {MESES_PT.map((m, i) => (
+                          <SelectItem key={i} value={String(i)}>{m}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs text-foreground">Ano</Label>
+                    <Select value={String(avalAno)} onValueChange={v => loadAvaliacao(avalMes, Number(v))}>
+                      <SelectTrigger className="h-8 text-foreground"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {[2024, 2025, 2026, 2027].map(y => (
+                          <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs text-foreground">Feedback — {MESES_PT[avalMes]} {avalAno}</Label>
+                  <Textarea
+                    className="min-h-[80px]"
+                    placeholder="Escreva o feedback mensal do colaborador..."
+                    value={avalFeedback}
+                    onChange={e => setAvalFeedback(e.target.value)}
+                  />
+                </div>
+                {isTrimestral && (
+                  <div className="grid gap-1.5 rounded-lg border-2 border-primary/30 bg-primary/5 p-3">
+                    <Label className="text-xs text-primary font-bold uppercase tracking-wider">
+                      🎯 Conclusão do Trimestre / OKR — {MESES_PT[avalMes]} {avalAno}
+                    </Label>
+                    <Textarea
+                      className="min-h-[80px] border-primary/20"
+                      placeholder="Conclusão trimestral, metas atingidas, OKRs..."
+                      value={avalTrimestral}
+                      onChange={e => setAvalTrimestral(e.target.value)}
+                    />
+                  </div>
+                )}
+                <Button size="sm" onClick={handleSaveAvaliacao} disabled={upsertAvaliacao.isPending}>
+                  {upsertAvaliacao.isPending ? 'Salvando...' : 'Salvar Avaliação'}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Historical avaliacoes */}
+            {(avaliacoes || []).length > 0 && (
+              <Card className="border-border/60">
+                <CardContent className="p-4 space-y-2">
+                  <p className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">Histórico de Avaliações</p>
+                  {(avaliacoes || []).map(a => (
+                    <div key={a.id} className="rounded-lg border border-border/60 p-3 space-y-1 cursor-pointer hover:bg-muted/30"
+                      onClick={() => loadAvaliacao(a.mes, a.ano)}>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-foreground">{MESES_PT[a.mes]} {a.ano}</p>
+                        {TRIMESTRAL_MESES.includes(a.mes) && a.conclusao_trimestral && (
+                          <Badge className="bg-primary/10 text-primary border-0 text-[10px]">Trimestral</Badge>
+                        )}
+                      </div>
+                      {a.feedback && <p className="text-xs text-muted-foreground line-clamp-2">{a.feedback}</p>}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Gestão Profissional */}
@@ -279,9 +395,11 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
                   <div className="rounded-lg border border-border/60 p-3">
                     <p className="text-xs text-muted-foreground">Adiantamento</p>
                     <p className="font-semibold text-foreground">
-                      {colab.adiantamento_tipo === 'percentual'
-                        ? `${colab.adiantamento_valor}% do salário`
-                        : fmt(Number(colab.adiantamento_valor))}
+                      {colab.possui_adiantamento
+                        ? (colab.adiantamento_tipo === 'percentual'
+                          ? `${colab.adiantamento_valor}% do salário`
+                          : fmt(Number(colab.adiantamento_valor)))
+                        : `Integral (Dia ${colab.dia_pagamento_integral || 5})`}
                     </p>
                   </div>
                 </div>
