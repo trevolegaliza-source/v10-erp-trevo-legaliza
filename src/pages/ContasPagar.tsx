@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { ptBR } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -406,10 +407,10 @@ export default function ContasPagar() {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative flex-1 max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Buscar..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
+              <Input placeholder="Buscar..." className="pl-9 text-foreground" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setCalendarDate(undefined); }}>
-              <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Visão" /></SelectTrigger>
+             <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setCalendarDate(undefined); }}>
+              <SelectTrigger className="w-36 h-9 text-foreground"><SelectValue placeholder="Visão" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ativo">Ativos</SelectItem>
                 <SelectItem value="all">Todos</SelectItem>
@@ -421,7 +422,7 @@ export default function ContasPagar() {
               </SelectContent>
             </Select>
             <Select value={filterCategoria} onValueChange={setFilterCategoria}>
-              <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Categoria" /></SelectTrigger>
+              <SelectTrigger className="w-40 h-9 text-foreground"><SelectValue placeholder="Categoria" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas Categorias</SelectItem>
                 <SelectItem value="colaborador">Colaborador</SelectItem>
@@ -549,6 +550,7 @@ export default function ContasPagar() {
               selected={calendarDate}
               onSelect={handleCalendarClick}
               className="p-0 pointer-events-auto"
+              locale={ptBR}
               modifiers={{
                 paid: paidDates,
                 pending: paymentDates,
