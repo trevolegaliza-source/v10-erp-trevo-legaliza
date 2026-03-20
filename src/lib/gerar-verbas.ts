@@ -50,7 +50,6 @@ function buildEntriesSemAdiantamento(colab: Colaborador, year: number, month: nu
   const monthLabel = new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   const diaPagamento = colab.dia_pagamento_integral || 5;
   const diaPag = new Date(year, month, diaPagamento);
-  // Last day of month for benefits
   const ultimoDia = new Date(year, month + 1, 0);
 
   const entries: VerbaEntry[] = [];
@@ -58,7 +57,7 @@ function buildEntriesSemAdiantamento(colab: Colaborador, year: number, month: nu
   if (sal > 0) {
     entries.push({
       tipoVerba: 'Salário Integral',
-      descricao: `Salário Integral - ${colab.nome} (${monthLabel})`,
+      descricao: `${colab.nome} - Salário Integral (${monthLabel})`,
       valor: sal,
       data_vencimento: fmt(diaPag),
       categoria: 'colaborador',
@@ -68,7 +67,7 @@ function buildEntriesSemAdiantamento(colab: Colaborador, year: number, month: nu
   if (beneficios > 0) {
     entries.push({
       tipoVerba: 'Benefícios',
-      descricao: `Benefícios (VT+VR) - ${colab.nome} (${monthLabel})`,
+      descricao: `${colab.nome} - VT/VR (${monthLabel})`,
       valor: beneficios,
       data_vencimento: fmt(ultimoDia),
       categoria: 'colaborador',
@@ -78,7 +77,7 @@ function buildEntriesSemAdiantamento(colab: Colaborador, year: number, month: nu
   if (das > 0) {
     entries.push({
       tipoVerba: 'Guia DAS',
-      descricao: `Guia DAS - ${colab.nome} (${monthLabel})`,
+      descricao: `${colab.nome} - Guia DAS (${monthLabel})`,
       valor: das,
       data_vencimento: fmt(new Date(year, month, 20)),
       categoria: 'imposto',
