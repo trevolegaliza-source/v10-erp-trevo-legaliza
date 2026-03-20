@@ -12,7 +12,7 @@ import { useColaboradores, useCreateColaborador, useUpdateColaborador, useDelete
 import { getBusinessDaysInMonth, calcularCustoMensal } from '@/lib/business-days';
 import { toast } from 'sonner';
 
-const EMPTY_FORM = { nome: '', email: '', regime: 'CLT' as const, salario_base: '', vt_diario: '', vr_diario: '', status: 'ativo' as const };
+const EMPTY_FORM = { nome: '', email: '', regime: 'CLT' as 'CLT' | 'PJ', salario_base: '', vt_diario: '', vr_diario: '', status: 'ativo' as 'ativo' | 'inativo' };
 
 export default function Colaboradores() {
   const { data: colaboradores, isLoading } = useColaboradores();
