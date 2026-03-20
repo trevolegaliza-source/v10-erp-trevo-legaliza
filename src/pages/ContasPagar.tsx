@@ -422,7 +422,7 @@ export default function ContasPagar() {
               </SelectContent>
             </Select>
             <Select value={filterCategoria} onValueChange={setFilterCategoria}>
-              <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Categoria" /></SelectTrigger>
+              <SelectTrigger className="w-40 h-9 text-foreground"><SelectValue placeholder="Categoria" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas Categorias</SelectItem>
                 <SelectItem value="colaborador">Colaborador</SelectItem>
