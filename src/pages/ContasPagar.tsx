@@ -409,8 +409,8 @@ export default function ContasPagar() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Buscar..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setCalendarDate(undefined); }}>
-              <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Visão" /></SelectTrigger>
+             <Select value={filterStatus} onValueChange={v => { setFilterStatus(v); setCalendarDate(undefined); }}>
+              <SelectTrigger className="w-36 h-9 text-foreground"><SelectValue placeholder="Visão" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ativo">Ativos</SelectItem>
                 <SelectItem value="all">Todos</SelectItem>
