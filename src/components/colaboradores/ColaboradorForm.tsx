@@ -17,12 +17,15 @@ export interface ColaboradorFormData {
   pix_tipo: string;
   pix_chave: string;
   valor_das: string;
+  aumento_previsto_valor: string;
+  aumento_previsto_data: string;
 }
 
 export const EMPTY_FORM: ColaboradorFormData = {
   nome: '', email: '', regime: 'CLT', salario_base: '', vt_diario: '', vr_diario: '',
   status: 'ativo', adiantamento_tipo: 'percentual', adiantamento_valor: '',
   pix_tipo: '', pix_chave: '', valor_das: '',
+  aumento_previsto_valor: '', aumento_previsto_data: '',
 };
 
 interface Props {
@@ -45,16 +48,16 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
   return (
     <form onSubmit={onSubmit} className="grid gap-4 py-2 max-h-[70vh] overflow-y-auto pr-1">
       <div className="grid gap-2">
-        <Label>Nome *</Label>
+        <Label className="text-foreground">Nome *</Label>
         <Input required value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
       </div>
       <div className="grid gap-2">
-        <Label>Email</Label>
+        <Label className="text-foreground">Email</Label>
         <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
-          <Label>Regime</Label>
+          <Label className="text-foreground">Regime</Label>
           <Select value={form.regime} onValueChange={v => setForm(f => ({ ...f, regime: v as any }))}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -64,7 +67,7 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
           </Select>
         </div>
         <div className="grid gap-2">
-          <Label>Status</Label>
+          <Label className="text-foreground">Status</Label>
           <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v as any }))}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -77,25 +80,25 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
 
       <div className="grid grid-cols-3 gap-3">
         <div className="grid gap-2">
-          <Label>Salário Base (R$)</Label>
+          <Label className="text-foreground">Salário Base (R$)</Label>
           <Input type="number" step="0.01" min="0" value={form.salario_base} onChange={e => setForm(f => ({ ...f, salario_base: e.target.value }))} />
         </div>
         <div className="grid gap-2">
-          <Label>VT Diário (R$)</Label>
+          <Label className="text-foreground">VT Diário (R$)</Label>
           <Input type="number" step="0.01" min="0" value={form.vt_diario} onChange={e => setForm(f => ({ ...f, vt_diario: e.target.value }))} />
         </div>
         <div className="grid gap-2">
-          <Label>VR Diário (R$)</Label>
+          <Label className="text-foreground">VR Diário (R$)</Label>
           <Input type="number" step="0.01" min="0" value={form.vr_diario} onChange={e => setForm(f => ({ ...f, vr_diario: e.target.value }))} />
         </div>
       </div>
 
       {/* Adiantamento */}
       <div className="rounded-lg border border-border/60 p-3 space-y-3">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Adiantamento (Dia 20)</p>
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Adiantamento (Dia 20)</p>
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-2">
-            <Label className="text-xs">Tipo</Label>
+            <Label className="text-xs text-foreground">Tipo</Label>
             <Select value={form.adiantamento_tipo} onValueChange={v => setForm(f => ({ ...f, adiantamento_tipo: v as any }))}>
               <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -105,7 +108,7 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label className="text-xs">{form.adiantamento_tipo === 'percentual' ? 'Percentual (%)' : 'Valor (R$)'}</Label>
+            <Label className="text-xs text-foreground">{form.adiantamento_tipo === 'percentual' ? 'Percentual (%)' : 'Valor (R$)'}</Label>
             <Input className="h-8" type="number" step="0.01" min="0" value={form.adiantamento_valor}
               onChange={e => setForm(f => ({ ...f, adiantamento_valor: e.target.value }))} />
           </div>
@@ -117,10 +120,10 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
 
       {/* PIX */}
       <div className="rounded-lg border border-border/60 p-3 space-y-3">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dados PIX</p>
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Dados PIX</p>
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-2">
-            <Label className="text-xs">Tipo de Chave</Label>
+            <Label className="text-xs text-foreground">Tipo de Chave</Label>
             <Select value={form.pix_tipo || 'nenhum'} onValueChange={v => setForm(f => ({ ...f, pix_tipo: v === 'nenhum' ? '' : v }))}>
               <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -134,7 +137,7 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label className="text-xs">Chave PIX</Label>
+            <Label className="text-xs text-foreground">Chave PIX</Label>
             <Input className="h-8" value={form.pix_chave} onChange={e => setForm(f => ({ ...f, pix_chave: e.target.value }))}
               placeholder="Insira a chave PIX" />
           </div>
@@ -143,9 +146,32 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
 
       {/* DAS (MEI) */}
       <div className="grid gap-2">
-        <Label>Guia DAS / MEI (R$)</Label>
+        <Label className="text-foreground">Guia DAS / MEI (R$)</Label>
         <Input type="number" step="0.01" min="0" value={form.valor_das}
           onChange={e => setForm(f => ({ ...f, valor_das: e.target.value }))} placeholder="0.00" />
+      </div>
+
+      {/* Aumento Previsto */}
+      <div className="rounded-lg border border-border/60 p-3 space-y-3">
+        <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Aumento Previsto</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-2">
+            <Label className="text-xs text-foreground">Novo Salário (R$)</Label>
+            <Input className="h-8" type="number" step="0.01" min="0" value={form.aumento_previsto_valor}
+              onChange={e => setForm(f => ({ ...f, aumento_previsto_valor: e.target.value }))}
+              placeholder="0.00" />
+          </div>
+          <div className="grid gap-2">
+            <Label className="text-xs text-foreground">Mês/Ano (YYYY-MM)</Label>
+            <Input className="h-8" type="month" value={form.aumento_previsto_data}
+              onChange={e => setForm(f => ({ ...f, aumento_previsto_data: e.target.value }))} />
+          </div>
+        </div>
+        {Number(form.aumento_previsto_valor) > 0 && form.aumento_previsto_data && (
+          <p className="text-xs text-primary">
+            Salário será atualizado para {fmt(Number(form.aumento_previsto_valor))} em {form.aumento_previsto_data}
+          </p>
+        )}
       </div>
 
       {/* Live cost preview */}

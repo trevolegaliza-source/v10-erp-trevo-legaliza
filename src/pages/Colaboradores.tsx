@@ -45,6 +45,8 @@ export default function Colaboradores() {
       adiantamento_valor: String(c.adiantamento_valor || 0),
       pix_tipo: c.pix_tipo || '', pix_chave: c.pix_chave || '',
       valor_das: String(c.valor_das || 0),
+      aumento_previsto_valor: String(c.aumento_previsto_valor || ''),
+      aumento_previsto_data: c.aumento_previsto_data || '',
     });
     setDialog(true);
   };
@@ -64,6 +66,8 @@ export default function Colaboradores() {
       pix_tipo: form.pix_tipo || null,
       pix_chave: form.pix_chave || null,
       valor_das: Number(form.valor_das) || 0,
+      aumento_previsto_valor: Number(form.aumento_previsto_valor) || 0,
+      aumento_previsto_data: form.aumento_previsto_data || null,
     };
     if (!payload.nome) return toast.error('Nome é obrigatório');
 
@@ -96,7 +100,7 @@ export default function Colaboradores() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Colaboradores</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Colaboradores</h1>
           <p className="text-sm text-muted-foreground">Gestão de RH e custo de pessoal</p>
         </div>
         <div className="flex items-center gap-2">
@@ -110,7 +114,7 @@ export default function Colaboradores() {
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg">
-              <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Novo'} Colaborador</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle className="text-foreground">{editId ? 'Editar' : 'Novo'} Colaborador</DialogTitle></DialogHeader>
               <ColaboradorForm
                 form={form} setForm={setForm} onSubmit={handleSubmit}
                 isPending={create.isPending || update.isPending}
@@ -127,7 +131,7 @@ export default function Colaboradores() {
           <CardContent className="p-5 flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-2.5"><Users className="h-5 w-5 text-primary" /></div>
             <div>
-              <p className="text-2xl font-bold">{totalAtivos.length}</p>
+              <p className="text-2xl font-bold text-foreground">{totalAtivos.length}</p>
               <p className="text-xs text-muted-foreground">Colaboradores Ativos</p>
             </div>
           </CardContent>
@@ -141,7 +145,7 @@ export default function Colaboradores() {
         <Card className="border-border/60 card-hover">
           <CardContent className="p-5">
             <p className="text-xs text-muted-foreground mb-1">Dias Úteis (Mês Atual)</p>
-            <p className="text-2xl font-bold">{diasUteis}</p>
+            <p className="text-2xl font-bold text-foreground">{diasUteis}</p>
           </CardContent>
         </Card>
       </div>
@@ -162,13 +166,13 @@ export default function Colaboradores() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Regime</TableHead>
-                    <TableHead className="text-right">Salário</TableHead>
-                    <TableHead className="text-right">Custo Mensal</TableHead>
-                    <TableHead>Chave PIX</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-center">Ações</TableHead>
+                    <TableHead className="text-foreground">Nome</TableHead>
+                    <TableHead className="text-foreground">Regime</TableHead>
+                    <TableHead className="text-right text-foreground">Salário</TableHead>
+                    <TableHead className="text-right text-foreground">Custo Mensal</TableHead>
+                    <TableHead className="text-foreground">Chave PIX</TableHead>
+                    <TableHead className="text-center text-foreground">Status</TableHead>
+                    <TableHead className="text-center text-foreground">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -176,7 +180,7 @@ export default function Colaboradores() {
                     const custo = calcularCustoMensal(Number(c.salario_base), Number(c.vt_diario), Number(c.vr_diario), diasUteis);
                     return (
                       <TableRow key={c.id} className="group" onDoubleClick={() => openEdit(c)}>
-                        <TableCell className="font-medium">
+                        <TableCell className="font-medium text-foreground">
                           {c.nome}
                           {c.email && <span className="block text-[10px] text-muted-foreground">{c.email}</span>}
                         </TableCell>
@@ -185,16 +189,18 @@ export default function Colaboradores() {
                             {c.regime}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">{fmt(Number(c.salario_base))}</TableCell>
+                        <TableCell className="text-right text-foreground">{fmt(Number(c.salario_base))}</TableCell>
                         <TableCell className="text-right font-semibold text-primary">{fmt(custo)}</TableCell>
                         <TableCell>
                           {c.pix_chave ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs truncate max-w-[140px]" title={c.pix_chave}>{c.pix_chave}</span>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => copyPix(c.pix_chave!)}>
-                                <Copy className="h-3 w-3" />
-                              </Button>
-                            </div>
+                            <button
+                              className="flex items-center gap-1.5 hover:text-primary transition-colors cursor-pointer bg-transparent border-0 p-0"
+                              onClick={() => copyPix(c.pix_chave!)}
+                              title="Clique para copiar"
+                            >
+                              <span className="text-xs truncate max-w-[140px] text-foreground">{c.pix_chave}</span>
+                              <Copy className="h-3 w-3 text-muted-foreground" />
+                            </button>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}

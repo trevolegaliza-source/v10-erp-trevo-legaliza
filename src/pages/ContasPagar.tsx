@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,13 +9,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import { Calendar } from '@/components/ui/calendar';
 import { Plus, Search, CheckCircle, Wallet, Building2, Upload, AlertTriangle, Copy, Printer } from 'lucide-react';
 import { useLancamentos, useCreateLancamento, useUpdateLancamento } from '@/hooks/useFinanceiro';
 import { useColaboradores, type Colaborador } from '@/hooks/useColaboradores';
 import { calcularCustoMensal, getBusinessDaysInMonth } from '@/lib/business-days';
 import { STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
 import type { StatusFinanceiro } from '@/types/financial';
-import { uploadFile } from '@/hooks/useStorageUpload';
+import { supabase } from '@/integrations/supabase/client';
+import { STORAGE_BUCKETS } from '@/constants/storage';
 import { abrirRecibo } from '@/lib/recibo';
 import { toast } from 'sonner';
 
@@ -27,12 +29,22 @@ const CATEGORIA_COLORS: Record<string, string> = {
   outros: 'bg-muted text-muted-foreground',
 };
 
+function sanitizeFileName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .substring(0, 80);
+}
+
 export default function ContasPagar() {
   const { data: lancamentos, isLoading } = useLancamentos('pagar');
   const { data: colaboradores } = useColaboradores();
   const createLancamento = useCreateLancamento();
   const updateLancamento = useUpdateLancamento();
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterCategoria, setFilterCategoria] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState(false);
   const [payDialog, setPayDialog] = useState<string | null>(null);
@@ -48,18 +60,33 @@ export default function ContasPagar() {
   const diasUteis = getBusinessDaysInMonth();
   const activeColabs = (colaboradores || []).filter(c => c.status === 'ativo');
 
-  // Build a map colaborador_id -> Colaborador for PIX display
   const colabMap = new Map<string, Colaborador>();
   (colaboradores || []).forEach(c => colabMap.set(c.id, c));
 
   const filtered = (lancamentos || []).filter(l => {
     if (filterStatus !== 'all' && l.status !== filterStatus) return false;
+    if (filterCategoria !== 'all' && (l.categoria || 'outros') !== filterCategoria) return false;
     if (search && !l.descricao.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
   const totalPendente = (lancamentos || []).filter(l => l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
   const totalPago = (lancamentos || []).filter(l => l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
+
+  // Calendar payment dates
+  const paymentDates = useMemo(() => {
+    if (!lancamentos) return [];
+    return lancamentos
+      .filter(l => l.status === 'pendente')
+      .map(l => new Date(l.data_vencimento + 'T12:00:00'));
+  }, [lancamentos]);
+
+  const paidDates = useMemo(() => {
+    if (!lancamentos) return [];
+    return lancamentos
+      .filter(l => l.status === 'pago')
+      .map(l => new Date(l.data_vencimento + 'T12:00:00'));
+  }, [lancamentos]);
 
   const handleColabSelect = (colabId: string) => {
     const colab = activeColabs.find(c => c.id === colabId);
@@ -121,17 +148,9 @@ export default function ContasPagar() {
     if (!compFile) return toast.error('Anexe o comprovante para confirmar o pagamento.');
     setUploading(true);
     try {
-      // Find the lancamento to build the filename
-      const lanc = (lancamentos || []).find(l => l.id === payDialog);
-      const descClean = (lanc?.descricao || 'pagamento').replace(/[^a-zA-Z0-9À-ÿ\s-]/g, '').replace(/\s+/g, '_').substring(0, 60);
-      const mesAno = new Date().toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }).replace('/', '-');
-      const ext = compFile.name.split('.').pop() || 'pdf';
-      const fileName = `comprovante_${descClean}_${mesAno}.${ext}`;
+      const ext = (compFile.name.split('.').pop() || 'pdf').toLowerCase();
+      const storagePath = `comprovantes/${payDialog}.${ext}`;
 
-      // Upload with renamed path
-      const storagePath = `comprovantes/${payDialog}/${fileName}`;
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { STORAGE_BUCKETS } = await import('@/constants/storage');
       const { error: upErr } = await supabase.storage
         .from(STORAGE_BUCKETS.CONTRACTS)
         .upload(storagePath, compFile, { upsert: true });
@@ -172,7 +191,7 @@ export default function ContasPagar() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Contas a Pagar</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Contas a Pagar</h1>
           <p className="text-sm text-muted-foreground">Custos operacionais e colaboradores</p>
         </div>
         <Dialog open={dialog} onOpenChange={setDialog}>
@@ -182,15 +201,15 @@ export default function ContasPagar() {
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Nova Conta a Pagar</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-foreground">Nova Conta a Pagar</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="grid gap-4 py-2">
               <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-                <Label className="text-sm font-medium">Vincular Colaborador</Label>
+                <Label className="text-sm font-medium text-foreground">Vincular Colaborador</Label>
                 <Switch checked={form.vincularColab} onCheckedChange={c => setForm(f => ({ ...f, vincularColab: c, colaboradorId: '' }))} />
               </div>
               {form.vincularColab && (
                 <div className="grid gap-2">
-                  <Label>Colaborador</Label>
+                  <Label className="text-foreground">Colaborador</Label>
                   <Select value={form.colaboradorId} onValueChange={handleColabSelect}>
                     <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
@@ -202,21 +221,21 @@ export default function ContasPagar() {
                 </div>
               )}
               <div className="grid gap-2">
-                <Label>Descrição *</Label>
+                <Label className="text-foreground">Descrição *</Label>
                 <Input required value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} placeholder="Ex: Aluguel, Salário..." />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label>Valor *</Label>
+                  <Label className="text-foreground">Valor *</Label>
                   <Input required type="number" step="0.01" min="0" value={form.valor} onChange={e => setForm(f => ({ ...f, valor: e.target.value }))} />
                 </div>
                 <div className="grid gap-2">
-                  <Label>Vencimento *</Label>
+                  <Label className="text-foreground">Vencimento *</Label>
                   <Input required type="date" value={form.data_vencimento} onChange={e => setForm(f => ({ ...f, data_vencimento: e.target.value }))} />
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label>Categoria</Label>
+                <Label className="text-foreground">Categoria</Label>
                 <Select value={form.categoria} onValueChange={v => setForm(f => ({ ...f, categoria: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -231,12 +250,12 @@ export default function ContasPagar() {
               <div className="rounded-lg border border-border/60 p-3 space-y-3">
                 <div className="flex items-center gap-2">
                   <Checkbox id="recorrente" checked={form.recorrente} onCheckedChange={c => setForm(f => ({ ...f, recorrente: !!c }))} />
-                  <label htmlFor="recorrente" className="text-sm font-medium cursor-pointer">Lançamento Recorrente</label>
+                  <label htmlFor="recorrente" className="text-sm font-medium cursor-pointer text-foreground">Lançamento Recorrente</label>
                 </div>
                 {form.recorrente && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
-                      <Label className="text-xs">Frequência</Label>
+                      <Label className="text-xs text-foreground">Frequência</Label>
                       <Select value={form.frequencia} onValueChange={v => setForm(f => ({ ...f, frequencia: v }))}>
                         <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -246,7 +265,7 @@ export default function ContasPagar() {
                       </Select>
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs">Parcelas</Label>
+                      <Label className="text-xs text-foreground">Parcelas</Label>
                       <Select value={form.parcelas} onValueChange={v => setForm(f => ({ ...f, parcelas: v }))}>
                         <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -273,7 +292,7 @@ export default function ContasPagar() {
           <CardContent className="p-5 flex items-center gap-3">
             <div className="rounded-lg bg-warning/10 p-2.5"><Wallet className="h-5 w-5 text-warning" /></div>
             <div>
-              <p className="text-2xl font-bold">{fmtCurrency(totalPendente)}</p>
+              <p className="text-2xl font-bold text-foreground">{fmtCurrency(totalPendente)}</p>
               <p className="text-xs text-muted-foreground">A Pagar</p>
             </div>
           </CardContent>
@@ -282,123 +301,164 @@ export default function ContasPagar() {
           <CardContent className="p-5 flex items-center gap-3">
             <div className="rounded-lg bg-success/10 p-2.5"><Building2 className="h-5 w-5 text-success" /></div>
             <div>
-              <p className="text-2xl font-bold">{fmtCurrency(totalPago)}</p>
+              <p className="text-2xl font-bold text-foreground">{fmtCurrency(totalPago)}</p>
               <p className="text-xs text-muted-foreground">Pago no Período</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="pendente">Pendente</SelectItem>
-            <SelectItem value="pago">Pago</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Table */}
-      <Card className="border-border/60">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">Carregando...</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>PIX</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="text-center">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map(l => {
-                    const colab = (l as any).colaborador_id ? colabMap.get((l as any).colaborador_id) : null;
-                    return (
-                      <TableRow key={l.id}>
-                        <TableCell className="font-medium">{l.descricao}</TableCell>
-                        <TableCell>
-                          <Badge className={`${CATEGORIA_COLORS[l.categoria || 'outros']} border-0 text-[10px]`}>
-                            {(l.categoria || 'outros').charAt(0).toUpperCase() + (l.categoria || 'outros').slice(1)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {colab?.pix_chave ? (
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] truncate max-w-[100px]" title={colab.pix_chave}>{colab.pix_chave}</span>
-                              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" onClick={() => copyPix(colab.pix_chave!)}>
-                                <Copy className="h-2.5 w-2.5" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-[10px] text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
-                        <TableCell className="text-right font-medium">
-                          {fmtCurrency(Number(l.valor))}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge className={`${STATUS_STYLES[l.status as StatusFinanceiro]} border-0 text-[10px]`}>
-                            {STATUS_LABELS[l.status as StatusFinanceiro]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            {l.status === 'pendente' && (
-                              <Button variant="ghost" size="sm" className="h-7 text-xs text-success hover:text-success"
-                                onClick={() => { setPayDialog(l.id); setCompFile(null); }}>
-                                <CheckCircle className="h-3.5 w-3.5 mr-1" /> Pagar
-                              </Button>
-                            )}
-                            {l.status === 'pago' && (
-                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleRecibo(l)}>
-                                <Printer className="h-3.5 w-3.5 mr-1" /> Recibo
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {filtered.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum lançamento</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+      {/* Filters + Calendar */}
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-36 h-9"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Status</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="pago">Pago</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterCategoria} onValueChange={setFilterCategoria}>
+              <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Categoria" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas Categorias</SelectItem>
+                <SelectItem value="colaborador">Colaborador</SelectItem>
+                <SelectItem value="operacional">Operacional</SelectItem>
+                <SelectItem value="pessoal">Pessoal</SelectItem>
+                <SelectItem value="imposto">Imposto</SelectItem>
+                <SelectItem value="outros">Outros</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Table */}
+          <Card className="border-border/60">
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">Carregando...</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-foreground">Descrição</TableHead>
+                        <TableHead className="text-foreground">Categoria</TableHead>
+                        <TableHead className="text-foreground">PIX</TableHead>
+                        <TableHead className="text-foreground">Vencimento</TableHead>
+                        <TableHead className="text-right text-foreground">Valor</TableHead>
+                        <TableHead className="text-center text-foreground">Status</TableHead>
+                        <TableHead className="text-center text-foreground">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map(l => {
+                        const colab = (l as any).colaborador_id ? colabMap.get((l as any).colaborador_id) : null;
+                        return (
+                          <TableRow key={l.id}>
+                            <TableCell className="font-medium text-foreground">{l.descricao}</TableCell>
+                            <TableCell>
+                              <Badge className={`${CATEGORIA_COLORS[l.categoria || 'outros']} border-0 text-[10px]`}>
+                                {(l.categoria || 'outros').charAt(0).toUpperCase() + (l.categoria || 'outros').slice(1)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {colab?.pix_chave ? (
+                                <button
+                                  className="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer bg-transparent border-0 p-0"
+                                  onClick={() => copyPix(colab.pix_chave!)}
+                                  title="Clique para copiar"
+                                >
+                                  <span className="text-[10px] truncate max-w-[100px] text-foreground">{colab.pix_chave}</span>
+                                  <Copy className="h-2.5 w-2.5 text-muted-foreground" />
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm text-foreground">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
+                            <TableCell className="text-right font-medium text-foreground">
+                              {fmtCurrency(Number(l.valor))}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge className={`${STATUS_STYLES[l.status as StatusFinanceiro]} border-0 text-[10px]`}>
+                                {STATUS_LABELS[l.status as StatusFinanceiro]}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                {l.status === 'pendente' && (
+                                  <Button variant="ghost" size="sm" className="h-7 text-xs text-success hover:text-success"
+                                    onClick={() => { setPayDialog(l.id); setCompFile(null); }}>
+                                    <CheckCircle className="h-3.5 w-3.5 mr-1" /> Pagar
+                                  </Button>
+                                )}
+                                {l.status === 'pago' && (
+                                  <Button variant="ghost" size="sm" className="h-7 text-xs text-foreground" onClick={() => handleRecibo(l)}>
+                                    <Printer className="h-3.5 w-3.5 mr-1" /> Recibo
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {filtered.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum lançamento</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Mini Calendar Sidebar */}
+        <Card className="border-border/60 card-hover hidden lg:block">
+          <CardContent className="p-3">
+            <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">Calendário</p>
+            <Calendar
+              mode="multiple"
+              selected={paymentDates}
+              className="p-0 pointer-events-auto"
+              modifiers={{
+                paid: paidDates,
+                pending: paymentDates,
+              }}
+              modifiersClassNames={{
+                paid: '[&]:bg-success/20 [&]:text-success',
+                pending: '[&]:bg-warning/20 [&]:text-warning',
+              }}
+            />
+            <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-warning inline-block" /> Pendente</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-success inline-block" /> Pago</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Payment Modal */}
       <Dialog open={!!payDialog} onOpenChange={o => { if (!o) { setPayDialog(null); setCompFile(null); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Confirmar Pagamento</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-foreground">Confirmar Pagamento</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
               <p className="text-xs text-muted-foreground">
-                Para confirmar o pagamento, é <strong>obrigatório</strong> anexar o comprovante (PDF ou imagem).
+                Para confirmar o pagamento, é <strong className="text-foreground">obrigatório</strong> anexar o comprovante (PDF ou imagem).
               </p>
             </div>
             <div className="grid gap-2">
-              <Label>Comprovante *</Label>
+              <Label className="text-foreground">Comprovante *</Label>
               <div className="flex items-center gap-2">
                 <Input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setCompFile(e.target.files?.[0] || null)} />
                 {compFile && <Upload className="h-4 w-4 text-primary shrink-0" />}
