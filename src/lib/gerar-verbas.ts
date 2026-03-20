@@ -10,7 +10,6 @@ const fmt = (d: Date) => d.toISOString().split('T')[0];
 
 /**
  * Check if a verba already exists for this collaborator/month/type.
- * Returns the existing record id if found.
  */
 async function findExistingVerba(
   colaboradorId: string,
@@ -30,40 +29,84 @@ async function findExistingVerba(
   return data && data.length > 0 ? data[0].id : null;
 }
 
+interface VerbaEntry {
+  tipoVerba: string;
+  descricao: string;
+  valor: number;
+  data_vencimento: string;
+  categoria: string;
+}
+
 /**
- * Generate all financial entries for a collaborator for a given month/year.
- * IDEMPOTENT: checks for existing records before inserting, updates if salary changed.
+ * Build entries for collaborator WITHOUT adiantamento (e.g. Michele).
+ * 2 entries: full salary on configured day + benefits on last day of month.
  */
-export async function gerarVerbasColaborador(
-  colab: Colaborador,
-  year: number,
-  month: number,
-) {
-  const diasUteis = getBusinessDaysInMonth(year, month);
+function buildEntriesSemAdiantamento(colab: Colaborador, year: number, month: number, diasUteis: number): VerbaEntry[] {
+  const sal = Number(colab.salario_base);
+  const vt = Number(colab.vt_diario);
+  const vr = Number(colab.vr_diario);
+  const beneficios = (vt + vr) * diasUteis;
+  const das = Number(colab.valor_das) || 0;
+  const monthLabel = new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const diaPagamento = colab.dia_pagamento_integral || 5;
+  const diaPag = new Date(year, month, diaPagamento);
+  // Last day of month for benefits
+  const ultimoDia = new Date(year, month + 1, 0);
+
+  const entries: VerbaEntry[] = [];
+
+  if (sal > 0) {
+    entries.push({
+      tipoVerba: 'Salário Integral',
+      descricao: `Salário Integral - ${colab.nome} (${monthLabel})`,
+      valor: sal,
+      data_vencimento: fmt(diaPag),
+      categoria: 'colaborador',
+    });
+  }
+
+  if (beneficios > 0) {
+    entries.push({
+      tipoVerba: 'Benefícios',
+      descricao: `Benefícios (VT+VR) - ${colab.nome} (${monthLabel})`,
+      valor: beneficios,
+      data_vencimento: fmt(ultimoDia),
+      categoria: 'colaborador',
+    });
+  }
+
+  if (das > 0) {
+    entries.push({
+      tipoVerba: 'Guia DAS',
+      descricao: `Guia DAS - ${colab.nome} (${monthLabel})`,
+      valor: das,
+      data_vencimento: fmt(new Date(year, month, 20)),
+      categoria: 'imposto',
+    });
+  }
+
+  return entries;
+}
+
+/**
+ * Build entries for collaborator WITH adiantamento (default).
+ * 4 entries: benefits day 1, 50% on 5th biz day, 50% on day 20, DAS day 20.
+ */
+function buildEntriesComAdiantamento(colab: Colaborador, year: number, month: number, diasUteis: number): VerbaEntry[] {
   const sal = Number(colab.salario_base);
   const vt = Number(colab.vt_diario);
   const vr = Number(colab.vr_diario);
   const beneficios = (vt + vr) * diasUteis;
   const das = Number(colab.valor_das) || 0;
   const metadeSalario = sal / 2;
-
   const monthLabel = new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   const dia01 = new Date(year, month, 1);
   const dia20 = new Date(year, month, 20);
   const quintoDiaUtil = getFifthBusinessDay(year, month);
 
-  interface VerbaEntry {
-    tipoVerba: string;
-    descricao: string;
-    valor: number;
-    data_vencimento: string;
-    categoria: string;
-  }
-
   const entries: VerbaEntry[] = [];
 
-  // 1. VT + VR (Day 1)
   if (beneficios > 0) {
     entries.push({
       tipoVerba: 'Benefícios',
@@ -74,7 +117,6 @@ export async function gerarVerbasColaborador(
     });
   }
 
-  // 2. 50% Salário (5th business day)
   if (metadeSalario > 0) {
     entries.push({
       tipoVerba: '50% Salário',
@@ -85,7 +127,6 @@ export async function gerarVerbasColaborador(
     });
   }
 
-  // 3. 50% Salário 2ª parcela (Day 20)
   if (metadeSalario > 0) {
     entries.push({
       tipoVerba: '50% Salário (2ª parcela)',
@@ -96,7 +137,6 @@ export async function gerarVerbasColaborador(
     });
   }
 
-  // 4. Guia DAS
   if (das > 0) {
     entries.push({
       tipoVerba: 'Guia DAS',
@@ -107,13 +147,30 @@ export async function gerarVerbasColaborador(
     });
   }
 
+  return entries;
+}
+
+/**
+ * Generate all financial entries for a collaborator for a given month/year.
+ * IDEMPOTENT: checks for existing records before inserting, updates if salary changed.
+ */
+export async function gerarVerbasColaborador(
+  colab: Colaborador,
+  year: number,
+  month: number,
+) {
+  const diasUteis = getBusinessDaysInMonth(year, month);
+
+  const entries = colab.possui_adiantamento === false
+    ? buildEntriesSemAdiantamento(colab, year, month, diasUteis)
+    : buildEntriesComAdiantamento(colab, year, month, diasUteis);
+
   if (entries.length === 0) return 0;
 
   let created = 0;
   for (const entry of entries) {
     const existingId = await findExistingVerba(colab.id, entry.tipoVerba, month, year);
     if (existingId) {
-      // Update if value changed
       await (supabase as any)
         .from('lancamentos')
         .update({ valor: entry.valor, updated_at: new Date().toISOString() })

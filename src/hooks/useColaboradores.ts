@@ -13,6 +13,8 @@ export interface Colaborador {
   status: 'ativo' | 'inativo';
   adiantamento_tipo: 'percentual' | 'fixo';
   adiantamento_valor: number;
+  possui_adiantamento: boolean;
+  dia_pagamento_integral: number | null;
   pix_tipo: string | null;
   pix_chave: string | null;
   valor_das: number;
