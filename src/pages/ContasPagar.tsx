@@ -71,8 +71,8 @@ export default function ContasPagar() {
   (colaboradores || []).forEach(c => colabMap.set(c.id, c));
 
   // 5-day rule: hide paid items older than 5 days unless showing history
-  const now = new Date();
-  const fiveDaysAgo = new Date(now.getTime() - 5 * 86400000);
+  const today = new Date();
+  const fiveDaysAgo = new Date(today.getTime() - 5 * 86400000);
 
   const filtered = useMemo(() => {
     return (lancamentos || []).filter(l => {
