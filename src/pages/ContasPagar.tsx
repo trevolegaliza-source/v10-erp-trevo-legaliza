@@ -320,7 +320,7 @@ export default function ContasPagar() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-        <Dialog open={dialog} onOpenChange={setDialog}>
+          <Dialog open={dialog} onOpenChange={setDialog}>
           <DialogTrigger asChild>
             <Button size="sm" className="h-9" onClick={() => { resetForm(); setDialog(true); }}>
               <Plus className="h-4 w-4 mr-1" /> Novo Lançamento
