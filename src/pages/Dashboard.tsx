@@ -184,7 +184,7 @@ export default function Dashboard() {
       </div>
 
       {/* Financial stat cards */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <Card
           className="border-border/60 border-l-4 border-l-warning card-hover cursor-pointer hover:border-primary/40"
           onClick={() => navigate('/financeiro')}
@@ -203,6 +203,27 @@ export default function Dashboard() {
                 <p className="text-2xl font-bold">{formatCurrency(stats?.totalCobrancasGerar ?? 0)}</p>
               )}
               <p className="text-xs text-muted-foreground">Cobranças a Gerar</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card
+          className="border-border/60 border-l-4 border-l-destructive card-hover cursor-pointer hover:border-primary/40"
+          onClick={() => navigate('/contas-pagar')}
+        >
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div className="rounded-lg bg-destructive/10 p-2 w-fit">
+                <ArrowUpRight className="h-4.5 w-4.5 text-destructive" />
+              </div>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="mt-3">
+              {isLoading ? (
+                <Skeleton className="h-7 w-24" />
+              ) : (
+                <p className="text-2xl font-bold">{formatCurrency(stats?.contasPagarMes ?? 0)}</p>
+              )}
+              <p className="text-xs text-muted-foreground">Contas a Pagar (Mês)</p>
             </div>
           </CardContent>
         </Card>

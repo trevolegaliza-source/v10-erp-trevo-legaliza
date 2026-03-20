@@ -15,6 +15,7 @@ import ClienteDetalhe from "./pages/ClienteDetalhe";
 import Financeiro from "./pages/Financeiro";
 import ContasReceber from "./pages/ContasReceber";
 import ContasPagar from "./pages/ContasPagar";
+import Colaboradores from "./pages/Colaboradores";
 import CadastroRapido from "./pages/CadastroRapido";
 import Documentos from "./pages/Documentos";
 import Configuracoes from "./pages/Configuracoes";
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/contas-receber" element={<ContasReceber />} />
               <Route path="/contas-pagar" element={<ContasPagar />} />
+              <Route path="/colaboradores" element={<Colaboradores />} />
               <Route path="/documentos" element={<Documentos />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
             </Route>

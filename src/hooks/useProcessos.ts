@@ -244,6 +244,15 @@ export function useDashboardStats() {
         .order('created_at', { ascending: true })
         .limit(3);
 
+      // Contas a Pagar do mês (pendentes)
+      const { data: contasPagarData } = await supabase
+        .from('lancamentos')
+        .select('valor')
+        .eq('tipo', 'pagar')
+        .eq('status', 'pendente')
+        .gte('data_vencimento', startOfMonth);
+      const contasPagarMes = (contasPagarData || []).reduce((s: number, r: any) => s + Number(r.valor), 0);
+
       return {
         processosAtivos: processosAtivos || 0,
         totalClientes: totalClientes || 0,
@@ -252,6 +261,7 @@ export function useDashboardStats() {
         faturamentoPotencial,
         totalCobrancasGerar,
         totalValoresReembolsaveis,
+        contasPagarMes,
         urgentes: (urgentes || []) as ProcessoDB[],
         recentes: (recentes || []) as ProcessoDB[],
         topClientes,

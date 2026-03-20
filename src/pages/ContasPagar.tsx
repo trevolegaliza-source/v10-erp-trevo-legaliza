@@ -3,33 +3,50 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Search, CheckCircle, Wallet, Building2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Search, CheckCircle, Wallet, Building2, Upload, AlertTriangle } from 'lucide-react';
 import { useLancamentos, useCreateLancamento, useUpdateLancamento } from '@/hooks/useFinanceiro';
+import { useColaboradores, type Colaborador } from '@/hooks/useColaboradores';
+import { calcularCustoMensal, getBusinessDaysInMonth } from '@/lib/business-days';
 import { STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
 import type { StatusFinanceiro } from '@/types/financial';
+import { uploadFile } from '@/hooks/useStorageUpload';
 import { toast } from 'sonner';
+
+const CATEGORIA_COLORS: Record<string, string> = {
+  pessoal: 'bg-purple-500/15 text-purple-400',
+  operacional: 'bg-info/10 text-info',
+  imposto: 'bg-warning/10 text-warning',
+  colaborador: 'bg-primary/10 text-primary',
+  outros: 'bg-muted text-muted-foreground',
+};
 
 export default function ContasPagar() {
   const { data: lancamentos, isLoading } = useLancamentos('pagar');
+  const { data: colaboradores } = useColaboradores();
   const createLancamento = useCreateLancamento();
   const updateLancamento = useUpdateLancamento();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [dialog, setDialog] = useState(false);
+  const [payDialog, setPayDialog] = useState<string | null>(null);
+  const [compFile, setCompFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  // Form state
   const [form, setForm] = useState({
-    descricao: '',
-    valor: '',
-    categoria: 'operacional',
-    data_vencimento: '',
-    recorrente: false,
-    frequencia: 'mensal',
-    parcelas: '12',
+    descricao: '', valor: '', categoria: 'operacional',
+    data_vencimento: '', recorrente: false, frequencia: 'mensal',
+    parcelas: '12', vincularColab: false, colaboradorId: '',
   });
+
+  const diasUteis = getBusinessDaysInMonth();
+  const activeColabs = (colaboradores || []).filter(c => c.status === 'ativo');
 
   const filtered = (lancamentos || []).filter(l => {
     if (filterStatus !== 'all' && l.status !== filterStatus) return false;
@@ -40,6 +57,21 @@ export default function ContasPagar() {
   const totalPendente = (lancamentos || []).filter(l => l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
   const totalPago = (lancamentos || []).filter(l => l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
 
+  // Auto-fill from collaborator
+  const handleColabSelect = (colabId: string) => {
+    setForm(f => ({ ...f, colaboradorId: colabId }));
+    const colab = activeColabs.find(c => c.id === colabId);
+    if (colab) {
+      const custo = calcularCustoMensal(Number(colab.salario_base), Number(colab.vt_diario), Number(colab.vr_diario), diasUteis);
+      setForm(f => ({
+        ...f, colaboradorId: colabId,
+        descricao: `Pagamento - ${colab.nome} (${colab.regime})`,
+        valor: custo.toFixed(2),
+        categoria: 'colaborador',
+      }));
+    }
+  };
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     const valor = Number(form.valor);
@@ -49,49 +81,52 @@ export default function ContasPagar() {
       const parcelas = form.parcelas === 'indeterminado' ? 12 : Number(form.parcelas);
       const baseDate = new Date(form.data_vencimento);
       const promises: Promise<any>[] = [];
-
       for (let i = 0; i < parcelas; i++) {
         const venc = new Date(baseDate);
         if (form.frequencia === 'mensal') venc.setMonth(venc.getMonth() + i);
         else if (form.frequencia === 'semanal') venc.setDate(venc.getDate() + i * 7);
-
         promises.push(
           new Promise((resolve, reject) => {
             createLancamento.mutate({
-              tipo: 'pagar',
-              descricao: `${form.descricao} (${i + 1}/${parcelas})`,
-              valor,
-              categoria: form.categoria,
-              status: 'pendente',
+              tipo: 'pagar', descricao: `${form.descricao} (${i + 1}/${parcelas})`,
+              valor, categoria: form.categoria, status: 'pendente',
               data_vencimento: venc.toISOString().split('T')[0],
-            } as any, {
-              onSuccess: resolve,
-              onError: reject,
-            });
+            } as any, { onSuccess: resolve, onError: reject });
           })
         );
       }
-
       Promise.all(promises).then(() => {
         toast.success(`${parcelas} lançamentos recorrentes criados!`);
-        setDialog(false);
-        setForm({ descricao: '', valor: '', categoria: 'operacional', data_vencimento: '', recorrente: false, frequencia: 'mensal', parcelas: '12' });
+        resetForm();
       });
     } else {
       createLancamento.mutate({
-        tipo: 'pagar',
-        descricao: form.descricao,
-        valor,
-        categoria: form.categoria,
-        status: 'pendente',
-        data_vencimento: form.data_vencimento,
-      } as any, {
-        onSuccess: () => {
-          setDialog(false);
-          setForm({ descricao: '', valor: '', categoria: 'operacional', data_vencimento: '', recorrente: false, frequencia: 'mensal', parcelas: '12' });
-        },
-      });
+        tipo: 'pagar', descricao: form.descricao, valor, categoria: form.categoria,
+        status: 'pendente', data_vencimento: form.data_vencimento,
+      } as any, { onSuccess: () => resetForm() });
     }
+  };
+
+  const resetForm = () => {
+    setDialog(false);
+    setForm({ descricao: '', valor: '', categoria: 'operacional', data_vencimento: '', recorrente: false, frequencia: 'mensal', parcelas: '12', vincularColab: false, colaboradorId: '' });
+  };
+
+  const handlePay = async () => {
+    if (!payDialog) return;
+    if (!compFile) return toast.error('Anexe o comprovante para confirmar o pagamento.');
+    setUploading(true);
+    try {
+      const path = await uploadFile(compFile, 'comprovantes', payDialog);
+      updateLancamento.mutate({
+        id: payDialog, status: 'pago',
+        data_pagamento: new Date().toISOString().split('T')[0],
+        comprovante_url: path,
+      } as any, {
+        onSuccess: () => { setPayDialog(null); setCompFile(null); },
+      });
+    } catch { /* toast already handled */ }
+    setUploading(false);
   };
 
   return (
@@ -103,14 +138,32 @@ export default function ContasPagar() {
         </div>
         <Dialog open={dialog} onOpenChange={setDialog}>
           <DialogTrigger asChild>
-            <Button size="sm" className="h-9">
-              <Plus className="h-4 w-4 mr-1" />
-              Novo Lançamento
+            <Button size="sm" className="h-9" onClick={() => { resetForm(); setDialog(true); }}>
+              <Plus className="h-4 w-4 mr-1" /> Novo Lançamento
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Nova Conta a Pagar</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="grid gap-4 py-2">
+              {/* Collaborator toggle */}
+              <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+                <Label className="text-sm font-medium">Vincular Colaborador</Label>
+                <Switch checked={form.vincularColab} onCheckedChange={c => setForm(f => ({ ...f, vincularColab: c, colaboradorId: '' }))} />
+              </div>
+              {form.vincularColab && (
+                <div className="grid gap-2">
+                  <Label>Colaborador</Label>
+                  <Select value={form.colaboradorId} onValueChange={handleColabSelect}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                    <SelectContent>
+                      {activeColabs.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.nome} ({c.regime})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="grid gap-2">
                 <Label>Descrição *</Label>
                 <Input required value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} placeholder="Ex: Aluguel, Salário..." />
@@ -132,6 +185,7 @@ export default function ContasPagar() {
                   <SelectContent>
                     <SelectItem value="operacional">Operacional</SelectItem>
                     <SelectItem value="colaborador">Colaborador</SelectItem>
+                    <SelectItem value="pessoal">Pessoal</SelectItem>
                     <SelectItem value="imposto">Imposto</SelectItem>
                     <SelectItem value="outros">Outros</SelectItem>
                   </SelectContent>
@@ -141,14 +195,8 @@ export default function ContasPagar() {
               {/* Recorrente */}
               <div className="rounded-lg border border-border/60 p-3 space-y-3">
                 <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="recorrente"
-                    checked={form.recorrente}
-                    onCheckedChange={(c) => setForm(f => ({ ...f, recorrente: !!c }))}
-                  />
-                  <label htmlFor="recorrente" className="text-sm font-medium cursor-pointer">
-                    Lançamento Recorrente
-                  </label>
+                  <Checkbox id="recorrente" checked={form.recorrente} onCheckedChange={c => setForm(f => ({ ...f, recorrente: !!c }))} />
+                  <label htmlFor="recorrente" className="text-sm font-medium cursor-pointer">Lançamento Recorrente</label>
                 </div>
                 {form.recorrente && (
                   <div className="grid grid-cols-2 gap-3">
@@ -187,7 +235,7 @@ export default function ContasPagar() {
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="border-border/60">
+        <Card className="border-border/60 card-hover">
           <CardContent className="p-5 flex items-center gap-3">
             <div className="rounded-lg bg-warning/10 p-2.5"><Wallet className="h-5 w-5 text-warning" /></div>
             <div>
@@ -196,7 +244,7 @@ export default function ContasPagar() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/60">
+        <Card className="border-border/60 card-hover">
           <CardContent className="p-5 flex items-center gap-3">
             <div className="rounded-lg bg-success/10 p-2.5"><Building2 className="h-5 w-5 text-success" /></div>
             <div>
@@ -244,7 +292,11 @@ export default function ContasPagar() {
                 {filtered.map(l => (
                   <TableRow key={l.id}>
                     <TableCell className="font-medium">{l.descricao}</TableCell>
-                    <TableCell className="text-sm capitalize">{l.categoria || '-'}</TableCell>
+                    <TableCell>
+                      <Badge className={`${CATEGORIA_COLORS[l.categoria || 'outros']} border-0 text-[10px]`}>
+                        {(l.categoria || 'outros').charAt(0).toUpperCase() + (l.categoria || 'outros').slice(1)}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
                     <TableCell className="text-right font-medium">
                       {Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -256,14 +308,9 @@ export default function ContasPagar() {
                     </TableCell>
                     <TableCell className="text-center">
                       {l.status === 'pendente' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs text-success hover:text-success"
-                          onClick={() => updateLancamento.mutate({ id: l.id, status: 'pago', data_pagamento: new Date().toISOString().split('T')[0] })}
-                        >
-                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                          Pagar
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-success hover:text-success"
+                          onClick={() => { setPayDialog(l.id); setCompFile(null); }}>
+                          <CheckCircle className="h-3.5 w-3.5 mr-1" /> Pagar
                         </Button>
                       )}
                     </TableCell>
@@ -279,6 +326,34 @@ export default function ContasPagar() {
           )}
         </CardContent>
       </Card>
+
+      {/* Payment Modal with comprovante upload */}
+      <Dialog open={!!payDialog} onOpenChange={o => { if (!o) { setPayDialog(null); setCompFile(null); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Confirmar Pagamento</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                Para confirmar o pagamento, é <strong>obrigatório</strong> anexar o comprovante (PDF ou imagem).
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label>Comprovante *</Label>
+              <div className="flex items-center gap-2">
+                <Input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setCompFile(e.target.files?.[0] || null)} />
+                {compFile && <Upload className="h-4 w-4 text-primary shrink-0" />}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setPayDialog(null); setCompFile(null); }}>Cancelar</Button>
+            <Button onClick={handlePay} disabled={!compFile || uploading}>
+              {uploading ? 'Enviando...' : 'Confirmar Pagamento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
