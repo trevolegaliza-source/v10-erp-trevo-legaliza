@@ -16,6 +16,8 @@ export interface Colaborador {
   pix_tipo: string | null;
   pix_chave: string | null;
   valor_das: number;
+  aumento_previsto_valor: number | null;
+  aumento_previsto_data: string | null;
   created_at: string;
   updated_at: string;
 }
