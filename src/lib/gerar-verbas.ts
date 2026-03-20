@@ -109,7 +109,7 @@ function buildEntriesComAdiantamento(colab: Colaborador, year: number, month: nu
   if (beneficios > 0) {
     entries.push({
       tipoVerba: 'Benefícios',
-      descricao: `Benefícios (VT+VR) - ${colab.nome} (${monthLabel})`,
+      descricao: `${colab.nome} - VT/VR (${monthLabel})`,
       valor: beneficios,
       data_vencimento: fmt(dia01),
       categoria: 'colaborador',
@@ -119,7 +119,7 @@ function buildEntriesComAdiantamento(colab: Colaborador, year: number, month: nu
   if (metadeSalario > 0) {
     entries.push({
       tipoVerba: '50% Salário',
-      descricao: `50% Salário - ${colab.nome} (${monthLabel})`,
+      descricao: `${colab.nome} - 50% Salário (${monthLabel})`,
       valor: metadeSalario,
       data_vencimento: fmt(quintoDiaUtil),
       categoria: 'colaborador',
@@ -129,7 +129,7 @@ function buildEntriesComAdiantamento(colab: Colaborador, year: number, month: nu
   if (metadeSalario > 0) {
     entries.push({
       tipoVerba: '50% Salário (2ª parcela)',
-      descricao: `50% Salário (2ª parcela) - ${colab.nome} (${monthLabel})`,
+      descricao: `${colab.nome} - 50% Salário 2ª parcela (${monthLabel})`,
       valor: metadeSalario,
       data_vencimento: fmt(dia20),
       categoria: 'colaborador',
@@ -139,7 +139,7 @@ function buildEntriesComAdiantamento(colab: Colaborador, year: number, month: nu
   if (das > 0) {
     entries.push({
       tipoVerba: 'Guia DAS',
-      descricao: `Guia DAS - ${colab.nome} (${monthLabel})`,
+      descricao: `${colab.nome} - Guia DAS (${monthLabel})`,
       valor: das,
       data_vencimento: fmt(dia20),
       categoria: 'imposto',
