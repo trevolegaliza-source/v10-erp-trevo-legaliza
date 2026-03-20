@@ -76,15 +76,17 @@ export default function ContasPagar() {
 
   const filtered = useMemo(() => {
     return (lancamentos || []).filter(l => {
+      // Month navigation filter
+      const lDate = new Date(l.data_vencimento);
+      if (lDate.getMonth() !== viewMonth || lDate.getFullYear() !== viewYear) return false;
+
       // History vs Active filter
       if (filterStatus === 'ativo') {
-        // Hide paid items older than 5 days
         if (l.status === 'pago' && l.data_pagamento) {
           const paidDate = new Date(l.data_pagamento);
           if (paidDate < fiveDaysAgo) return false;
         }
       } else if (filterStatus === 'historico') {
-        // Show only old paid items
         if (l.status !== 'pago') return false;
         if (l.data_pagamento) {
           const paidDate = new Date(l.data_pagamento);
@@ -97,16 +99,14 @@ export default function ContasPagar() {
       if (filterCategoria !== 'all' && (l.categoria || 'outros') !== filterCategoria) return false;
       if (search && !l.descricao.toLowerCase().includes(search.toLowerCase())) return false;
 
-      // Calendar date filter
       if (calendarDate) {
-        const lDate = l.data_vencimento;
         const cDate = calendarDate.toISOString().split('T')[0];
-        if (lDate !== cDate) return false;
+        if (l.data_vencimento !== cDate) return false;
       }
 
       return true;
     });
-  }, [lancamentos, filterStatus, filterCategoria, search, calendarDate, fiveDaysAgo]);
+  }, [lancamentos, filterStatus, filterCategoria, search, calendarDate, fiveDaysAgo, viewMonth, viewYear]);
 
   // Group by month
   const grouped = useMemo(() => {
