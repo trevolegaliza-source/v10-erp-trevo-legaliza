@@ -287,6 +287,19 @@ export default function ContasPagar() {
     return new Date(Number(y), Number(m) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
   };
 
+  const MESES_NAV = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+    setCalendarDate(undefined);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+    setCalendarDate(undefined);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -294,6 +307,19 @@ export default function ContasPagar() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Contas a Pagar</h1>
           <p className="text-sm text-muted-foreground">Custos operacionais e colaboradores</p>
         </div>
+        <div className="flex items-center gap-3">
+          {/* Month Navigation */}
+          <div className="flex items-center gap-1 bg-muted/30 rounded-lg px-2 py-1">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={prevMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-semibold text-foreground min-w-[120px] text-center">
+              {MESES_NAV[viewMonth]} {viewYear}
+            </span>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={nextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         <Dialog open={dialog} onOpenChange={setDialog}>
           <DialogTrigger asChild>
             <Button size="sm" className="h-9" onClick={() => { resetForm(); setDialog(true); }}>
