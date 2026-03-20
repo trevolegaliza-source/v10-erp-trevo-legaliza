@@ -95,13 +95,56 @@ export type Database = {
         }
         Relationships: []
       }
+      colaborador_avaliacoes: {
+        Row: {
+          ano: number
+          colaborador_id: string
+          conclusao_trimestral: string | null
+          created_at: string | null
+          feedback: string | null
+          id: string
+          mes: number
+          updated_at: string | null
+        }
+        Insert: {
+          ano: number
+          colaborador_id: string
+          conclusao_trimestral?: string | null
+          created_at?: string | null
+          feedback?: string | null
+          id?: string
+          mes: number
+          updated_at?: string | null
+        }
+        Update: {
+          ano?: number
+          colaborador_id?: string
+          conclusao_trimestral?: string | null
+          created_at?: string | null
+          feedback?: string | null
+          id?: string
+          mes?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "colaborador_avaliacoes_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       colaboradores: {
         Row: {
           adiantamento_tipo: string
           adiantamento_valor: number
+          aniversario: string | null
           aumento_previsto_data: string | null
           aumento_previsto_valor: number | null
           created_at: string | null
+          data_inicio: string | null
           dia_pagamento_integral: number | null
           email: string | null
           id: string
@@ -120,9 +163,11 @@ export type Database = {
         Insert: {
           adiantamento_tipo?: string
           adiantamento_valor?: number
+          aniversario?: string | null
           aumento_previsto_data?: string | null
           aumento_previsto_valor?: number | null
           created_at?: string | null
+          data_inicio?: string | null
           dia_pagamento_integral?: number | null
           email?: string | null
           id?: string
@@ -141,9 +186,11 @@ export type Database = {
         Update: {
           adiantamento_tipo?: string
           adiantamento_valor?: number
+          aniversario?: string | null
           aumento_previsto_data?: string | null
           aumento_previsto_valor?: number | null
           created_at?: string | null
+          data_inicio?: string | null
           dia_pagamento_integral?: number | null
           email?: string | null
           id?: string

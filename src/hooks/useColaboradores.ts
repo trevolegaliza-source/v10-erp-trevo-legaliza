@@ -6,7 +6,7 @@ export interface Colaborador {
   id: string;
   nome: string;
   email: string | null;
-  regime: 'CLT' | 'PJ';
+  regime: 'CLT' | 'PJ' | 'INDEFINIDO';
   salario_base: number;
   vt_diario: number;
   vr_diario: number;
@@ -20,6 +20,8 @@ export interface Colaborador {
   valor_das: number;
   aumento_previsto_valor: number | null;
   aumento_previsto_data: string | null;
+  data_inicio: string | null;
+  aniversario: string | null;
   created_at: string;
   updated_at: string;
 }

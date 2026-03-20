@@ -8,7 +8,7 @@ import { calcularCustoMensal, calcularAdiantamento } from '@/lib/business-days';
 export interface ColaboradorFormData {
   nome: string;
   email: string;
-  regime: 'CLT' | 'PJ';
+  regime: 'CLT' | 'PJ' | 'INDEFINIDO';
   salario_base: string;
   vt_diario: string;
   vr_diario: string;
@@ -22,6 +22,8 @@ export interface ColaboradorFormData {
   valor_das: string;
   aumento_previsto_valor: string;
   aumento_previsto_data: string;
+  data_inicio: string;
+  aniversario: string;
 }
 
 export const EMPTY_FORM: ColaboradorFormData = {
@@ -30,6 +32,7 @@ export const EMPTY_FORM: ColaboradorFormData = {
   dia_pagamento_integral: '5',
   pix_tipo: '', pix_chave: '', valor_das: '',
   aumento_previsto_valor: '', aumento_previsto_data: '',
+  data_inicio: '', aniversario: '',
 };
 
 interface Props {
@@ -67,6 +70,7 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
             <SelectContent>
               <SelectItem value="CLT">CLT</SelectItem>
               <SelectItem value="PJ">PJ</SelectItem>
+              <SelectItem value="INDEFINIDO">Indefinido</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -79,6 +83,18 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
               <SelectItem value="inativo">Inativo</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </div>
+
+      {/* Data de Início e Aniversário */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-2">
+          <Label className="text-foreground">Data de Início</Label>
+          <Input type="date" value={form.data_inicio} onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))} />
+        </div>
+        <div className="grid gap-2">
+          <Label className="text-foreground">Aniversário 🎂</Label>
+          <Input type="date" value={form.aniversario} onChange={e => setForm(f => ({ ...f, aniversario: e.target.value }))} />
         </div>
       </div>
 
@@ -168,12 +184,14 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
         </div>
       </div>
 
-      {/* DAS (MEI) */}
-      <div className="grid gap-2">
-        <Label className="text-foreground">Guia DAS / MEI (R$)</Label>
-        <Input type="number" step="0.01" min="0" value={form.valor_das}
-          onChange={e => setForm(f => ({ ...f, valor_das: e.target.value }))} placeholder="0.00" />
-      </div>
+      {/* DAS (MEI) — hidden for INDEFINIDO */}
+      {form.regime !== 'INDEFINIDO' && (
+        <div className="grid gap-2">
+          <Label className="text-foreground">Guia DAS / MEI (R$)</Label>
+          <Input type="number" step="0.01" min="0" value={form.valor_das}
+            onChange={e => setForm(f => ({ ...f, valor_das: e.target.value }))} placeholder="0.00" />
+        </div>
+      )}
 
       {/* Aumento Previsto */}
       <div className="rounded-lg border border-border/60 p-3 space-y-3">

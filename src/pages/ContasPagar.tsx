@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
-import { Plus, Search, CheckCircle, Wallet, Building2, Upload, AlertTriangle, Copy, Printer, Trash2, Pencil, History } from 'lucide-react';
+import { Plus, Search, CheckCircle, Wallet, Building2, Upload, AlertTriangle, Copy, Printer, Trash2, Pencil, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLancamentos, useCreateLancamento, useUpdateLancamento, useDeleteLancamento } from '@/hooks/useFinanceiro';
 import { useColaboradores, type Colaborador } from '@/hooks/useColaboradores';
 import { calcularCustoMensal, getBusinessDaysInMonth } from '@/lib/business-days';
@@ -21,6 +21,7 @@ import type { StatusFinanceiro, Lancamento } from '@/types/financial';
 import { supabase } from '@/integrations/supabase/client';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import { abrirRecibo } from '@/lib/recibo';
+import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { toast } from 'sonner';
 
 const CATEGORIA_COLORS: Record<string, string> = {
@@ -46,6 +47,13 @@ export default function ContasPagar() {
   const [compFile, setCompFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<Lancamento | null>(null);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+
+  // Month navigation
+  const now = new Date();
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
+  const [viewYear, setViewYear] = useState(now.getFullYear());
 
   const [form, setForm] = useState({
     descricao: '', valor: '', categoria: 'operacional',
@@ -63,20 +71,22 @@ export default function ContasPagar() {
   (colaboradores || []).forEach(c => colabMap.set(c.id, c));
 
   // 5-day rule: hide paid items older than 5 days unless showing history
-  const now = new Date();
-  const fiveDaysAgo = new Date(now.getTime() - 5 * 86400000);
+  const today = new Date();
+  const fiveDaysAgo = new Date(today.getTime() - 5 * 86400000);
 
   const filtered = useMemo(() => {
     return (lancamentos || []).filter(l => {
+      // Month navigation filter
+      const lDate = new Date(l.data_vencimento);
+      if (lDate.getMonth() !== viewMonth || lDate.getFullYear() !== viewYear) return false;
+
       // History vs Active filter
       if (filterStatus === 'ativo') {
-        // Hide paid items older than 5 days
         if (l.status === 'pago' && l.data_pagamento) {
           const paidDate = new Date(l.data_pagamento);
           if (paidDate < fiveDaysAgo) return false;
         }
       } else if (filterStatus === 'historico') {
-        // Show only old paid items
         if (l.status !== 'pago') return false;
         if (l.data_pagamento) {
           const paidDate = new Date(l.data_pagamento);
@@ -89,16 +99,14 @@ export default function ContasPagar() {
       if (filterCategoria !== 'all' && (l.categoria || 'outros') !== filterCategoria) return false;
       if (search && !l.descricao.toLowerCase().includes(search.toLowerCase())) return false;
 
-      // Calendar date filter
       if (calendarDate) {
-        const lDate = l.data_vencimento;
         const cDate = calendarDate.toISOString().split('T')[0];
-        if (lDate !== cDate) return false;
+        if (l.data_vencimento !== cDate) return false;
       }
 
       return true;
     });
-  }, [lancamentos, filterStatus, filterCategoria, search, calendarDate, fiveDaysAgo]);
+  }, [lancamentos, filterStatus, filterCategoria, search, calendarDate, fiveDaysAgo, viewMonth, viewYear]);
 
   // Group by month
   const grouped = useMemo(() => {
@@ -235,8 +243,15 @@ export default function ContasPagar() {
   };
 
   const handleDelete = (l: Lancamento) => {
-    if (!confirm(`Excluir "${l.descricao}"? Esta ação não pode ser desfeita.`)) return;
-    deleteLancamento.mutate(l.id);
+    setDeleteTarget(l);
+    setShowPasswordDialog(true);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteLancamento.mutate(deleteTarget.id);
+      setDeleteTarget(null);
+    }
   };
 
   const copyPix = (chave: string) => {
@@ -272,6 +287,19 @@ export default function ContasPagar() {
     return new Date(Number(y), Number(m) - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
   };
 
+  const MESES_NAV = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+    setCalendarDate(undefined);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+    setCalendarDate(undefined);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -279,7 +307,20 @@ export default function ContasPagar() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Contas a Pagar</h1>
           <p className="text-sm text-muted-foreground">Custos operacionais e colaboradores</p>
         </div>
-        <Dialog open={dialog} onOpenChange={setDialog}>
+        <div className="flex items-center gap-3">
+          {/* Month Navigation */}
+          <div className="flex items-center gap-1 bg-muted/30 rounded-lg px-2 py-1">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={prevMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-semibold text-foreground min-w-[120px] text-center">
+              {MESES_NAV[viewMonth]} {viewYear}
+            </span>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={nextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <Dialog open={dialog} onOpenChange={setDialog}>
           <DialogTrigger asChild>
             <Button size="sm" className="h-9" onClick={() => { resetForm(); setDialog(true); }}>
               <Plus className="h-4 w-4 mr-1" /> Novo Lançamento
@@ -377,6 +418,7 @@ export default function ContasPagar() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Stats */}
@@ -640,6 +682,15 @@ export default function ContasPagar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Master Password Dialog for Delete */}
+      <PasswordConfirmDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+        onConfirm={confirmDelete}
+        title="Excluir Lançamento"
+        description={`Digite a senha master para excluir "${deleteTarget?.descricao || ''}".`}
+      />
     </div>
   );
 }
