@@ -95,6 +95,45 @@ export type Database = {
         }
         Relationships: []
       }
+      colaboradores: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          id: string
+          nome: string
+          regime: string
+          salario_base: number
+          status: string
+          updated_at: string | null
+          vr_diario: number
+          vt_diario: number
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          nome: string
+          regime?: string
+          salario_base?: number
+          status?: string
+          updated_at?: string | null
+          vr_diario?: number
+          vt_diario?: number
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          nome?: string
+          regime?: string
+          salario_base?: number
+          status?: string
+          updated_at?: string | null
+          vr_diario?: number
+          vt_diario?: number
+        }
+        Relationships: []
+      }
       documentos: {
         Row: {
           created_at: string | null
@@ -139,6 +178,7 @@ export type Database = {
           categoria: string | null
           cliente_id: string | null
           cobranca_encaminhada: boolean | null
+          colaborador_id: string | null
           comprovante_url: string | null
           confirmado_recebimento: boolean | null
           created_at: string | null
@@ -163,6 +203,7 @@ export type Database = {
           categoria?: string | null
           cliente_id?: string | null
           cobranca_encaminhada?: boolean | null
+          colaborador_id?: string | null
           comprovante_url?: string | null
           confirmado_recebimento?: boolean | null
           created_at?: string | null
@@ -187,6 +228,7 @@ export type Database = {
           categoria?: string | null
           cliente_id?: string | null
           cobranca_encaminhada?: boolean | null
+          colaborador_id?: string | null
           comprovante_url?: string | null
           confirmado_recebimento?: boolean | null
           created_at?: string | null
@@ -212,6 +254,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
             referencedColumns: ["id"]
           },
           {
