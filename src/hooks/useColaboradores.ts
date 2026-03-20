@@ -11,6 +11,11 @@ export interface Colaborador {
   vt_diario: number;
   vr_diario: number;
   status: 'ativo' | 'inativo';
+  adiantamento_tipo: 'percentual' | 'fixo';
+  adiantamento_valor: number;
+  pix_tipo: string | null;
+  pix_chave: string | null;
+  valor_das: number;
   created_at: string;
   updated_at: string;
 }
