@@ -9,13 +9,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Search, CheckCircle, Wallet, Building2, Upload, AlertTriangle } from 'lucide-react';
+import { Plus, Search, CheckCircle, Wallet, Building2, Upload, AlertTriangle, Copy, Printer } from 'lucide-react';
 import { useLancamentos, useCreateLancamento, useUpdateLancamento } from '@/hooks/useFinanceiro';
 import { useColaboradores, type Colaborador } from '@/hooks/useColaboradores';
 import { calcularCustoMensal, getBusinessDaysInMonth } from '@/lib/business-days';
 import { STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
 import type { StatusFinanceiro } from '@/types/financial';
 import { uploadFile } from '@/hooks/useStorageUpload';
+import { abrirRecibo } from '@/lib/recibo';
 import { toast } from 'sonner';
 
 const CATEGORIA_COLORS: Record<string, string> = {
@@ -38,7 +39,6 @@ export default function ContasPagar() {
   const [compFile, setCompFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Form state
   const [form, setForm] = useState({
     descricao: '', valor: '', categoria: 'operacional',
     data_vencimento: '', recorrente: false, frequencia: 'mensal',
@@ -47,6 +47,10 @@ export default function ContasPagar() {
 
   const diasUteis = getBusinessDaysInMonth();
   const activeColabs = (colaboradores || []).filter(c => c.status === 'ativo');
+
+  // Build a map colaborador_id -> Colaborador for PIX display
+  const colabMap = new Map<string, Colaborador>();
+  (colaboradores || []).forEach(c => colabMap.set(c.id, c));
 
   const filtered = (lancamentos || []).filter(l => {
     if (filterStatus !== 'all' && l.status !== filterStatus) return false;
@@ -57,9 +61,7 @@ export default function ContasPagar() {
   const totalPendente = (lancamentos || []).filter(l => l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
   const totalPago = (lancamentos || []).filter(l => l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
 
-  // Auto-fill from collaborator
   const handleColabSelect = (colabId: string) => {
-    setForm(f => ({ ...f, colaboradorId: colabId }));
     const colab = activeColabs.find(c => c.id === colabId);
     if (colab) {
       const custo = calcularCustoMensal(Number(colab.salario_base), Number(colab.vt_diario), Number(colab.vr_diario), diasUteis);
@@ -91,6 +93,7 @@ export default function ContasPagar() {
               tipo: 'pagar', descricao: `${form.descricao} (${i + 1}/${parcelas})`,
               valor, categoria: form.categoria, status: 'pendente',
               data_vencimento: venc.toISOString().split('T')[0],
+              colaborador_id: form.vincularColab ? form.colaboradorId : null,
             } as any, { onSuccess: resolve, onError: reject });
           })
         );
@@ -103,6 +106,7 @@ export default function ContasPagar() {
       createLancamento.mutate({
         tipo: 'pagar', descricao: form.descricao, valor, categoria: form.categoria,
         status: 'pendente', data_vencimento: form.data_vencimento,
+        colaborador_id: form.vincularColab ? form.colaboradorId : null,
       } as any, { onSuccess: () => resetForm() });
     }
   };
@@ -117,17 +121,52 @@ export default function ContasPagar() {
     if (!compFile) return toast.error('Anexe o comprovante para confirmar o pagamento.');
     setUploading(true);
     try {
-      const path = await uploadFile(compFile, 'comprovantes', payDialog);
+      // Find the lancamento to build the filename
+      const lanc = (lancamentos || []).find(l => l.id === payDialog);
+      const descClean = (lanc?.descricao || 'pagamento').replace(/[^a-zA-Z0-9À-ÿ\s-]/g, '').replace(/\s+/g, '_').substring(0, 60);
+      const mesAno = new Date().toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }).replace('/', '-');
+      const ext = compFile.name.split('.').pop() || 'pdf';
+      const fileName = `comprovante_${descClean}_${mesAno}.${ext}`;
+
+      // Upload with renamed path
+      const storagePath = `comprovantes/${payDialog}/${fileName}`;
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { STORAGE_BUCKETS } = await import('@/constants/storage');
+      const { error: upErr } = await supabase.storage
+        .from(STORAGE_BUCKETS.CONTRACTS)
+        .upload(storagePath, compFile, { upsert: true });
+      if (upErr) throw upErr;
+
       updateLancamento.mutate({
         id: payDialog, status: 'pago',
         data_pagamento: new Date().toISOString().split('T')[0],
-        comprovante_url: path,
+        comprovante_url: storagePath,
       } as any, {
-        onSuccess: () => { setPayDialog(null); setCompFile(null); },
+        onSuccess: () => { setPayDialog(null); setCompFile(null); toast.success('Pagamento confirmado!'); },
       });
-    } catch { /* toast already handled */ }
+    } catch (err: any) {
+      toast.error('Erro no upload: ' + (err?.message || 'Desconhecido'));
+    }
     setUploading(false);
   };
+
+  const copyPix = (chave: string) => {
+    navigator.clipboard.writeText(chave);
+    toast.success('Chave PIX copiada!');
+  };
+
+  const handleRecibo = (l: any) => {
+    const mesAno = new Date(l.data_vencimento).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const colab = l.colaborador_id ? colabMap.get(l.colaborador_id) : null;
+    abrirRecibo({
+      nome: colab?.nome || 'Beneficiário',
+      valor: Number(l.valor),
+      descricao: l.descricao,
+      mesAno,
+    });
+  };
+
+  const fmtCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <div className="space-y-6">
@@ -145,7 +184,6 @@ export default function ContasPagar() {
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Nova Conta a Pagar</DialogTitle></DialogHeader>
             <form onSubmit={handleCreate} className="grid gap-4 py-2">
-              {/* Collaborator toggle */}
               <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
                 <Label className="text-sm font-medium">Vincular Colaborador</Label>
                 <Switch checked={form.vincularColab} onCheckedChange={c => setForm(f => ({ ...f, vincularColab: c, colaboradorId: '' }))} />
@@ -163,7 +201,6 @@ export default function ContasPagar() {
                   </Select>
                 </div>
               )}
-
               <div className="grid gap-2">
                 <Label>Descrição *</Label>
                 <Input required value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} placeholder="Ex: Aluguel, Salário..." />
@@ -191,8 +228,6 @@ export default function ContasPagar() {
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Recorrente */}
               <div className="rounded-lg border border-border/60 p-3 space-y-3">
                 <div className="flex items-center gap-2">
                   <Checkbox id="recorrente" checked={form.recorrente} onCheckedChange={c => setForm(f => ({ ...f, recorrente: !!c }))} />
@@ -226,7 +261,6 @@ export default function ContasPagar() {
                   </div>
                 )}
               </div>
-
               <Button type="submit" disabled={createLancamento.isPending}>Criar Lançamento</Button>
             </form>
           </DialogContent>
@@ -239,7 +273,7 @@ export default function ContasPagar() {
           <CardContent className="p-5 flex items-center gap-3">
             <div className="rounded-lg bg-warning/10 p-2.5"><Wallet className="h-5 w-5 text-warning" /></div>
             <div>
-              <p className="text-2xl font-bold">{totalPendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+              <p className="text-2xl font-bold">{fmtCurrency(totalPendente)}</p>
               <p className="text-xs text-muted-foreground">A Pagar</p>
             </div>
           </CardContent>
@@ -248,7 +282,7 @@ export default function ContasPagar() {
           <CardContent className="p-5 flex items-center gap-3">
             <div className="rounded-lg bg-success/10 p-2.5"><Building2 className="h-5 w-5 text-success" /></div>
             <div>
-              <p className="text-2xl font-bold">{totalPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+              <p className="text-2xl font-bold">{fmtCurrency(totalPago)}</p>
               <p className="text-xs text-muted-foreground">Pago no Período</p>
             </div>
           </CardContent>
@@ -277,57 +311,82 @@ export default function ContasPagar() {
           {isLoading ? (
             <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">Carregando...</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map(l => (
-                  <TableRow key={l.id}>
-                    <TableCell className="font-medium">{l.descricao}</TableCell>
-                    <TableCell>
-                      <Badge className={`${CATEGORIA_COLORS[l.categoria || 'outros']} border-0 text-[10px]`}>
-                        {(l.categoria || 'outros').charAt(0).toUpperCase() + (l.categoria || 'outros').slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge className={`${STATUS_STYLES[l.status as StatusFinanceiro]} border-0 text-[10px]`}>
-                        {STATUS_LABELS[l.status as StatusFinanceiro]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {l.status === 'pendente' && (
-                        <Button variant="ghost" size="sm" className="h-7 text-xs text-success hover:text-success"
-                          onClick={() => { setPayDialog(l.id); setCompFile(null); }}>
-                          <CheckCircle className="h-3.5 w-3.5 mr-1" /> Pagar
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum lançamento</TableCell>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead>PIX</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-center">Ações</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map(l => {
+                    const colab = (l as any).colaborador_id ? colabMap.get((l as any).colaborador_id) : null;
+                    return (
+                      <TableRow key={l.id}>
+                        <TableCell className="font-medium">{l.descricao}</TableCell>
+                        <TableCell>
+                          <Badge className={`${CATEGORIA_COLORS[l.categoria || 'outros']} border-0 text-[10px]`}>
+                            {(l.categoria || 'outros').charAt(0).toUpperCase() + (l.categoria || 'outros').slice(1)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {colab?.pix_chave ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] truncate max-w-[100px]" title={colab.pix_chave}>{colab.pix_chave}</span>
+                              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" onClick={() => copyPix(colab.pix_chave!)}>
+                                <Copy className="h-2.5 w-2.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {fmtCurrency(Number(l.valor))}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge className={`${STATUS_STYLES[l.status as StatusFinanceiro]} border-0 text-[10px]`}>
+                            {STATUS_LABELS[l.status as StatusFinanceiro]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {l.status === 'pendente' && (
+                              <Button variant="ghost" size="sm" className="h-7 text-xs text-success hover:text-success"
+                                onClick={() => { setPayDialog(l.id); setCompFile(null); }}>
+                                <CheckCircle className="h-3.5 w-3.5 mr-1" /> Pagar
+                              </Button>
+                            )}
+                            {l.status === 'pago' && (
+                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleRecibo(l)}>
+                                <Printer className="h-3.5 w-3.5 mr-1" /> Recibo
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {filtered.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum lançamento</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Payment Modal with comprovante upload */}
+      {/* Payment Modal */}
       <Dialog open={!!payDialog} onOpenChange={o => { if (!o) { setPayDialog(null); setCompFile(null); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Confirmar Pagamento</DialogTitle></DialogHeader>
