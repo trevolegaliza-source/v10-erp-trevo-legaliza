@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
-import { Plus, Search, CheckCircle, Wallet, Building2, Upload, AlertTriangle, Copy, Printer, Trash2, Pencil, History } from 'lucide-react';
+import { Plus, Search, CheckCircle, Wallet, Building2, Upload, AlertTriangle, Copy, Printer, Trash2, Pencil, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLancamentos, useCreateLancamento, useUpdateLancamento, useDeleteLancamento } from '@/hooks/useFinanceiro';
 import { useColaboradores, type Colaborador } from '@/hooks/useColaboradores';
 import { calcularCustoMensal, getBusinessDaysInMonth } from '@/lib/business-days';
@@ -21,6 +21,7 @@ import type { StatusFinanceiro, Lancamento } from '@/types/financial';
 import { supabase } from '@/integrations/supabase/client';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import { abrirRecibo } from '@/lib/recibo';
+import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { toast } from 'sonner';
 
 const CATEGORIA_COLORS: Record<string, string> = {
