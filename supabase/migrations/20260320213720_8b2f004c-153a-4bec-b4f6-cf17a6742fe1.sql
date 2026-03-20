@@ -1,0 +1,2 @@
+ALTER TABLE public.colaboradores ADD COLUMN IF NOT EXISTS possui_adiantamento boolean NOT NULL DEFAULT true;
+ALTER TABLE public.colaboradores ADD COLUMN IF NOT EXISTS dia_pagamento_integral integer DEFAULT 5;
