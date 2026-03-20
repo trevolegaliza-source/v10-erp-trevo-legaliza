@@ -47,6 +47,13 @@ export default function ContasPagar() {
   const [compFile, setCompFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<Lancamento | null>(null);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+
+  // Month navigation
+  const now = new Date();
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
+  const [viewYear, setViewYear] = useState(now.getFullYear());
 
   const [form, setForm] = useState({
     descricao: '', valor: '', categoria: 'operacional',
