@@ -682,6 +682,15 @@ export default function ContasPagar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Master Password Dialog for Delete */}
+      <PasswordConfirmDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+        onConfirm={confirmDelete}
+        title="Excluir Lançamento"
+        description={`Digite a senha master para excluir "${deleteTarget?.descricao || ''}".`}
+      />
     </div>
   );
 }
