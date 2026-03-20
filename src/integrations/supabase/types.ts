@@ -97,38 +97,53 @@ export type Database = {
       }
       colaboradores: {
         Row: {
+          adiantamento_tipo: string
+          adiantamento_valor: number
           created_at: string | null
           email: string | null
           id: string
           nome: string
+          pix_chave: string | null
+          pix_tipo: string | null
           regime: string
           salario_base: number
           status: string
           updated_at: string | null
+          valor_das: number
           vr_diario: number
           vt_diario: number
         }
         Insert: {
+          adiantamento_tipo?: string
+          adiantamento_valor?: number
           created_at?: string | null
           email?: string | null
           id?: string
           nome: string
+          pix_chave?: string | null
+          pix_tipo?: string | null
           regime?: string
           salario_base?: number
           status?: string
           updated_at?: string | null
+          valor_das?: number
           vr_diario?: number
           vt_diario?: number
         }
         Update: {
+          adiantamento_tipo?: string
+          adiantamento_valor?: number
           created_at?: string | null
           email?: string | null
           id?: string
           nome?: string
+          pix_chave?: string | null
+          pix_tipo?: string | null
           regime?: string
           salario_base?: number
           status?: string
           updated_at?: string | null
+          valor_das?: number
           vr_diario?: number
           vt_diario?: number
         }
