@@ -102,11 +102,13 @@ export type Database = {
           aumento_previsto_data: string | null
           aumento_previsto_valor: number | null
           created_at: string | null
+          dia_pagamento_integral: number | null
           email: string | null
           id: string
           nome: string
           pix_chave: string | null
           pix_tipo: string | null
+          possui_adiantamento: boolean
           regime: string
           salario_base: number
           status: string
@@ -121,11 +123,13 @@ export type Database = {
           aumento_previsto_data?: string | null
           aumento_previsto_valor?: number | null
           created_at?: string | null
+          dia_pagamento_integral?: number | null
           email?: string | null
           id?: string
           nome: string
           pix_chave?: string | null
           pix_tipo?: string | null
+          possui_adiantamento?: boolean
           regime?: string
           salario_base?: number
           status?: string
@@ -140,11 +144,13 @@ export type Database = {
           aumento_previsto_data?: string | null
           aumento_previsto_valor?: number | null
           created_at?: string | null
+          dia_pagamento_integral?: number | null
           email?: string | null
           id?: string
           nome?: string
           pix_chave?: string | null
           pix_tipo?: string | null
+          possui_adiantamento?: boolean
           regime?: string
           salario_base?: number
           status?: string

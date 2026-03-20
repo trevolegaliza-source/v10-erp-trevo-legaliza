@@ -1,6 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { calcularCustoMensal, calcularAdiantamento } from '@/lib/business-days';
 
@@ -12,8 +13,10 @@ export interface ColaboradorFormData {
   vt_diario: string;
   vr_diario: string;
   status: 'ativo' | 'inativo';
+  possui_adiantamento: boolean;
   adiantamento_tipo: 'percentual' | 'fixo';
   adiantamento_valor: string;
+  dia_pagamento_integral: string;
   pix_tipo: string;
   pix_chave: string;
   valor_das: string;
@@ -23,7 +26,8 @@ export interface ColaboradorFormData {
 
 export const EMPTY_FORM: ColaboradorFormData = {
   nome: '', email: '', regime: 'CLT', salario_base: '', vt_diario: '', vr_diario: '',
-  status: 'ativo', adiantamento_tipo: 'percentual', adiantamento_valor: '',
+  status: 'ativo', possui_adiantamento: true, adiantamento_tipo: 'percentual', adiantamento_valor: '',
+  dia_pagamento_integral: '5',
   pix_tipo: '', pix_chave: '', valor_das: '',
   aumento_previsto_valor: '', aumento_previsto_data: '',
 };
@@ -43,7 +47,7 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
   const vt = Number(form.vt_diario) || 0;
   const vr = Number(form.vr_diario) || 0;
   const custoMensal = calcularCustoMensal(sal, vt, vr, diasUteis);
-  const adiantamento = calcularAdiantamento(sal, form.adiantamento_tipo, Number(form.adiantamento_valor) || 0);
+  const adiantamento = form.possui_adiantamento ? calcularAdiantamento(sal, form.adiantamento_tipo, Number(form.adiantamento_valor) || 0) : 0;
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4 py-2 max-h-[70vh] overflow-y-auto pr-1">
@@ -93,28 +97,48 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
         </div>
       </div>
 
-      {/* Adiantamento */}
+      {/* Adiantamento Toggle */}
       <div className="rounded-lg border border-border/60 p-3 space-y-3">
-        <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Adiantamento (Dia 20)</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="grid gap-2">
-            <Label className="text-xs text-foreground">Tipo</Label>
-            <Select value={form.adiantamento_tipo} onValueChange={v => setForm(f => ({ ...f, adiantamento_tipo: v as any }))}>
-              <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="percentual">% do Salário</SelectItem>
-                <SelectItem value="fixo">Valor Fixo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label className="text-xs text-foreground">{form.adiantamento_tipo === 'percentual' ? 'Percentual (%)' : 'Valor (R$)'}</Label>
-            <Input className="h-8" type="number" step="0.01" min="0" value={form.adiantamento_valor}
-              onChange={e => setForm(f => ({ ...f, adiantamento_valor: e.target.value }))} />
-          </div>
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-foreground uppercase tracking-wider">Possui Adiantamento?</p>
+          <Switch
+            checked={form.possui_adiantamento}
+            onCheckedChange={v => setForm(f => ({ ...f, possui_adiantamento: v }))}
+          />
         </div>
-        {adiantamento > 0 && (
-          <p className="text-xs text-primary">Valor do adiantamento: {fmt(adiantamento)}</p>
+
+        {form.possui_adiantamento ? (
+          <>
+            <p className="text-[10px] text-muted-foreground">Pagamento dividido: 50% no 5º dia útil + 50% no dia 20</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label className="text-xs text-foreground">Tipo</Label>
+                <Select value={form.adiantamento_tipo} onValueChange={v => setForm(f => ({ ...f, adiantamento_tipo: v as any }))}>
+                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentual">% do Salário</SelectItem>
+                    <SelectItem value="fixo">Valor Fixo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-xs text-foreground">{form.adiantamento_tipo === 'percentual' ? 'Percentual (%)' : 'Valor (R$)'}</Label>
+                <Input className="h-8" type="number" step="0.01" min="0" value={form.adiantamento_valor}
+                  onChange={e => setForm(f => ({ ...f, adiantamento_valor: e.target.value }))} />
+              </div>
+            </div>
+            {adiantamento > 0 && (
+              <p className="text-xs text-primary">Valor do adiantamento: {fmt(adiantamento)}</p>
+            )}
+          </>
+        ) : (
+          <div className="grid gap-2">
+            <Label className="text-xs text-foreground">Dia do Pagamento Integral</Label>
+            <Input className="h-8" type="number" min="1" max="31" value={form.dia_pagamento_integral}
+              onChange={e => setForm(f => ({ ...f, dia_pagamento_integral: e.target.value }))}
+              placeholder="Ex: 5" />
+            <p className="text-[10px] text-muted-foreground">Salário 100% pago neste dia do mês + Benefícios no último dia</p>
+          </div>
         )}
       </div>
 
