@@ -549,6 +549,7 @@ export default function ContasPagar() {
               selected={calendarDate}
               onSelect={handleCalendarClick}
               className="p-0 pointer-events-auto"
+              locale={ptBR}
               modifiers={{
                 paid: paidDates,
                 pending: paymentDates,
