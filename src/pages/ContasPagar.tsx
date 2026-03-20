@@ -243,8 +243,15 @@ export default function ContasPagar() {
   };
 
   const handleDelete = (l: Lancamento) => {
-    if (!confirm(`Excluir "${l.descricao}"? Esta ação não pode ser desfeita.`)) return;
-    deleteLancamento.mutate(l.id);
+    setDeleteTarget(l);
+    setShowPasswordDialog(true);
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      deleteLancamento.mutate(deleteTarget.id);
+      setDeleteTarget(null);
+    }
   };
 
   const copyPix = (chave: string) => {
