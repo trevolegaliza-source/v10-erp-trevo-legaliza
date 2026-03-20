@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,13 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Copy, TrendingUp, Calendar, FileText, AlertCircle, Wallet } from 'lucide-react';
+import { Copy, TrendingUp, FileText, AlertCircle, Wallet, Upload, Eye, CheckCircle2 } from 'lucide-react';
 import type { Colaborador } from '@/hooks/useColaboradores';
 import { useUpdateColaborador } from '@/hooks/useColaboradores';
-import { useLancamentos } from '@/hooks/useFinanceiro';
+import { useLancamentos, useUpdateLancamento } from '@/hooks/useFinanceiro';
 import { calcularCustoMensal, getBusinessDaysInMonth } from '@/lib/business-days';
 import { STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
 import type { StatusFinanceiro } from '@/types/financial';
+import { supabase } from '@/integrations/supabase/client';
+import { STORAGE_BUCKETS } from '@/constants/storage';
 import { toast } from 'sonner';
 
 interface Props {
@@ -26,7 +28,10 @@ interface Props {
 export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: Props) {
   const { data: allLancamentos } = useLancamentos('pagar');
   const update = useUpdateColaborador();
+  const updateLancamento = useUpdateLancamento();
   const [ocorrencia, setOcorrencia] = useState({ data: '', tipo: 'falta', desconto: true, obs: '' });
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!colab) return null;
 
@@ -35,6 +40,7 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
   const custoAnual = custoMensal * 12;
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+  // ALL lancamentos for this collaborator — no 5-day filter
   const lancamentos = (allLancamentos || []).filter(l => (l as any).colaborador_id === colab.id);
   const totalPago = lancamentos.filter(l => l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
   const totalPendente = lancamentos.filter(l => l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
@@ -44,6 +50,45 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
       navigator.clipboard.writeText(colab.pix_chave);
       toast.success('Chave PIX copiada!');
     }
+  };
+
+  const viewComprovante = async (url: string) => {
+    try {
+      const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(url, 3600);
+      if (error) throw error;
+      window.open(data.signedUrl, '_blank');
+    } catch (err: any) {
+      toast.error('Erro ao abrir comprovante: ' + (err?.message || 'Desconhecido'));
+    }
+  };
+
+  const handleReciboUpload = async (lancamentoId: string, file: File) => {
+    setUploadingId(lancamentoId);
+    try {
+      const ext = (file.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const storagePath = `recibos/${lancamentoId}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(storagePath, file, { upsert: true });
+      if (upErr) throw upErr;
+      updateLancamento.mutate({ id: lancamentoId, recibo_assinado_url: storagePath } as any, {
+        onSuccess: () => toast.success('Recibo assinado anexado!'),
+      });
+    } catch (err: any) {
+      toast.error('Erro no upload: ' + (err?.message || 'Desconhecido'));
+    }
+    setUploadingId(null);
+  };
+
+  const triggerReciboUpload = (lancamentoId: string) => {
+    setUploadingId(lancamentoId);
+    fileInputRef.current?.click();
+  };
+
+  const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && uploadingId) {
+      handleReciboUpload(uploadingId, file);
+    }
+    e.target.value = '';
   };
 
   return (
@@ -67,6 +112,9 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
             </div>
           </DialogTitle>
         </DialogHeader>
+
+        {/* Hidden file input for recibo uploads */}
+        <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={onFileSelected} />
 
         <Tabs defaultValue="dashboard" className="mt-2">
           <TabsList className="w-full grid grid-cols-5 h-9">
@@ -122,7 +170,7 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
             </div>
           </TabsContent>
 
-          {/* Histórico */}
+          {/* Histórico — ALL records, permanently visible */}
           <TabsContent value="historico" className="mt-4">
             <div className="rounded-lg border border-border/60 overflow-hidden">
               <Table>
@@ -132,25 +180,72 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
                     <TableHead className="text-foreground">Vencimento</TableHead>
                     <TableHead className="text-right text-foreground">Valor</TableHead>
                     <TableHead className="text-center text-foreground">Status</TableHead>
+                    <TableHead className="text-center text-foreground">Documentos</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {lancamentos.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhum lançamento encontrado</TableCell>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhum lançamento encontrado</TableCell>
                     </TableRow>
-                  ) : lancamentos.map(l => (
-                    <TableRow key={l.id}>
-                      <TableCell className="text-foreground text-sm">{l.descricao}</TableCell>
-                      <TableCell className="text-foreground text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
-                      <TableCell className="text-right font-medium text-foreground">{fmt(Number(l.valor))}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge className={`${STATUS_STYLES[l.status as StatusFinanceiro]} border-0 text-[10px]`}>
-                          {STATUS_LABELS[l.status as StatusFinanceiro]}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  ) : lancamentos.map(l => {
+                    const hasComprovante = !!(l as any).comprovante_url;
+                    const hasRecibo = !!(l as any).recibo_assinado_url;
+                    const isPago = l.status === 'pago';
+
+                    return (
+                      <TableRow key={l.id}>
+                        <TableCell className="text-foreground text-sm">{l.descricao}</TableCell>
+                        <TableCell className="text-foreground text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
+                        <TableCell className="text-right font-medium text-foreground">{fmt(Number(l.valor))}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge className={`${STATUS_STYLES[l.status as StatusFinanceiro]} border-0 text-[10px]`}>
+                            {STATUS_LABELS[l.status as StatusFinanceiro]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1 flex-wrap">
+                            {/* Comprovante badge */}
+                            {hasComprovante ? (
+                              <Button
+                                variant="ghost" size="sm"
+                                className="h-6 px-1.5 text-[10px] gap-1 text-success hover:text-success"
+                                onClick={() => viewComprovante((l as any).comprovante_url)}
+                                title="Ver comprovante bancário"
+                              >
+                                <CheckCircle2 className="h-3 w-3" /> Bancário
+                              </Button>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+
+                            {/* Recibo badge or upload */}
+                            {hasRecibo ? (
+                              <Button
+                                variant="ghost" size="sm"
+                                className="h-6 px-1.5 text-[10px] gap-1 text-success hover:text-success"
+                                onClick={() => viewComprovante((l as any).recibo_assinado_url)}
+                                title="Ver recibo assinado"
+                              >
+                                <FileText className="h-3 w-3" /> Recibo
+                              </Button>
+                            ) : isPago ? (
+                              <Button
+                                variant="ghost" size="sm"
+                                className="h-6 px-1.5 text-[10px] gap-1 text-primary hover:text-primary"
+                                onClick={() => triggerReciboUpload(l.id)}
+                                disabled={uploadingId === l.id}
+                                title="Anexar recibo assinado"
+                              >
+                                <Upload className="h-3 w-3" />
+                                {uploadingId === l.id ? '...' : 'Recibo'}
+                              </Button>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

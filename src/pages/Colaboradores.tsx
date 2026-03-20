@@ -112,7 +112,7 @@ export default function Colaboradores() {
           <p className="text-sm text-muted-foreground">Gestão de RH e custo de pessoal</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="h-9" onClick={handleGerarVerbas} disabled={gerando}>
+          <Button size="sm" className="h-9 bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleGerarVerbas} disabled={gerando}>
             <Zap className="h-4 w-4 mr-1" /> {gerando ? 'Gerando...' : 'Gerar Verbas do Mês'}
           </Button>
           <Dialog open={dialog} onOpenChange={setDialog}>

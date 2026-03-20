@@ -212,6 +212,7 @@ export type Database = {
           is_taxa_reembolsavel: boolean | null
           observacoes_financeiro: string | null
           processo_id: string | null
+          recibo_assinado_url: string | null
           status: Database["public"]["Enums"]["status_financeiro"]
           tipo: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at: string | null
@@ -237,6 +238,7 @@ export type Database = {
           is_taxa_reembolsavel?: boolean | null
           observacoes_financeiro?: string | null
           processo_id?: string | null
+          recibo_assinado_url?: string | null
           status?: Database["public"]["Enums"]["status_financeiro"]
           tipo: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at?: string | null
@@ -262,6 +264,7 @@ export type Database = {
           is_taxa_reembolsavel?: boolean | null
           observacoes_financeiro?: string | null
           processo_id?: string | null
+          recibo_assinado_url?: string | null
           status?: Database["public"]["Enums"]["status_financeiro"]
           tipo?: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at?: string | null
