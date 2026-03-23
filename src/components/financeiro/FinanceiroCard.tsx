@@ -154,7 +154,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
         )}
         onDoubleClick={() => onDoubleClick?.(processo)}
       >
-        <CardContent className="p-3 space-y-2.5">
+        <CardContent className="p-3 pb-5 space-y-2.5">
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
@@ -162,7 +162,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
                 <p className="text-sm font-semibold truncate">{clienteApelido}</p>
               </div>
-              <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
+              <p className="text-[11px] text-zinc-400 truncate">{processo.razao_social}</p>
             </div>
             <div className="text-right shrink-0 flex items-center gap-1">
               <span className="text-sm font-bold text-primary whitespace-nowrap">
@@ -243,7 +243,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 checked={!!lanc?.cobranca_encaminhada}
                 onCheckedChange={(c) => handleCheckbox('cobranca_encaminhada', !!c)}
               />
-              <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
+              <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-zinc-400 cursor-pointer">
                 Cobrança encaminhada ao cliente
               </label>
             </div>
@@ -253,7 +253,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 checked={!!lanc?.confirmado_recebimento}
                 onCheckedChange={(c) => handleCheckbox('confirmado_recebimento', !!c)}
               />
-              <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
+              <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-zinc-400 cursor-pointer">
                 Confirmado recebimento
               </label>
             </div>
@@ -291,7 +291,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
             ) : <div className="flex-1" />}
           </div>
 
-          <p className="text-[9px] text-muted-foreground/60 text-center">Duplo clique para edição completa</p>
+          <p className="text-[9px] text-zinc-500 text-center">Duplo clique para edição completa</p>
         </CardContent>
       </Card>
 
