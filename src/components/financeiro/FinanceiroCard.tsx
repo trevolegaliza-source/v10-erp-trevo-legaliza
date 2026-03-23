@@ -17,6 +17,7 @@ import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
 import { uploadFile, viewFile, getSignedUrl } from '@/hooks/useStorageUpload';
 import { formatBRL } from '@/lib/pricing-engine';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
+import type { ServiceNegotiationRecord } from '@/hooks/useAllServiceNegotiations';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -24,9 +25,29 @@ interface FinanceiroCardProps {
   processo: ProcessoFinanceiro;
   onMoveRequest: (processo: ProcessoFinanceiro, targetEtapa: EtapaFinanceiro) => void;
   onDoubleClick?: (processo: ProcessoFinanceiro) => void;
+  negotiationLookup?: Map<string, Map<string, ServiceNegotiationRecord>>;
 }
 
-export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick }: FinanceiroCardProps) {
+/** Retroactive negotiation detection: checks if the processo's service matches a client negotiation */
+function detectNegotiation(
+  processo: ProcessoFinanceiro,
+  lookup?: Map<string, Map<string, ServiceNegotiationRecord>>,
+): ServiceNegotiationRecord | null {
+  if (!lookup) return null;
+  const clientMap = lookup.get(processo.cliente_id);
+  if (!clientMap) return null;
+
+  const lanc = processo.lancamento;
+  const descricao = lanc?.descricao || '';
+
+  // Direct match by description
+  for (const [name, neg] of clientMap) {
+    if (descricao.toLowerCase().includes(name)) return neg;
+  }
+  return null;
+}
+
+export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick, negotiationLookup }: FinanceiroCardProps) {
   const updateLanc = useUpdateLancamentoFinanceiro();
   const lanc = processo.lancamento;
 
@@ -44,12 +65,13 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
   const isUrgente = processo.prioridade === 'urgente';
   const cliente = processo.cliente as any;
 
-  // Service name from lancamento descricao or tipo
-  const serviceName = lanc?.descricao || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
-  // Check if this is a negotiated (custom) service — avulso type with a custom description
-  const isNegociado = processo.tipo === 'avulso' && lanc?.descricao && !Object.values(TIPO_PROCESSO_LABELS).includes(lanc.descricao);
+  // Retroactive negotiation detection
+  const matchedNeg = detectNegotiation(processo, negotiationLookup);
+  const isNegociado = !!matchedNeg;
 
-  // The stored valor already includes urgency/discounts calculated at creation time.
+  // Service name: prefer matched negotiation name, then lancamento descricao, then tipo label
+  const serviceName = matchedNeg?.service_name || lanc?.descricao || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
+
   const valorArmazenado = Number(lanc?.valor ?? processo.valor ?? 0);
   const totalValue = valorArmazenado + somaAdicionais;
   const momentoFat = cliente?.momento_faturamento || 'na_solicitacao';
@@ -99,7 +121,6 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
     a.click();
   };
 
-  // Navigation arrows
   const currentIdx = ETAPA_FINANCEIRO_ORDER.indexOf(processo.etapa_financeiro);
   const prevEtapa = currentIdx > 0 ? ETAPA_FINANCEIRO_ORDER[currentIdx - 1] : null;
   const nextEtapa = currentIdx < ETAPA_FINANCEIRO_ORDER.length - 1 ? ETAPA_FINANCEIRO_ORDER[currentIdx + 1] : null;
@@ -165,13 +186,15 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
-                <p className="text-sm font-semibold truncate">{clienteApelido}</p>
+                <p className="text-sm font-semibold truncate text-foreground">{clienteApelido}</p>
               </div>
               <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <p className="text-[11px] font-medium text-foreground/80 truncate">{serviceName}</p>
+                <p className="text-[12px] font-semibold text-foreground/90 truncate">{serviceName}</p>
                 {isNegociado && (
-                  <Badge variant="outline" className="text-[9px] border-accent text-accent-foreground bg-accent/20 px-1.5 py-0">Negociado</Badge>
+                  <Badge className="text-[9px] bg-emerald-500/20 text-emerald-400 border-emerald-500/50 px-1.5 py-0">
+                    Negociado
+                  </Badge>
                 )}
               </div>
             </div>
@@ -189,6 +212,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                   <TooltipContent side="left" className="text-xs max-w-[220px]">
                     <div className="space-y-0.5">
                       <p>Valor Serviço: {formatBRL(valorArmazenado)}</p>
+                      {isNegociado && <p className="text-emerald-400">Valor conforme tabela negociada</p>}
                       {isUrgente && <p className="text-warning">Inclui Urgência +50%</p>}
                       {somaAdicionais > 0 && <p>Adicionais: +{formatBRL(somaAdicionais)}</p>}
                       <p className="font-semibold border-t border-border pt-0.5 mt-1">Total: {formatBRL(totalValue)}</p>
