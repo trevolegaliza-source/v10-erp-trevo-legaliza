@@ -341,9 +341,7 @@ export default function Clientes() {
                       <TableCell className="text-center">
                         <Badge className="bg-primary/10 text-primary border-0">{activeCount(client.id)}/{processCount(client.id)}</Badge>
                       </TableCell>
-                      <TableCell className="text-center" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
-                        <ContractButton clienteId={client.id} />
-                      </TableCell>
+                      {/* Contract column removed — alert now shows in name column */}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
                           {(client as any).is_archived ? (
