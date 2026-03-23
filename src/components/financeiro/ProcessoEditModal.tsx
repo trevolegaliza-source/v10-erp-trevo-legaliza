@@ -38,6 +38,8 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   const comprovanteRef = useRef<HTMLInputElement>(null);
   const reciboRef = useRef<HTMLInputElement>(null);
 
+  const { data: valoresAdicionais = [] } = useValoresAdicionais(processo?.id ?? '');
+
   if (!processo) return null;
 
   const lanc = processo.lancamento;
