@@ -319,25 +319,25 @@ export default function Processos() {
           <div className="rounded-xl border border-border/60 overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Razão Social</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Etapa</TableHead>
-                  <TableHead>Prioridade</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-center">Ações</TableHead>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-xs font-semibold text-zinc-300">Razão Social</TableHead>
+                  <TableHead className="text-xs font-semibold text-zinc-300">Cliente</TableHead>
+                  <TableHead className="text-xs font-semibold text-zinc-300">Tipo</TableHead>
+                  <TableHead className="text-xs font-semibold text-zinc-300">Etapa</TableHead>
+                  <TableHead className="text-xs font-semibold text-zinc-300">Prioridade</TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-zinc-300">Valor</TableHead>
+                  <TableHead className="text-center text-xs font-semibold text-zinc-300">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((proc) => (
                   <TableRow
                     key={proc.id}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
                     onDoubleClick={() => openEditModal(proc)}
                   >
-                    <TableCell className="font-medium">{proc.razao_social}</TableCell>
-                    <TableCell className="text-sm">{proc.cliente?.nome || '-'}</TableCell>
+                    <TableCell className="font-medium text-zinc-100">{proc.razao_social}</TableCell>
+                    <TableCell className="text-sm text-zinc-100">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
                         {(() => {
@@ -346,19 +346,19 @@ export default function Processos() {
                         })()}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
+                    <TableCell className="text-sm text-zinc-100">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
                     <TableCell>
                       {proc.prioridade === 'urgente' ? (
                         <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Normal</span>
+                        <span className="text-xs text-zinc-400">Normal</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-sm font-medium">
+                    <TableCell className="text-right text-sm font-semibold text-zinc-100">
                       {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                     </TableCell>
                     <TableCell className="text-center">
-                      <QuickActionsMenu process={proc} onDelete={handleDelete} onHonorarioExtra={openHonorarioExtra} />
+                      <QuickActionsMenu process={proc} onDelete={handleDeleteRequest} onEdit={openEditModal} onHonorarioExtra={openHonorarioExtra} />
                     </TableCell>
                   </TableRow>
                 ))}
