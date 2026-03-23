@@ -48,6 +48,7 @@ export default function ClienteDetalhe() {
   const [editCadastroForm, setEditCadastroForm] = useState<Record<string, any>>({});
   const updateCliente = useUpdateCliente();
   const createProcesso = useCreateProcesso();
+  const { data: negotiations } = useServiceNegotiations(id);
   const deleteCliente = useDeleteCliente();
   const archiveCliente = useArchiveCliente();
   const unarchiveCliente = useUnarchiveCliente();
