@@ -69,10 +69,10 @@ export default function Financeiro() {
               <span className="text-xs">Lista</span>
             </Toggle>
           </div>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="text-zinc-400 hover:text-white hover:bg-muted/50 transition-colors" asChild>
             <Link to="/contas-receber">Contas a Receber</Link>
           </Button>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="text-zinc-400 hover:text-white hover:bg-muted/50 transition-colors" asChild>
             <Link to="/contas-pagar">Contas a Pagar</Link>
           </Button>
         </div>

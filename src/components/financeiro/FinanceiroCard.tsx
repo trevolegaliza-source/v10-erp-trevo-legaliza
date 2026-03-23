@@ -291,7 +291,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
             ) : <div className="flex-1" />}
           </div>
 
-          <p className="text-[9px] text-muted-foreground/60 text-center">Duplo clique para edição completa</p>
+          <p className="text-[9px] text-zinc-500 text-center">Duplo clique para edição completa</p>
         </CardContent>
       </Card>
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import FinanceiroCard from './FinanceiroCard';
 import ProcessoEditModal from './ProcessoEditModal';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';

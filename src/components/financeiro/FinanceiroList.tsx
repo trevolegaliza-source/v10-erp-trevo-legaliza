@@ -32,15 +32,15 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
             const status = (lanc?.status || 'pendente') as StatusFinanceiro;
             return (
               <tr key={p.id} className={cn('border-t border-border/30', isOverdue && 'bg-destructive/5')}>
-                <td className="px-4 py-2.5 font-medium flex items-center gap-1.5">
+                <td className="px-4 py-2.5 font-medium text-zinc-100 flex items-center gap-1.5">
                   {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
                   {(p.cliente as any)?.apelido || (p.cliente as any)?.nome || '-'}
                 </td>
-                <td className="px-4 py-2.5 text-muted-foreground truncate max-w-[200px]">{p.razao_social}</td>
-                <td className="px-4 py-2.5 font-semibold">
+                <td className="px-4 py-2.5 text-zinc-300 truncate max-w-[200px]">{p.razao_social}</td>
+                <td className="px-4 py-2.5 font-semibold text-zinc-100">
                   {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </td>
-                <td className="px-4 py-2.5">
+                <td className="px-4 py-2.5 text-zinc-300">
                   {lanc?.data_vencimento ? new Date(lanc.data_vencimento).toLocaleDateString('pt-BR') : '-'}
                 </td>
                 <td className="px-4 py-2.5">
