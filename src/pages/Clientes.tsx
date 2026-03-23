@@ -500,6 +500,13 @@ export default function Clientes() {
         </DialogContent>
       </Dialog>
 
+      <ContractPreviewModal
+        open={!!previewUrl}
+        onOpenChange={(o) => { if (!o) { setPreviewUrl(null); setPreviewFileName(''); } }}
+        url={previewUrl}
+        fileName={previewFileName}
+      />
+
       <PasswordConfirmDialog
         open={showDeletePassword}
         onOpenChange={setShowDeletePassword}
