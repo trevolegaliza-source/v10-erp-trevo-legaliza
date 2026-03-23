@@ -332,8 +332,6 @@ export default function Processos() {
                         })()}
                       </Badge>
                     </TableCell>
-                      </Badge>
-                    </TableCell>
                     <TableCell className="text-sm">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
                     <TableCell>
                       {proc.prioridade === 'urgente' ? (
