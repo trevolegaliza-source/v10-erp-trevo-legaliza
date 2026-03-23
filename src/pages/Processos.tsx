@@ -326,7 +326,12 @@ export default function Processos() {
                     <TableCell className="text-sm">{proc.cliente?.nome || '-'}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                        {PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo}
+                        {(() => {
+                          const m = proc.notas?.match(/\[AVULSO:(.+?)\]/);
+                          return m ? m[1] : (PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo);
+                        })()}
+                      </Badge>
+                    </TableCell>
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>

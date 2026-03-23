@@ -77,7 +77,9 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
   const isNegociado = !!matchedNeg;
 
   // Service name: prefer matched negotiation name, then lancamento descricao, then tipo label
-  const serviceName = matchedNeg?.service_name || lanc?.descricao || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
+  // Service name: prefer avulso custom desc, then matched negotiation name, then tipo label
+  const avulsoDesc = extractAvulsoDesc(processo.notas);
+  const serviceName = avulsoDesc || matchedNeg?.service_name || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
 
   const valorArmazenado = Number(lanc?.valor ?? processo.valor ?? 0);
   const totalValue = valorArmazenado + somaAdicionais;
