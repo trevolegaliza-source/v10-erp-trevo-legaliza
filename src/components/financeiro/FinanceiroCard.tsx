@@ -277,7 +277,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 checked={!!lanc?.confirmado_recebimento}
                 onCheckedChange={(c) => handleCheckbox('confirmado_recebimento', !!c)}
               />
-              <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-zinc-400 cursor-pointer">
+              <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
                 Confirmado recebimento
               </label>
             </div>
