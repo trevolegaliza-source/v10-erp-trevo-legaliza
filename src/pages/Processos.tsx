@@ -294,8 +294,9 @@ export default function Processos() {
                                 key={proc.id}
                                 process={proc}
                                 index={idx}
-                                onDelete={handleDelete}
+                                onDelete={handleDeleteRequest}
                                 onDoubleClick={openEditModal}
+                                onEdit={openEditModal}
                                 onHonorarioExtra={openHonorarioExtra}
                               />
                             ))}
