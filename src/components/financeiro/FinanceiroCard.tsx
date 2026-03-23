@@ -267,7 +267,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 checked={!!lanc?.cobranca_encaminhada}
                 onCheckedChange={(c) => handleCheckbox('cobranca_encaminhada', !!c)}
               />
-              <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-zinc-400 cursor-pointer">
+              <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
                 Cobrança encaminhada ao cliente
               </label>
             </div>
