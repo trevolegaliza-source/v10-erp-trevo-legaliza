@@ -233,6 +233,8 @@ export function useCreateProcesso() {
       notas?: string | null;
       ja_pago?: boolean;
       descricao_avulso?: string;
+      desconto_boas_vindas?: number; // percentage, e.g. 10
+      mudanca_uf?: boolean; // doubles the process for billing
     }) => {
       const isAvulso = input.tipo === 'avulso';
       const isManualPrice = !!input.valor_manual && input.valor_manual > 0;
@@ -261,6 +263,9 @@ export function useCreateProcesso() {
 
       const monthCount = processosNoMes ?? 0;
 
+      // How many "slots" this process consumes (mudança de UF = 2)
+      const slots = input.mudanca_uf ? 2 : 1;
+
       let valorFinal: number;
       let discountInfo = '';
 
@@ -268,11 +273,25 @@ export function useCreateProcesso() {
         valorFinal = isManualPrice ? Number(input.valor_manual) : 0;
       } else if (isManualPrice) {
         valorFinal = Number(input.valor_manual);
-      } else if (descontoPercent > 0 && cliente.tipo !== 'MENSALISTA') {
-        const calc = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount, valorLimite);
-        valorFinal = calc.valorFinal;
-        if (calc.descontoAcumulado > 0) {
-          discountInfo = `Desconto Progressivo: ${descontoPercent}% (Processo nº ${calc.processoNumero} do mês) | Base: R$ ${valorBaseCliente.toFixed(2)} | Desconto: R$ ${calc.descontoAcumulado.toFixed(2)}`;
+      } else if (cliente.tipo !== 'MENSALISTA') {
+        if (slots === 2 && descontoPercent > 0) {
+          // Mudança de UF: sum of process N and process N+1
+          const calc1 = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount, valorLimite);
+          const calc2 = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount + 1, valorLimite);
+          valorFinal = calc1.valorFinal + calc2.valorFinal;
+          discountInfo = `Mudança de UF (2 Processos) | Proc ${calc1.processoNumero}: R$ ${calc1.valorFinal.toFixed(2)} + Proc ${calc2.processoNumero}: R$ ${calc2.valorFinal.toFixed(2)}`;
+        } else if (slots === 2) {
+          // Mudança de UF without progressive discount
+          valorFinal = valorBaseCliente * 2;
+          discountInfo = `Mudança de UF (2 Processos) | 2 × R$ ${valorBaseCliente.toFixed(2)}`;
+        } else if (descontoPercent > 0) {
+          const calc = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount, valorLimite);
+          valorFinal = calc.valorFinal;
+          if (calc.descontoAcumulado > 0) {
+            discountInfo = `Desconto Progressivo: ${descontoPercent}% (Processo nº ${calc.processoNumero} do mês) | Base: R$ ${valorBaseCliente.toFixed(2)} | Desconto: R$ ${calc.descontoAcumulado.toFixed(2)}`;
+          }
+        } else {
+          valorFinal = valorBaseCliente;
         }
         if (isUrgente) {
           valorFinal = valorFinal * 1.5;
@@ -281,12 +300,23 @@ export function useCreateProcesso() {
         valorFinal = isUrgente ? valorBaseCliente * 1.5 : valorBaseCliente;
       }
 
+      // Apply welcome discount (before anything else is added)
+      let welcomeDiscountInfo = '';
+      if (input.desconto_boas_vindas && input.desconto_boas_vindas > 0) {
+        const discountAmt = valorFinal * (input.desconto_boas_vindas / 100);
+        valorFinal = Math.round((valorFinal - discountAmt) * 100) / 100;
+        welcomeDiscountInfo = `Desconto de Boas-vindas aplicado: ${input.desconto_boas_vindas}% (-R$ ${discountAmt.toFixed(2)})`;
+      }
+
       const { data: vencimento } = await supabase.rpc('calcular_vencimento', {
         p_cliente_id: input.cliente_id,
       });
 
       // Append discount info to notas
       let notasFinal = input.notas || '';
+      if (welcomeDiscountInfo) {
+        notasFinal = notasFinal ? `${notasFinal}\n${welcomeDiscountInfo}` : welcomeDiscountInfo;
+      }
       if (discountInfo) {
         notasFinal = notasFinal ? `${notasFinal}\n${discountInfo}` : discountInfo;
       }
@@ -310,10 +340,12 @@ export function useCreateProcesso() {
       const serviceName = isAvulso && input.descricao_avulso
         ? input.descricao_avulso
         : `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)}`;
-      const descParts = [`${serviceName} - ${input.razao_social}`];
+      const descParts = [input.mudanca_uf ? `${serviceName} (Mudança de UF - 2 Processos)` : `${serviceName}`];
+      descParts[0] += ` - ${input.razao_social}`;
       if (isUrgente && !isManualPrice && !isAvulso) descParts.push('(+50% Urgência)');
       if (isManualPrice && !isAvulso) descParts.push('(Valor Manual)');
-      if (discountInfo) descParts.push(`(${descontoPercent}% desc.)`);
+      if (discountInfo && !input.mudanca_uf) descParts.push(`(${descontoPercent}% desc.)`);
+      if (welcomeDiscountInfo) descParts.push(`(Boas-vindas ${input.desconto_boas_vindas}%)`);
 
       const momentoFat = cliente.momento_faturamento || 'na_solicitacao';
       const shouldCreateLancamento = input.ja_pago || momentoFat === 'na_solicitacao';
