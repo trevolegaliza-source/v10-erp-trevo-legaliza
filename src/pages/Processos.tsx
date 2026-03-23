@@ -68,7 +68,9 @@ function ProcessCard({
   onHonorarioExtra: (process: ProcessoDB) => void;
 }) {
   const clientName = process.cliente?.nome || 'Cliente';
-  const typeLabel = PROCESS_TYPE_LABELS[process.tipo] || process.tipo;
+  // Extract avulso custom description from notas
+  const avulsoMatch = process.notas?.match(/\[AVULSO:(.+?)\]/);
+  const typeLabel = avulsoMatch ? avulsoMatch[1] : (PROCESS_TYPE_LABELS[process.tipo] || process.tipo);
 
   return (
     <Draggable draggableId={process.id} index={index}>
@@ -324,7 +326,10 @@ export default function Processos() {
                     <TableCell className="text-sm">{proc.cliente?.nome || '-'}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                        {PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo}
+                        {(() => {
+                          const m = proc.notas?.match(/\[AVULSO:(.+?)\]/);
+                          return m ? m[1] : (PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo);
+                        })()}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>

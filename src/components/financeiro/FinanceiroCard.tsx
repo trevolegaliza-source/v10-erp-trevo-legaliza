@@ -28,6 +28,13 @@ interface FinanceiroCardProps {
   negotiationLookup?: Map<string, Map<string, ServiceNegotiationRecord>>;
 }
 
+/** Extract avulso custom description from notas field */
+export function extractAvulsoDesc(notas: string | null | undefined): string | null {
+  if (!notas) return null;
+  const match = notas.match(/\[AVULSO:(.+?)\]/);
+  return match ? match[1] : null;
+}
+
 /** Retroactive negotiation detection: checks if the processo's service matches a client negotiation */
 function detectNegotiation(
   processo: ProcessoFinanceiro,
@@ -70,7 +77,9 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
   const isNegociado = !!matchedNeg;
 
   // Service name: prefer matched negotiation name, then lancamento descricao, then tipo label
-  const serviceName = matchedNeg?.service_name || lanc?.descricao || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
+  // Service name: prefer avulso custom desc, then matched negotiation name, then tipo label
+  const avulsoDesc = extractAvulsoDesc(processo.notas);
+  const serviceName = avulsoDesc || matchedNeg?.service_name || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
 
   const valorArmazenado = Number(lanc?.valor ?? processo.valor ?? 0);
   const totalValue = valorArmazenado + somaAdicionais;

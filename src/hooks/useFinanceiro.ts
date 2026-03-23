@@ -210,7 +210,11 @@ export function useCreateProcesso() {
       prioridade?: string;
       responsavel?: string;
       valor_manual?: number;
+      notas?: string | null;
+      ja_pago?: boolean;
+      descricao_avulso?: string;
     }) => {
+      const isAvulso = input.tipo === 'avulso';
       const isManualPrice = !!input.valor_manual && input.valor_manual > 0;
       const isUrgente = input.prioridade === 'urgente';
 
@@ -224,11 +228,14 @@ export function useCreateProcesso() {
       const cliente = clienteData as Pick<ClienteDB, 'id' | 'tipo' | 'valor_base'> & { momento_faturamento?: string };
       const valorBaseCliente = cliente.tipo === 'MENSALISTA' ? 0 : Number(cliente.valor_base ?? 0);
       const valorBaseProcesso = isManualPrice ? Number(input.valor_manual) : valorBaseCliente;
-      const valorFinal = isManualPrice
-        ? valorBaseProcesso
-        : isUrgente
-          ? valorBaseProcesso * 1.5
-          : valorBaseProcesso;
+      // Avulso: value is always manual/final — no discounts or urgency surcharge
+      const valorFinal = isAvulso
+        ? (isManualPrice ? Number(input.valor_manual) : 0)
+        : isManualPrice
+          ? valorBaseProcesso
+          : isUrgente
+            ? valorBaseProcesso * 1.5
+            : valorBaseProcesso;
 
       const { data: vencimento } = await supabase.rpc('calcular_vencimento', {
         p_cliente_id: input.cliente_id,
@@ -243,27 +250,45 @@ export function useCreateProcesso() {
           prioridade: input.prioridade || 'normal',
           responsavel: input.responsavel || null,
           valor: valorFinal,
+          notas: input.notas || null,
         })
         .select('*, cliente:clientes(*)')
         .single();
       if (error) throw error;
 
-      const momentoFat = cliente.momento_faturamento || 'na_solicitacao';
-      if (momentoFat === 'na_solicitacao') {
-        const descParts = [`${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`];
-        if (isUrgente && !isManualPrice) descParts.push('(+50% Urgência)');
-        if (isManualPrice) descParts.push('(Valor Manual)');
+      // Determine lancamento description
+      const serviceName = isAvulso && input.descricao_avulso
+        ? input.descricao_avulso
+        : `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)}`;
+      const descParts = [`${serviceName} - ${input.razao_social}`];
+      if (isUrgente && !isManualPrice && !isAvulso) descParts.push('(+50% Urgência)');
+      if (isManualPrice && !isAvulso) descParts.push('(Valor Manual)');
 
+      const momentoFat = cliente.momento_faturamento || 'na_solicitacao';
+      const shouldCreateLancamento = input.ja_pago || momentoFat === 'na_solicitacao';
+
+      if (shouldCreateLancamento) {
+        const today = new Date().toISOString().split('T')[0];
         const { error: lancError } = await supabase.from('lancamentos').insert({
           tipo: 'receber',
           cliente_id: input.cliente_id,
           processo_id: processo.id,
           descricao: descParts.join(' '),
           valor: valorFinal,
-          status: 'pendente',
-          data_vencimento: vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
+          status: input.ja_pago ? 'pago' : 'pendente',
+          data_vencimento: input.ja_pago ? today : (vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0]),
+          data_pagamento: input.ja_pago ? today : null,
+          etapa_financeiro: input.ja_pago ? 'honorario_pago' : 'solicitacao_criada',
         });
         if (lancError) throw lancError;
+      }
+
+      // If ja_pago, also mark processo as concluido
+      if (input.ja_pago) {
+        await supabase
+          .from('processos')
+          .update({ etapa: 'finalizados', updated_at: new Date().toISOString() })
+          .eq('id', processo.id);
       }
 
       return processo as ProcessoDB;
@@ -272,6 +297,7 @@ export function useCreateProcesso() {
       qc.invalidateQueries({ queryKey: ['processos_db'] });
       qc.invalidateQueries({ queryKey: ['lancamentos'] });
       qc.invalidateQueries({ queryKey: ['dashboard_stats'] });
+      qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
       toast.success('Processo criado!');
     },
     onError: (e: Error) => toast.error(e.message),
