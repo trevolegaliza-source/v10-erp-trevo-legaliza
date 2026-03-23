@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { UserPlus, FileText, Upload, X, Check, ChevronsUpDown } from 'lucide-react';
-import { useClientes, useCreateCliente, useCreateProcesso } from '@/hooks/useFinanceiro';
+import { useClientes, useCreateCliente, useCreateProcesso, calcularDescontoProgressivo } from '@/hooks/useFinanceiro';
 import type { TipoCliente, TipoProcesso } from '@/types/financial';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
