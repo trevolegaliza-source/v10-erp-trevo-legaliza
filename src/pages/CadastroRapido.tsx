@@ -119,6 +119,9 @@ export default function CadastroRapido() {
     descricao_avulso: '',
     ja_pago: false,
     observacoes: '',
+    desconto_boas_vindas: false,
+    desconto_boas_vindas_percent: '10',
+    mudanca_uf: false,
   });
   const createProcesso = useCreateProcesso();
   const { data: clientes } = useClientes();
@@ -126,6 +129,22 @@ export default function CadastroRapido() {
   const { data: negotiations } = useServiceNegotiations(processoForm.cliente_id || undefined);
 
   const selectedCliente = (clientes || []).find(c => c.id === processoForm.cliente_id);
+
+  // Check if selected client has zero processes (first-time client)
+  const [isFirstProcess, setIsFirstProcess] = useState(false);
+  useEffect(() => {
+    if (!processoForm.cliente_id) { setIsFirstProcess(false); return; }
+    supabase
+      .from('processos')
+      .select('id', { count: 'exact', head: true })
+      .eq('cliente_id', processoForm.cliente_id)
+      .then(({ count }) => {
+        setIsFirstProcess((count ?? 0) === 0);
+        if ((count ?? 0) > 0) {
+          setProcessoForm(f => ({ ...f, desconto_boas_vindas: false }));
+        }
+      });
+  }, [processoForm.cliente_id]);
 
 
 
@@ -286,10 +305,12 @@ export default function CadastroRapido() {
         notas,
         ja_pago: processoForm.ja_pago,
         descricao_avulso: isProcessoAvulso ? processoForm.descricao_avulso.trim() : undefined,
+        desconto_boas_vindas: processoForm.desconto_boas_vindas ? Number(processoForm.desconto_boas_vindas_percent) : undefined,
+        mudanca_uf: processoForm.mudanca_uf,
       },
       {
         onSuccess: () =>
-          setProcessoForm({ cliente_id: '', razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, descricao_avulso: '', ja_pago: false, observacoes: '' }),
+          setProcessoForm({ cliente_id: '', razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, descricao_avulso: '', ja_pago: false, observacoes: '', desconto_boas_vindas: false, desconto_boas_vindas_percent: '10', mudanca_uf: false }),
       },
     );
   };
@@ -617,6 +638,56 @@ export default function CadastroRapido() {
                       onChange={e => setProcessoForm(f => ({ ...f, descricao_avulso: e.target.value }))}
                     />
                     <p className="text-[10px] text-muted-foreground">Este nome será exibido no Kanban em vez de &quot;Avulso&quot;.</p>
+                  </div>
+                )}
+
+                {/* Mudança de UF switch — only for 'alteracao' */}
+                {processoForm.tipo === 'alteracao' && (
+                  <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                    <div>
+                      <Label className="text-sm font-medium text-amber-400">🔄 Envolve mudança entre Estados (UF)?</Label>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {processoForm.mudanca_uf
+                          ? 'Será tratado como 2 processos simultâneos para faturamento e contagem progressiva.'
+                          : 'Processo simples de alteração, sem duplicidade.'}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={processoForm.mudanca_uf}
+                      onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, mudanca_uf: checked }))}
+                    />
+                  </div>
+                )}
+
+                {/* Welcome discount — only for first-time clients */}
+                {isFirstProcess && selectedCliente && (
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-sm font-medium text-emerald-400">🎁 Primeiro Processo Detectado!</Label>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Aplicar desconto de Anúncio/Marketing?
+                        </p>
+                      </div>
+                      <Switch
+                        checked={processoForm.desconto_boas_vindas}
+                        onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, desconto_boas_vindas: checked }))}
+                      />
+                    </div>
+                    {processoForm.desconto_boas_vindas && (
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs">Porcentagem do desconto (%)</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          step={1}
+                          value={processoForm.desconto_boas_vindas_percent}
+                          onChange={e => setProcessoForm(f => ({ ...f, desconto_boas_vindas_percent: e.target.value }))}
+                          className="w-32"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 
