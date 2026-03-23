@@ -136,7 +136,6 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
     </div>
   );
 
-  const { data: valoresAdicionais = [] } = useValoresAdicionais(processo.id);
   const somaAdicionais = valoresAdicionais.reduce((s, i) => s + Number(i.valor), 0);
   const baseValue = Number(lanc?.valor ?? processo.valor ?? 0);
   const totalValue = baseValue + somaAdicionais;
