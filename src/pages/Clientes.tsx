@@ -299,10 +299,13 @@ export default function Clientes() {
                       onDoubleClick={() => openEdit(client)}
                     >
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{client.nome}</p>
-                          {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
-                          {client.nome_contador && <p className="text-[10px] text-muted-foreground">Contador: {client.nome_contador}</p>}
+                        <div className="flex items-center gap-2">
+                          <ContractButton clienteId={client.id} contrato_url={(client as any).contrato_url} />
+                          <div>
+                            <p className="font-medium">{client.nome}</p>
+                            {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
+                            {client.nome_contador && <p className="text-[10px] text-muted-foreground">Contador: {client.nome_contador}</p>}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-xs font-mono">{(client as any).cnpj || '—'}</TableCell>
