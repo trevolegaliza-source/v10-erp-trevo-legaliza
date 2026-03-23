@@ -441,13 +441,39 @@ export default function CadastroRapido() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label>Tipo</Label>
-                    <Select value={processoForm.tipo} onValueChange={v => setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso }))}>
+                    <Label>Tipo de Serviço</Label>
+                    <Select
+                      value={processoForm.tipo}
+                      onValueChange={v => {
+                        const neg = negotiations?.find(n => n.id === v);
+                        if (neg) {
+                          setProcessoForm(f => ({
+                            ...f,
+                            tipo: v,
+                            definir_manual: true,
+                            valor_manual: String(neg.fixed_price),
+                          }));
+                        } else {
+                          setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso, definir_manual: false, valor_manual: '' }));
+                        }
+                      }}
+                    >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
+                        <SelectItem disabled value="__header_std" className="text-[10px] font-semibold text-muted-foreground">— Serviços Padrão —</SelectItem>
                         {Object.entries(TIPO_PROCESSO_LABELS).map(([k, v]) => (
                           <SelectItem key={k} value={k}>{v}</SelectItem>
                         ))}
+                        {negotiations && negotiations.length > 0 && (
+                          <>
+                            <SelectItem disabled value="__header_neg" className="text-[10px] font-semibold text-muted-foreground">— Serviços Negociados —</SelectItem>
+                            {negotiations.map(n => (
+                              <SelectItem key={n.id} value={n.id}>
+                                {n.service_name} — {Number(n.fixed_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
