@@ -186,12 +186,31 @@ export default function CadastroRapido() {
     );
   };
 
+  const isProcessoAvulso = processoForm.tipo === 'avulso';
+
   const handleCreateProcesso = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isProcessoAvulso && !processoForm.descricao_avulso.trim()) {
+      toast.error('Preencha a Descrição do Serviço Avulso.');
+      return;
+    }
     // Check if negotiated service selected
     const neg = negotiations?.find(n => n.id === processoForm.tipo);
     const tipoFinal = neg ? 'avulso' : processoForm.tipo;
-    const valorFinal = neg ? neg.fixed_price : (processoForm.definir_manual && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined);
+    const valorFinal = neg
+      ? neg.fixed_price
+      : isProcessoAvulso
+        ? (processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined)
+        : (processoForm.definir_manual && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined);
+
+    // Build notas: for avulso, prefix with description marker
+    let notas = processoForm.observacoes || null;
+    if (isProcessoAvulso && processoForm.descricao_avulso.trim()) {
+      notas = `[AVULSO:${processoForm.descricao_avulso.trim()}]${notas ? '\n' + notas : ''}`;
+    }
+    if (neg) {
+      notas = `Valor fixo conforme negociação contratual para o serviço: ${neg.service_name}. Gatilho: ${neg.billing_trigger}.${notas ? '\n' + notas : ''}`;
+    }
 
     createProcesso.mutate(
       {
@@ -201,10 +220,13 @@ export default function CadastroRapido() {
         prioridade: processoForm.prioridade,
         responsavel: processoForm.responsavel,
         valor_manual: valorFinal,
+        notas,
+        ja_pago: processoForm.ja_pago,
+        descricao_avulso: isProcessoAvulso ? processoForm.descricao_avulso.trim() : undefined,
       },
       {
         onSuccess: () =>
-          setProcessoForm({ cliente_id: '', razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false }),
+          setProcessoForm({ cliente_id: '', razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, descricao_avulso: '', ja_pago: false, observacoes: '' }),
       },
     );
   };
