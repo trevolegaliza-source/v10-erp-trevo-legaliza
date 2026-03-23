@@ -45,6 +45,8 @@ export default function CadastroRapido() {
   const [clienteForm, setClienteForm] = useState(INITIAL_CLIENTE);
   const [contratoFile, setContratoFile] = useState<File | null>(null);
   const createCliente = useCreateCliente();
+  const upsertNegotiations = useUpsertServiceNegotiations();
+  const [honorariosRows, setHonorariosRows] = useState<InlineNegotiationRow[]>([]);
 
   const [processoForm, setProcessoForm] = useState({
     cliente_id: '',
