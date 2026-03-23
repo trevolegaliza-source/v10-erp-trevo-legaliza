@@ -16,12 +16,12 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-muted/50 text-left">
-            <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Cliente</th>
-            <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Razão Social</th>
-            <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Valor</th>
-            <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Vencimento</th>
-            <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Etapa</th>
-            <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Status</th>
+            <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Cliente</th>
+            <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Razão Social</th>
+            <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Valor</th>
+            <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Vencimento</th>
+            <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Etapa</th>
+            <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Status</th>
           </tr>
         </thead>
         <tbody>
