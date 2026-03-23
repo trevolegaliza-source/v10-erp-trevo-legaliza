@@ -18,7 +18,8 @@ import { cn } from '@/lib/utils';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import { maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
-import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
+import { useServiceNegotiations, useUpsertServiceNegotiations } from '@/hooks/useServiceNegotiations';
+import HonorariosInlineRepeater, { type InlineNegotiationRow } from '@/components/clientes/HonorariosInlineRepeater';
 
 const INITIAL_CLIENTE = {
   codigo_identificador: '',
@@ -44,6 +45,8 @@ export default function CadastroRapido() {
   const [clienteForm, setClienteForm] = useState(INITIAL_CLIENTE);
   const [contratoFile, setContratoFile] = useState<File | null>(null);
   const createCliente = useCreateCliente();
+  const upsertNegotiations = useUpsertServiceNegotiations();
+  const [honorariosRows, setHonorariosRows] = useState<InlineNegotiationRow[]>([]);
 
   const [processoForm, setProcessoForm] = useState({
     cliente_id: '',
@@ -151,13 +154,30 @@ export default function CadastroRapido() {
     createCliente.mutate(
       payload as any,
       {
-        onSuccess: (data: any) => {
+        onSuccess: async (data: any) => {
           const clienteId = data?.id || data?.[0]?.id;
           if (contratoFile && clienteId) {
             uploadContrato(clienteId);
           }
+          // Save honorários if any
+          if (clienteId && honorariosRows.length > 0) {
+            const validRows = honorariosRows.filter(r => r.service_name.trim() && r.fixed_price);
+            if (validRows.length > 0) {
+              await upsertNegotiations.mutateAsync({
+                clienteId,
+                negotiations: validRows.map(r => ({
+                  service_name: r.service_name.trim(),
+                  fixed_price: Number(r.fixed_price),
+                  billing_trigger: r.billing_trigger,
+                  trigger_days: Number(r.trigger_days) || 0,
+                  is_custom: true as const,
+                })),
+              });
+            }
+          }
           setClienteForm(INITIAL_CLIENTE);
           setContratoFile(null);
+          setHonorariosRows([]);
         },
       },
     );
@@ -355,6 +375,9 @@ export default function CadastroRapido() {
                     onChange={(e) => update('observacoes', e.target.value)}
                   />
                 </div>
+
+                {/* Honorários Específicos */}
+                <HonorariosInlineRepeater rows={honorariosRows} onChange={setHonorariosRows} />
 
                 {/* Document Upload */}
                 <div className="grid gap-1.5">
