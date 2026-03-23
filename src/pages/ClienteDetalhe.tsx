@@ -725,28 +725,28 @@ export default function ClienteDetalhe() {
         </TabsContent>
       </Tabs>
 
-      {/* Edit Cadastro Sheet */}
-      <Sheet open={showEditCadastro} onOpenChange={setShowEditCadastro}>
-        <SheetContent className="sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Editar Cadastro</SheetTitle>
-          </SheetHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label className="text-slate-300">Nome da Contabilidade *</Label>
-              <Input value={editCadastroForm.nome || ''} onChange={e => setEditCadastroForm(f => ({ ...f, nome: e.target.value }))} />
-            </div>
+      {/* Edit Cadastro Dialog */}
+      <Dialog open={showEditCadastro} onOpenChange={setShowEditCadastro}>
+        <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Cadastro</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Nome da Contabilidade *</Label>
+                <Input value={editCadastroForm.nome || ''} onChange={e => setEditCadastroForm(f => ({ ...f, nome: e.target.value }))} />
+              </div>
               <div className="grid gap-2">
                 <Label className="text-slate-300">Apelido</Label>
                 <Input value={editCadastroForm.apelido || ''} onChange={e => setEditCadastroForm(f => ({ ...f, apelido: e.target.value }))} />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label className="text-slate-300">Nome do Contador</Label>
                 <Input value={editCadastroForm.nome_contador || ''} onChange={e => setEditCadastroForm(f => ({ ...f, nome_contador: e.target.value }))} />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label className="text-slate-300">CNPJ</Label>
                 <Input
@@ -759,6 +759,8 @@ export default function ClienteDetalhe() {
                   <p className="text-[10px] text-destructive">CNPJ deve conter 14 dígitos</p>
                 )}
               </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label className="text-slate-300">Código do Cliente</Label>
                 <Input
@@ -767,7 +769,14 @@ export default function ClienteDetalhe() {
                   placeholder="000.000 (auto)"
                   maxLength={7}
                 />
-                <p className="text-[10px] text-muted-foreground">Extraído automaticamente do CNPJ</p>
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Email</Label>
+                <Input value={editCadastroForm.email || ''} onChange={e => setEditCadastroForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Telefone</Label>
+                <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
               </div>
             </div>
             <div className="grid gap-2">
@@ -780,30 +789,24 @@ export default function ClienteDetalhe() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label className="text-slate-300">Email</Label>
-                <Input value={editCadastroForm.email || ''} onChange={e => setEditCadastroForm(f => ({ ...f, email: e.target.value }))} />
-              </div>
-              <div className="grid gap-2">
-                <Label className="text-slate-300">Telefone</Label>
-                <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
-              </div>
-            </div>
             {/* Honorários Específicos inline */}
-            <div className="pt-2 border-t border-border/40">
-              <HonorariosRepeater clienteId={cliente.id} />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setShowEditCadastro(false)}>Cancelar</Button>
-              <Button onClick={handleSaveCadastro} disabled={updateCliente.isPending}>
-                {updateCliente.isPending ? 'Salvando...' : 'Salvar Cadastro'}
-              </Button>
+            <div className="pt-3 border-t border-border/40">
+              <HonorariosInlineRepeater rows={editHonorariosRows} onChange={setEditHonorariosRows} />
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditCadastro(false)}>Cancelar</Button>
+            <Button onClick={handleSaveCadastro} disabled={savingCadastro}>
+              {savingCadastro ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Salvando...
+                </span>
+              ) : 'Salvar Cadastro'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ContractPreviewModal
         open={!!previewUrl}
