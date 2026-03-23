@@ -59,7 +59,7 @@ export function useUpsertServiceNegotiations() {
         .insert(rows)
         .select('*');
       if (error) throw error;
-      return data as ServiceNegotiation[];
+      return data as unknown as ServiceNegotiation[];
     },
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['service_negotiations', variables.clienteId] });
