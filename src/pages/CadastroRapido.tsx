@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import { maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
+import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
 
 const INITIAL_CLIENTE = {
   codigo_identificador: '',
