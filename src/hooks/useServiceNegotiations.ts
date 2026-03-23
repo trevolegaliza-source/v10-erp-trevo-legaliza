@@ -27,7 +27,7 @@ export function useServiceNegotiations(clienteId?: string) {
         .eq('cliente_id', clienteId!)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      return (data || []) as ServiceNegotiation[];
+      return (data || []) as unknown as ServiceNegotiation[];
     },
   });
 }
