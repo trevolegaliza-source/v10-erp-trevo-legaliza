@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye } from 'lucide-react';
-import { formatCNPJ } from '@/lib/cnpj';
+import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil } from 'lucide-react';
+import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,7 +20,7 @@ import { toast } from 'sonner';
 import { useUpdateCliente, useCreateProcesso, useDeleteCliente, useArchiveCliente, useUnarchiveCliente } from '@/hooks/useFinanceiro';
 import { KANBAN_STAGES } from '@/types/process';
 import { STATUS_LABELS, STATUS_STYLES, TIPO_PROCESSO_LABELS } from '@/types/financial';
-import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso } from '@/types/financial';
+import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso, TipoCliente } from '@/types/financial';
 import { cn } from '@/lib/utils';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { STORAGE_BUCKETS } from '@/constants/storage';
@@ -41,6 +42,8 @@ export default function ClienteDetalhe() {
   const [previewFileName, setPreviewFileName] = useState('');
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
+  const [showEditCadastro, setShowEditCadastro] = useState(false);
+  const [editCadastroForm, setEditCadastroForm] = useState<Record<string, any>>({});
   const updateCliente = useUpdateCliente();
   const createProcesso = useCreateProcesso();
   const deleteCliente = useDeleteCliente();
@@ -99,11 +102,7 @@ export default function ClienteDetalhe() {
   const loadAll = async (clienteId: string) => {
     setLoading(true);
     const [cRes, pRes, lRes] = await Promise.all([
-      supabase
-        .from('clientes')
-        .select('*')
-        .eq('id', clienteId)
-        .maybeSingle(),
+      supabase.from('clientes').select('*').eq('id', clienteId).maybeSingle(),
       supabase.from('processos').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }),
       supabase.from('lancamentos').select('*').eq('cliente_id', clienteId).order('data_vencimento', { ascending: false }),
     ]);
@@ -129,6 +128,61 @@ export default function ClienteDetalhe() {
     updateCliente.mutate(payload as any, {
       onSuccess: () => { setEditing(false); loadAll(cliente.id); toast.success('Parâmetros atualizados!'); },
       onError: (err: any) => { toast.error('Erro ao salvar: ' + (err?.message || 'Erro desconhecido')); },
+    });
+  };
+
+  // ── Edit Cadastro handlers ──
+  const openEditCadastro = () => {
+    if (!cliente) return;
+    setEditCadastroForm({
+      nome: cliente.nome || '',
+      apelido: cliente.apelido || '',
+      nome_contador: cliente.nome_contador || '',
+      cnpj: maskCNPJ((cliente as any).cnpj || ''),
+      codigo_identificador: cliente.codigo_identificador || '',
+      email: cliente.email || '',
+      telefone: cliente.telefone || '',
+      tipo: cliente.tipo,
+    });
+    setShowEditCadastro(true);
+  };
+
+  const handleCnpjEditChange = (value: string) => {
+    const masked = maskCNPJ(value);
+    const digits = value.replace(/\D/g, '');
+    const codigo = digits.slice(0, 6);
+    setEditCadastroForm(f => ({
+      ...f,
+      cnpj: masked,
+      codigo_identificador: codigo || f.codigo_identificador,
+    }));
+  };
+
+  const handleSaveCadastro = () => {
+    if (!cliente) return;
+    const cnpjDigits = (editCadastroForm.cnpj || '').replace(/\D/g, '');
+    if (cnpjDigits.length > 0 && cnpjDigits.length !== 14) {
+      toast.error('Erro ao validar CNPJ: deve conter 14 dígitos.');
+      return;
+    }
+    const payload: Record<string, any> = {
+      id: cliente.id,
+      nome: editCadastroForm.nome,
+      apelido: editCadastroForm.apelido,
+      nome_contador: editCadastroForm.nome_contador,
+      cnpj: cnpjDigits || null,
+      codigo_identificador: editCadastroForm.codigo_identificador?.replace(/\D/g, '') || cliente.codigo_identificador,
+      email: editCadastroForm.email || null,
+      telefone: editCadastroForm.telefone || null,
+      tipo: editCadastroForm.tipo,
+    };
+    updateCliente.mutate(payload as any, {
+      onSuccess: () => {
+        toast.success('Dados cadastrais atualizados com sucesso');
+        setShowEditCadastro(false);
+        loadAll(cliente.id);
+      },
+      onError: (err: any) => toast.error('Erro: ' + (err?.message || 'Desconhecido')),
     });
   };
 
@@ -158,7 +212,7 @@ export default function ClienteDetalhe() {
   const handleViewContract = async (fileName: string) => {
     if (!cliente) return;
     const storagePath = `${cliente.id}/${fileName}`;
-    const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(storagePath, 3600);
+    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(storagePath, 3600);
     if (data?.signedUrl) {
       window.open(data.signedUrl, '_blank');
     } else {
@@ -214,6 +268,10 @@ export default function ClienteDetalhe() {
     ? processos.filter(p => !DEFERIMENTO_STAGES.includes(p.etapa) && p.etapa !== 'arquivo' && !billedProcessIds.has(p.id))
     : [];
 
+  // CNPJ display - field is cnpj (14 digits), codigo_identificador is 6 digits
+  const cnpjInfo = formatCNPJ((cliente as any).cnpj);
+  const codigoDisplay = cliente.codigo_identificador || '—';
+
   return (
     <div className="space-y-6">
       {/* Back + Header */}
@@ -238,18 +296,22 @@ export default function ClienteDetalhe() {
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
-            <span className="flex items-center gap-1"><Building2 className="h-3.5 w-3.5" />{cliente.nome}</span>
-            {(cliente as any).cnpj && (() => {
-              const cnpjInfo = formatCNPJ((cliente as any).cnpj);
-              return <span className={`text-xs font-mono ${!cnpjInfo.valid ? 'text-destructive font-semibold' : 'text-slate-400'}`}>CNPJ: {cnpjInfo.formatted}</span>;
-            })()}
-            {cliente.nome_contador && <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{cliente.nome_contador}</span>}
-            <span className="text-xs">Código: {cliente.codigo_identificador}</span>
+          <div className="flex items-center gap-4 mt-1 text-sm flex-wrap">
+            <span className="flex items-center gap-1 text-muted-foreground"><Building2 className="h-3.5 w-3.5" />{cliente.nome}</span>
+            {(cliente as any).cnpj && (
+              <span className={`text-xs font-mono ${!cnpjInfo.valid ? 'text-destructive font-semibold' : 'text-slate-300'}`}>
+                CNPJ: {cnpjInfo.formatted}
+              </span>
+            )}
+            <span className="text-xs text-slate-400">Código: {maskCodigo(codigoDisplay)}</span>
+            {cliente.nome_contador && <span className="flex items-center gap-1 text-slate-400"><User className="h-3.5 w-3.5" />{cliente.nome_contador}</span>}
           </div>
         </div>
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs text-foreground" onClick={openEditCadastro}>
+            <Pencil className="h-3.5 w-3.5" /> Editar Cadastro
+          </Button>
           <Button variant="outline" size="sm" className="gap-1.5 text-xs text-foreground" onClick={() => { setSelectedRelatorioProcessos(new Set()); setShowRelatorioDialog(true); }}>
             <FileBarChart className="h-3.5 w-3.5" /> Gerar Relatório
           </Button>
@@ -328,13 +390,13 @@ export default function ClienteDetalhe() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label className="text-xs text-muted-foreground">Tipo de Cliente</Label>
+                  <Label className="text-xs text-slate-400">Tipo de Cliente</Label>
                   <p className="font-medium">{isMensalista ? 'Mensalista' : 'Avulso'}</p>
                 </div>
                 {isMensalista ? (
                   <>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Valor da Mensalidade</Label>
+                      <Label className="text-xs text-slate-400">Valor da Mensalidade</Label>
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).mensalidade ?? ''} onChange={e => setEditForm(f => ({ ...f, mensalidade: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
@@ -342,7 +404,7 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Vencimento</Label>
+                      <Label className="text-xs text-slate-400">Vencimento</Label>
                       {editing ? (
                         <Input type="number" min={1} max={31} value={(editForm as any).vencimento ?? (editForm as any).dia_vencimento_mensal ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : null; setEditForm(f => ({ ...f, vencimento: v, dia_vencimento_mensal: v ?? undefined })); }} />
                       ) : (
@@ -350,9 +412,9 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Qtd Processos Inclusos</Label>
+                      <Label className="text-xs text-slate-400">Qtd Processos Inclusos</Label>
                       {editing ? (
-                        <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
+                        <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
                       ) : (
                         <p className="font-medium">{formatValueOrZero((cliente as any).qtd_processos)}</p>
                       )}
@@ -361,7 +423,7 @@ export default function ClienteDetalhe() {
                 ) : (
                   <>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Valor Base</Label>
+                      <Label className="text-xs text-slate-400">Valor Base</Label>
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
@@ -369,15 +431,15 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Desconto Progressivo (%)</Label>
+                      <Label className="text-xs text-slate-400">Desconto Progressivo (%)</Label>
                       {editing ? (
-                        <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
+                        <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
                       ) : (
                         <p className="font-medium">{formatValueOrZero((cliente as any).desconto_progressivo)}%</p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Valor Limite de Desconto</Label>
+                      <Label className="text-xs text-slate-400">Valor Limite de Desconto</Label>
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
@@ -385,9 +447,9 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Dia de Cobrança (D+X)</Label>
+                      <Label className="text-xs text-slate-400">Dia de Cobrança (D+X)</Label>
                       {editing ? (
-                        <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
+                        <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="4" />
                       ) : (
                         <p className="font-medium">D+{(cliente as any).dia_cobranca ?? 0}</p>
                       )}
@@ -401,7 +463,6 @@ export default function ClienteDetalhe() {
 
         {/* ── Processos ── */}
         <TabsContent value="processos">
-          {/* Aguardando Deferimento Banner */}
           {aguardandoDeferimento.length > 0 && (
             <div className="mb-4 rounded-lg border border-warning/40 bg-warning/5 p-4">
               <p className="text-xs font-semibold text-warning mb-2">⏳ Aguardando Deferimento para Cobrança ({aguardandoDeferimento.length})</p>
@@ -418,7 +479,6 @@ export default function ClienteDetalhe() {
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-2">A cobrança será gerada automaticamente ao mover para "Registro" ou "Finalizados" no Kanban.</p>
             </div>
           )}
 
@@ -607,6 +667,81 @@ export default function ClienteDetalhe() {
         </TabsContent>
       </Tabs>
 
+      {/* Edit Cadastro Sheet */}
+      <Sheet open={showEditCadastro} onOpenChange={setShowEditCadastro}>
+        <SheetContent className="sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Editar Cadastro</SheetTitle>
+          </SheetHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label className="text-slate-300">Nome da Contabilidade *</Label>
+              <Input value={editCadastroForm.nome || ''} onChange={e => setEditCadastroForm(f => ({ ...f, nome: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Apelido</Label>
+                <Input value={editCadastroForm.apelido || ''} onChange={e => setEditCadastroForm(f => ({ ...f, apelido: e.target.value }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Nome do Contador</Label>
+                <Input value={editCadastroForm.nome_contador || ''} onChange={e => setEditCadastroForm(f => ({ ...f, nome_contador: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-slate-300">CNPJ</Label>
+                <Input
+                  value={editCadastroForm.cnpj || ''}
+                  onChange={e => handleCnpjEditChange(e.target.value)}
+                  placeholder="00.000.000/0000-00"
+                  maxLength={18}
+                />
+                {editCadastroForm.cnpj && editCadastroForm.cnpj.replace(/\D/g, '').length > 0 && !isValidCNPJ(editCadastroForm.cnpj) && (
+                  <p className="text-[10px] text-destructive">CNPJ deve conter 14 dígitos</p>
+                )}
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Código do Cliente</Label>
+                <Input
+                  value={maskCodigo(editCadastroForm.codigo_identificador || '')}
+                  onChange={e => setEditCadastroForm(f => ({ ...f, codigo_identificador: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                  placeholder="000.000 (auto)"
+                  maxLength={7}
+                />
+                <p className="text-[10px] text-muted-foreground">Extraído automaticamente do CNPJ</p>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label className="text-slate-300">Tipo</Label>
+              <Select value={editCadastroForm.tipo} onValueChange={(v) => setEditCadastroForm(f => ({ ...f, tipo: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MENSALISTA">Mensalista</SelectItem>
+                  <SelectItem value="AVULSO_4D">Avulso</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Email</Label>
+                <Input value={editCadastroForm.email || ''} onChange={e => setEditCadastroForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Telefone</Label>
+                <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setShowEditCadastro(false)}>Cancelar</Button>
+              <Button onClick={handleSaveCadastro} disabled={updateCliente.isPending}>
+                {updateCliente.isPending ? 'Salvando...' : 'Salvar Cadastro'}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <ContractPreviewModal
         open={!!previewUrl}
         onOpenChange={(o) => { if (!o) { setPreviewUrl(null); setPreviewFileName(''); } }}
@@ -659,7 +794,6 @@ export default function ClienteDetalhe() {
               <Label>Responsável</Label>
               <Input value={processoForm.responsavel} onChange={e => setProcessoForm(f => ({ ...f, responsavel: e.target.value }))} placeholder="Opcional" />
             </div>
-            {/* Manual value toggle */}
             <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
               <div>
                 <Label className="text-sm font-medium">Definir Valor Manualmente</Label>
@@ -828,23 +962,22 @@ export default function ClienteDetalhe() {
                     disabled={selectedCobrancaProcessos.size === 0}
                     onClick={() => {
                       const selected = pendentes.filter(l => selectedCobrancaProcessos.has(l.id));
-                      const total = selected.reduce((s, l) => s + Number(l.valor || 0), 0);
+                      const totalCobranca = selected.reduce((s, l) => s + Number(l.valor), 0);
                       const lines = [
                         `COBRANÇA - ${cliente.nome}`,
                         `Data: ${new Date().toLocaleDateString('pt-BR')}`,
                         `Código: ${cliente.codigo_identificador}`,
-                        cliente.email ? `E-mail: ${cliente.email}` : '',
                         '',
                         'ITENS:',
-                        ...selected.map((l, i) => `${i + 1}. ${l.descricao} | Vencimento: ${l.data_vencimento ? new Date(l.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'} | ${Number(l.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`),
+                        ...selected.map((l, i) => `${i + 1}. ${l.descricao} | Venc: ${l.data_vencimento ? new Date(l.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'} | ${Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`),
                         '',
-                        `TOTAL: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
-                      ].filter(Boolean);
+                        `TOTAL: ${totalCobranca.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+                      ];
                       const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
                       const url = URL.createObjectURL(blob);
                       const a = document.createElement('a'); a.href = url; a.download = `cobranca_${cliente.codigo_identificador}_${Date.now()}.txt`; a.click();
                       URL.revokeObjectURL(url);
-                      toast.success(`Cobrança gerada: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+                      toast.success(`Cobrança gerada: ${totalCobranca.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
                       setShowCobrancaDialog(false);
                     }}
                   >
