@@ -505,9 +505,10 @@ export default function CadastroRapido() {
                             tipo: v,
                             definir_manual: true,
                             valor_manual: String(neg.fixed_price),
+                            descricao_avulso: '',
                           }));
                         } else {
-                          setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso, definir_manual: false, valor_manual: '' }));
+                          setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso, definir_manual: v === 'avulso', valor_manual: v === 'avulso' ? f.valor_manual : '', descricao_avulso: v === 'avulso' ? f.descricao_avulso : '' }));
                         }
                       }}
                     >
@@ -542,30 +543,72 @@ export default function CadastroRapido() {
                   </div>
                 </div>
 
+                {/* Conditional: Avulso description */}
+                {isProcessoAvulso && (
+                  <div className="grid gap-2">
+                    <Label>Descrição do Serviço Avulso *</Label>
+                    <Input
+                      required
+                      placeholder="Ex: Inscrição Municipal, Certidão Negativa..."
+                      value={processoForm.descricao_avulso}
+                      onChange={e => setProcessoForm(f => ({ ...f, descricao_avulso: e.target.value }))}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Este nome será exibido no Kanban em vez de &quot;Avulso&quot;.</p>
+                  </div>
+                )}
+
                 <div className="grid gap-2">
                   <Label>Responsável (opcional)</Label>
                   <Input value={processoForm.responsavel} onChange={(e) => setProcessoForm(f => ({ ...f, responsavel: e.target.value }))} placeholder="Nome do responsável" />
                 </div>
 
-                {/* Manual value toggle */}
-                <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+                {/* Manual value toggle — always enabled for avulso */}
+                {!isProcessoAvulso && (
+                  <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+                    <div>
+                      <Label className="text-sm font-medium">Definir Valor Manualmente</Label>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {processoForm.definir_manual ? 'Valor digitado abaixo será usado.' : 'Sistema calcula pela Metodologia de Cobrança.'}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={processoForm.definir_manual}
+                      onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, definir_manual: checked }))}
+                    />
+                  </div>
+                )}
+                {(processoForm.definir_manual || isProcessoAvulso) && (
+                  <div className="grid gap-2">
+                    <Label>{isProcessoAvulso ? 'Valor do Serviço (R$) *' : 'Valor Manual (R$)'}</Label>
+                    <Input type="number" step="0.01" value={processoForm.valor_manual} onChange={e => setProcessoForm(f => ({ ...f, valor_manual: e.target.value }))} placeholder="0,00" />
+                    {isProcessoAvulso && <p className="text-[10px] text-muted-foreground">O valor digitado é final — sem desconto progressivo.</p>}
+                  </div>
+                )}
+
+                {/* Já pago switch */}
+                <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/5 p-3">
                   <div>
-                    <Label className="text-sm font-medium">Definir Valor Manualmente</Label>
+                    <Label className="text-sm font-medium">Este serviço já foi pago/liquidado?</Label>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {processoForm.definir_manual ? 'Valor digitado abaixo será usado.' : 'Sistema calcula pela Metodologia de Cobrança.'}
+                      {processoForm.ja_pago ? 'O processo entrará direto como Honorário Pago.' : 'Seguirá o fluxo normal de cobrança.'}
                     </p>
                   </div>
                   <Switch
-                    checked={processoForm.definir_manual}
-                    onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, definir_manual: checked }))}
+                    checked={processoForm.ja_pago}
+                    onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, ja_pago: checked }))}
                   />
                 </div>
-                {processoForm.definir_manual && (
-                  <div className="grid gap-2">
-                    <Label>Valor Manual (R$)</Label>
-                    <Input type="number" step="0.01" value={processoForm.valor_manual} onChange={e => setProcessoForm(f => ({ ...f, valor_manual: e.target.value }))} placeholder="0,00" />
-                  </div>
-                )}
+
+                {/* Observações */}
+                <div className="grid gap-2">
+                  <Label>Observações</Label>
+                  <textarea
+                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+                    placeholder="Protocolo, detalhes da Receita Federal, etc."
+                    value={processoForm.observacoes}
+                    onChange={e => setProcessoForm(f => ({ ...f, observacoes: e.target.value }))}
+                  />
+                </div>
 
                 {selectedCliente && (
                   <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
