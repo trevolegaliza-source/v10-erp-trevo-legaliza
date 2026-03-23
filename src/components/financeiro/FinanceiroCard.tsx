@@ -10,7 +10,7 @@ import {
   ChevronLeft, ChevronRight, Eye, Info,
 } from 'lucide-react';
 import type { EtapaFinanceiro } from '@/types/financial';
-import { ETAPA_FINANCEIRO_ORDER, ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
+import { ETAPA_FINANCEIRO_ORDER, ETAPA_FINANCEIRO_LABELS, TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
