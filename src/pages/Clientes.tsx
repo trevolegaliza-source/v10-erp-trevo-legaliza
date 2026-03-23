@@ -103,6 +103,8 @@ export default function Clientes() {
 
   const [contracts, setContracts] = useState<{ name: string; id: string }[]>([]);
   const [uploadingContract, setUploadingContract] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFileName, setPreviewFileName] = useState('');
 
   const openEdit = (client: ClienteDB) => {
     setEditClient(client);
