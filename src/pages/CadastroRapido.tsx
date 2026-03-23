@@ -305,10 +305,12 @@ export default function CadastroRapido() {
         notas,
         ja_pago: processoForm.ja_pago,
         descricao_avulso: isProcessoAvulso ? processoForm.descricao_avulso.trim() : undefined,
+        desconto_boas_vindas: processoForm.desconto_boas_vindas ? Number(processoForm.desconto_boas_vindas_percent) : undefined,
+        mudanca_uf: processoForm.mudanca_uf,
       },
       {
         onSuccess: () =>
-          setProcessoForm({ cliente_id: '', razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, descricao_avulso: '', ja_pago: false, observacoes: '' }),
+          setProcessoForm({ cliente_id: '', razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, descricao_avulso: '', ja_pago: false, observacoes: '', desconto_boas_vindas: false, desconto_boas_vindas_percent: '10', mudanca_uf: false }),
       },
     );
   };
