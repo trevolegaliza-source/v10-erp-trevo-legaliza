@@ -426,6 +426,50 @@ export type Database = {
           },
         ]
       }
+      service_negotiations: {
+        Row: {
+          billing_trigger: string
+          cliente_id: string
+          created_at: string | null
+          fixed_price: number
+          id: string
+          is_custom: boolean
+          service_name: string
+          trigger_days: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          billing_trigger?: string
+          cliente_id: string
+          created_at?: string | null
+          fixed_price?: number
+          id?: string
+          is_custom?: boolean
+          service_name: string
+          trigger_days?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          billing_trigger?: string
+          cliente_id?: string
+          created_at?: string | null
+          fixed_price?: number
+          id?: string
+          is_custom?: boolean
+          service_name?: string
+          trigger_days?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_negotiations_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       valores_adicionais: {
         Row: {
           anexo_url: string | null
