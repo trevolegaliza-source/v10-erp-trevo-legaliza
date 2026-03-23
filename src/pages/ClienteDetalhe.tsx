@@ -131,15 +131,17 @@ export default function ClienteDetalhe() {
     });
   };
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!cliente || !e.target.files?.[0]) return;
-    const file = e.target.files[0];
-    if (file.size > 10 * 1024 * 1024) { toast.error('Máx. 10MB'); return; }
+  const handleUpload = async (file: File) => {
+    if (!cliente) return;
+    const allowed = ['application/pdf', 'image/png', 'image/jpeg'];
+    if (!allowed.includes(file.type)) { toast.error('Formato inválido. Aceitos: PDF, PNG, JPG'); throw new Error('invalid'); }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo: 10MB'); throw new Error('too large'); }
     setUploadingContract(true);
     const path = `${cliente.id}/${Date.now()}_${file.name}`;
     const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(path, file);
-    if (error) toast.error('Erro: ' + error.message);
-    else { toast.success('Contrato anexado!'); loadContracts(cliente.id); }
+    if (error) { toast.error('Erro no upload: ' + error.message); setUploadingContract(false); throw error; }
+    toast.success('Contrato anexado!');
+    loadContracts(cliente.id);
     setUploadingContract(false);
   };
 
