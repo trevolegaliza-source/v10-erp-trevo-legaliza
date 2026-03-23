@@ -46,6 +46,8 @@ export default function ClienteDetalhe() {
   const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
   const [showEditCadastro, setShowEditCadastro] = useState(false);
   const [editCadastroForm, setEditCadastroForm] = useState<Record<string, any>>({});
+  const [editHonorariosRows, setEditHonorariosRows] = useState<InlineNegotiationRow[]>([]);
+  const upsertNegotiations = useUpsertServiceNegotiations();
   const updateCliente = useUpdateCliente();
   const createProcesso = useCreateProcesso();
   const { data: negotiations } = useServiceNegotiations(id);
