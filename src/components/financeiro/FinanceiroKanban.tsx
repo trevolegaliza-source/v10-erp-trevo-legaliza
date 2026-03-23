@@ -121,10 +121,10 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
       <div className="w-full overflow-x-auto pb-4 scrollbar-thin">
         <div className="flex min-w-max gap-3">
           {columns.map((col) => (
-            <div key={col.etapa} className="flex-1 min-w-[300px]">
-              <div className={cn('rounded-t-lg border-t-4 bg-card p-3 mb-2', col.color)}>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
+            <div key={col.etapa} className="flex-1 min-w-[300px] flex flex-col" style={{ minHeight: '80vh' }}>
+              <div className={cn('rounded-t-lg border-t-4 bg-card p-3 mb-2 h-16 flex items-center', col.color)}>
+                <div className="flex items-center justify-between w-full">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 text-foreground">
                     {col.etapa === 'honorario_vencido' && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
                     {col.label}
                   </h3>
@@ -133,8 +133,8 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
                   </span>
                 </div>
               </div>
-              <ScrollArea className="h-[calc(100vh-320px)]">
-                <div className="space-y-2 pr-2">
+              <div className="flex-1 overflow-y-auto pr-1">
+                <div className="space-y-2 pb-8">
                   {col.items.map((p) => (
                     <FinanceiroCard
                       key={p.id}
@@ -147,7 +147,7 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
                     <p className="text-xs text-muted-foreground text-center py-8">Nenhum item</p>
                   )}
                 </div>
-              </ScrollArea>
+              </div>
             </div>
           ))}
         </div>
