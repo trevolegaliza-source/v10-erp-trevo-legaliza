@@ -439,6 +439,20 @@ export default function ClienteDetalhe() {
                   <Label className="text-xs text-slate-400">Tipo de Cliente</Label>
                   <p className="font-medium">{isMensalista ? 'Mensalista' : 'Avulso'}</p>
                 </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs text-slate-400">Momento do Faturamento</Label>
+                  {editing ? (
+                    <Select value={(editForm as any).momento_faturamento || 'na_solicitacao'} onValueChange={(v) => setEditForm(f => ({ ...f, momento_faturamento: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>
+                        <SelectItem value="no_deferimento">No Deferimento</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="font-medium">{isDeferimento ? 'No Deferimento' : 'Na Solicitação'}</p>
+                  )}
+                </div>
                 {isMensalista ? (
                   <>
                     <div className="grid gap-1.5">
