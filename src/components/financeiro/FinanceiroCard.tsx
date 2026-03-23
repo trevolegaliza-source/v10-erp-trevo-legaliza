@@ -243,7 +243,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 checked={!!lanc?.cobranca_encaminhada}
                 onCheckedChange={(c) => handleCheckbox('cobranca_encaminhada', !!c)}
               />
-              <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
+              <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-zinc-400 cursor-pointer">
                 Cobrança encaminhada ao cliente
               </label>
             </div>
@@ -253,7 +253,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 checked={!!lanc?.confirmado_recebimento}
                 onCheckedChange={(c) => handleCheckbox('confirmado_recebimento', !!c)}
               />
-              <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
+              <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-zinc-400 cursor-pointer">
                 Confirmado recebimento
               </label>
             </div>
