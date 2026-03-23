@@ -119,6 +119,9 @@ export default function CadastroRapido() {
     descricao_avulso: '',
     ja_pago: false,
     observacoes: '',
+    desconto_boas_vindas: false,
+    desconto_boas_vindas_percent: '10',
+    mudanca_uf: false,
   });
   const createProcesso = useCreateProcesso();
   const { data: clientes } = useClientes();
@@ -126,6 +129,22 @@ export default function CadastroRapido() {
   const { data: negotiations } = useServiceNegotiations(processoForm.cliente_id || undefined);
 
   const selectedCliente = (clientes || []).find(c => c.id === processoForm.cliente_id);
+
+  // Check if selected client has zero processes (first-time client)
+  const [isFirstProcess, setIsFirstProcess] = useState(false);
+  useEffect(() => {
+    if (!processoForm.cliente_id) { setIsFirstProcess(false); return; }
+    supabase
+      .from('processos')
+      .select('id', { count: 'exact', head: true })
+      .eq('cliente_id', processoForm.cliente_id)
+      .then(({ count }) => {
+        setIsFirstProcess((count ?? 0) === 0);
+        if ((count ?? 0) > 0) {
+          setProcessoForm(f => ({ ...f, desconto_boas_vindas: false }));
+        }
+      });
+  }, [processoForm.cliente_id]);
 
 
 
