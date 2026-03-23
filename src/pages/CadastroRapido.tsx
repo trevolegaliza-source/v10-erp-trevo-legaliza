@@ -57,6 +57,7 @@ export default function CadastroRapido() {
   const createProcesso = useCreateProcesso();
   const { data: clientes } = useClientes();
   const [clienteComboOpen, setClienteComboOpen] = useState(false);
+  const { data: negotiations } = useServiceNegotiations(processoForm.cliente_id || undefined);
 
   const selectedCliente = (clientes || []).find(c => c.id === processoForm.cliente_id);
 
