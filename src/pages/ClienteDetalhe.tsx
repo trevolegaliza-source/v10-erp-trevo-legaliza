@@ -63,13 +63,15 @@ export default function ClienteDetalhe() {
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
     razao_social: '',
-    tipo: 'abertura' as TipoProcesso,
+    tipo: 'abertura' as string,
     prioridade: 'normal',
     responsavel: '',
     valor_manual: '',
     definir_manual: false,
+    negotiated_service_id: '' as string,
   });
   const isManualPrice = processoForm.definir_manual;
+  const isNegotiatedService = !!processoForm.negotiated_service_id;
   const isArchived = !!(cliente as any)?.is_archived;
 
   const handleCreateProcesso = () => {
