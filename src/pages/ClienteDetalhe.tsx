@@ -79,19 +79,25 @@ export default function ClienteDetalhe() {
       toast.error('Preencha a Razão Social');
       return;
     }
+    // Determine valor: negotiated service uses fixed_price, otherwise normal flow
+    const negotiatedService = negotiations?.find(n => n.id === processoForm.negotiated_service_id);
+    const valorManualFinal = negotiatedService
+      ? negotiatedService.fixed_price
+      : (isManualPrice && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined);
+
     createProcesso.mutate(
       {
         cliente_id: cliente.id,
         razao_social: processoForm.razao_social.trim(),
-        tipo: processoForm.tipo,
+        tipo: (isNegotiatedService ? 'avulso' : processoForm.tipo) as TipoProcesso,
         prioridade: processoForm.prioridade,
         responsavel: processoForm.responsavel || undefined,
-        valor_manual: isManualPrice && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined,
+        valor_manual: valorManualFinal,
       },
       {
         onSuccess: () => {
           setShowNovoProcesso(false);
-          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false });
+          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, negotiated_service_id: '' });
           loadAll(cliente.id);
         },
       }
