@@ -464,6 +464,18 @@ export default function ClienteDetalhe() {
           </Card>
         </TabsContent>
 
+        {/* ── Honorários Específicos ── */}
+        <TabsContent value="honorarios">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Tabela de Honorários Específicos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HonorariosRepeater clienteId={cliente.id} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* ── Processos ── */}
         <TabsContent value="processos">
           {aguardandoDeferimento.length > 0 && (
