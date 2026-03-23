@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { KANBAN_STAGES, PROCESS_TYPE_LABELS, type KanbanStage } from '@/types/process';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, GripVertical, LayoutGrid, List, MoreHorizontal, Receipt, EyeOff, Trash2 } from 'lucide-react';
+import { Plus, Filter, GripVertical, LayoutGrid, List, MoreHorizontal, Receipt, EyeOff, Trash2, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -11,6 +11,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useProcessosDB, useUpdateProcessoEtapa, useDeleteProcesso, type ProcessoDB } from '@/hooks/useProcessos';
 import { gerarFaturamentoDeferimento } from '@/hooks/useFinanceiro';
 import { useProcessosFinanceiro, type ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
@@ -25,10 +26,12 @@ type ViewMode = 'kanban' | 'list';
 function QuickActionsMenu({
   process,
   onDelete,
+  onEdit,
   onHonorarioExtra,
 }: {
   process: ProcessoDB;
   onDelete: (id: string) => void;
+  onEdit: (process: ProcessoDB) => void;
   onHonorarioExtra: (process: ProcessoDB) => void;
 }) {
   return (
@@ -39,6 +42,9 @@ function QuickActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onClick={() => onEdit(process)}>
+          <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onHonorarioExtra(process)}>
           <Receipt className="h-3.5 w-3.5 mr-2" /> Honorário Extra
         </DropdownMenuItem>
@@ -59,16 +65,17 @@ function ProcessCard({
   index,
   onDelete,
   onDoubleClick,
+  onEdit,
   onHonorarioExtra,
 }: {
   process: ProcessoDB;
   index: number;
   onDelete: (id: string) => void;
   onDoubleClick: (process: ProcessoDB) => void;
+  onEdit: (process: ProcessoDB) => void;
   onHonorarioExtra: (process: ProcessoDB) => void;
 }) {
-  const clientName = process.cliente?.nome || 'Cliente';
-  // Extract avulso custom description from notas
+  const clientName = process.cliente?.apelido || process.cliente?.nome || 'Cliente';
   const avulsoMatch = process.notas?.match(/\[AVULSO:(.+?)\]/);
   const typeLabel = avulsoMatch ? avulsoMatch[1] : (PROCESS_TYPE_LABELS[process.tipo] || process.tipo);
 
@@ -81,24 +88,22 @@ function ProcessCard({
           {...provided.dragHandleProps}
           onDoubleClick={() => onDoubleClick(process)}
           className={cn(
-            'group rounded-lg border border-border/50 bg-card p-3 shadow-sm card-hover cursor-pointer',
+            'group rounded-lg border border-border bg-zinc-900 p-3 shadow-sm cursor-pointer transition-all hover:border-primary/40 hover:shadow-[0_0_12px_-3px_hsl(var(--primary)/0.25)]',
             snapshot.isDragging && 'shadow-lg ring-2 ring-primary/30'
           )}
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold truncate leading-tight">{process.razao_social}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{clientName}</p>
+              <p className="text-[13px] font-bold truncate leading-tight text-white">{clientName}</p>
+              <p className="text-[11px] text-zinc-400 mt-0.5 truncate">{process.razao_social}</p>
+              <p className="text-[12px] font-semibold text-primary mt-0.5 truncate">{typeLabel}</p>
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
-              <QuickActionsMenu process={process} onDelete={onDelete} onHonorarioExtra={onHonorarioExtra} />
+              <QuickActionsMenu process={process} onDelete={onDelete} onEdit={onEdit} onHonorarioExtra={onHonorarioExtra} />
               <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           </div>
           <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
-            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-[18px] border-primary/30 text-primary font-medium">
-              {typeLabel}
-            </Badge>
             {process.prioridade === 'urgente' && (
               <Badge className="text-[9px] px-1.5 py-0 h-[18px] bg-destructive/10 text-destructive border-0 font-medium">
                 Urgente
@@ -110,15 +115,14 @@ function ProcessCard({
               <div className="h-5 w-5 rounded-full bg-primary/15 flex items-center justify-center">
                 <span className="text-[9px] font-semibold text-primary">{process.responsavel[0]}</span>
               </div>
-              <span className="text-[11px] text-muted-foreground">{process.responsavel}</span>
+              <span className="text-[11px] text-zinc-400">{process.responsavel}</span>
             </div>
           )}
           {process.valor && (
-            <p className="text-[10px] text-muted-foreground mt-1.5">
+            <p className="text-sm font-semibold text-white mt-1.5">
               {Number(process.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </p>
           )}
-          {/* SLA Progress Bar */}
           {(() => {
             const daysSince = Math.floor((Date.now() - new Date(process.created_at).getTime()) / 86400000);
             const slaMax = process.prioridade === 'urgente' ? 5 : 10;
@@ -147,9 +151,18 @@ export default function Processos() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [valoresOpen, setValoresOpen] = useState(false);
 
-  const handleDelete = useCallback((id: string) => {
-    deleteProcesso.mutate(id);
-  }, [deleteProcesso]);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const handleDeleteRequest = useCallback((id: string) => {
+    setDeleteConfirmId(id);
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    if (deleteConfirmId) {
+      deleteProcesso.mutate(deleteConfirmId);
+      setDeleteConfirmId(null);
+    }
+  }, [deleteConfirmId, deleteProcesso]);
 
   const filtered = filterType === 'all'
     ? (processos || [])
@@ -266,7 +279,7 @@ export default function Processos() {
                         >
                           <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/30">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold">{stage.label}</span>
+                              <span className="text-xs font-semibold text-white uppercase tracking-wide">{stage.label}</span>
                               <span className={cn(
                                 'flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold',
                                 stageProcesses.length > 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
@@ -281,8 +294,9 @@ export default function Processos() {
                                 key={proc.id}
                                 process={proc}
                                 index={idx}
-                                onDelete={handleDelete}
+                                onDelete={handleDeleteRequest}
                                 onDoubleClick={openEditModal}
+                                onEdit={openEditModal}
                                 onHonorarioExtra={openHonorarioExtra}
                               />
                             ))}
@@ -305,25 +319,25 @@ export default function Processos() {
           <div className="rounded-xl border border-border/60 overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Razão Social</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Etapa</TableHead>
-                  <TableHead>Prioridade</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-center">Ações</TableHead>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-xs font-semibold text-zinc-300">Razão Social</TableHead>
+                  <TableHead className="text-xs font-semibold text-zinc-300">Cliente</TableHead>
+                  <TableHead className="text-xs font-semibold text-zinc-300">Tipo</TableHead>
+                  <TableHead className="text-xs font-semibold text-zinc-300">Etapa</TableHead>
+                  <TableHead className="text-xs font-semibold text-zinc-300">Prioridade</TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-zinc-300">Valor</TableHead>
+                  <TableHead className="text-center text-xs font-semibold text-zinc-300">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((proc) => (
                   <TableRow
                     key={proc.id}
-                    className="cursor-pointer hover:bg-muted/50"
+                    className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
                     onDoubleClick={() => openEditModal(proc)}
                   >
-                    <TableCell className="font-medium">{proc.razao_social}</TableCell>
-                    <TableCell className="text-sm">{proc.cliente?.nome || '-'}</TableCell>
+                    <TableCell className="font-medium text-zinc-100">{proc.razao_social}</TableCell>
+                    <TableCell className="text-sm text-zinc-100">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
                         {(() => {
@@ -332,19 +346,19 @@ export default function Processos() {
                         })()}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
+                    <TableCell className="text-sm text-zinc-100">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
                     <TableCell>
                       {proc.prioridade === 'urgente' ? (
                         <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Normal</span>
+                        <span className="text-xs text-zinc-400">Normal</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-sm font-medium">
+                    <TableCell className="text-right text-sm font-semibold text-zinc-100">
                       {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                     </TableCell>
                     <TableCell className="text-center">
-                      <QuickActionsMenu process={proc} onDelete={handleDelete} onHonorarioExtra={openHonorarioExtra} />
+                      <QuickActionsMenu process={proc} onDelete={handleDeleteRequest} onEdit={openEditModal} onHonorarioExtra={openHonorarioExtra} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -376,6 +390,23 @@ export default function Processos() {
         processoId={selectedFinanceiroProcess?.id || ''}
         clienteApelido={(selectedFinanceiroProcess?.cliente as any)?.apelido || (selectedFinanceiroProcess?.cliente as any)?.nome || '-'}
       />
+
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Processo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente excluir este processo? Esta ação é irreversível.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

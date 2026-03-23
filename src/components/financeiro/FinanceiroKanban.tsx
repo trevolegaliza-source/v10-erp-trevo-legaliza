@@ -120,13 +120,13 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
         <div className="flex min-w-max gap-3">
           {columns.map((col) => (
             <div key={col.etapa} className="flex-1 min-w-[300px] flex flex-col" style={{ minHeight: '80vh' }}>
-              <div className={cn('rounded-t-lg border-t-4 bg-card p-3 mb-2 h-16 flex items-center', col.color)}>
+              <div className={cn('rounded-t-lg border-t-4 bg-zinc-900 p-3 mb-2 h-16 flex items-center', col.color)}>
                 <div className="flex items-center justify-between w-full">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 text-foreground">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 text-white">
                     {col.etapa === 'honorario_vencido' && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
                     {col.label}
                   </h3>
-                  <span className="text-[10px] text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                  <span className="text-[10px] text-zinc-400 bg-muted rounded-full px-2 py-0.5">
                     {col.items.length}
                   </span>
                 </div>
