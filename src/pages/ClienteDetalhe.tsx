@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useUpsertServiceNegotiations } from '@/hooks/useServiceNegotiations';
 import HonorariosInlineRepeater, { type InlineNegotiationRow, emptyNegotiationRow } from '@/components/clientes/HonorariosInlineRepeater';
+import HonorariosRepeater from '@/components/clientes/HonorariosRepeater';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
