@@ -12,7 +12,9 @@ import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, T
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useUpsertServiceNegotiations } from '@/hooks/useServiceNegotiations';
+import HonorariosInlineRepeater, { type InlineNegotiationRow, emptyNegotiationRow } from '@/components/clientes/HonorariosInlineRepeater';
+import HonorariosRepeater from '@/components/clientes/HonorariosRepeater';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,7 +28,6 @@ import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
-import HonorariosRepeater from '@/components/clientes/HonorariosRepeater';
 import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
 
 export default function ClienteDetalhe() {
@@ -46,6 +47,8 @@ export default function ClienteDetalhe() {
   const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
   const [showEditCadastro, setShowEditCadastro] = useState(false);
   const [editCadastroForm, setEditCadastroForm] = useState<Record<string, any>>({});
+  const [editHonorariosRows, setEditHonorariosRows] = useState<InlineNegotiationRow[]>([]);
+  const upsertNegotiations = useUpsertServiceNegotiations();
   const updateCliente = useUpdateCliente();
   const createProcesso = useCreateProcesso();
   const { data: negotiations } = useServiceNegotiations(id);
@@ -155,6 +158,16 @@ export default function ClienteDetalhe() {
       telefone: cliente.telefone || '',
       tipo: cliente.tipo,
     });
+    // Load existing negotiations into inline rows
+    setEditHonorariosRows(
+      (negotiations || []).map(n => ({
+        key: n.id,
+        service_name: n.service_name,
+        fixed_price: String(n.fixed_price),
+        billing_trigger: n.billing_trigger as 'request' | 'approval',
+        trigger_days: String(n.trigger_days),
+      }))
+    );
     setShowEditCadastro(true);
   };
 
@@ -169,32 +182,53 @@ export default function ClienteDetalhe() {
     }));
   };
 
-  const handleSaveCadastro = () => {
+  const [savingCadastro, setSavingCadastro] = useState(false);
+  const handleSaveCadastro = async () => {
     if (!cliente) return;
     const cnpjDigits = (editCadastroForm.cnpj || '').replace(/\D/g, '');
     if (cnpjDigits.length > 0 && cnpjDigits.length !== 14) {
       toast.error('Erro ao validar CNPJ: deve conter 14 dígitos.');
       return;
     }
-    const payload: Record<string, any> = {
-      id: cliente.id,
-      nome: editCadastroForm.nome,
-      apelido: editCadastroForm.apelido,
-      nome_contador: editCadastroForm.nome_contador,
-      cnpj: cnpjDigits || null,
-      codigo_identificador: editCadastroForm.codigo_identificador?.replace(/\D/g, '') || cliente.codigo_identificador,
-      email: editCadastroForm.email || null,
-      telefone: editCadastroForm.telefone || null,
-      tipo: editCadastroForm.tipo,
-    };
-    updateCliente.mutate(payload as any, {
-      onSuccess: () => {
-        toast.success('Dados cadastrais atualizados com sucesso');
-        setShowEditCadastro(false);
-        loadAll(cliente.id);
-      },
-      onError: (err: any) => toast.error('Erro: ' + (err?.message || 'Desconhecido')),
-    });
+    setSavingCadastro(true);
+    try {
+      const payload: Record<string, any> = {
+        id: cliente.id,
+        nome: editCadastroForm.nome,
+        apelido: editCadastroForm.apelido,
+        nome_contador: editCadastroForm.nome_contador,
+        cnpj: cnpjDigits || null,
+        codigo_identificador: editCadastroForm.codigo_identificador?.replace(/\D/g, '') || cliente.codigo_identificador,
+        email: editCadastroForm.email || null,
+        telefone: editCadastroForm.telefone || null,
+        tipo: editCadastroForm.tipo,
+      };
+      await new Promise<void>((resolve, reject) => {
+        updateCliente.mutate(payload as any, {
+          onSuccess: () => resolve(),
+          onError: (err: any) => reject(err),
+        });
+      });
+      // Upsert honorários
+      const validRows = editHonorariosRows.filter(r => r.service_name.trim() && r.fixed_price);
+      await upsertNegotiations.mutateAsync({
+        clienteId: cliente.id,
+        negotiations: validRows.map(r => ({
+          service_name: r.service_name.trim(),
+          fixed_price: Number(r.fixed_price),
+          billing_trigger: r.billing_trigger,
+          trigger_days: Number(r.trigger_days) || 0,
+          is_custom: true as const,
+        })),
+      });
+      toast.success('Dados cadastrais e honorários atualizados!');
+      setShowEditCadastro(false);
+      loadAll(cliente.id);
+    } catch (err: any) {
+      toast.error('Erro: ' + (err?.message || 'Desconhecido'));
+    } finally {
+      setSavingCadastro(false);
+    }
   };
 
   const handleUpload = async (file: File) => {
@@ -481,6 +515,7 @@ export default function ClienteDetalhe() {
             </CardHeader>
             <CardContent>
               <HonorariosRepeater clienteId={cliente.id} />
+              {/* Using the standalone HonorariosRepeater for the tab */}
             </CardContent>
           </Card>
         </TabsContent>
@@ -691,28 +726,28 @@ export default function ClienteDetalhe() {
         </TabsContent>
       </Tabs>
 
-      {/* Edit Cadastro Sheet */}
-      <Sheet open={showEditCadastro} onOpenChange={setShowEditCadastro}>
-        <SheetContent className="sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Editar Cadastro</SheetTitle>
-          </SheetHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label className="text-slate-300">Nome da Contabilidade *</Label>
-              <Input value={editCadastroForm.nome || ''} onChange={e => setEditCadastroForm(f => ({ ...f, nome: e.target.value }))} />
-            </div>
+      {/* Edit Cadastro Dialog */}
+      <Dialog open={showEditCadastro} onOpenChange={setShowEditCadastro}>
+        <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Cadastro</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Nome da Contabilidade *</Label>
+                <Input value={editCadastroForm.nome || ''} onChange={e => setEditCadastroForm(f => ({ ...f, nome: e.target.value }))} />
+              </div>
               <div className="grid gap-2">
                 <Label className="text-slate-300">Apelido</Label>
                 <Input value={editCadastroForm.apelido || ''} onChange={e => setEditCadastroForm(f => ({ ...f, apelido: e.target.value }))} />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label className="text-slate-300">Nome do Contador</Label>
                 <Input value={editCadastroForm.nome_contador || ''} onChange={e => setEditCadastroForm(f => ({ ...f, nome_contador: e.target.value }))} />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label className="text-slate-300">CNPJ</Label>
                 <Input
@@ -725,6 +760,8 @@ export default function ClienteDetalhe() {
                   <p className="text-[10px] text-destructive">CNPJ deve conter 14 dígitos</p>
                 )}
               </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
                 <Label className="text-slate-300">Código do Cliente</Label>
                 <Input
@@ -733,7 +770,14 @@ export default function ClienteDetalhe() {
                   placeholder="000.000 (auto)"
                   maxLength={7}
                 />
-                <p className="text-[10px] text-muted-foreground">Extraído automaticamente do CNPJ</p>
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Email</Label>
+                <Input value={editCadastroForm.email || ''} onChange={e => setEditCadastroForm(f => ({ ...f, email: e.target.value }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Telefone</Label>
+                <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
               </div>
             </div>
             <div className="grid gap-2">
@@ -746,30 +790,24 @@ export default function ClienteDetalhe() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label className="text-slate-300">Email</Label>
-                <Input value={editCadastroForm.email || ''} onChange={e => setEditCadastroForm(f => ({ ...f, email: e.target.value }))} />
-              </div>
-              <div className="grid gap-2">
-                <Label className="text-slate-300">Telefone</Label>
-                <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
-              </div>
-            </div>
             {/* Honorários Específicos inline */}
-            <div className="pt-2 border-t border-border/40">
-              <HonorariosRepeater clienteId={cliente.id} />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={() => setShowEditCadastro(false)}>Cancelar</Button>
-              <Button onClick={handleSaveCadastro} disabled={updateCliente.isPending}>
-                {updateCliente.isPending ? 'Salvando...' : 'Salvar Cadastro'}
-              </Button>
+            <div className="pt-3 border-t border-border/40">
+              <HonorariosInlineRepeater rows={editHonorariosRows} onChange={setEditHonorariosRows} />
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditCadastro(false)}>Cancelar</Button>
+            <Button onClick={handleSaveCadastro} disabled={savingCadastro}>
+              {savingCadastro ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Salvando...
+                </span>
+              ) : 'Salvar Cadastro'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ContractPreviewModal
         open={!!previewUrl}
