@@ -239,7 +239,10 @@ export default function ClienteDetalhe() {
           </div>
           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1"><Building2 className="h-3.5 w-3.5" />{cliente.nome}</span>
-            {(cliente as any).cnpj && <span className="text-xs font-mono">CNPJ: {(cliente as any).cnpj}</span>}
+            {(cliente as any).cnpj && (() => {
+              const cnpjInfo = formatCNPJ((cliente as any).cnpj);
+              return <span className={`text-xs font-mono ${!cnpjInfo.valid ? 'text-destructive font-semibold' : 'text-slate-400'}`}>CNPJ: {cnpjInfo.formatted}</span>;
+            })()}
             {cliente.nome_contador && <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{cliente.nome_contador}</span>}
             <span className="text-xs">Código: {cliente.codigo_identificador}</span>
           </div>
