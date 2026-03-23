@@ -602,6 +602,13 @@ export default function ClienteDetalhe() {
         </TabsContent>
       </Tabs>
 
+      <ContractPreviewModal
+        open={!!previewUrl}
+        onOpenChange={(o) => { if (!o) { setPreviewUrl(null); setPreviewFileName(''); } }}
+        url={previewUrl}
+        fileName={previewFileName}
+      />
+
       <PasswordConfirmDialog
         open={showDeletePassword}
         onOpenChange={setShowDeletePassword}
