@@ -154,7 +154,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
         )}
         onDoubleClick={() => onDoubleClick?.(processo)}
       >
-        <CardContent className="p-3 space-y-2.5">
+        <CardContent className="p-3 pb-5 space-y-2.5">
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
