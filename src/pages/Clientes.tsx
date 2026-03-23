@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Users, Mail, Phone, Search, UserX, Upload, FileText, Download, Trash2, Archive, ArchiveRestore, ExternalLink, AlertTriangle, Eye } from 'lucide-react';
+import { Plus, Users, Search, UserX, FileText, Download, Trash2, Archive, ArchiveRestore, Eye, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -19,48 +19,7 @@ import { toast } from 'sonner';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
-
-function ContractButton({ clienteId, contrato_url }: { clienteId: string; contrato_url?: string | null }) {
-  const [hasContract, setHasContract] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(clienteId).then(({ data }) => {
-      setHasContract(!!(data && data.length > 0));
-    });
-  }, [clienteId]);
-
-  if (hasContract === null) return <span className="text-muted-foreground text-xs">...</span>;
-  if (!hasContract) {
-    return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex items-center justify-center">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p className="text-xs">Atenção: Contrato não anexado</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
-  }
-
-  const handleView = async () => {
-    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(clienteId);
-    if (!data || data.length === 0) return;
-    const fileName = data[0].name;
-    const { data: signed } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(`${clienteId}/${fileName}`, 3600);
-    if (signed?.signedUrl) window.open(signed.signedUrl, '_blank');
-  };
-
-  return (
-    <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-primary" onClick={handleView}>
-      <ExternalLink className="h-3 w-3" /> Ver Contrato
-    </Button>
-  );
-}
+import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 
 export default function Clientes() {
   const navigate = useNavigate();
@@ -79,13 +38,13 @@ export default function Clientes() {
   const archiveCliente = useArchiveCliente();
   const unarchiveCliente = useUnarchiveCliente();
 
-  // Count processes per client
   const processCount = (clienteId: string) =>
     (processos || []).filter(p => p.cliente_id === clienteId).length;
   const activeCount = (clienteId: string) =>
     (processos || []).filter(p => p.cliente_id === clienteId && p.etapa !== 'finalizados' && p.etapa !== 'arquivo').length;
+  const doneCount = (clienteId: string) =>
+    (processos || []).filter(p => p.cliente_id === clienteId && (p.etapa === 'finalizados' || p.etapa === 'arquivo')).length;
 
-  // Inactive = no processes in last 10 days
   const tenDaysAgo = new Date(Date.now() - 10 * 86400000).toISOString();
   const isInactive = (clienteId: string) => {
     const clientProcesses = (processos || []).filter(p => p.cliente_id === clienteId);
@@ -96,7 +55,7 @@ export default function Clientes() {
   const filtered = (clientes || []).filter(c => {
     const archived = !!(c as any).is_archived;
     if (showArchived) return archived;
-    if (archived) return false; // hide archived by default
+    if (archived) return false;
     if (showInactive) return isInactive(c.id);
     return true;
   });
@@ -105,6 +64,7 @@ export default function Clientes() {
   const [uploadingContract, setUploadingContract] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewFileName, setPreviewFileName] = useState('');
+  const [previewClienteName, setPreviewClienteName] = useState('');
 
   const openEdit = (client: ClienteDB) => {
     setEditClient(client);
@@ -123,9 +83,11 @@ export default function Clientes() {
     if (!allowed.includes(file.type)) { toast.error('Formato inválido. Aceitos: PDF, PNG, JPG'); throw new Error('invalid'); }
     if (file.size > 10 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo: 10MB'); throw new Error('too large'); }
     setUploadingContract(true);
-    const path = `${editClient.id}/${Date.now()}_${file.name}`;
+    const path = `${editClient.id}/contrato_${Date.now()}.${file.name.split('.').pop()}`;
     const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(path, file);
     if (error) { toast.error('Erro no upload: ' + error.message); setUploadingContract(false); throw error; }
+    // Update contrato_url
+    await supabase.from('clientes').update({ contrato_url: path, updated_at: new Date().toISOString() }).eq('id', editClient.id);
     toast.success('Contrato anexado!');
     loadContracts(editClient.id);
     setUploadingContract(false);
@@ -133,10 +95,14 @@ export default function Clientes() {
 
   const handlePreviewContract = async (fileName: string) => {
     if (!editClient) return;
-    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(`${editClient.id}/${fileName}`, 3600);
+    const storagePath = `${editClient.id}/${fileName}`;
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(storagePath, 3600);
     if (data?.signedUrl) {
       setPreviewUrl(data.signedUrl);
       setPreviewFileName(fileName);
+      setPreviewClienteName(editClient.nome);
+    } else {
+      toast.error('Erro: Arquivo antigo incompatível, por favor re-anexe');
     }
   };
 
@@ -161,8 +127,41 @@ export default function Clientes() {
 
   const handleSave = () => {
     if (!editClient) return;
-    updateCliente.mutate({ id: editClient.id, ...editForm } as any, {
-      onSuccess: () => setEditClient(null),
+    // Validate CNPJ if provided
+    const cnpjRaw = (editForm as any).cnpj;
+    if (cnpjRaw && cnpjRaw.replace(/\D/g, '').length > 0 && !isValidCNPJ(cnpjRaw)) {
+      toast.error('CNPJ inválido. Deve conter 14 dígitos.');
+      return;
+    }
+    const payload: Record<string, any> = {
+      id: editClient.id,
+      nome: editForm.nome,
+      apelido: editForm.apelido,
+      nome_contador: editForm.nome_contador,
+      codigo_identificador: editForm.codigo_identificador,
+      cnpj: cnpjRaw ? cnpjRaw.replace(/\D/g, '') : (editForm as any).cnpj,
+      email: editForm.email,
+      telefone: editForm.telefone,
+      tipo: editForm.tipo,
+      momento_faturamento: (editForm as any).momento_faturamento,
+    };
+    // Financial fields
+    if (editForm.tipo === 'MENSALISTA') {
+      payload.mensalidade = (editForm as any).mensalidade;
+      payload.vencimento = (editForm as any).vencimento;
+      payload.dia_vencimento_mensal = (editForm as any).dia_vencimento_mensal;
+      payload.qtd_processos = (editForm as any).qtd_processos;
+    } else {
+      payload.valor_base = (editForm as any).valor_base;
+      payload.desconto_progressivo = (editForm as any).desconto_progressivo;
+      payload.valor_limite_desconto = (editForm as any).valor_limite_desconto;
+      payload.dia_cobranca = (editForm as any).dia_cobranca;
+    }
+    updateCliente.mutate(payload as any, {
+      onSuccess: () => {
+        toast.success('Dados cadastrais atualizados com sucesso');
+        setEditClient(null);
+      },
     });
   };
 
@@ -198,6 +197,16 @@ export default function Clientes() {
   const totalClientes = activeClientes.length;
   const mensalistas = activeClientes.filter(c => c.tipo === 'MENSALISTA').length;
   const avulsos = activeClientes.filter(c => c.tipo === 'AVULSO_4D').length;
+
+  // Badge color for processes
+  const getProcessBadgeClass = (clienteId: string) => {
+    const total = processCount(clienteId);
+    const active = activeCount(clienteId);
+    const done = doneCount(clienteId);
+    if (total === 0) return 'bg-muted/40 text-muted-foreground border-0'; // Grey
+    if (active === 0 && done === total) return 'bg-primary/10 text-primary border-0'; // Green - all done
+    return 'bg-warning/10 text-warning border-0'; // Yellow - in progress
+  };
 
   return (
     <div className="space-y-6">
@@ -272,24 +281,24 @@ export default function Clientes() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8"></TableHead>
                   <TableHead>Nome / Apelido</TableHead>
                   <TableHead>CNPJ</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Valor Base / Mensalidade</TableHead>
                   <TableHead>Desconto</TableHead>
                   <TableHead className="text-center">Processos</TableHead>
-                  <TableHead className="text-center">Contrato</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((client) => {
                   const isMens = client.tipo === 'MENSALISTA';
-                  const valorExibir = isMens
-                    ? (client as any).mensalidade
-                    : (client as any).valor_base;
+                  const valorExibir = isMens ? (client as any).mensalidade : (client as any).valor_base;
                   const descontoExibir = (client as any).desconto_progressivo;
                   const limiteExibir = (client as any).valor_limite_desconto;
+                  const cnpjInfo = formatCNPJ((client as any).cnpj);
+                  const hasContract = !!(client as any).contrato_url;
 
                   return (
                     <TableRow
@@ -298,17 +307,35 @@ export default function Clientes() {
                       onClick={() => navigate(`/clientes/${client.id}`)}
                       onDoubleClick={() => openEdit(client)}
                     >
+                      {/* Compliance column */}
+                      <TableCell className="w-8 px-2">
+                        {!hasContract && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center justify-center">
+                                  <ShieldAlert className="h-4 w-4 text-destructive" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Atenção: Contrato não anexado</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <ContractButton clienteId={client.id} contrato_url={(client as any).contrato_url} />
-                          <div>
-                            <p className="font-medium">{client.nome}</p>
-                            {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
-                            {client.nome_contador && <p className="text-[10px] text-muted-foreground">Contador: {client.nome_contador}</p>}
-                          </div>
+                        <div>
+                          <p className="font-medium text-foreground">{client.nome}</p>
+                          {client.apelido && <p className="text-xs text-slate-400">{client.apelido}</p>}
+                          {client.nome_contador && <p className="text-[10px] text-slate-400">Contador: {client.nome_contador}</p>}
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs font-mono">{(client as any).cnpj || '—'}</TableCell>
+                      <TableCell>
+                        <span className={`text-xs font-mono ${!cnpjInfo.valid ? 'text-destructive font-semibold' : 'text-slate-300'}`}>
+                          {cnpjInfo.formatted}
+                        </span>
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={isMens ? 'border-primary/30 text-primary' : 'border-warning/30 text-warning'}>
                           {isMens ? 'Mensalista' : 'Avulso'}
@@ -321,7 +348,7 @@ export default function Clientes() {
                             : '—'}
                         </span>
                         {isMens && (client as any).qtd_processos != null && (
-                          <p className="text-[10px] text-muted-foreground">{(client as any).qtd_processos} proc. inclusos</p>
+                          <p className="text-[10px] text-slate-400">{(client as any).qtd_processos} proc. inclusos</p>
                         )}
                       </TableCell>
                       <TableCell>
@@ -329,24 +356,25 @@ export default function Clientes() {
                           <div>
                             <span className="text-sm font-medium">{descontoExibir}%</span>
                             {limiteExibir != null && (
-                              <p className="text-[10px] text-muted-foreground">
+                              <p className="text-[10px] text-slate-400">
                                 Mín. {Number(limiteExibir).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                               </p>
                             )}
                           </div>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-slate-500">—</span>
                         )}
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge className="bg-primary/10 text-primary border-0">{activeCount(client.id)}/{processCount(client.id)}</Badge>
+                        <Badge className={getProcessBadgeClass(client.id)}>
+                          {activeCount(client.id)}/{processCount(client.id)}
+                        </Badge>
                       </TableCell>
-                      {/* Contract column removed — alert now shows in name column */}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
                           {(client as any).is_archived ? (
                             <Button variant="ghost" size="icon" className="h-7 w-7" title="Desarquivar" onClick={() => handleUnarchive(client.id)}>
-                              <ArchiveRestore className="h-3.5 w-3.5" />
+                              <Archive className="h-3.5 w-3.5" />
                             </Button>
                           ) : (
                             <Button variant="ghost" size="icon" className="h-7 w-7" title="Arquivar" onClick={() => handleArchive(client.id)}>
@@ -368,33 +396,54 @@ export default function Clientes() {
               </TableBody>
             </Table>
           )}
-          <p className="text-[11px] text-muted-foreground mt-3">💡 Dê um duplo-clique para editar um cliente</p>
+          <p className="text-[11px] text-slate-400 mt-3">💡 Dê um duplo-clique para editar um cliente</p>
         </CardContent>
       </Card>
 
       {/* Edit Modal */}
       <Dialog open={!!editClient} onOpenChange={(o) => !o && setEditClient(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Cliente</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label>Nome *</Label>
+              <Label className="text-slate-300">Nome da Contabilidade *</Label>
               <Input value={editForm.nome || ''} onChange={e => setEditForm(f => ({ ...f, nome: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Nome do Contador</Label>
+                <Label className="text-slate-300">Nome do Contador</Label>
                 <Input value={editForm.nome_contador || ''} onChange={e => setEditForm(f => ({ ...f, nome_contador: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Apelido</Label>
+                <Label className="text-slate-300">Apelido</Label>
                 <Input value={editForm.apelido || ''} onChange={e => setEditForm(f => ({ ...f, apelido: e.target.value }))} />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-slate-300">CNPJ</Label>
+                <Input
+                  value={maskCNPJ((editForm as any).cnpj || '')}
+                  onChange={e => setEditForm(f => ({ ...f, cnpj: e.target.value }))}
+                  placeholder="00.000.000/0000-00"
+                  maxLength={18}
+                />
+                {(editForm as any).cnpj && (editForm as any).cnpj.replace(/\D/g, '').length > 0 && !isValidCNPJ((editForm as any).cnpj) && (
+                  <p className="text-[10px] text-destructive">CNPJ deve conter 14 dígitos</p>
+                )}
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Código do Cliente</Label>
+                <Input
+                  value={editForm.codigo_identificador || ''}
+                  onChange={e => setEditForm(f => ({ ...f, codigo_identificador: e.target.value }))}
+                />
+              </div>
+            </div>
             <div className="grid gap-2">
-              <Label>Tipo</Label>
+              <Label className="text-slate-300">Tipo</Label>
               <Select value={editForm.tipo} onValueChange={(v) => setEditForm(f => ({ ...f, tipo: v as TipoCliente }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -405,29 +454,29 @@ export default function Clientes() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Email</Label>
+                <Label className="text-slate-300">Email</Label>
                 <Input value={editForm.email || ''} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label>Telefone</Label>
+                <Label className="text-slate-300">Telefone</Label>
                 <Input value={editForm.telefone || ''} onChange={e => setEditForm(f => ({ ...f, telefone: e.target.value }))} />
               </div>
             </div>
-            {/* Financial params in edit modal */}
+            {/* Financial params */}
             {editForm.tipo === 'MENSALISTA' ? (
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
                 <p className="text-xs font-medium text-primary">Configuração Mensalista</p>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="grid gap-1">
-                    <Label className="text-xs">Mensalidade (R$)</Label>
+                    <Label className="text-xs text-slate-400">Mensalidade (R$)</Label>
                     <Input type="number" step="0.01" value={(editForm as any).mensalidade ?? ''} onChange={e => setEditForm(f => ({ ...f, mensalidade: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                   <div className="grid gap-1">
-                    <Label className="text-xs">Dia Vencimento</Label>
+                    <Label className="text-xs text-slate-400">Dia Vencimento</Label>
                     <Input type="number" min={1} max={31} value={(editForm as any).vencimento ?? editForm.dia_vencimento_mensal ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : null; setEditForm(f => ({ ...f, vencimento: v, dia_vencimento_mensal: v ?? undefined })); }} />
                   </div>
                   <div className="grid gap-1">
-                    <Label className="text-xs">Processos Inclusos</Label>
+                    <Label className="text-xs text-slate-400">Processos Inclusos</Label>
                     <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                 </div>
@@ -437,19 +486,19 @@ export default function Clientes() {
                 <p className="text-xs font-medium text-warning">Configuração Avulso</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-1">
-                    <Label className="text-xs">Valor Base (R$)</Label>
+                    <Label className="text-xs text-slate-400">Valor Base (R$)</Label>
                     <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                   <div className="grid gap-1">
-                    <Label className="text-xs">Desconto (%)</Label>
+                    <Label className="text-xs text-slate-400">Desconto (%)</Label>
                     <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                   <div className="grid gap-1">
-                    <Label className="text-xs">Limite Desconto (R$)</Label>
+                    <Label className="text-xs text-slate-400">Limite Desconto (R$)</Label>
                     <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                   <div className="grid gap-1">
-                    <Label className="text-xs">Dia Cobrança (D+X)</Label>
+                    <Label className="text-xs text-slate-400">Dia Cobrança (D+X)</Label>
                     <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                 </div>
@@ -457,14 +506,14 @@ export default function Clientes() {
             )}
             {/* Contratos */}
             <div className="grid gap-2 border-t border-border/40 pt-3">
-              <Label className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Contratos Anexados</Label>
+              <Label className="flex items-center gap-1.5 text-slate-300"><FileText className="h-3.5 w-3.5" /> Contratos Anexados</Label>
               {contracts.length > 0 ? (
                 <div className="space-y-1.5 max-h-32 overflow-y-auto">
                   {contracts.map((c) => (
                     <div key={c.name} className="flex items-center gap-2 text-sm bg-muted/30 rounded-md px-3 py-1.5">
-                      <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="flex-1 truncate">{c.name}</span>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePreviewContract(c.name)}>
+                      <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span className="flex-1 truncate text-slate-300">{c.name}</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePreviewContract(c.name)} title="Preview">
                         <Eye className="h-3 w-3" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDownloadContract(c.name)}>
@@ -477,7 +526,7 @@ export default function Clientes() {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">Nenhum contrato anexado</p>
+                <p className="text-xs text-slate-500">Nenhum contrato anexado</p>
               )}
               <ContractDropzone uploading={uploadingContract} onUpload={handleUploadContract} />
             </div>
@@ -488,7 +537,7 @@ export default function Clientes() {
                 {!(editClient as any)?.is_archived ? (
                   <Button variant="outline" size="sm" onClick={() => editClient && handleArchive(editClient.id)}><Archive className="h-3.5 w-3.5 mr-1" />Arquivar</Button>
                 ) : (
-                  <Button variant="outline" size="sm" onClick={() => editClient && handleUnarchive(editClient.id)}><ArchiveRestore className="h-3.5 w-3.5 mr-1" />Desarquivar</Button>
+                  <Button variant="outline" size="sm" onClick={() => editClient && handleUnarchive(editClient.id)}><Archive className="h-3.5 w-3.5 mr-1" />Desarquivar</Button>
                 )}
               </div>
               <div className="flex gap-2">
@@ -502,9 +551,10 @@ export default function Clientes() {
 
       <ContractPreviewModal
         open={!!previewUrl}
-        onOpenChange={(o) => { if (!o) { setPreviewUrl(null); setPreviewFileName(''); } }}
+        onOpenChange={(o) => { if (!o) { setPreviewUrl(null); setPreviewFileName(''); setPreviewClienteName(''); } }}
         url={previewUrl}
         fileName={previewFileName}
+        clienteName={previewClienteName}
       />
 
       <PasswordConfirmDialog

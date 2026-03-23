@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye } from 'lucide-react';
+import { formatCNPJ } from '@/lib/cnpj';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -156,11 +157,12 @@ export default function ClienteDetalhe() {
 
   const handleViewContract = async (fileName: string) => {
     if (!cliente) return;
-    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(`${cliente.id}/${fileName}`, 3600);
+    const storagePath = `${cliente.id}/${fileName}`;
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(storagePath, 3600);
     if (data?.signedUrl) {
       window.open(data.signedUrl, '_blank');
     } else {
-      toast.error('Erro ao gerar link de visualização');
+      toast.error('Erro: Arquivo antigo incompatível, por favor re-anexe');
     }
   };
 
@@ -238,17 +240,20 @@ export default function ClienteDetalhe() {
           </div>
           <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground flex-wrap">
             <span className="flex items-center gap-1"><Building2 className="h-3.5 w-3.5" />{cliente.nome}</span>
-            {(cliente as any).cnpj && <span className="text-xs font-mono">CNPJ: {(cliente as any).cnpj}</span>}
+            {(cliente as any).cnpj && (() => {
+              const cnpjInfo = formatCNPJ((cliente as any).cnpj);
+              return <span className={`text-xs font-mono ${!cnpjInfo.valid ? 'text-destructive font-semibold' : 'text-slate-400'}`}>CNPJ: {cnpjInfo.formatted}</span>;
+            })()}
             {cliente.nome_contador && <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{cliente.nome_contador}</span>}
             <span className="text-xs">Código: {cliente.codigo_identificador}</span>
           </div>
         </div>
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedRelatorioProcessos(new Set()); setShowRelatorioDialog(true); }}>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs text-foreground" onClick={() => { setSelectedRelatorioProcessos(new Set()); setShowRelatorioDialog(true); }}>
             <FileBarChart className="h-3.5 w-3.5" /> Gerar Relatório
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedCobrancaProcessos(new Set()); setShowCobrancaDialog(true); }}>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs text-foreground" onClick={() => { setSelectedCobrancaProcessos(new Set()); setShowCobrancaDialog(true); }}>
             <Receipt className="h-3.5 w-3.5" /> Gerar Cobrança
           </Button>
           {isArchived ? (
@@ -607,6 +612,7 @@ export default function ClienteDetalhe() {
         onOpenChange={(o) => { if (!o) { setPreviewUrl(null); setPreviewFileName(''); } }}
         url={previewUrl}
         fileName={previewFileName}
+        clienteName={cliente?.nome || ''}
       />
 
       <PasswordConfirmDialog
