@@ -612,6 +612,7 @@ export default function ClienteDetalhe() {
         onOpenChange={(o) => { if (!o) { setPreviewUrl(null); setPreviewFileName(''); } }}
         url={previewUrl}
         fileName={previewFileName}
+        clienteName={cliente?.nome || ''}
       />
 
       <PasswordConfirmDialog
