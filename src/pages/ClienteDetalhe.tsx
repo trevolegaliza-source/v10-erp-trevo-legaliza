@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,6 +22,8 @@ import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso 
 import { cn } from '@/lib/utils';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { STORAGE_BUCKETS } from '@/constants/storage';
+import ContractDropzone from '@/components/contratos/ContractDropzone';
+import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +36,8 @@ export default function ClienteDetalhe() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<ClienteDB>>({});
   const [uploadingContract, setUploadingContract] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFileName, setPreviewFileName] = useState('');
   const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
   const updateCliente = useUpdateCliente();
@@ -127,15 +131,17 @@ export default function ClienteDetalhe() {
     });
   };
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!cliente || !e.target.files?.[0]) return;
-    const file = e.target.files[0];
-    if (file.size > 10 * 1024 * 1024) { toast.error('Máx. 10MB'); return; }
+  const handleUpload = async (file: File) => {
+    if (!cliente) return;
+    const allowed = ['application/pdf', 'image/png', 'image/jpeg'];
+    if (!allowed.includes(file.type)) { toast.error('Formato inválido. Aceitos: PDF, PNG, JPG'); throw new Error('invalid'); }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo: 10MB'); throw new Error('too large'); }
     setUploadingContract(true);
     const path = `${cliente.id}/${Date.now()}_${file.name}`;
     const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(path, file);
-    if (error) toast.error('Erro: ' + error.message);
-    else { toast.success('Contrato anexado!'); loadContracts(cliente.id); }
+    if (error) { toast.error('Erro no upload: ' + error.message); setUploadingContract(false); throw error; }
+    toast.success('Contrato anexado!');
+    loadContracts(cliente.id);
     setUploadingContract(false);
   };
 
@@ -525,30 +531,35 @@ export default function ClienteDetalhe() {
             <CardContent className="space-y-3">
               {contracts.length > 0 ? (
                 <div className="space-y-2">
-                  {contracts.map(c => (
-                    <div key={c.name} className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-3 border border-border/40">
-                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="flex-1 text-sm truncate">{c.name}</span>
-                      <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => handleViewContract(c.name)}>
-                        <ExternalLink className="h-3 w-3" /> Ver
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => handleDownload(c.name)}>
-                        <Download className="h-3 w-3" /> Baixar
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 text-destructive" onClick={() => handleDeleteContract(c.name)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
+                  {contracts.map(c => {
+                    const handlePreview = async () => {
+                      const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(`${cliente.id}/${c.name}`, 3600);
+                      if (data?.signedUrl) { setPreviewUrl(data.signedUrl); setPreviewFileName(c.name); }
+                    };
+                    return (
+                      <div key={c.name} className="flex items-center gap-3 bg-muted/30 rounded-lg px-4 py-3 border border-border/40">
+                        <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="flex-1 text-sm truncate">{c.name}</span>
+                        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={handlePreview}>
+                          <Eye className="h-3 w-3" /> Visualizar
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => handleViewContract(c.name)}>
+                          <ExternalLink className="h-3 w-3" /> Nova aba
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => handleDownload(c.name)}>
+                          <Download className="h-3 w-3" /> Baixar
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 text-destructive" onClick={() => handleDeleteContract(c.name)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-center py-6 text-muted-foreground text-sm">Nenhum contrato anexado</p>
               )}
-              <label className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/20 px-4 py-5 text-sm text-muted-foreground cursor-pointer hover:bg-muted/40 transition-colors">
-                <Upload className="h-4 w-4" />
-                {uploadingContract ? 'Enviando...' : 'Clique para anexar contrato (PDF, DOC — máx. 10MB)'}
-                <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleUpload} disabled={uploadingContract} />
-              </label>
+              <ContractDropzone uploading={uploadingContract} onUpload={handleUpload} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -590,6 +601,13 @@ export default function ClienteDetalhe() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ContractPreviewModal
+        open={!!previewUrl}
+        onOpenChange={(o) => { if (!o) { setPreviewUrl(null); setPreviewFileName(''); } }}
+        url={previewUrl}
+        fileName={previewFileName}
+      />
 
       <PasswordConfirmDialog
         open={showDeletePassword}

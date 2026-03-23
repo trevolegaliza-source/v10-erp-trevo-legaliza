@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Users, Mail, Phone, Search, UserX, Upload, FileText, Download, Trash2, Archive, ArchiveRestore, ExternalLink } from 'lucide-react';
+import { Plus, Users, Mail, Phone, Search, UserX, Upload, FileText, Download, Trash2, Archive, ArchiveRestore, ExternalLink, AlertTriangle, Eye } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useClientes, useUpdateCliente, useDeleteCliente, useArchiveCliente, useUnarchiveCliente } from '@/hooks/useFinanceiro';
@@ -16,8 +17,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { STORAGE_BUCKETS } from '@/constants/storage';
+import ContractDropzone from '@/components/contratos/ContractDropzone';
+import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 
-function ContractButton({ clienteId }: { clienteId: string }) {
+function ContractButton({ clienteId, contrato_url }: { clienteId: string; contrato_url?: string | null }) {
   const [hasContract, setHasContract] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -27,7 +30,22 @@ function ContractButton({ clienteId }: { clienteId: string }) {
   }, [clienteId]);
 
   if (hasContract === null) return <span className="text-muted-foreground text-xs">...</span>;
-  if (!hasContract) return <span className="text-muted-foreground text-xs">—</span>;
+  if (!hasContract) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex items-center justify-center">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">Atenção: Contrato não anexado</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
   const handleView = async () => {
     const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(clienteId);
@@ -85,6 +103,8 @@ export default function Clientes() {
 
   const [contracts, setContracts] = useState<{ name: string; id: string }[]>([]);
   const [uploadingContract, setUploadingContract] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFileName, setPreviewFileName] = useState('');
 
   const openEdit = (client: ClienteDB) => {
     setEditClient(client);
@@ -97,16 +117,27 @@ export default function Clientes() {
     setContracts((data || []).map(f => ({ name: f.name, id: f.id })));
   };
 
-  const handleUploadContract = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!editClient || !e.target.files?.[0]) return;
-    const file = e.target.files[0];
-    if (file.size > 10 * 1024 * 1024) { toast.error('Máx. 10MB'); return; }
+  const handleUploadContract = async (file: File) => {
+    if (!editClient) return;
+    const allowed = ['application/pdf', 'image/png', 'image/jpeg'];
+    if (!allowed.includes(file.type)) { toast.error('Formato inválido. Aceitos: PDF, PNG, JPG'); throw new Error('invalid'); }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo: 10MB'); throw new Error('too large'); }
     setUploadingContract(true);
     const path = `${editClient.id}/${Date.now()}_${file.name}`;
     const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(path, file);
-    if (error) toast.error('Erro: ' + error.message);
-    else { toast.success('Contrato anexado!'); loadContracts(editClient.id); }
+    if (error) { toast.error('Erro no upload: ' + error.message); setUploadingContract(false); throw error; }
+    toast.success('Contrato anexado!');
+    loadContracts(editClient.id);
     setUploadingContract(false);
+  };
+
+  const handlePreviewContract = async (fileName: string) => {
+    if (!editClient) return;
+    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(`${editClient.id}/${fileName}`, 3600);
+    if (data?.signedUrl) {
+      setPreviewUrl(data.signedUrl);
+      setPreviewFileName(fileName);
+    }
   };
 
   const handleDownloadContract = async (fileName: string) => {
@@ -268,10 +299,13 @@ export default function Clientes() {
                       onDoubleClick={() => openEdit(client)}
                     >
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{client.nome}</p>
-                          {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
-                          {client.nome_contador && <p className="text-[10px] text-muted-foreground">Contador: {client.nome_contador}</p>}
+                        <div className="flex items-center gap-2">
+                          <ContractButton clienteId={client.id} contrato_url={(client as any).contrato_url} />
+                          <div>
+                            <p className="font-medium">{client.nome}</p>
+                            {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
+                            {client.nome_contador && <p className="text-[10px] text-muted-foreground">Contador: {client.nome_contador}</p>}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-xs font-mono">{(client as any).cnpj || '—'}</TableCell>
@@ -307,9 +341,7 @@ export default function Clientes() {
                       <TableCell className="text-center">
                         <Badge className="bg-primary/10 text-primary border-0">{activeCount(client.id)}/{processCount(client.id)}</Badge>
                       </TableCell>
-                      <TableCell className="text-center" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
-                        <ContractButton clienteId={client.id} />
-                      </TableCell>
+                      {/* Contract column removed — alert now shows in name column */}
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
                           {(client as any).is_archived ? (
@@ -432,6 +464,9 @@ export default function Clientes() {
                     <div key={c.name} className="flex items-center gap-2 text-sm bg-muted/30 rounded-md px-3 py-1.5">
                       <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       <span className="flex-1 truncate">{c.name}</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePreviewContract(c.name)}>
+                        <Eye className="h-3 w-3" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDownloadContract(c.name)}>
                         <Download className="h-3 w-3" />
                       </Button>
@@ -444,11 +479,7 @@ export default function Clientes() {
               ) : (
                 <p className="text-xs text-muted-foreground">Nenhum contrato anexado</p>
               )}
-              <label className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-3 text-sm text-muted-foreground cursor-pointer hover:bg-muted/40 transition-colors">
-                <Upload className="h-4 w-4" />
-                {uploadingContract ? 'Enviando...' : 'Anexar Contrato (PDF, DOC — máx. 10MB)'}
-                <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleUploadContract} disabled={uploadingContract} />
-              </label>
+              <ContractDropzone uploading={uploadingContract} onUpload={handleUploadContract} />
             </div>
 
             <div className="flex items-center justify-between pt-2">
@@ -468,6 +499,13 @@ export default function Clientes() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ContractPreviewModal
+        open={!!previewUrl}
+        onOpenChange={(o) => { if (!o) { setPreviewUrl(null); setPreviewFileName(''); } }}
+        url={previewUrl}
+        fileName={previewFileName}
+      />
 
       <PasswordConfirmDialog
         open={showDeletePassword}
