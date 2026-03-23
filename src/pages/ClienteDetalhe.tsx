@@ -249,10 +249,10 @@ export default function ClienteDetalhe() {
         </div>
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedRelatorioProcessos(new Set()); setShowRelatorioDialog(true); }}>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs text-foreground" onClick={() => { setSelectedRelatorioProcessos(new Set()); setShowRelatorioDialog(true); }}>
             <FileBarChart className="h-3.5 w-3.5" /> Gerar Relatório
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => { setSelectedCobrancaProcessos(new Set()); setShowCobrancaDialog(true); }}>
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs text-foreground" onClick={() => { setSelectedCobrancaProcessos(new Set()); setShowCobrancaDialog(true); }}>
             <Receipt className="h-3.5 w-3.5" /> Gerar Cobrança
           </Button>
           {isArchived ? (
