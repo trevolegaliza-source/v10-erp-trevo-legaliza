@@ -162,7 +162,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
                 <p className="text-sm font-semibold truncate">{clienteApelido}</p>
               </div>
-              <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
+              <p className="text-[11px] text-zinc-400 truncate">{processo.razao_social}</p>
             </div>
             <div className="text-right shrink-0 flex items-center gap-1">
               <span className="text-sm font-bold text-primary whitespace-nowrap">
