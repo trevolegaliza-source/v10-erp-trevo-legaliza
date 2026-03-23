@@ -8,6 +8,7 @@ import { useMoveEtapaFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import type { EtapaFinanceiro } from '@/types/financial';
 import { ETAPA_FINANCEIRO_ORDER, ETAPA_FINANCEIRO_LABELS, ETAPA_FINANCEIRO_COLORS } from '@/types/financial';
+import { useAllServiceNegotiations, buildNegotiationLookup } from '@/hooks/useAllServiceNegotiations';
 import { cn } from '@/lib/utils';
 import { AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,6 +19,8 @@ interface FinanceiroKanbanProps {
 
 export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
   const moveEtapa = useMoveEtapaFinanceiro();
+  const { data: allNegotiations = [] } = useAllServiceNegotiations();
+  const negotiationLookup = buildNegotiationLookup(allNegotiations);
 
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [pendingMove, setPendingMove] = useState<{ processo: ProcessoFinanceiro; target: EtapaFinanceiro } | null>(null);
@@ -39,7 +42,6 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
     const cliente = processo.cliente as any;
     const momentoFat = cliente?.momento_faturamento || 'na_solicitacao';
 
-    // Password gate: anticipation for 'no_deferimento' clients
     if (
       processo.etapa_financeiro === 'solicitacao_criada' &&
       targetEtapa === 'gerar_cobranca' &&
@@ -52,7 +54,6 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
       return;
     }
 
-    // Password gate: overdue invoices
     if (processo.etapa_financeiro === 'honorario_vencido') {
       setPasswordTitle('Trava de Inadimplência');
       setPasswordDesc('Para mover um honorário vencido, insira a senha master.');
@@ -61,7 +62,6 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
       return;
     }
 
-    // PASSWORD GATE: "Gerar Cobrança" action
     if (targetEtapa === 'cobranca_gerada' && processo.etapa_financeiro === 'gerar_cobranca') {
       setPasswordTitle('Confirmar Geração de Cobrança');
       setPasswordDesc('Insira a senha master para gerar a cobrança.');
@@ -70,7 +70,6 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
       return;
     }
 
-    // PASSWORD GATE: "Marcar como Pago" action
     if (targetEtapa === 'honorario_pago') {
       setPasswordTitle('Confirmar Pagamento');
       setPasswordDesc('Insira a senha master para marcar como pago.');
@@ -91,7 +90,6 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
 
   const handlePasswordConfirm = () => {
     if (pendingMove) {
-      // If it was a gerar_cobranca action, open the cobranca modal
       if ((pendingMove.target as string) === '__gerar_cobranca__') {
         setCobrancaProcesso(pendingMove.processo);
         setCobrancaModalOpen(true);
@@ -141,6 +139,7 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
                       processo={p}
                       onMoveRequest={handleMoveRequest}
                       onDoubleClick={handleDoubleClick}
+                      negotiationLookup={negotiationLookup}
                     />
                   ))}
                   {col.items.length === 0 && (

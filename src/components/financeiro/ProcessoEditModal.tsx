@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -7,13 +7,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import {
-  FileText, Upload, CheckCircle2, Trash2, PlusCircle, Download, Eye,
+  FileText, Upload, CheckCircle2, Trash2, PlusCircle, Download, Eye, Loader2,
 } from 'lucide-react';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
+import { useAllServiceNegotiations, buildNegotiationLookup } from '@/hooks/useAllServiceNegotiations';
 import { uploadFile, viewFile, getSignedUrl } from '@/hooks/useStorageUpload';
 import { formatBRL } from '@/lib/pricing-engine';
+import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { useDeleteProcesso } from '@/hooks/useProcessos';
@@ -28,6 +30,7 @@ interface ProcessoEditModalProps {
 export default function ProcessoEditModal({ open, onOpenChange, processo }: ProcessoEditModalProps) {
   const updateLanc = useUpdateLancamentoFinanceiro();
   const deleteProcesso = useDeleteProcesso();
+  const { data: allNegotiations = [] } = useAllServiceNegotiations();
 
   const [notes, setNotes] = useState('');
   const [valoresOpen, setValoresOpen] = useState(false);
@@ -40,12 +43,29 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
 
   const { data: valoresAdicionais = [] } = useValoresAdicionais(processo?.id ?? '');
 
+  // Retroactive negotiation detection
+  const negotiationLookup = useMemo(() => buildNegotiationLookup(allNegotiations), [allNegotiations]);
+
+  const matchedNeg = useMemo(() => {
+    if (!processo) return null;
+    const clientMap = negotiationLookup.get(processo.cliente_id);
+    if (!clientMap) return null;
+    const descricao = processo.lancamento?.descricao || '';
+    for (const [name, neg] of clientMap) {
+      if (descricao.toLowerCase().includes(name)) return neg;
+    }
+    return null;
+  }, [processo, negotiationLookup]);
+
   if (!processo) return null;
 
   const lanc = processo.lancamento;
   const cliente = processo.cliente as any;
   const clienteApelido = cliente?.apelido || cliente?.nome || '-';
   const currentNotes = lanc?.observacoes_financeiro || '';
+  const isNegociado = !!matchedNeg;
+  const serviceName = matchedNeg?.service_name || lanc?.descricao || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
+  const createdAt = processo.created_at ? new Date(processo.created_at).toLocaleDateString('pt-BR') : null;
 
   const handleNotesBlur = () => {
     if (notes !== currentNotes) {
@@ -103,23 +123,26 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
     <div className="flex items-center justify-between py-2">
       <div className="flex items-center gap-2">
         <FileText className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm">{label}</span>
-        {storagePath && <CheckCircle2 className="h-3.5 w-3.5 text-success" />}
+        <span className="text-sm text-foreground">{label}</span>
+        {storagePath && <CheckCircle2 className="h-3.5 w-3.5 text-[#22c55e]" />}
       </div>
       <div className="flex items-center gap-1.5">
         {storagePath && (
           <>
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => viewFile(storagePath)}>
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => viewFile(storagePath)}>
               <Eye className="h-3 w-3 mr-1" /> Ver
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleDownload(storagePath)}>
+            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => handleDownload(storagePath)}>
               <Download className="h-3 w-3 mr-1" /> Baixar
             </Button>
           </>
         )}
-        <Button variant="outline" size="sm" className="h-7 text-xs" disabled={uploading === field} onClick={() => inputRef.current?.click()}>
-          <Upload className="h-3 w-3 mr-1" />
-          {uploading === field ? 'Enviando...' : storagePath ? 'Substituir' : 'Enviar'}
+        <Button variant="outline" size="sm" className="h-7 text-xs border-border" disabled={uploading === field} onClick={() => inputRef.current?.click()}>
+          {uploading === field ? (
+            <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Enviando...</>
+          ) : (
+            <><Upload className="h-3 w-3 mr-1" /> {storagePath ? 'Substituir' : 'Enviar'}</>
+          )}
         </Button>
         <input
           ref={inputRef}
@@ -143,17 +166,23 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col bg-background text-foreground border-border">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              Editar Processo
-              <Badge variant="outline" className="text-[10px]">{processo.tipo}</Badge>
+            <DialogTitle className="flex items-center gap-2 text-foreground">
+              {serviceName}
+              <Badge variant="outline" className="text-[10px] border-border">{processo.tipo}</Badge>
               {cliente?.tipo === 'MENSALISTA' && (
                 <Badge variant="outline" className="text-[10px] border-info text-info">Mensalista</Badge>
               )}
+              {isNegociado && (
+                <Badge className="text-[10px] bg-emerald-500/20 text-emerald-400 border-emerald-500/50">
+                  Negociado
+                </Badge>
+              )}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-muted-foreground">
               {processo.razao_social} — <span className="font-semibold text-foreground">{clienteApelido}</span>
+              {createdAt && <span className="ml-2 text-xs">📅 {createdAt}</span>}
             </DialogDescription>
           </DialogHeader>
 
@@ -162,7 +191,7 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
             <div className="rounded-lg border border-border bg-muted/30 p-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Valor Base</span>
-                <span>{formatBRL(baseValue)}</span>
+                <span className="text-foreground">{formatBRL(baseValue)}</span>
               </div>
               {cliente?.desconto_progressivo > 0 && (
                 <div className="flex justify-between text-sm mt-1">
@@ -178,31 +207,36 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
               )}
               <Separator className="my-2" />
               <div className="flex justify-between font-bold">
-                <span>Total</span>
+                <span className="text-foreground">Total</span>
                 <span className="text-primary">{formatBRL(totalValue)}</span>
               </div>
+              {isNegociado && (
+                <p className="text-[11px] text-emerald-400 mt-2 flex items-center gap-1">
+                  ⚠️ Valor definido conforme Tabela de Honorários Específicos
+                </p>
+              )}
             </div>
 
             {/* Observações */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium">Observações</label>
+              <label className="text-xs font-medium text-foreground">Observações</label>
               <Textarea
                 defaultValue={currentNotes}
                 onChange={(e) => setNotes(e.target.value)}
                 onBlur={handleNotesBlur}
                 placeholder="Anotações sobre este processo..."
-                className="text-sm min-h-[60px]"
+                className="text-sm min-h-[60px] bg-background border-border text-foreground"
                 rows={3}
               />
             </div>
 
             {/* Valores Adicionais */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium">Valores Adicionais</label>
+              <label className="text-xs font-medium text-foreground">Valores Adicionais</label>
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full text-xs h-8 justify-start"
+                className="w-full text-xs h-8 justify-start border-border"
                 onClick={() => setValoresOpen(true)}
               >
                 <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
@@ -215,17 +249,17 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
               </Button>
             </div>
 
-            <Separator />
+            <Separator className="bg-border" />
 
             {/* Documents */}
             <div className="space-y-1">
-              <label className="text-xs font-medium">Documentos Anexados</label>
+              <label className="text-xs font-medium text-foreground">Documentos Anexados</label>
               <DocRow label="Boleto" storagePath={lanc?.boleto_url} field="boleto_url" inputRef={boletoRef} folder="boletos" />
               <DocRow label="Comprovante de Pagamento" storagePath={(lanc as any)?.url_comprovante} field="url_comprovante" inputRef={comprovanteRef} folder="comprovantes" />
               <DocRow label="Guia / Recibo de Taxa" storagePath={(lanc as any)?.url_recibo_taxa} field="url_recibo_taxa" inputRef={reciboRef} folder="recibos" />
             </div>
 
-            <Separator />
+            <Separator className="bg-border" />
 
             {/* Delete */}
             <Button variant="destructive" size="sm" className="w-full" onClick={() => setDeleteOpen(true)}>
