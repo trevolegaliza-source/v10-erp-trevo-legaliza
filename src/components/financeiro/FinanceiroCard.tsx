@@ -10,7 +10,7 @@ import {
   ChevronLeft, ChevronRight, Eye, Info,
 } from 'lucide-react';
 import type { EtapaFinanceiro } from '@/types/financial';
-import { ETAPA_FINANCEIRO_ORDER, ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
+import { ETAPA_FINANCEIRO_ORDER, ETAPA_FINANCEIRO_LABELS, TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useValoresAdicionais } from '@/hooks/useValoresAdicionais';
@@ -44,13 +44,18 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
   const isUrgente = processo.prioridade === 'urgente';
   const cliente = processo.cliente as any;
 
+  // Service name from lancamento descricao or tipo
+  const serviceName = lanc?.descricao || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
+  // Check if this is a negotiated (custom) service — avulso type with a custom description
+  const isNegociado = processo.tipo === 'avulso' && lanc?.descricao && !Object.values(TIPO_PROCESSO_LABELS).includes(lanc.descricao);
+
   // The stored valor already includes urgency/discounts calculated at creation time.
-  // Do NOT re-run pricing engine — just use stored value + adicionais from popup.
   const valorArmazenado = Number(lanc?.valor ?? processo.valor ?? 0);
   const totalValue = valorArmazenado + somaAdicionais;
   const momentoFat = cliente?.momento_faturamento || 'na_solicitacao';
   const clienteApelido = cliente?.apelido || cliente?.nome || '-';
   const vencimento = lanc?.data_vencimento;
+  const createdAt = processo.created_at ? new Date(processo.created_at).toLocaleDateString('pt-BR') : null;
 
   const mutateField = (updates: Record<string, any>) => {
     updateLanc.mutate({
@@ -162,7 +167,13 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
                 <p className="text-sm font-semibold truncate">{clienteApelido}</p>
               </div>
-              <p className="text-[11px] text-zinc-400 truncate">{processo.razao_social}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <p className="text-[11px] font-medium text-foreground/80 truncate">{serviceName}</p>
+                {isNegociado && (
+                  <Badge variant="outline" className="text-[9px] border-accent text-accent-foreground bg-accent/20 px-1.5 py-0">Negociado</Badge>
+                )}
+              </div>
             </div>
             <div className="text-right shrink-0 flex items-center gap-1">
               <span className="text-sm font-bold text-primary whitespace-nowrap">
@@ -188,20 +199,33 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
               {isUrgente && (
                 <Badge variant="outline" className="text-[9px] border-warning text-warning ml-1">+50%</Badge>
               )}
-              {momentoFat === 'no_deferimento' && (
-                <Badge variant="outline" className="text-[9px] border-info text-info ml-1">Deferimento</Badge>
-              )}
-              {cliente?.tipo === 'MENSALISTA' && (
-                <Badge variant="outline" className="text-[9px] border-info text-info block mt-0.5">Mensalista</Badge>
-              )}
             </div>
           </div>
 
-          {/* Faturamento info */}
+          {/* Creation date */}
+          {createdAt && (
+            <p className="text-[10px] text-muted-foreground">📅 Criado em: {createdAt}</p>
+          )}
+
+          {/* Faturamento info with tooltip */}
           {momentoFat === 'no_deferimento' && (
-            <div className="text-[10px] text-info bg-info/10 rounded px-2 py-1">
-              Faturamento condicionado ao sucesso do processo
-            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="text-[10px] text-info bg-info/10 rounded px-2 py-1 cursor-help flex items-center gap-1">
+                    <Badge variant="outline" className="text-[9px] border-info text-info">Deferimento</Badge>
+                    Faturamento condicionado ao sucesso do processo
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs max-w-[260px]">
+                  A cobrança só deve ser efetivada após o sucesso/conclusão do processo
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
+          {cliente?.tipo === 'MENSALISTA' && (
+            <Badge variant="outline" className="text-[9px] border-info text-info">Mensalista</Badge>
           )}
 
           {/* Discount info */}
@@ -243,7 +267,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 checked={!!lanc?.cobranca_encaminhada}
                 onCheckedChange={(c) => handleCheckbox('cobranca_encaminhada', !!c)}
               />
-              <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-zinc-400 cursor-pointer">
+              <label htmlFor={`enc-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
                 Cobrança encaminhada ao cliente
               </label>
             </div>
@@ -253,7 +277,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
                 checked={!!lanc?.confirmado_recebimento}
                 onCheckedChange={(c) => handleCheckbox('confirmado_recebimento', !!c)}
               />
-              <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-zinc-400 cursor-pointer">
+              <label htmlFor={`rec-${processo.id}`} className="text-[11px] text-muted-foreground cursor-pointer">
                 Confirmado recebimento
               </label>
             </div>
@@ -291,7 +315,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
             ) : <div className="flex-1" />}
           </div>
 
-          <p className="text-[9px] text-zinc-500 text-center">Duplo clique para edição completa</p>
+          <p className="text-[9px] text-muted-foreground text-center">Duplo clique para edição completa</p>
         </CardContent>
       </Card>
 
