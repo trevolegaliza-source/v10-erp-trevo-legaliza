@@ -376,6 +376,9 @@ export default function CadastroRapido() {
                   />
                 </div>
 
+                {/* Honorários Específicos */}
+                <HonorariosInlineRepeater rows={honorariosRows} onChange={setHonorariosRows} />
+
                 {/* Document Upload */}
                 <div className="grid gap-1.5">
                   <Label>Anexar Contrato Assinado</Label>
