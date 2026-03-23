@@ -44,13 +44,18 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick 
   const isUrgente = processo.prioridade === 'urgente';
   const cliente = processo.cliente as any;
 
+  // Service name from lancamento descricao or tipo
+  const serviceName = lanc?.descricao || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
+  // Check if this is a negotiated (custom) service — avulso type with a custom description
+  const isNegociado = processo.tipo === 'avulso' && lanc?.descricao && !Object.values(TIPO_PROCESSO_LABELS).includes(lanc.descricao);
+
   // The stored valor already includes urgency/discounts calculated at creation time.
-  // Do NOT re-run pricing engine — just use stored value + adicionais from popup.
   const valorArmazenado = Number(lanc?.valor ?? processo.valor ?? 0);
   const totalValue = valorArmazenado + somaAdicionais;
   const momentoFat = cliente?.momento_faturamento || 'na_solicitacao';
   const clienteApelido = cliente?.apelido || cliente?.nome || '-';
   const vencimento = lanc?.data_vencimento;
+  const createdAt = processo.created_at ? new Date(processo.created_at).toLocaleDateString('pt-BR') : null;
 
   const mutateField = (updates: Record<string, any>) => {
     updateLanc.mutate({
