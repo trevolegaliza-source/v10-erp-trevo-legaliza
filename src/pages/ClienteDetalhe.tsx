@@ -514,6 +514,7 @@ export default function ClienteDetalhe() {
             </CardHeader>
             <CardContent>
               <HonorariosRepeater clienteId={cliente.id} />
+              {/* Using the standalone HonorariosRepeater for the tab */}
             </CardContent>
           </Card>
         </TabsContent>
