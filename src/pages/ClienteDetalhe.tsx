@@ -12,7 +12,8 @@ import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, T
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useUpsertServiceNegotiations } from '@/hooks/useServiceNegotiations';
+import HonorariosInlineRepeater, { type InlineNegotiationRow, emptyNegotiationRow } from '@/components/clientes/HonorariosInlineRepeater';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
