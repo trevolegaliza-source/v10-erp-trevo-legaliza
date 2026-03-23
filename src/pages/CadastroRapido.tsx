@@ -82,9 +82,10 @@ export default function CadastroRapido() {
   }, []);
 
   // Trigger fetch when client changes
-  useState(() => {
+  useEffect(() => {
     if (processoForm.cliente_id) fetchMonthCount(processoForm.cliente_id);
-  });
+    else setMonthCount(null);
+  }, [processoForm.cliente_id, fetchMonthCount]);
 
   const isAvulso = clienteForm.tipo === 'AVULSO_4D';
   const isMensalista = clienteForm.tipo === 'MENSALISTA';
