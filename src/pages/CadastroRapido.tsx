@@ -611,16 +611,7 @@ export default function CadastroRapido() {
                 </div>
 
                 {selectedCliente && (
-                  <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Cliente selecionado: <span className="font-medium text-foreground">{selectedCliente.nome}</span>
-                      {' · '}
-                      {selectedCliente.tipo === 'MENSALISTA' ? 'Mensalista' : 'Avulso'}
-                      {selectedCliente.tipo !== 'MENSALISTA' && (selectedCliente as any).valor_base != null && (
-                        <> · Base: {Number((selectedCliente as any).valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</>
-                      )}
-                    </p>
-                  </div>
+                  <CalculatedValuePreview cliente={selectedCliente} tipo={processoForm.tipo} isManual={processoForm.definir_manual || isProcessoAvulso} />
                 )}
 
                 <Button type="submit" disabled={createProcesso.isPending || !processoForm.cliente_id || !processoForm.razao_social} className="w-fit">
