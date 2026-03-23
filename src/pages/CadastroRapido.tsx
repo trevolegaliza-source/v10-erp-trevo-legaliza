@@ -165,14 +165,19 @@ export default function CadastroRapido() {
 
   const handleCreateProcesso = (e: React.FormEvent) => {
     e.preventDefault();
+    // Check if negotiated service selected
+    const neg = negotiations?.find(n => n.id === processoForm.tipo);
+    const tipoFinal = neg ? 'avulso' : processoForm.tipo;
+    const valorFinal = neg ? neg.fixed_price : (processoForm.definir_manual && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined);
+
     createProcesso.mutate(
       {
         cliente_id: processoForm.cliente_id,
         razao_social: processoForm.razao_social,
-        tipo: processoForm.tipo,
+        tipo: tipoFinal as TipoProcesso,
         prioridade: processoForm.prioridade,
         responsavel: processoForm.responsavel,
-        valor_manual: processoForm.definir_manual && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined,
+        valor_manual: valorFinal,
       },
       {
         onSuccess: () =>
