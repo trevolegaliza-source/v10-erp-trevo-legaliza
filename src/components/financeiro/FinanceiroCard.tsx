@@ -208,7 +208,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
               </div>
             </div>
             <div className="text-right shrink-0 flex items-center gap-1">
-              <span className="text-sm font-bold text-primary whitespace-nowrap">
+              <span className="text-sm font-bold text-white whitespace-nowrap">
                 {formatBRL(totalValue)}
               </span>
               <TooltipProvider>

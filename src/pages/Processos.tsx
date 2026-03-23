@@ -390,6 +390,23 @@ export default function Processos() {
         processoId={selectedFinanceiroProcess?.id || ''}
         clienteApelido={(selectedFinanceiroProcess?.cliente as any)?.apelido || (selectedFinanceiroProcess?.cliente as any)?.nome || '-'}
       />
+
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Processo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja realmente excluir este processo? Esta ação é irreversível.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
