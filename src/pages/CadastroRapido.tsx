@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { UserPlus, FileText, Upload, X, Check, ChevronsUpDown } from 'lucide-react';
-import { useClientes, useCreateCliente, useCreateProcesso } from '@/hooks/useFinanceiro';
+import { useClientes, useCreateCliente, useCreateProcesso, calcularDescontoProgressivo } from '@/hooks/useFinanceiro';
 import type { TipoCliente, TipoProcesso } from '@/types/financial';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -41,6 +41,66 @@ const INITIAL_CLIENTE = {
   qtd_processos_inclusos: '',
 };
 
+function CalculatedValuePreview({ cliente, tipo, isManual }: { cliente: any; tipo: string; isManual: boolean }) {
+  const [monthCount, setMonthCount] = useState<number>(0);
+
+  useEffect(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    supabase
+      .from('processos')
+      .select('id', { count: 'exact', head: true })
+      .eq('cliente_id', cliente.id)
+      .gte('created_at', startOfMonth)
+      .then(({ count }) => setMonthCount(count ?? 0));
+  }, [cliente.id]);
+
+  if (isManual || cliente.tipo === 'MENSALISTA') {
+    return (
+      <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
+        <p className="text-xs text-muted-foreground">
+          Cliente: <span className="font-medium text-foreground">{cliente.nome}</span> · {cliente.tipo === 'MENSALISTA' ? 'Mensalista' : 'Avulso'}
+          {isManual && <span className="ml-1 text-warning">(Valor manual)</span>}
+        </p>
+      </div>
+    );
+  }
+
+  const valorBase = Number(cliente.valor_base ?? 0);
+  const descontoPercent = Number(cliente.desconto_progressivo ?? 0);
+  const valorLimite = cliente.valor_limite_desconto != null ? Number(cliente.valor_limite_desconto) : null;
+
+  if (descontoPercent > 0) {
+    const calc = calcularDescontoProgressivo(valorBase, descontoPercent, monthCount, valorLimite);
+    return (
+      <div className="rounded-lg border border-info/30 bg-info/5 p-3 space-y-1">
+        <p className="text-xs text-muted-foreground">
+          Cliente: <span className="font-medium text-foreground">{cliente.nome}</span> · Avulso
+        </p>
+        <div className="text-xs space-y-0.5">
+          <p>Valor Base: <span className="font-medium">{valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></p>
+          <p className="text-info">📊 Processo nº {calc.processoNumero} do mês · Desconto: {descontoPercent}%</p>
+          {calc.descontoAcumulado > 0 && (
+            <p className="text-info">Desconto acumulado: -{calc.descontoAcumulado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+          )}
+          <p className="font-semibold text-foreground">
+            Valor calculado: {calc.valorFinal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            {valorLimite && calc.valorFinal === valorLimite && <span className="text-warning ml-1">(piso mínimo atingido)</span>}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
+      <p className="text-xs text-muted-foreground">
+        Cliente: <span className="font-medium text-foreground">{cliente.nome}</span> · Avulso · Base: {valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+      </p>
+    </div>
+  );
+}
+
 export default function CadastroRapido() {
   const [clienteForm, setClienteForm] = useState(INITIAL_CLIENTE);
   const [contratoFile, setContratoFile] = useState<File | null>(null);
@@ -66,6 +126,9 @@ export default function CadastroRapido() {
   const { data: negotiations } = useServiceNegotiations(processoForm.cliente_id || undefined);
 
   const selectedCliente = (clientes || []).find(c => c.id === processoForm.cliente_id);
+
+
+
 
   const isAvulso = clienteForm.tipo === 'AVULSO_4D';
   const isMensalista = clienteForm.tipo === 'MENSALISTA';
@@ -611,16 +674,7 @@ export default function CadastroRapido() {
                 </div>
 
                 {selectedCliente && (
-                  <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Cliente selecionado: <span className="font-medium text-foreground">{selectedCliente.nome}</span>
-                      {' · '}
-                      {selectedCliente.tipo === 'MENSALISTA' ? 'Mensalista' : 'Avulso'}
-                      {selectedCliente.tipo !== 'MENSALISTA' && (selectedCliente as any).valor_base != null && (
-                        <> · Base: {Number((selectedCliente as any).valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</>
-                      )}
-                    </p>
-                  </div>
+                  <CalculatedValuePreview cliente={selectedCliente} tipo={processoForm.tipo} isManual={processoForm.definir_manual || isProcessoAvulso} />
                 )}
 
                 <Button type="submit" disabled={createProcesso.isPending || !processoForm.cliente_id || !processoForm.razao_social} className="w-fit">

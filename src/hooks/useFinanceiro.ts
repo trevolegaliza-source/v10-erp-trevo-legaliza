@@ -200,6 +200,26 @@ export function useProcessos() {
   });
 }
 
+/** Calculate compounding progressive discount */
+export function calcularDescontoProgressivo(
+  valorBase: number,
+  descontoPercent: number,
+  processosNoMes: number,
+  valorLimite: number | null,
+): { valorFinal: number; descontoAcumulado: number; processoNumero: number } {
+  let valor = valorBase;
+  const processoNumero = processosNoMes + 1; // this will be the Nth process
+  for (let i = 0; i < processosNoMes; i++) {
+    valor = valor * (1 - descontoPercent / 100);
+  }
+  if (valorLimite != null && valor < valorLimite) {
+    valor = valorLimite;
+  }
+  valor = Math.max(valor, 0);
+  const descontoAcumulado = valorBase - valor;
+  return { valorFinal: Math.round(valor * 100) / 100, descontoAcumulado: Math.round(descontoAcumulado * 100) / 100, processoNumero };
+}
+
 export function useCreateProcesso() {
   const qc = useQueryClient();
   return useMutation({
@@ -220,26 +240,56 @@ export function useCreateProcesso() {
 
       const { data: clienteData, error: clienteError } = await supabase
         .from('clientes')
-        .select('id, tipo, valor_base, momento_faturamento')
+        .select('id, tipo, valor_base, momento_faturamento, desconto_progressivo, valor_limite_desconto')
         .eq('id', input.cliente_id)
         .single();
       if (clienteError) throw clienteError;
 
-      const cliente = clienteData as Pick<ClienteDB, 'id' | 'tipo' | 'valor_base'> & { momento_faturamento?: string };
+      const cliente = clienteData as any;
       const valorBaseCliente = cliente.tipo === 'MENSALISTA' ? 0 : Number(cliente.valor_base ?? 0);
-      const valorBaseProcesso = isManualPrice ? Number(input.valor_manual) : valorBaseCliente;
-      // Avulso: value is always manual/final — no discounts or urgency surcharge
-      const valorFinal = isAvulso
-        ? (isManualPrice ? Number(input.valor_manual) : 0)
-        : isManualPrice
-          ? valorBaseProcesso
-          : isUrgente
-            ? valorBaseProcesso * 1.5
-            : valorBaseProcesso;
+      const descontoPercent = Number(cliente.desconto_progressivo ?? 0);
+      const valorLimite = cliente.valor_limite_desconto != null ? Number(cliente.valor_limite_desconto) : null;
+
+      // Count same-month processes for this client
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const { count: processosNoMes } = await supabase
+        .from('processos')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', input.cliente_id)
+        .gte('created_at', startOfMonth);
+
+      const monthCount = processosNoMes ?? 0;
+
+      let valorFinal: number;
+      let discountInfo = '';
+
+      if (isAvulso) {
+        valorFinal = isManualPrice ? Number(input.valor_manual) : 0;
+      } else if (isManualPrice) {
+        valorFinal = Number(input.valor_manual);
+      } else if (descontoPercent > 0 && cliente.tipo !== 'MENSALISTA') {
+        const calc = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount, valorLimite);
+        valorFinal = calc.valorFinal;
+        if (calc.descontoAcumulado > 0) {
+          discountInfo = `Desconto Progressivo: ${descontoPercent}% (Processo nº ${calc.processoNumero} do mês) | Base: R$ ${valorBaseCliente.toFixed(2)} | Desconto: R$ ${calc.descontoAcumulado.toFixed(2)}`;
+        }
+        if (isUrgente) {
+          valorFinal = valorFinal * 1.5;
+        }
+      } else {
+        valorFinal = isUrgente ? valorBaseCliente * 1.5 : valorBaseCliente;
+      }
 
       const { data: vencimento } = await supabase.rpc('calcular_vencimento', {
         p_cliente_id: input.cliente_id,
       });
+
+      // Append discount info to notas
+      let notasFinal = input.notas || '';
+      if (discountInfo) {
+        notasFinal = notasFinal ? `${notasFinal}\n${discountInfo}` : discountInfo;
+      }
 
       const { data: processo, error } = await supabase
         .from('processos')
@@ -250,7 +300,7 @@ export function useCreateProcesso() {
           prioridade: input.prioridade || 'normal',
           responsavel: input.responsavel || null,
           valor: valorFinal,
-          notas: input.notas || null,
+          notas: notasFinal || null,
         })
         .select('*, cliente:clientes(*)')
         .single();
@@ -263,6 +313,7 @@ export function useCreateProcesso() {
       const descParts = [`${serviceName} - ${input.razao_social}`];
       if (isUrgente && !isManualPrice && !isAvulso) descParts.push('(+50% Urgência)');
       if (isManualPrice && !isAvulso) descParts.push('(Valor Manual)');
+      if (discountInfo) descParts.push(`(${descontoPercent}% desc.)`);
 
       const momentoFat = cliente.momento_faturamento || 'na_solicitacao';
       const shouldCreateLancamento = input.ja_pago || momentoFat === 'na_solicitacao';
