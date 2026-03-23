@@ -756,6 +756,11 @@ export default function ClienteDetalhe() {
                 <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
               </div>
             </div>
+            {/* Honorários Específicos inline */}
+            <div className="pt-2 border-t border-border/40">
+              <HonorariosRepeater clienteId={cliente.id} />
+            </div>
+
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setShowEditCadastro(false)}>Cancelar</Button>
               <Button onClick={handleSaveCadastro} disabled={updateCliente.isPending}>
