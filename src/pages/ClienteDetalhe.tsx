@@ -22,6 +22,8 @@ import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso 
 import { cn } from '@/lib/utils';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { STORAGE_BUCKETS } from '@/constants/storage';
+import ContractDropzone from '@/components/contratos/ContractDropzone';
+import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
