@@ -20,7 +20,7 @@ import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 
-function ContractButton({ clienteId }: { clienteId: string }) {
+function ContractButton({ clienteId, contrato_url }: { clienteId: string; contrato_url?: string | null }) {
   const [hasContract, setHasContract] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -30,7 +30,22 @@ function ContractButton({ clienteId }: { clienteId: string }) {
   }, [clienteId]);
 
   if (hasContract === null) return <span className="text-muted-foreground text-xs">...</span>;
-  if (!hasContract) return <span className="text-muted-foreground text-xs">—</span>;
+  if (!hasContract) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex items-center justify-center">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-xs">Atenção: Contrato não anexado</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
   const handleView = async () => {
     const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(clienteId);
