@@ -16,6 +16,8 @@ import type { TipoCliente, TipoProcesso } from '@/types/financial';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { STORAGE_BUCKETS } from '@/constants/storage';
+import { maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
+import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 
 const INITIAL_CLIENTE = {
   codigo_identificador: '',
@@ -60,6 +62,18 @@ export default function CadastroRapido() {
   const isAvulso = clienteForm.tipo === 'AVULSO_4D';
   const isMensalista = clienteForm.tipo === 'MENSALISTA';
 
+  // Auto-fill codigo from CNPJ (first 6 digits)
+  const handleCnpjChange = (value: string) => {
+    const masked = maskCNPJ(value);
+    const digits = value.replace(/\D/g, '');
+    const codigo = digits.slice(0, 6);
+    setClienteForm(f => ({
+      ...f,
+      cnpj: masked,
+      codigo_identificador: codigo ? maskCodigo(codigo) : f.codigo_identificador,
+    }));
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -99,10 +113,17 @@ export default function CadastroRapido() {
 
   const handleCreateCliente = (e: React.FormEvent) => {
     e.preventDefault();
+    // Validate CNPJ if provided
+    const cnpjDigits = clienteForm.cnpj.replace(/\D/g, '');
+    if (cnpjDigits.length > 0 && !isValidCNPJ(clienteForm.cnpj)) {
+      toast.error('Erro ao validar CNPJ: deve conter 14 dígitos.');
+      return;
+    }
+
     const payload: Record<string, any> = {
-      codigo_identificador: clienteForm.codigo_identificador,
+      codigo_identificador: clienteForm.codigo_identificador.replace(/\D/g, ''),
       nome: clienteForm.nome,
-      cnpj: clienteForm.cnpj || null,
+      cnpj: cnpjDigits || null,
       tipo: clienteForm.tipo,
       email: clienteForm.email || null,
       telefone: clienteForm.telefone || null,
@@ -189,24 +210,34 @@ export default function CadastroRapido() {
               <form onSubmit={handleCreateCliente} className="grid gap-5 max-w-xl">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
-                    <Label>Código Identificador *</Label>
-                    <Input required placeholder="Ex: CONT-001" value={clienteForm.codigo_identificador} onChange={(e) => update('codigo_identificador', e.target.value)} />
+                    <Label>CNPJ *</Label>
+                    <Input
+                      required
+                      placeholder="00.000.000/0000-00"
+                      value={clienteForm.cnpj}
+                      onChange={(e) => handleCnpjChange(e.target.value)}
+                      maxLength={18}
+                    />
+                    {clienteForm.cnpj && clienteForm.cnpj.replace(/\D/g, '').length > 0 && !isValidCNPJ(clienteForm.cnpj) && (
+                      <p className="text-[10px] text-destructive">CNPJ deve conter 14 dígitos</p>
+                    )}
                   </div>
                   <div className="grid gap-1.5">
-                    <Label>Nome *</Label>
-                    <Input required placeholder="Nome da contabilidade" value={clienteForm.nome} onChange={(e) => update('nome', e.target.value)} />
+                    <Label>Código do Cliente</Label>
+                    <Input
+                      placeholder="000.000 (auto)"
+                      value={clienteForm.codigo_identificador}
+                      onChange={(e) => update('codigo_identificador', maskCodigo(e.target.value))}
+                      maxLength={7}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Preenchido automaticamente a partir do CNPJ</p>
                   </div>
-                </div>
-
-                <div className="grid gap-1.5">
-                  <Label>CNPJ</Label>
-                  <Input placeholder="00.000.000/0000-00" value={clienteForm.cnpj} onChange={(e) => update('cnpj', e.target.value)} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
-                    <Label>Nome do Contador</Label>
-                    <Input placeholder="Contador responsável" value={clienteForm.nome_contador} onChange={(e) => update('nome_contador', e.target.value)} />
+                    <Label>Nome da Contabilidade *</Label>
+                    <Input required placeholder="Nome da contabilidade" value={clienteForm.nome} onChange={(e) => update('nome', e.target.value)} />
                   </div>
                   <div className="grid gap-1.5">
                     <Label>Apelido</Label>
@@ -216,13 +247,18 @@ export default function CadastroRapido() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-1.5">
-                    <Label>Email</Label>
-                    <Input type="email" placeholder="email@contabilidade.com" value={clienteForm.email} onChange={(e) => update('email', e.target.value)} />
+                    <Label>Nome do Contador</Label>
+                    <Input placeholder="Contador responsável" value={clienteForm.nome_contador} onChange={(e) => update('nome_contador', e.target.value)} />
                   </div>
                   <div className="grid gap-1.5">
                     <Label>Telefone</Label>
                     <Input placeholder="(11) 99999-0000" value={clienteForm.telefone} onChange={(e) => update('telefone', e.target.value)} />
                   </div>
+                </div>
+
+                <div className="grid gap-1.5">
+                  <Label>Email</Label>
+                  <Input type="email" placeholder="email@contabilidade.com" value={clienteForm.email} onChange={(e) => update('email', e.target.value)} />
                 </div>
 
                 <div className="grid gap-1.5">
@@ -327,8 +363,8 @@ export default function CadastroRapido() {
                   ) : (
                     <label className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-4 text-sm text-muted-foreground cursor-pointer hover:bg-muted/40 transition-colors">
                       <Upload className="h-4 w-4" />
-                      Clique para selecionar (PDF, DOC — máx. 10MB)
-                      <input type="file" className="hidden" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={handleFileChange} />
+                      Clique para selecionar (PDF, PNG, JPG — máx. 10MB)
+                      <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={handleFileChange} />
                     </label>
                   )}
                 </div>
@@ -367,27 +403,25 @@ export default function CadastroRapido() {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <PopoverContent className="w-full p-0" align="start">
                       <Command>
-                        <CommandInput placeholder="Filtrar clientes..." />
+                        <CommandInput placeholder="Buscar cliente..." />
                         <CommandList>
                           <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
                           <CommandGroup>
-                            {(clientes || []).map((c) => (
+                            {(clientes || []).filter(c => !(c as any).is_archived).map(c => (
                               <CommandItem
                                 key={c.id}
-                                value={`${c.nome} ${c.codigo_identificador} ${c.apelido || ''} ${c.nome_contador || ''}`}
+                                value={`${c.nome} ${c.apelido || ''} ${c.codigo_identificador}`}
                                 onSelect={() => {
-                                  const valorBase = c.tipo === 'MENSALISTA' ? 0 : Number((c as any).valor_base ?? 0);
-                                  setProcessoForm((f) => ({ ...f, cliente_id: c.id }));
+                                  setProcessoForm(f => ({ ...f, cliente_id: c.id }));
                                   setClienteComboOpen(false);
                                 }}
                               >
-                                <Check className={cn('mr-2 h-4 w-4', processoForm.cliente_id === c.id ? 'opacity-100' : 'opacity-0')} />
-                                <div className="flex-1 min-w-0">
-                                  <span className="font-medium">{c.apelido || c.nome}</span>
-                                  <span className="text-muted-foreground ml-1.5 text-xs">({c.codigo_identificador})</span>
-                                  {c.nome_contador && <span className="text-muted-foreground text-xs ml-1">· {c.nome_contador}</span>}
+                                <Check className={cn("mr-2 h-4 w-4", processoForm.cliente_id === c.id ? "opacity-100" : "opacity-0")} />
+                                <div>
+                                  <p className="text-sm font-medium">{c.apelido || c.nome}</p>
+                                  <p className="text-xs text-muted-foreground">{c.codigo_identificador} · {c.tipo === 'MENSALISTA' ? 'Mensalista' : 'Avulso'}</p>
                                 </div>
                               </CommandItem>
                             ))}
@@ -400,26 +434,24 @@ export default function CadastroRapido() {
 
                 <div className="grid gap-2">
                   <Label>Razão Social *</Label>
-                  <Input required placeholder="Nome da empresa" value={processoForm.razao_social} onChange={(e) => setProcessoForm((f) => ({ ...f, razao_social: e.target.value }))} />
+                  <Input required placeholder="Nome da empresa" value={processoForm.razao_social} onChange={(e) => setProcessoForm(f => ({ ...f, razao_social: e.target.value }))} />
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label>Tipo de Processo *</Label>
-                    <Select value={processoForm.tipo} onValueChange={(v) => setProcessoForm((f) => ({ ...f, tipo: v as TipoProcesso }))}>
+                    <Label>Tipo</Label>
+                    <Select value={processoForm.tipo} onValueChange={v => setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="abertura">Abertura</SelectItem>
-                        <SelectItem value="alteracao">Alteração</SelectItem>
-                        <SelectItem value="transformacao">Transformação</SelectItem>
-                        <SelectItem value="baixa">Baixa</SelectItem>
-                        <SelectItem value="avulso">Avulso</SelectItem>
-                        <SelectItem value="orcamento">Orçamento</SelectItem>
+                        {Object.entries(TIPO_PROCESSO_LABELS).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>{v}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="grid gap-2">
                     <Label>Prioridade</Label>
-                    <Select value={processoForm.prioridade} onValueChange={(v) => setProcessoForm((f) => ({ ...f, prioridade: v }))}>
+                    <Select value={processoForm.prioridade} onValueChange={v => setProcessoForm(f => ({ ...f, prioridade: v }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="normal">Normal</SelectItem>
@@ -429,50 +461,45 @@ export default function CadastroRapido() {
                   </div>
                 </div>
 
-                {/* Valor Base info */}
-                {selectedCliente && !processoForm.definir_manual && (
-                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
-                    <p className="text-xs font-medium text-primary">Valor Base do Cliente</p>
-                    <p className="text-lg font-bold mt-1">
-                      {selectedCliente.tipo === 'MENSALISTA'
-                        ? 'Mensalista (franquia)'
-                        : Number((selectedCliente as any).valor_base ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </p>
-                    {processoForm.prioridade === 'urgente' && selectedCliente.tipo !== 'MENSALISTA' && (
-                      <p className="text-[10px] text-warning mt-1">+50% urgência = {(Number((selectedCliente as any).valor_base ?? 0) * 1.5).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                    )}
-                    {(selectedCliente as any).momento_faturamento === 'no_deferimento' && (
-                      <Badge variant="outline" className="text-[9px] border-info text-info mt-1">Faturamento: Deferimento</Badge>
-                    )}
-                  </div>
-                )}
+                <div className="grid gap-2">
+                  <Label>Responsável (opcional)</Label>
+                  <Input value={processoForm.responsavel} onChange={(e) => setProcessoForm(f => ({ ...f, responsavel: e.target.value }))} placeholder="Nome do responsável" />
+                </div>
 
                 {/* Manual value toggle */}
                 <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
                   <div>
                     <Label className="text-sm font-medium">Definir Valor Manualmente</Label>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {processoForm.definir_manual ? 'Valor digitado abaixo será usado.' : 'O sistema calcula usando a Metodologia de Cobrança do cliente.'}
+                      {processoForm.definir_manual ? 'Valor digitado abaixo será usado.' : 'Sistema calcula pela Metodologia de Cobrança.'}
                     </p>
                   </div>
                   <Switch
                     checked={processoForm.definir_manual}
-                    onCheckedChange={(checked) => setProcessoForm((f) => ({ ...f, definir_manual: checked }))}
+                    onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, definir_manual: checked }))}
                   />
                 </div>
-
                 {processoForm.definir_manual && (
                   <div className="grid gap-2">
-                    <Label>Valor Manual (R$) *</Label>
-                    <Input required type="number" step="0.01" min="0" placeholder="Informe o valor exato" value={processoForm.valor_manual} onChange={(e) => setProcessoForm((f) => ({ ...f, valor_manual: e.target.value }))} />
+                    <Label>Valor Manual (R$)</Label>
+                    <Input type="number" step="0.01" value={processoForm.valor_manual} onChange={e => setProcessoForm(f => ({ ...f, valor_manual: e.target.value }))} placeholder="0,00" />
                   </div>
                 )}
 
-                <div className="grid gap-2">
-                  <Label>Responsável</Label>
-                  <Input placeholder="Nome do responsável" value={processoForm.responsavel} onChange={(e) => setProcessoForm((f) => ({ ...f, responsavel: e.target.value }))} />
-                </div>
-                <Button type="submit" disabled={createProcesso.isPending} className="mt-2 w-fit">
+                {selectedCliente && (
+                  <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      Cliente selecionado: <span className="font-medium text-foreground">{selectedCliente.nome}</span>
+                      {' · '}
+                      {selectedCliente.tipo === 'MENSALISTA' ? 'Mensalista' : 'Avulso'}
+                      {selectedCliente.tipo !== 'MENSALISTA' && (selectedCliente as any).valor_base != null && (
+                        <> · Base: {Number((selectedCliente as any).valor_base).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                <Button type="submit" disabled={createProcesso.isPending || !processoForm.cliente_id || !processoForm.razao_social} className="w-fit">
                   {createProcesso.isPending ? 'Criando...' : 'Criar Processo'}
                 </Button>
               </form>

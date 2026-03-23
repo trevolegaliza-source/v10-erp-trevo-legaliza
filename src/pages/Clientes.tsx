@@ -426,7 +426,16 @@ export default function Clientes() {
                 <Label className="text-slate-300">CNPJ</Label>
                 <Input
                   value={maskCNPJ((editForm as any).cnpj || '')}
-                  onChange={e => setEditForm(f => ({ ...f, cnpj: e.target.value }))}
+                  onChange={e => {
+                    const masked = maskCNPJ(e.target.value);
+                    const digits = e.target.value.replace(/\D/g, '');
+                    const codigo = digits.slice(0, 6);
+                    setEditForm(f => ({
+                      ...f,
+                      cnpj: masked,
+                      codigo_identificador: codigo || f.codigo_identificador,
+                    }));
+                  }}
                   placeholder="00.000.000/0000-00"
                   maxLength={18}
                 />
@@ -437,9 +446,12 @@ export default function Clientes() {
               <div className="grid gap-2">
                 <Label className="text-slate-300">Código do Cliente</Label>
                 <Input
-                  value={editForm.codigo_identificador || ''}
-                  onChange={e => setEditForm(f => ({ ...f, codigo_identificador: e.target.value }))}
+                  value={maskCodigo(editForm.codigo_identificador || '')}
+                  onChange={e => setEditForm(f => ({ ...f, codigo_identificador: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                  placeholder="000.000 (auto)"
+                  maxLength={7}
                 />
+                <p className="text-[10px] text-muted-foreground">Extraído automaticamente do CNPJ</p>
               </div>
             </div>
             <div className="grid gap-2">
