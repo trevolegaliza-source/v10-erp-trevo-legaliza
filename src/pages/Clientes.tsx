@@ -117,16 +117,27 @@ export default function Clientes() {
     setContracts((data || []).map(f => ({ name: f.name, id: f.id })));
   };
 
-  const handleUploadContract = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!editClient || !e.target.files?.[0]) return;
-    const file = e.target.files[0];
-    if (file.size > 10 * 1024 * 1024) { toast.error('Máx. 10MB'); return; }
+  const handleUploadContract = async (file: File) => {
+    if (!editClient) return;
+    const allowed = ['application/pdf', 'image/png', 'image/jpeg'];
+    if (!allowed.includes(file.type)) { toast.error('Formato inválido. Aceitos: PDF, PNG, JPG'); throw new Error('invalid'); }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo: 10MB'); throw new Error('too large'); }
     setUploadingContract(true);
     const path = `${editClient.id}/${Date.now()}_${file.name}`;
     const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(path, file);
-    if (error) toast.error('Erro: ' + error.message);
-    else { toast.success('Contrato anexado!'); loadContracts(editClient.id); }
+    if (error) { toast.error('Erro no upload: ' + error.message); setUploadingContract(false); throw error; }
+    toast.success('Contrato anexado!');
+    loadContracts(editClient.id);
     setUploadingContract(false);
+  };
+
+  const handlePreviewContract = async (fileName: string) => {
+    if (!editClient) return;
+    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(`${editClient.id}/${fileName}`, 3600);
+    if (data?.signedUrl) {
+      setPreviewUrl(data.signedUrl);
+      setPreviewFileName(fileName);
+    }
   };
 
   const handleDownloadContract = async (fileName: string) => {
