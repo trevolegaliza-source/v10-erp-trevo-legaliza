@@ -181,32 +181,53 @@ export default function ClienteDetalhe() {
     }));
   };
 
-  const handleSaveCadastro = () => {
+  const [savingCadastro, setSavingCadastro] = useState(false);
+  const handleSaveCadastro = async () => {
     if (!cliente) return;
     const cnpjDigits = (editCadastroForm.cnpj || '').replace(/\D/g, '');
     if (cnpjDigits.length > 0 && cnpjDigits.length !== 14) {
       toast.error('Erro ao validar CNPJ: deve conter 14 dígitos.');
       return;
     }
-    const payload: Record<string, any> = {
-      id: cliente.id,
-      nome: editCadastroForm.nome,
-      apelido: editCadastroForm.apelido,
-      nome_contador: editCadastroForm.nome_contador,
-      cnpj: cnpjDigits || null,
-      codigo_identificador: editCadastroForm.codigo_identificador?.replace(/\D/g, '') || cliente.codigo_identificador,
-      email: editCadastroForm.email || null,
-      telefone: editCadastroForm.telefone || null,
-      tipo: editCadastroForm.tipo,
-    };
-    updateCliente.mutate(payload as any, {
-      onSuccess: () => {
-        toast.success('Dados cadastrais atualizados com sucesso');
-        setShowEditCadastro(false);
-        loadAll(cliente.id);
-      },
-      onError: (err: any) => toast.error('Erro: ' + (err?.message || 'Desconhecido')),
-    });
+    setSavingCadastro(true);
+    try {
+      const payload: Record<string, any> = {
+        id: cliente.id,
+        nome: editCadastroForm.nome,
+        apelido: editCadastroForm.apelido,
+        nome_contador: editCadastroForm.nome_contador,
+        cnpj: cnpjDigits || null,
+        codigo_identificador: editCadastroForm.codigo_identificador?.replace(/\D/g, '') || cliente.codigo_identificador,
+        email: editCadastroForm.email || null,
+        telefone: editCadastroForm.telefone || null,
+        tipo: editCadastroForm.tipo,
+      };
+      await new Promise<void>((resolve, reject) => {
+        updateCliente.mutate(payload as any, {
+          onSuccess: () => resolve(),
+          onError: (err: any) => reject(err),
+        });
+      });
+      // Upsert honorários
+      const validRows = editHonorariosRows.filter(r => r.service_name.trim() && r.fixed_price);
+      await upsertNegotiations.mutateAsync({
+        clienteId: cliente.id,
+        negotiations: validRows.map(r => ({
+          service_name: r.service_name.trim(),
+          fixed_price: Number(r.fixed_price),
+          billing_trigger: r.billing_trigger,
+          trigger_days: Number(r.trigger_days) || 0,
+          is_custom: true as const,
+        })),
+      });
+      toast.success('Dados cadastrais e honorários atualizados!');
+      setShowEditCadastro(false);
+      loadAll(cliente.id);
+    } catch (err: any) {
+      toast.error('Erro: ' + (err?.message || 'Desconhecido'));
+    } finally {
+      setSavingCadastro(false);
+    }
   };
 
   const handleUpload = async (file: File) => {
