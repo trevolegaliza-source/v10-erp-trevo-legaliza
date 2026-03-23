@@ -154,13 +154,30 @@ export default function CadastroRapido() {
     createCliente.mutate(
       payload as any,
       {
-        onSuccess: (data: any) => {
+        onSuccess: async (data: any) => {
           const clienteId = data?.id || data?.[0]?.id;
           if (contratoFile && clienteId) {
             uploadContrato(clienteId);
           }
+          // Save honorários if any
+          if (clienteId && honorariosRows.length > 0) {
+            const validRows = honorariosRows.filter(r => r.service_name.trim() && r.fixed_price);
+            if (validRows.length > 0) {
+              await upsertNegotiations.mutateAsync({
+                clienteId,
+                negotiations: validRows.map(r => ({
+                  service_name: r.service_name.trim(),
+                  fixed_price: Number(r.fixed_price),
+                  billing_trigger: r.billing_trigger,
+                  trigger_days: Number(r.trigger_days) || 0,
+                  is_custom: true as const,
+                })),
+              });
+            }
+          }
           setClienteForm(INITIAL_CLIENTE);
           setContratoFile(null);
+          setHonorariosRows([]);
         },
       },
     );
