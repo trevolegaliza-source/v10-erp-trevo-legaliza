@@ -101,6 +101,8 @@ export function useUpdateCliente() {
       }
       if (updates.momento_faturamento !== undefined) payload.momento_faturamento = updates.momento_faturamento;
       if ((updates as any).observacoes !== undefined) payload.observacoes = (updates as any).observacoes;
+      if ((updates as any).cnpj !== undefined) payload.cnpj = (updates as any).cnpj;
+      if ((updates as any).tipo !== undefined) payload.tipo = (updates as any).tipo;
 
       const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
       if (error) throw error;
