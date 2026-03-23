@@ -151,9 +151,18 @@ export default function Processos() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [valoresOpen, setValoresOpen] = useState(false);
 
-  const handleDelete = useCallback((id: string) => {
-    deleteProcesso.mutate(id);
-  }, [deleteProcesso]);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const handleDeleteRequest = useCallback((id: string) => {
+    setDeleteConfirmId(id);
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    if (deleteConfirmId) {
+      deleteProcesso.mutate(deleteConfirmId);
+      setDeleteConfirmId(null);
+    }
+  }, [deleteConfirmId, deleteProcesso]);
 
   const filtered = filterType === 'all'
     ? (processos || [])
