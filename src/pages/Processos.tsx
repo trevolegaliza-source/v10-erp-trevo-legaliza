@@ -26,10 +26,12 @@ type ViewMode = 'kanban' | 'list';
 function QuickActionsMenu({
   process,
   onDelete,
+  onEdit,
   onHonorarioExtra,
 }: {
   process: ProcessoDB;
   onDelete: (id: string) => void;
+  onEdit: (process: ProcessoDB) => void;
   onHonorarioExtra: (process: ProcessoDB) => void;
 }) {
   return (
@@ -40,6 +42,9 @@ function QuickActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onClick={() => onEdit(process)}>
+          <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onHonorarioExtra(process)}>
           <Receipt className="h-3.5 w-3.5 mr-2" /> Honorário Extra
         </DropdownMenuItem>
