@@ -261,8 +261,22 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
             <Badge variant="outline" className="text-[9px] border-info text-info">Mensalista</Badge>
           )}
 
-          {/* Discount info */}
-          {cliente?.desconto_progressivo > 0 && cliente?.tipo !== 'MENSALISTA' && (
+          {/* Discount info from notas */}
+          {processo.notas?.includes('Desconto Progressivo:') && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="text-[10px] text-info bg-info/10 rounded px-2 py-1 cursor-help">
+                    📊 {processo.notas.match(/Desconto Progressivo: .+?\)/)?.[0] || `Desc. ${cliente?.desconto_progressivo}% progressivo`}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs max-w-[280px]">
+                  {processo.notas.match(/Base: .+/)?.[0] || 'Desconto progressivo aplicado conforme regra do cliente'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {!processo.notas?.includes('Desconto Progressivo:') && cliente?.desconto_progressivo > 0 && cliente?.tipo !== 'MENSALISTA' && (
             <div className="text-[10px] text-muted-foreground bg-muted/50 rounded px-2 py-1">
               Desc. {cliente.desconto_progressivo}% progressivo
               {cliente.valor_limite_desconto && ` (mín. ${formatBRL(cliente.valor_limite_desconto)})`}

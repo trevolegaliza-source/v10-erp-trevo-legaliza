@@ -189,16 +189,33 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
             {/* Value summary */}
             <div className="rounded-lg border border-border bg-muted/30 p-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Valor Base</span>
-                <span className="text-foreground">{formatBRL(baseValue)}</span>
-              </div>
-              {cliente?.desconto_progressivo > 0 && (
-                <div className="flex justify-between text-sm mt-1">
-                  <span className="text-info">Desconto Progressivo</span>
-                  <span className="text-info">{cliente.desconto_progressivo}%</span>
-                </div>
-              )}
+              {(() => {
+                const discountMatch = processo.notas?.match(/Base: R\$ ([\d.,]+) \| Desconto: R\$ ([\d.,]+)/);
+                const valorBase = discountMatch ? parseFloat(discountMatch[1].replace(',', '.')) : baseValue;
+                const descontoAcum = discountMatch ? parseFloat(discountMatch[2].replace(',', '.')) : 0;
+                const processNumMatch = processo.notas?.match(/Processo nº (\d+) do mês/);
+                const processNum = processNumMatch ? processNumMatch[1] : null;
+                return (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Valor Base</span>
+                      <span className="text-foreground">{formatBRL(valorBase)}</span>
+                    </div>
+                    {descontoAcum > 0 && (
+                      <div className="flex justify-between text-sm mt-1">
+                        <span className="text-info">Desconto Acumulado {processNum && `(nº ${processNum} do mês)`}</span>
+                        <span className="text-info">-{formatBRL(descontoAcum)}</span>
+                      </div>
+                    )}
+                    {descontoAcum > 0 && (
+                      <div className="flex justify-between text-sm mt-1">
+                        <span className="text-muted-foreground">Valor com Desconto</span>
+                        <span className="text-foreground">{formatBRL(baseValue)}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               {somaAdicionais > 0 && (
                 <div className="flex justify-between text-sm mt-1">
                   <span className="text-muted-foreground">Valores Adicionais ({valoresAdicionais.length})</span>
