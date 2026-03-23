@@ -157,6 +157,16 @@ export default function ClienteDetalhe() {
       telefone: cliente.telefone || '',
       tipo: cliente.tipo,
     });
+    // Load existing negotiations into inline rows
+    setEditHonorariosRows(
+      (negotiations || []).map(n => ({
+        key: n.id,
+        service_name: n.service_name,
+        fixed_price: String(n.fixed_price),
+        billing_trigger: n.billing_trigger as 'request' | 'approval',
+        trigger_days: String(n.trigger_days),
+      }))
+    );
     setShowEditCadastro(true);
   };
 
