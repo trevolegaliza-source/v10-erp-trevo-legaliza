@@ -157,11 +157,12 @@ export default function ClienteDetalhe() {
 
   const handleViewContract = async (fileName: string) => {
     if (!cliente) return;
-    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(`${cliente.id}/${fileName}`, 3600);
+    const storagePath = `${cliente.id}/${fileName}`;
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(storagePath, 3600);
     if (data?.signedUrl) {
       window.open(data.signedUrl, '_blank');
     } else {
-      toast.error('Erro ao gerar link de visualização');
+      toast.error('Erro: Arquivo antigo incompatível, por favor re-anexe');
     }
   };
 
