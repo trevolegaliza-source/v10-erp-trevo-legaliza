@@ -467,7 +467,7 @@ export default function Clientes() {
               </div>
               <div className="grid gap-2">
                 <Label className="text-slate-300">Momento do Faturamento</Label>
-                <Select value={(editForm as any).momento_faturamento || 'na_solicitacao'} onValueChange={(v) => setEditForm(f => ({ ...f, momento_faturamento: v }))}>
+                <Select value={(editForm as any).momento_faturamento || 'na_solicitacao'} onValueChange={(v) => setEditForm(f => ({ ...f, momento_faturamento: v as any }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>

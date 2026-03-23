@@ -442,7 +442,7 @@ export default function ClienteDetalhe() {
                 <div className="grid gap-1.5">
                   <Label className="text-xs text-slate-400">Momento do Faturamento</Label>
                   {editing ? (
-                    <Select value={(editForm as any).momento_faturamento || 'na_solicitacao'} onValueChange={(v) => setEditForm(f => ({ ...f, momento_faturamento: v }))}>
+                    <Select value={(editForm as any).momento_faturamento || 'na_solicitacao'} onValueChange={(v) => setEditForm(f => ({ ...f, momento_faturamento: v as MomentoFaturamento }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>
