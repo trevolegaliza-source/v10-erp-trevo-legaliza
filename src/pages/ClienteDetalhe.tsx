@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil } from 'lucide-react';
+import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil, List } from 'lucide-react';
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -26,6 +26,8 @@ import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
+import HonorariosRepeater from '@/components/clientes/HonorariosRepeater';
+import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +48,7 @@ export default function ClienteDetalhe() {
   const [editCadastroForm, setEditCadastroForm] = useState<Record<string, any>>({});
   const updateCliente = useUpdateCliente();
   const createProcesso = useCreateProcesso();
+  const { data: negotiations } = useServiceNegotiations(id);
   const deleteCliente = useDeleteCliente();
   const archiveCliente = useArchiveCliente();
   const unarchiveCliente = useUnarchiveCliente();
@@ -61,13 +64,15 @@ export default function ClienteDetalhe() {
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
     razao_social: '',
-    tipo: 'abertura' as TipoProcesso,
+    tipo: 'abertura' as string,
     prioridade: 'normal',
     responsavel: '',
     valor_manual: '',
     definir_manual: false,
+    negotiated_service_id: '' as string,
   });
   const isManualPrice = processoForm.definir_manual;
+  const isNegotiatedService = !!processoForm.negotiated_service_id;
   const isArchived = !!(cliente as any)?.is_archived;
 
   const handleCreateProcesso = () => {
@@ -75,19 +80,25 @@ export default function ClienteDetalhe() {
       toast.error('Preencha a Razão Social');
       return;
     }
+    // Determine valor: negotiated service uses fixed_price, otherwise normal flow
+    const negotiatedService = negotiations?.find(n => n.id === processoForm.negotiated_service_id);
+    const valorManualFinal = negotiatedService
+      ? negotiatedService.fixed_price
+      : (isManualPrice && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined);
+
     createProcesso.mutate(
       {
         cliente_id: cliente.id,
         razao_social: processoForm.razao_social.trim(),
-        tipo: processoForm.tipo,
+        tipo: (isNegotiatedService ? 'avulso' : processoForm.tipo) as TipoProcesso,
         prioridade: processoForm.prioridade,
         responsavel: processoForm.responsavel || undefined,
-        valor_manual: isManualPrice && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined,
+        valor_manual: valorManualFinal,
       },
       {
         onSuccess: () => {
           setShowNovoProcesso(false);
-          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false });
+          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, negotiated_service_id: '' });
           loadAll(cliente.id);
         },
       }
@@ -363,8 +374,9 @@ export default function ClienteDetalhe() {
 
       {/* Tabs */}
       <Tabs defaultValue="financeiro-config" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="financeiro-config" className="text-xs gap-1"><Settings className="h-3.5 w-3.5" />Config. Financeira</TabsTrigger>
+          <TabsTrigger value="honorarios" className="text-xs gap-1"><List className="h-3.5 w-3.5" />Honorários</TabsTrigger>
           <TabsTrigger value="processos" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Processos</TabsTrigger>
           <TabsTrigger value="faturas" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Financeiro</TabsTrigger>
           <TabsTrigger value="contratos" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Contratos</TabsTrigger>
@@ -457,6 +469,18 @@ export default function ClienteDetalhe() {
                   </>
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Honorários Específicos ── */}
+        <TabsContent value="honorarios">
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Tabela de Honorários Específicos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HonorariosRepeater clienteId={cliente.id} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -769,15 +793,51 @@ export default function ClienteDetalhe() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
-                <Label>Tipo</Label>
-                <Select value={processoForm.tipo} onValueChange={v => setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso }))}>
+                <Label>Tipo de Serviço</Label>
+                <Select
+                  value={processoForm.negotiated_service_id || processoForm.tipo}
+                  onValueChange={v => {
+                    const neg = negotiations?.find(n => n.id === v);
+                    if (neg) {
+                      setProcessoForm(f => ({
+                        ...f,
+                        negotiated_service_id: neg.id,
+                        tipo: 'avulso',
+                        definir_manual: true,
+                        valor_manual: String(neg.fixed_price),
+                      }));
+                    } else {
+                      setProcessoForm(f => ({
+                        ...f,
+                        negotiated_service_id: '',
+                        tipo: v,
+                        definir_manual: false,
+                        valor_manual: '',
+                      }));
+                    }
+                  }}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem disabled value="__header_std" className="text-[10px] font-semibold text-muted-foreground">— Serviços Padrão —</SelectItem>
                     {Object.entries(TIPO_PROCESSO_LABELS).map(([k, v]) => (
                       <SelectItem key={k} value={k}>{v}</SelectItem>
                     ))}
+                    {negotiations && negotiations.length > 0 && (
+                      <>
+                        <SelectItem disabled value="__header_neg" className="text-[10px] font-semibold text-muted-foreground">— Serviços Negociados —</SelectItem>
+                        {negotiations.map(n => (
+                          <SelectItem key={n.id} value={n.id}>
+                            {n.service_name} — {Number(n.fixed_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
+                {isNegotiatedService && (
+                  <p className="text-[10px] text-primary">Valor fixo negociado aplicado. Desconto progressivo bloqueado.</p>
+                )}
               </div>
               <div className="grid gap-1.5">
                 <Label>Prioridade</Label>

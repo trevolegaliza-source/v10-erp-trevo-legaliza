@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import { maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
+import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
 
 const INITIAL_CLIENTE = {
   codigo_identificador: '',
@@ -47,7 +48,7 @@ export default function CadastroRapido() {
   const [processoForm, setProcessoForm] = useState({
     cliente_id: '',
     razao_social: '',
-    tipo: 'abertura' as TipoProcesso,
+    tipo: 'abertura' as string,
     prioridade: 'normal',
     responsavel: '',
     valor_manual: '',
@@ -56,6 +57,7 @@ export default function CadastroRapido() {
   const createProcesso = useCreateProcesso();
   const { data: clientes } = useClientes();
   const [clienteComboOpen, setClienteComboOpen] = useState(false);
+  const { data: negotiations } = useServiceNegotiations(processoForm.cliente_id || undefined);
 
   const selectedCliente = (clientes || []).find(c => c.id === processoForm.cliente_id);
 
@@ -163,14 +165,19 @@ export default function CadastroRapido() {
 
   const handleCreateProcesso = (e: React.FormEvent) => {
     e.preventDefault();
+    // Check if negotiated service selected
+    const neg = negotiations?.find(n => n.id === processoForm.tipo);
+    const tipoFinal = neg ? 'avulso' : processoForm.tipo;
+    const valorFinal = neg ? neg.fixed_price : (processoForm.definir_manual && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined);
+
     createProcesso.mutate(
       {
         cliente_id: processoForm.cliente_id,
         razao_social: processoForm.razao_social,
-        tipo: processoForm.tipo,
+        tipo: tipoFinal as TipoProcesso,
         prioridade: processoForm.prioridade,
         responsavel: processoForm.responsavel,
-        valor_manual: processoForm.definir_manual && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined,
+        valor_manual: valorFinal,
       },
       {
         onSuccess: () =>
@@ -439,13 +446,39 @@ export default function CadastroRapido() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label>Tipo</Label>
-                    <Select value={processoForm.tipo} onValueChange={v => setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso }))}>
+                    <Label>Tipo de Serviço</Label>
+                    <Select
+                      value={processoForm.tipo}
+                      onValueChange={v => {
+                        const neg = negotiations?.find(n => n.id === v);
+                        if (neg) {
+                          setProcessoForm(f => ({
+                            ...f,
+                            tipo: v,
+                            definir_manual: true,
+                            valor_manual: String(neg.fixed_price),
+                          }));
+                        } else {
+                          setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso, definir_manual: false, valor_manual: '' }));
+                        }
+                      }}
+                    >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
+                        <SelectItem disabled value="__header_std" className="text-[10px] font-semibold text-muted-foreground">— Serviços Padrão —</SelectItem>
                         {Object.entries(TIPO_PROCESSO_LABELS).map(([k, v]) => (
                           <SelectItem key={k} value={k}>{v}</SelectItem>
                         ))}
+                        {negotiations && negotiations.length > 0 && (
+                          <>
+                            <SelectItem disabled value="__header_neg" className="text-[10px] font-semibold text-muted-foreground">— Serviços Negociados —</SelectItem>
+                            {negotiations.map(n => (
+                              <SelectItem key={n.id} value={n.id}>
+                                {n.service_name} — {Number(n.fixed_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
