@@ -67,6 +67,25 @@ export default function CadastroRapido() {
 
   const selectedCliente = (clientes || []).find(c => c.id === processoForm.cliente_id);
 
+  // Calculate value preview using same-month process count
+  const [monthCount, setMonthCount] = useState<number | null>(null);
+  // Fetch month count when client changes
+  const fetchMonthCount = useCallback(async (clienteId: string) => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const { count } = await supabase
+      .from('processos')
+      .select('id', { count: 'exact', head: true })
+      .eq('cliente_id', clienteId)
+      .gte('created_at', startOfMonth);
+    setMonthCount(count ?? 0);
+  }, []);
+
+  // Trigger fetch when client changes
+  useState(() => {
+    if (processoForm.cliente_id) fetchMonthCount(processoForm.cliente_id);
+  });
+
   const isAvulso = clienteForm.tipo === 'AVULSO_4D';
   const isMensalista = clienteForm.tipo === 'MENSALISTA';
 
