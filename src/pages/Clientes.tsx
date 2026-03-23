@@ -454,15 +454,27 @@ export default function Clientes() {
                 <p className="text-[10px] text-muted-foreground">Extraído automaticamente do CNPJ</p>
               </div>
             </div>
-            <div className="grid gap-2">
-              <Label className="text-slate-300">Tipo</Label>
-              <Select value={editForm.tipo} onValueChange={(v) => setEditForm(f => ({ ...f, tipo: v as TipoCliente }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MENSALISTA">Mensalista</SelectItem>
-                  <SelectItem value="AVULSO_4D">Avulso</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Tipo</Label>
+                <Select value={editForm.tipo} onValueChange={(v) => setEditForm(f => ({ ...f, tipo: v as TipoCliente }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MENSALISTA">Mensalista</SelectItem>
+                    <SelectItem value="AVULSO_4D">Avulso</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-slate-300">Momento do Faturamento</Label>
+                <Select value={(editForm as any).momento_faturamento || 'na_solicitacao'} onValueChange={(v) => setEditForm(f => ({ ...f, momento_faturamento: v as any }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>
+                    <SelectItem value="no_deferimento">No Deferimento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -509,10 +521,12 @@ export default function Clientes() {
                     <Label className="text-xs text-slate-400">Limite Desconto (R$)</Label>
                     <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
-                  <div className="grid gap-1">
-                    <Label className="text-xs text-slate-400">Dia Cobrança (D+X)</Label>
-                    <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} />
-                  </div>
+                  {(editForm as any).momento_faturamento !== 'no_deferimento' && (
+                    <div className="grid gap-1">
+                      <Label className="text-xs text-slate-400">Dia Cobrança (D+X)</Label>
+                      <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} />
+                    </div>
+                  )}
                 </div>
               </div>
             )}
