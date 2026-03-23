@@ -65,16 +65,17 @@ function ProcessCard({
   index,
   onDelete,
   onDoubleClick,
+  onEdit,
   onHonorarioExtra,
 }: {
   process: ProcessoDB;
   index: number;
   onDelete: (id: string) => void;
   onDoubleClick: (process: ProcessoDB) => void;
+  onEdit: (process: ProcessoDB) => void;
   onHonorarioExtra: (process: ProcessoDB) => void;
 }) {
-  const clientName = process.cliente?.nome || 'Cliente';
-  // Extract avulso custom description from notas
+  const clientName = process.cliente?.apelido || process.cliente?.nome || 'Cliente';
   const avulsoMatch = process.notas?.match(/\[AVULSO:(.+?)\]/);
   const typeLabel = avulsoMatch ? avulsoMatch[1] : (PROCESS_TYPE_LABELS[process.tipo] || process.tipo);
 
@@ -87,24 +88,22 @@ function ProcessCard({
           {...provided.dragHandleProps}
           onDoubleClick={() => onDoubleClick(process)}
           className={cn(
-            'group rounded-lg border border-border/50 bg-card p-3 shadow-sm card-hover cursor-pointer',
+            'group rounded-lg border border-border bg-zinc-900 p-3 shadow-sm cursor-pointer transition-all hover:border-primary/40 hover:shadow-[0_0_12px_-3px_hsl(var(--primary)/0.25)]',
             snapshot.isDragging && 'shadow-lg ring-2 ring-primary/30'
           )}
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold truncate leading-tight">{process.razao_social}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{clientName}</p>
+              <p className="text-[13px] font-bold truncate leading-tight text-white">{clientName}</p>
+              <p className="text-[11px] text-zinc-400 mt-0.5 truncate">{process.razao_social}</p>
+              <p className="text-[12px] font-semibold text-primary mt-0.5 truncate">{typeLabel}</p>
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
-              <QuickActionsMenu process={process} onDelete={onDelete} onHonorarioExtra={onHonorarioExtra} />
+              <QuickActionsMenu process={process} onDelete={onDelete} onEdit={onEdit} onHonorarioExtra={onHonorarioExtra} />
               <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           </div>
           <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
-            <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-[18px] border-primary/30 text-primary font-medium">
-              {typeLabel}
-            </Badge>
             {process.prioridade === 'urgente' && (
               <Badge className="text-[9px] px-1.5 py-0 h-[18px] bg-destructive/10 text-destructive border-0 font-medium">
                 Urgente
@@ -116,15 +115,14 @@ function ProcessCard({
               <div className="h-5 w-5 rounded-full bg-primary/15 flex items-center justify-center">
                 <span className="text-[9px] font-semibold text-primary">{process.responsavel[0]}</span>
               </div>
-              <span className="text-[11px] text-muted-foreground">{process.responsavel}</span>
+              <span className="text-[11px] text-zinc-400">{process.responsavel}</span>
             </div>
           )}
           {process.valor && (
-            <p className="text-[10px] text-muted-foreground mt-1.5">
+            <p className="text-sm font-semibold text-white mt-1.5">
               {Number(process.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </p>
           )}
-          {/* SLA Progress Bar */}
           {(() => {
             const daysSince = Math.floor((Date.now() - new Date(process.created_at).getTime()) / 86400000);
             const slaMax = process.prioridade === 'urgente' ? 5 : 10;
