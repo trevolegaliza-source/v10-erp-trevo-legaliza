@@ -56,6 +56,9 @@ export default function CadastroRapido() {
     responsavel: '',
     valor_manual: '',
     definir_manual: false,
+    descricao_avulso: '',
+    ja_pago: false,
+    observacoes: '',
   });
   const createProcesso = useCreateProcesso();
   const { data: clientes } = useClientes();
