@@ -464,6 +464,9 @@ export default function Clientes() {
                     <div key={c.name} className="flex items-center gap-2 text-sm bg-muted/30 rounded-md px-3 py-1.5">
                       <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       <span className="flex-1 truncate">{c.name}</span>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePreviewContract(c.name)}>
+                        <Eye className="h-3 w-3" />
+                      </Button>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDownloadContract(c.name)}>
                         <Download className="h-3 w-3" />
                       </Button>
@@ -476,11 +479,7 @@ export default function Clientes() {
               ) : (
                 <p className="text-xs text-muted-foreground">Nenhum contrato anexado</p>
               )}
-              <label className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-3 text-sm text-muted-foreground cursor-pointer hover:bg-muted/40 transition-colors">
-                <Upload className="h-4 w-4" />
-                {uploadingContract ? 'Enviando...' : 'Anexar Contrato (PDF, DOC — máx. 10MB)'}
-                <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleUploadContract} disabled={uploadingContract} />
-              </label>
+              <ContractDropzone uploading={uploadingContract} onUpload={handleUploadContract} />
             </div>
 
             <div className="flex items-center justify-between pt-2">
