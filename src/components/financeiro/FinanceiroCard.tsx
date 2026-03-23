@@ -195,11 +195,11 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
-                <p className="text-sm font-semibold truncate text-foreground">{clienteApelido}</p>
+              <p className="text-sm font-bold truncate text-white">{clienteApelido}</p>
               </div>
-              <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
+              <p className="text-[11px] text-zinc-400 truncate">{processo.razao_social}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <p className="text-[12px] font-semibold text-foreground/90 truncate">{serviceName}</p>
+                <p className="text-[12px] font-semibold text-primary truncate">{serviceName}</p>
                 {isNegociado && (
                   <Badge className="text-[9px] bg-emerald-500/20 text-emerald-400 border-emerald-500/50 px-1.5 py-0">
                     Negociado
