@@ -22,7 +22,7 @@ export function useServiceNegotiations(clienteId?: string) {
     enabled: !!clienteId,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('service_negotiations' as any)
+        .from('service_negotiations')
         .select('*')
         .eq('cliente_id', clienteId!)
         .order('created_at', { ascending: true });
@@ -38,7 +38,7 @@ export function useUpsertServiceNegotiations() {
     mutationFn: async ({ clienteId, negotiations }: { clienteId: string; negotiations: Omit<ServiceNegotiationInsert, 'cliente_id'>[] }) => {
       // Delete existing
       const { error: delError } = await supabase
-        .from('service_negotiations' as any)
+        .from('service_negotiations')
         .delete()
         .eq('cliente_id', clienteId);
       if (delError) throw delError;
@@ -55,7 +55,7 @@ export function useUpsertServiceNegotiations() {
       }));
 
       const { data, error } = await supabase
-        .from('service_negotiations' as any)
+        .from('service_negotiations')
         .insert(rows)
         .select('*');
       if (error) throw error;
