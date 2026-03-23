@@ -28,6 +28,13 @@ interface FinanceiroCardProps {
   negotiationLookup?: Map<string, Map<string, ServiceNegotiationRecord>>;
 }
 
+/** Extract avulso custom description from notas field */
+export function extractAvulsoDesc(notas: string | null | undefined): string | null {
+  if (!notas) return null;
+  const match = notas.match(/\[AVULSO:(.+?)\]/);
+  return match ? match[1] : null;
+}
+
 /** Retroactive negotiation detection: checks if the processo's service matches a client negotiation */
 function detectNegotiation(
   processo: ProcessoFinanceiro,
