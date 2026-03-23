@@ -1,6 +1,7 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, ExternalLink, FileWarning } from 'lucide-react';
 
 interface ContractPreviewModalProps {
   open: boolean;
@@ -11,43 +12,146 @@ interface ContractPreviewModalProps {
 }
 
 export default function ContractPreviewModal({ open, onOpenChange, url, fileName, clienteName }: ContractPreviewModalProps) {
-  if (!url) return null;
+  const [objectError, setObjectError] = useState(false);
 
-  const ext = fileName.split('.').pop()?.toLowerCase() || '';
+  const ext = fileName?.split('.').pop()?.toLowerCase() || '';
   const isImage = ['png', 'jpg', 'jpeg', 'webp'].includes(ext);
   const isPdf = ext === 'pdf';
+  const isValidUrl = url && url.startsWith('http');
+
+  // Build inline URL (avoid content-disposition=attachment)
+  const inlineUrl = isValidUrl && url
+    ? url.includes('?')
+      ? `${url}&response-content-disposition=inline`
+      : `${url}?response-content-disposition=inline`
+    : null;
+
+  const handleClose = () => onOpenChange(false);
+
+  const renderContent = () => {
+    if (!isValidUrl || !inlineUrl) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center gap-4 px-8">
+          <FileWarning className="h-16 w-16 text-muted-foreground/50" />
+          <div>
+            <p className="text-base font-medium text-foreground mb-2">Documento não encontrado ou formato incompatível</p>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Por favor, re-anexe o contrato usando o campo de Drag & Drop na aba de Contratos.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (isImage) {
+      return (
+        <div className="flex items-center justify-center h-full p-4">
+          <img
+            src={inlineUrl}
+            alt={fileName}
+            className="max-w-full max-h-full object-contain rounded-md"
+            onError={() => setObjectError(true)}
+          />
+          {objectError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 gap-3">
+              <FileWarning className="h-12 w-12 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">Não foi possível carregar a imagem.</p>
+              <Button variant="outline" size="sm" asChild>
+                <a href={url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir em nova aba
+                </a>
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (isPdf) {
+      return (
+        <div className="relative h-full w-full">
+          {!objectError ? (
+            <object
+              data={inlineUrl}
+              type="application/pdf"
+              className="w-full h-full"
+              onError={() => setObjectError(true)}
+            >
+              {/* Fallback if <object> fails */}
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <FileWarning className="h-12 w-12 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">O preview do PDF não carregou neste navegador.</p>
+                <Button variant="default" size="sm" asChild>
+                  <a href={url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir em tela cheia
+                  </a>
+                </Button>
+              </div>
+            </object>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full gap-4">
+              <FileWarning className="h-12 w-12 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">O preview do PDF não carregou.</p>
+              <Button variant="default" size="sm" asChild>
+                <a href={url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir em tela cheia
+                </a>
+              </Button>
+            </div>
+          )}
+          {/* Always show fallback button */}
+          <div className="absolute bottom-4 right-4">
+            <Button variant="secondary" size="sm" className="gap-1.5 shadow-lg" asChild>
+              <a href={url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-3.5 w-3.5" /> Abrir em nova aba
+              </a>
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    // Unknown format
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4">
+        <p className="text-sm text-muted-foreground">Pré-visualização não disponível para este formato.</p>
+        <Button variant="outline" size="sm" asChild>
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Abrir em nova aba
+          </a>
+        </Button>
+      </div>
+    );
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[85vw] max-h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="flex-row items-center justify-between px-6 py-4 border-b border-border/60">
+      <DialogContent
+        className="sm:max-w-[90vw] h-[90vh] flex flex-col p-0 gap-0 bg-background/95 backdrop-blur-sm border-border/60"
+        aria-describedby="contract-preview-desc"
+      >
+        <DialogDescription id="contract-preview-desc" className="sr-only">
+          Visualização do contrato {fileName}
+        </DialogDescription>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-border/60 shrink-0">
           <div className="flex-1 min-w-0">
-            <DialogTitle className="text-base font-semibold truncate">
+            <p className="text-base font-semibold truncate text-foreground">
               {clienteName ? `${clienteName} — ` : ''}{fileName}
-            </DialogTitle>
+            </p>
           </div>
           <Button
             variant="ghost"
-            size="lg"
+            size="icon"
             className="h-10 w-10 rounded-full hover:bg-destructive/10 hover:text-destructive shrink-0 ml-4"
-            onClick={() => onOpenChange(false)}
+            onClick={handleClose}
           >
             <X className="h-5 w-5" />
           </Button>
-        </DialogHeader>
-        <div className="flex-1 min-h-0 overflow-auto bg-muted/20 p-2">
-          {isPdf ? (
-            <iframe src={url} className="w-full h-[80vh] rounded-md border-0" title={fileName} />
-          ) : isImage ? (
-            <img src={url} alt={fileName} className="w-full h-auto max-h-[80vh] object-contain mx-auto rounded-md" />
-          ) : (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
-              <p className="text-sm">Pré-visualização não disponível para este formato.</p>
-              <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary underline text-sm">
-                Abrir em nova aba
-              </a>
-            </div>
-          )}
+        </div>
+        {/* Content */}
+        <div className="flex-1 min-h-0 relative bg-muted/10">
+          {renderContent()}
         </div>
       </DialogContent>
     </Dialog>
