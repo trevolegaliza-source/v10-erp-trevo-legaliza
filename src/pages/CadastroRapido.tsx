@@ -48,7 +48,7 @@ export default function CadastroRapido() {
   const [processoForm, setProcessoForm] = useState({
     cliente_id: '',
     razao_social: '',
-    tipo: 'abertura' as TipoProcesso,
+    tipo: 'abertura' as string,
     prioridade: 'normal',
     responsavel: '',
     valor_manual: '',
