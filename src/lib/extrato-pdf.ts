@@ -416,14 +416,26 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
     doc.setTextColor(30, 41, 59);
     doc.text(serviceName, MARGIN + 22, y + 8, { maxWidth: contentW - 70 });
 
-    // Date
+    // Date + manual/urgency badge
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Data: ${fmtDate(p.created_at)}`, MARGIN + 22, y + 14);
+    let infoLine = `Data: ${fmtDate(p.created_at)}`;
+    doc.text(infoLine, MARGIN + 22, y + 14);
 
-    // Discount info
-    if (step.desconto > 0) {
+    if (step.isManual || step.isUrgencia) {
+      const badgeLabel = step.isUrgencia ? 'URGÊNCIA' : 'VALOR MANUAL';
+      const badgeX = MARGIN + 22 + doc.getTextWidth(infoLine) + 4;
+      doc.setFillColor(234, 88, 12); // orange
+      doc.roundedRect(badgeX, y + 10.5, doc.getTextWidth(badgeLabel) + 6, 5, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(badgeLabel, badgeX + 3, y + 14);
+    }
+
+    // Discount info (only for progressive, not manual)
+    if (step.desconto > 0 && !step.isManual) {
       doc.setFontSize(6.5);
       doc.setTextColor(22, 101, 52);
       doc.text(`Desc. Progressivo: -${fmt(step.desconto)}`, MARGIN + 22, y + 19);
@@ -432,11 +444,11 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
     // Value on the right
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
-    doc.setTextColor(76, 159, 56);
+    doc.setTextColor(step.isManual ? 234 : 76, step.isManual ? 88 : 159, step.isManual ? 12 : 56);
     doc.text(fmt(step.valorFinal), pageW - MARGIN - 5, y + 10, { align: 'right' });
 
-    // Base value reference if discounted
-    if (step.desconto > 0) {
+    // Base value reference if discounted (not for manual)
+    if (step.desconto > 0 && !step.isManual) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.5);
       doc.setTextColor(148, 163, 184);
