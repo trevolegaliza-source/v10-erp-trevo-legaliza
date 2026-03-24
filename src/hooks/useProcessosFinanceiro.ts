@@ -24,6 +24,10 @@ export function useProcessosFinanceiro() {
         qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
         qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'valores_adicionais' }, () => {
+        qc.invalidateQueries({ queryKey: ['valores_adicionais'] });
+        qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
+      })
       .subscribe();
 
     return () => {

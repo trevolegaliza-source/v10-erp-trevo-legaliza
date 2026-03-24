@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
+import ProcessoEditModal from './ProcessoEditModal';
 
 interface FinanceiroListProps {
   processos: ProcessoFinanceiro[];
@@ -32,6 +33,8 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
   const [generating, setGenerating] = useState(false);
   const [showMarkDialog, setShowMarkDialog] = useState(false);
   const [lastPdfBlob, setLastPdfBlob] = useState<Blob | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
   const qc = useQueryClient();
 
   const allChecked = processos.length > 0 && selected.size === processos.length;
@@ -178,7 +181,7 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
               const total = Number(lanc?.valor ?? p.valor ?? 0) + Number(lanc?.honorario_extra || 0);
               const status = (lanc?.status || 'pendente') as StatusFinanceiro;
               return (
-                <tr key={p.id} className={cn('border-t border-border/30', isOverdue && 'bg-destructive/5')}>
+                <tr key={p.id} className={cn('border-t border-border/30 cursor-pointer hover:bg-muted/30', isOverdue && 'bg-destructive/5')} onDoubleClick={() => { setEditProcesso(p); setEditModalOpen(true); }}>
                   <td className="px-3 py-2.5">
                     <Checkbox
                       checked={selected.has(p.id)}
@@ -238,6 +241,11 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ProcessoEditModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        processo={editProcesso}
+      />
     </div>
   );
 }

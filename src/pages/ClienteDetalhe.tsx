@@ -29,6 +29,13 @@ import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
+import ProcessoEditModal from '@/components/financeiro/ProcessoEditModal';
+import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
+import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
@@ -63,6 +70,11 @@ export default function ClienteDetalhe() {
   const [showCobrancaDialog, setShowCobrancaDialog] = useState(false);
   const [selectedRelatorioProcessos, setSelectedRelatorioProcessos] = useState<Set<string>>(new Set());
   const [selectedCobrancaProcessos, setSelectedCobrancaProcessos] = useState<Set<string>>(new Set());
+  const [selectedProcessosTab, setSelectedProcessosTab] = useState<Set<string>>(new Set());
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
+  const [generatingExtrato, setGeneratingExtrato] = useState(false);
+  const [showMarkFaturadoDialog, setShowMarkFaturadoDialog] = useState(false);
 
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
@@ -560,15 +572,79 @@ export default function ClienteDetalhe() {
           <Card className="border-border/60">
             <CardHeader className="flex-row items-center justify-between pb-3">
               <CardTitle className="text-base">Histórico de Processos ({totalProcessos})</CardTitle>
-              <Button size="sm" className="gap-1.5" onClick={() => setShowNovoProcesso(true)}>
-                <Plus className="h-3.5 w-3.5" /> Novo Processo
-              </Button>
+              <div className="flex items-center gap-2">
+                {selectedProcessosTab.size > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    disabled={generatingExtrato}
+                    onClick={async () => {
+                      if (!cliente) return;
+                      const selectedProcs = processos.filter(p => selectedProcessosTab.has(p.id));
+                      if (selectedProcs.length === 0) return;
+                      setGeneratingExtrato(true);
+                      try {
+                        const { data: clienteData } = await supabase
+                          .from('clientes')
+                          .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
+                          .eq('id', cliente.id)
+                          .single();
+                        const processosFin: ProcessoFinanceiro[] = selectedProcs.map(p => ({
+                          ...p,
+                          etapa_financeiro: 'gerar_cobranca' as const,
+                          lancamento: lancamentos.find(l => l.processo_id === p.id && l.tipo === 'receber') || null,
+                        }));
+                        const [valoresAdicionais, allCompetencia] = await Promise.all([
+                          fetchValoresAdicionaisMulti(selectedProcs.map(p => p.id)),
+                          fetchCompetenciaProcessos(cliente.id),
+                        ]);
+                        const doc = await gerarExtratoPDF({
+                          processos: processosFin,
+                          allCompetencia,
+                          valoresAdicionais,
+                          cliente: clienteData as any,
+                        });
+                        const blob = doc.output('blob');
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        const clienteName = clienteData?.apelido || clienteData?.nome || 'extrato';
+                        a.download = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        toast.success('Extrato gerado com sucesso!');
+                        setShowMarkFaturadoDialog(true);
+                      } catch (err: any) {
+                        toast.error('Erro ao gerar extrato: ' + err.message);
+                      } finally {
+                        setGeneratingExtrato(false);
+                      }
+                    }}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    {generatingExtrato ? 'Gerando...' : `Gerar Extrato (${selectedProcessosTab.size})`}
+                  </Button>
+                )}
+                <Button size="sm" className="gap-1.5" onClick={() => setShowNovoProcesso(true)}>
+                  <Plus className="h-3.5 w-3.5" /> Novo Processo
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {processos.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={processos.length > 0 && selectedProcessosTab.size === processos.length}
+                          onCheckedChange={(checked) => {
+                            if (checked) setSelectedProcessosTab(new Set(processos.map(p => p.id)));
+                            else setSelectedProcessosTab(new Set());
+                          }}
+                        />
+                      </TableHead>
                       <TableHead>Razão Social</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Etapa</TableHead>
@@ -579,7 +655,29 @@ export default function ClienteDetalhe() {
                   </TableHeader>
                   <TableBody>
                     {processos.map(p => (
-                      <TableRow key={p.id}>
+                      <TableRow
+                        key={p.id}
+                        className="cursor-pointer hover:bg-muted/30"
+                        onDoubleClick={() => {
+                          const fin: ProcessoFinanceiro = {
+                            ...p,
+                            etapa_financeiro: 'solicitacao_criada' as const,
+                            lancamento: lancamentos.find(l => l.processo_id === p.id && l.tipo === 'receber') || null,
+                          };
+                          setEditProcesso(fin);
+                          setEditModalOpen(true);
+                        }}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedProcessosTab.has(p.id)}
+                            onCheckedChange={(checked) => {
+                              const next = new Set(selectedProcessosTab);
+                              if (checked) next.add(p.id); else next.delete(p.id);
+                              setSelectedProcessosTab(next);
+                            }}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">{p.razao_social}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
@@ -1108,6 +1206,56 @@ export default function ClienteDetalhe() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Process Modal (double-click) */}
+      <ProcessoEditModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        processo={editProcesso}
+      />
+
+      {/* Mark as Faturado after extrato */}
+      <AlertDialog open={showMarkFaturadoDialog} onOpenChange={setShowMarkFaturadoDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Extrato gerado com sucesso!</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja marcar os {selectedProcessosTab.size} processo(s) selecionado(s) como "Faturado"?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Não, manter</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              const selectedProcs = processos.filter(p => selectedProcessosTab.has(p.id));
+              const now = new Date().toISOString();
+              const dateStr = new Date().toLocaleDateString('pt-BR');
+              try {
+                for (const p of selectedProcs) {
+                  const lanc = lancamentos.find(l => l.processo_id === p.id && l.tipo === 'receber');
+                  if (lanc) {
+                    await supabase
+                      .from('lancamentos')
+                      .update({
+                        etapa_financeiro: 'cobranca_gerada',
+                        observacoes_financeiro: `Extrato emitido em ${dateStr}`,
+                        updated_at: now,
+                      })
+                      .eq('id', lanc.id);
+                  }
+                }
+                toast.success('Processos marcados como faturados!');
+                setSelectedProcessosTab(new Set());
+                loadAll(cliente!.id);
+              } catch (err: any) {
+                toast.error('Erro: ' + err.message);
+              }
+              setShowMarkFaturadoDialog(false);
+            }}>
+              Marcar como Faturado
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
