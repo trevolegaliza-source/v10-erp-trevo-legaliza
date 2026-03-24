@@ -241,6 +241,11 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ProcessoEditModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        processo={editProcesso}
+      />
     </div>
   );
 }
