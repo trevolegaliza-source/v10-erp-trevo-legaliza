@@ -476,7 +476,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   // PAGE 2+ — DETALHAMENTO (Master-Detail)
   // ═══════════════════════════════════════════════
   doc.addPage();
-  y = drawDarkHeaderBar(doc, 0);
+  y = drawDarkHeaderBar(doc, 0, logoBase64);
   y = drawSectionBanner(doc, y, 'DETALHAMENTO UNITÁRIO', 'Honorários e Taxas por Processo');
   y += 2;
 
