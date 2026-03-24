@@ -634,6 +634,9 @@ async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: numb
           <div style="padding:16px 30px;text-align:center;">
             <img src="${imgData}" style="max-width:100%;max-height:900px;object-fit:contain;" />
           </div>
+          <div style="padding: 0 30px;">
+            <div class="transparency-note"><p>Nota: Os comprovantes de pagamento originais de todas as taxas reembolsáveis estão disponíveis para conferência em nossa plataforma de gestão (Trello), dentro do card correspondente a cada processo.</p></div>
+          </div>
           <div class="gradient-bottom"></div>
           <div class="page-footer">
             <span>${BRAND.fantasia} • ${BRAND.cnpj} • ${BRAND.endereco}</span>
