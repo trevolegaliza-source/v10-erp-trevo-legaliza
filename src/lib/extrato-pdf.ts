@@ -127,7 +127,7 @@ const GLOBAL_STYLES = `
   .page { width: 794px; min-height: 1123px; background: #ffffff; position: relative; overflow: hidden; }
   .stripe-top { width: 100%; height: 5px; background: #1a3a1a; }
   .header { display: flex; justify-content: space-between; align-items: center; padding: 10px 30px; border-bottom: 1px solid #e2e8f0; background: #fff; }
-  .header-logo img { height: 28px; display: block; }
+  .header-logo img { width: 208px; height: auto; object-fit: contain; display: block; }
   .header-right { text-align: right; }
   .header-right .line1 { font-size: 9px; font-weight: 700; color: #64748b; }
   .header-right .line2 { font-size: 9px; font-weight: 500; color: #64748b; }
@@ -156,13 +156,30 @@ const GLOBAL_STYLES = `
   .footer-contact { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 10px 30px; text-align: center; font-size: 9px; color: #94a3b8; position: absolute; bottom: 30px; left: 0; right: 0; }
   .gradient-bottom { position: absolute; bottom: 20px; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #4C9F38 0%, #a3e635 100%); }
   .page-footer { position: absolute; bottom: 4px; left: 30px; right: 30px; display: flex; justify-content: space-between; font-size: 8px; color: #94a3b8; }
+  .transparency-note { margin-top: 8px; padding: 7px 14px; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 0 3px 3px 0; }
+  .transparency-note p { font-size: 7px; color: #78350f; font-style: italic; line-height: 1.4; }
+  /* Progression bar */
+  .prog-bar { display: flex; align-items: center; margin-top: 14px; margin-bottom: 12px; gap: 0; }
+  .prog-step { flex: 1; padding: 10px 14px; border-radius: 5px; text-align: center; position: relative; }
+  .prog-step.active { background: #1a3a1a; }
+  .prog-step.next { background: #f0fdf4; border: 2px dashed #86efac; }
+  .prog-step .ps-label { font-size: 8px; font-weight: 700; color: #ffffff; }
+  .prog-step.next .ps-label { color: #166534; }
+  .prog-step .ps-value { font-size: 12px; font-weight: 800; color: #4ade80; margin-top: 2px; }
+  .prog-step.next .ps-value { color: #166534; }
+  .prog-step .ps-desc { font-size: 7px; color: rgba(255,255,255,0.5); margin-top: 1px; }
+  .prog-step.next .ps-desc { color: #64748b; }
+  .prog-step .ps-next-label { font-size: 7px; font-weight: 700; color: #4C9F38; text-transform: uppercase; margin-top: 3px; }
+  .prog-step .ps-limit { display: inline-block; font-size: 6px; background: #f59e0b; color: white; padding: 1px 5px; border-radius: 2px; margin-top: 3px; }
+  .prog-arrow { width: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .prog-arrow svg { width: 10px; height: 10px; }
   /* Page 2 */
   .section-banner { background: #0f1f0f; padding: 12px 30px; }
   .section-banner-text { font-size: 9px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; }
   .process-card { background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #4C9F38; margin-bottom: 14px; overflow: hidden; }
   .process-header { background: #0f1f0f; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
   .ph-left { display: flex; align-items: center; gap: 10px; flex: 1; }
-  .ph-badge { background: #4C9F38; color: white; padding: 3px 10px; border-radius: 3px; font-size: 9px; font-weight: 700; }
+  .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: #4C9F38; color: white; border-radius: 4px; font-size: 10px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; }
   .ph-info { flex: 1; }
   .ph-title { font-size: 10px; font-weight: 700; color: #ffffff; text-transform: uppercase; }
   .ph-date { font-size: 8px; color: rgba(255,255,255,0.5); margin-top: 2px; }
@@ -180,8 +197,9 @@ const GLOBAL_STYLES = `
   .tax-table .td-desc { color: #334155; font-weight: 500; }
   .tax-table .td-val { text-align: right; color: #1a1a2e; font-weight: 700; }
   .tax-table .td-val .prefix { color: #64748b; }
-  .subtotal-row { background: #f0fdf4; border-top: 1px solid #dcfce7; padding: 7px 16px; font-size: 9px; font-weight: 600; color: #166534; }
-  .subtotal-row .bold { font-weight: 800; }
+  .subtotal-row { background: #f8fafc; border-top: 2px solid #e2e8f0; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .subtotal-calc { font-size: 9px; font-weight: 500; color: #64748b; }
+  .subtotal-result { font-size: 13px; font-weight: 800; color: #0f1f0f; background: #f0fdf4; border: 1px solid #dcfce7; padding: 4px 12px; border-radius: 4px; }
   .prog-block { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #86efac; border-radius: 5px; padding: 12px; margin-top: 14px; }
   .prog-title { font-size: 9px; font-weight: 700; color: #166534; text-transform: uppercase; margin-bottom: 8px; }
   .prog-table { width: 100%; border-collapse: collapse; font-size: 9px; }
@@ -217,6 +235,59 @@ function buildHeaderHTML(logoDataUrl: string | null): string {
   `;
 }
 
+function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
+  const descPct = data.cliente.desconto_progressivo ?? 0;
+  if (descPct <= 0) return '';
+
+  const base = data.cliente.valor_base ?? 580;
+  const limite = data.cliente.valor_limite_desconto ?? 0;
+
+  // Show active steps + 1 "next" step (max 5 total)
+  const activeSteps = steps.filter(s => !s.isManual);
+  const displaySteps = activeSteps.slice(-4); // last 4 active
+
+  // Calculate next step value
+  const lastSlot = steps.length;
+  let nextVal = base;
+  for (let i = 1; i <= lastSlot; i++) {
+    nextVal = nextVal * (1 - descPct / 100);
+  }
+  const limitReached = limite > 0 && nextVal <= limite;
+  if (limitReached) nextVal = limite;
+
+  const arrowSvg = (color: string) => `<svg viewBox="0 0 10 10"><polygon points="0,0 10,5 0,10" fill="${color}"/></svg>`;
+
+  let html = '<div class="prog-bar">';
+
+  displaySteps.forEach((s, i) => {
+    if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
+    const isLim = limite > 0 && s.valorFinal <= limite;
+    html += `
+      <div class="prog-step active">
+        <div class="ps-label">${s.index}º Processo</div>
+        <div class="ps-value">${fmt(s.valorFinal)}</div>
+        <div class="ps-desc">${s.desconto > 0 ? `-${descPct}%` : '(base)'}</div>
+        ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
+      </div>
+    `;
+  });
+
+  if (!limitReached) {
+    html += `<div class="prog-arrow">${arrowSvg('#86efac')}</div>`;
+    html += `
+      <div class="prog-step next">
+        <div class="ps-label">${lastSlot + 1}º Processo</div>
+        <div class="ps-value">${fmt(Math.round(nextVal * 100) / 100)}</div>
+        <div class="ps-desc">-${descPct}%</div>
+        <div class="ps-next-label">SEU PRÓXIMO DESCONTO</div>
+      </div>
+    `;
+  }
+
+  html += '</div>';
+  return html;
+}
+
 function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo[], logoDataUrl: string | null): string {
   const now = new Date();
   const mesRef = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -236,13 +307,13 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         <div class="client-tag">EXTRATO DE FATURAMENTO</div>
         <div class="client-name">${data.cliente.nome}</div>
         ${data.cliente.cnpj ? `<div class="client-cnpj">${data.cliente.cnpj}</div>` : ''}
-        <div class="client-meta">Competência: ${mesRef}</div>
+        <div class="client-meta">Relatório de Performance: 01/${mesNum}/${now.getFullYear()} até ${emissao}</div>
         <div class="client-meta">Emissão: ${emissao} • ${data.processos.length} processo(s) cobrado(s)</div>
       </div>
 
       <div class="fin-section">
         <div class="total-card">
-          <div class="total-tag">HONORÁRIOS DO PROCESSO</div>
+          <div class="total-tag">HONORÁRIOS DOS SERVIÇOS SOCIETÁRIOS</div>
           <div class="total-label">TOTAL</div>
           <div class="total-value"><span class="total-prefix">R$ </span>${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
           <div class="total-ctx">${selected.length} processo(s) • Competência ${mesRef}</div>
@@ -263,13 +334,18 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
           </div>
         </div>
 
+        ${buildProgressionBar(steps, data)}
+
         <div class="vol-block">
           <div class="vol-text">Volume Acumulado (01/${mesNum} até ${emissao}): ${data.allCompetencia.length} processo(s)</div>
           <div class="vol-text">Valor Base: ${fmt(data.cliente.valor_base ?? 580)} • Desc. Contratual: ${descPct > 0 ? descPct + '% progressivo' : 'N/A'}</div>
         </div>
       </div>
 
-      <div class="footer-contact">${BRAND.email} • ${BRAND.telefone} • trevolegaliza.com</div>
+      <div class="footer-contact">
+        ${BRAND.email} • ${BRAND.telefone} • trevolegaliza.com
+        <div class="transparency-note"><p>Nota: Os comprovantes de pagamento originais de todas as taxas reembolsáveis estão disponíveis para conferência em nossa plataforma de gestão (Trello), dentro do card correspondente a cada processo.</p></div>
+      </div>
       <div class="gradient-bottom"></div>
       <div class="page-footer">
         <span>${BRAND.fantasia} • ${BRAND.cnpj} • ${BRAND.endereco}</span>
@@ -325,7 +401,8 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
           </table>
         </div>
         <div class="subtotal-row">
-          Subtotal: ${fmt(step.valorFinal)} (Hon.) + ${fmt(taxTotal)} (Taxas) = <span class="bold">${fmt(blockTotal)}</span>
+          <span class="subtotal-calc">${fmt(step.valorFinal)} (Hon.) + ${fmt(taxTotal)} (Taxas)</span>
+          <span class="subtotal-result">= ${fmt(blockTotal)}</span>
         </div>
       `;
     }
@@ -404,6 +481,9 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         </div>
       </div>
 
+      <div style="padding: 0 30px;">
+        <div class="transparency-note"><p>Nota: Os comprovantes de pagamento originais de todas as taxas reembolsáveis estão disponíveis para conferência em nossa plataforma de gestão (Trello), dentro do card correspondente a cada processo.</p></div>
+      </div>
       <div class="gradient-bottom"></div>
       <div class="page-footer">
         <span>${BRAND.fantasia} • ${BRAND.cnpj} • ${BRAND.endereco}</span>
@@ -553,6 +633,9 @@ async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: numb
           <div class="gradient-bar"></div>
           <div style="padding:16px 30px;text-align:center;">
             <img src="${imgData}" style="max-width:100%;max-height:900px;object-fit:contain;" />
+          </div>
+          <div style="padding: 0 30px;">
+            <div class="transparency-note"><p>Nota: Os comprovantes de pagamento originais de todas as taxas reembolsáveis estão disponíveis para conferência em nossa plataforma de gestão (Trello), dentro do card correspondente a cada processo.</p></div>
           </div>
           <div class="gradient-bottom"></div>
           <div class="page-footer">
