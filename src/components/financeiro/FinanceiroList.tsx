@@ -70,16 +70,18 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
       const clienteId = selectedProcessos[0].cliente_id;
       const { data: clienteData } = await supabase
         .from('clientes')
-        .select('nome, cnpj, apelido, valor_base, desconto_progressivo')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
         .eq('id', clienteId)
         .single();
 
-      const valoresAdicionais = await fetchValoresAdicionaisMulti(
-        selectedProcessos.map(p => p.id)
-      );
+      const [valoresAdicionais, allCompetencia] = await Promise.all([
+        fetchValoresAdicionaisMulti(selectedProcessos.map(p => p.id)),
+        fetchCompetenciaProcessos(clienteId),
+      ]);
 
       const doc = await gerarExtratoPDF({
         processos: selectedProcessos,
+        allCompetencia,
         valoresAdicionais,
         cliente: clienteData as any,
       });
