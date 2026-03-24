@@ -235,6 +235,59 @@ function buildHeaderHTML(logoDataUrl: string | null): string {
   `;
 }
 
+function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
+  const descPct = data.cliente.desconto_progressivo ?? 0;
+  if (descPct <= 0) return '';
+
+  const base = data.cliente.valor_base ?? 580;
+  const limite = data.cliente.valor_limite_desconto ?? 0;
+
+  // Show active steps + 1 "next" step (max 5 total)
+  const activeSteps = steps.filter(s => !s.isManual);
+  const displaySteps = activeSteps.slice(-4); // last 4 active
+
+  // Calculate next step value
+  const lastSlot = steps.length;
+  let nextVal = base;
+  for (let i = 1; i <= lastSlot; i++) {
+    nextVal = nextVal * (1 - descPct / 100);
+  }
+  const limitReached = limite > 0 && nextVal <= limite;
+  if (limitReached) nextVal = limite;
+
+  const arrowSvg = (color: string) => `<svg viewBox="0 0 10 10"><polygon points="0,0 10,5 0,10" fill="${color}"/></svg>`;
+
+  let html = '<div class="prog-bar">';
+
+  displaySteps.forEach((s, i) => {
+    if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
+    const isLim = limite > 0 && s.valorFinal <= limite;
+    html += `
+      <div class="prog-step active">
+        <div class="ps-label">${s.index}º Processo</div>
+        <div class="ps-value">${fmt(s.valorFinal)}</div>
+        <div class="ps-desc">${s.desconto > 0 ? `-${descPct}%` : '(base)'}</div>
+        ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
+      </div>
+    `;
+  });
+
+  if (!limitReached) {
+    html += `<div class="prog-arrow">${arrowSvg('#86efac')}</div>`;
+    html += `
+      <div class="prog-step next">
+        <div class="ps-label">${lastSlot + 1}º Processo</div>
+        <div class="ps-value">${fmt(Math.round(nextVal * 100) / 100)}</div>
+        <div class="ps-desc">-${descPct}%</div>
+        <div class="ps-next-label">SEU PRÓXIMO DESCONTO</div>
+      </div>
+    `;
+  }
+
+  html += '</div>';
+  return html;
+}
+
 function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo[], logoDataUrl: string | null): string {
   const now = new Date();
   const mesRef = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
