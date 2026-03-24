@@ -73,27 +73,57 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
 
   for (const p of sorted) {
     const isMudancaUF = (p.notas || '').includes('Mudança de UF');
+    const notas = p.notas || '';
+    const isUrgencia = notas.toLowerCase().includes('urgência') || notas.toLowerCase().includes('urgencia');
+    // Manual value: processo.valor exists AND differs from progressive calculation OR notes indicate manual
+    const hasManualValue = p.valor != null && p.valor > 0 && (
+      notas.includes('Valor Manual') || notas.includes('VALOR MANUAL') ||
+      notas.includes('is_manual') || isUrgencia ||
+      // If valor doesn't match the base, treat as manual
+      Math.abs(p.valor - valorBase) > 1
+    );
     const slots = isMudancaUF ? 2 : 1;
 
     for (let slot = 0; slot < slots; slot++) {
       stepIdx++;
-      let valorAtual = valorBase;
-      if (descPct > 0 && stepIdx > 1) {
-        for (let i = 1; i < stepIdx; i++) {
-          valorAtual = valorAtual * (1 - descPct / 100);
+
+      let valorAtual: number;
+      let isManual = false;
+      let desconto = 0;
+
+      if (hasManualValue && slot === 0) {
+        // PRIORITY 1: Manual value is sovereign - use exactly what was set
+        valorAtual = p.valor!;
+        isManual = true;
+        desconto = 0;
+      } else if (isUrgencia && !hasManualValue) {
+        // PRIORITY 2: Urgency = +50% on base
+        valorAtual = valorBase * 1.5;
+        isManual = true;
+        desconto = 0;
+      } else {
+        // PRIORITY 3: Progressive discount
+        valorAtual = valorBase;
+        if (descPct > 0 && stepIdx > 1) {
+          for (let i = 1; i < stepIdx; i++) {
+            valorAtual = valorAtual * (1 - descPct / 100);
+          }
         }
+        if (limite > 0 && valorAtual < limite) valorAtual = limite;
+        desconto = valorBase - valorAtual;
       }
-      if (limite > 0 && valorAtual < limite) valorAtual = limite;
       valorAtual = Math.round(valorAtual * 100) / 100;
 
       steps.push({
         index: stepIdx,
         processo: p,
-        valorBase,
-        desconto: valorBase - valorAtual,
+        valorBase: isManual ? valorAtual : valorBase,
+        desconto,
         valorFinal: valorAtual,
         isSelected: selectedIds.has(p.id),
         isMudancaUF: isMudancaUF && slot === 0,
+        isManual,
+        isUrgencia,
       });
     }
   }
