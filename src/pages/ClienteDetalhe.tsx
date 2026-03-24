@@ -572,15 +572,79 @@ export default function ClienteDetalhe() {
           <Card className="border-border/60">
             <CardHeader className="flex-row items-center justify-between pb-3">
               <CardTitle className="text-base">Histórico de Processos ({totalProcessos})</CardTitle>
-              <Button size="sm" className="gap-1.5" onClick={() => setShowNovoProcesso(true)}>
-                <Plus className="h-3.5 w-3.5" /> Novo Processo
-              </Button>
+              <div className="flex items-center gap-2">
+                {selectedProcessosTab.size > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs"
+                    disabled={generatingExtrato}
+                    onClick={async () => {
+                      if (!cliente) return;
+                      const selectedProcs = processos.filter(p => selectedProcessosTab.has(p.id));
+                      if (selectedProcs.length === 0) return;
+                      setGeneratingExtrato(true);
+                      try {
+                        const { data: clienteData } = await supabase
+                          .from('clientes')
+                          .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
+                          .eq('id', cliente.id)
+                          .single();
+                        const processosFin: ProcessoFinanceiro[] = selectedProcs.map(p => ({
+                          ...p,
+                          etapa_financeiro: 'gerar_cobranca' as const,
+                          lancamento: lancamentos.find(l => l.processo_id === p.id && l.tipo === 'receber') || null,
+                        }));
+                        const [valoresAdicionais, allCompetencia] = await Promise.all([
+                          fetchValoresAdicionaisMulti(selectedProcs.map(p => p.id)),
+                          fetchCompetenciaProcessos(cliente.id),
+                        ]);
+                        const doc = await gerarExtratoPDF({
+                          processos: processosFin,
+                          allCompetencia,
+                          valoresAdicionais,
+                          cliente: clienteData as any,
+                        });
+                        const blob = doc.output('blob');
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        const clienteName = clienteData?.apelido || clienteData?.nome || 'extrato';
+                        a.download = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        toast.success('Extrato gerado com sucesso!');
+                        setShowMarkFaturadoDialog(true);
+                      } catch (err: any) {
+                        toast.error('Erro ao gerar extrato: ' + err.message);
+                      } finally {
+                        setGeneratingExtrato(false);
+                      }
+                    }}
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    {generatingExtrato ? 'Gerando...' : `Gerar Extrato (${selectedProcessosTab.size})`}
+                  </Button>
+                )}
+                <Button size="sm" className="gap-1.5" onClick={() => setShowNovoProcesso(true)}>
+                  <Plus className="h-3.5 w-3.5" /> Novo Processo
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {processos.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={processos.length > 0 && selectedProcessosTab.size === processos.length}
+                          onCheckedChange={(checked) => {
+                            if (checked) setSelectedProcessosTab(new Set(processos.map(p => p.id)));
+                            else setSelectedProcessosTab(new Set());
+                          }}
+                        />
+                      </TableHead>
                       <TableHead>Razão Social</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Etapa</TableHead>
@@ -591,7 +655,29 @@ export default function ClienteDetalhe() {
                   </TableHeader>
                   <TableBody>
                     {processos.map(p => (
-                      <TableRow key={p.id}>
+                      <TableRow
+                        key={p.id}
+                        className="cursor-pointer hover:bg-muted/30"
+                        onDoubleClick={() => {
+                          const fin: ProcessoFinanceiro = {
+                            ...p,
+                            etapa_financeiro: 'solicitacao_criada' as const,
+                            lancamento: lancamentos.find(l => l.processo_id === p.id && l.tipo === 'receber') || null,
+                          };
+                          setEditProcesso(fin);
+                          setEditModalOpen(true);
+                        }}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedProcessosTab.has(p.id)}
+                            onCheckedChange={(checked) => {
+                              const next = new Set(selectedProcessosTab);
+                              if (checked) next.add(p.id); else next.delete(p.id);
+                              setSelectedProcessosTab(next);
+                            }}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">{p.razao_social}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
