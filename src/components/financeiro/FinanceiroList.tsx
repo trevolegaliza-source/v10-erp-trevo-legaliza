@@ -9,7 +9,7 @@ import type { StatusFinanceiro } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { gerarExtratoPDF, fetchValoresAdicionaisMulti } from '@/lib/extrato-pdf';
+import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
 import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
@@ -70,16 +70,18 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
       const clienteId = selectedProcessos[0].cliente_id;
       const { data: clienteData } = await supabase
         .from('clientes')
-        .select('nome, cnpj, apelido, valor_base, desconto_progressivo')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
         .eq('id', clienteId)
         .single();
 
-      const valoresAdicionais = await fetchValoresAdicionaisMulti(
-        selectedProcessos.map(p => p.id)
-      );
+      const [valoresAdicionais, allCompetencia] = await Promise.all([
+        fetchValoresAdicionaisMulti(selectedProcessos.map(p => p.id)),
+        fetchCompetenciaProcessos(clienteId),
+      ]);
 
       const doc = await gerarExtratoPDF({
         processos: selectedProcessos,
+        allCompetencia,
         valoresAdicionais,
         cliente: clienteData as any,
       });
