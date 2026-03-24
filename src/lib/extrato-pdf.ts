@@ -343,34 +343,56 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   y += 14;
 
   // ── KPI STATS ROW (like "12 Anos | 26 Estados" row) ──
+  const emissaoStr = now.toLocaleDateString('pt-BR');
   const kpiW = (w - 9) / 4;
   const kpis = [
-    { label: 'Processos Cobrados', value: String(data.processos.length) },
-    { label: 'Total no Mês', value: String(data.allCompetencia.length) },
-    { label: 'Valor Base', value: fmt(data.cliente.valor_base ?? 580) },
-    { label: 'Desc. Contratual', value: descPct > 0 ? `${descPct}% progressivo` : 'N/A' },
+    { label: 'Processos Cobrados', value: String(data.processos.length), neon: false },
+    { label: `Volume Acumulado (01/${String(now.getMonth()+1).padStart(2,'0')} até ${emissaoStr})`, value: String(data.allCompetencia.length), neon: false },
+    { label: 'Valor Base Unitário', value: fmt(data.cliente.valor_base ?? 580), neon: true },
+    { label: 'Desc. Contratual', value: descPct > 0 ? `${descPct}% progressivo` : 'N/A', neon: descPct > 0 },
   ];
   doc.setDrawColor(...BORDER);
   kpis.forEach((kpi, i) => {
     const x = MARGIN + i * (kpiW + 3);
-    doc.setFillColor(...BG_BLOCK);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(x, y, kpiW, 22, 2, 2, 'FD');
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(...DARK_TEXT);
-    doc.text(kpi.value, x + 5, y + 10);
+    if (kpi.neon) {
+      // Neon green highlight for advantage cards
+      doc.setFillColor(...NEON_GREEN);
+      doc.setDrawColor(...NEON_GREEN);
+      doc.setLineWidth(1.2);
+      doc.roundedRect(x, y, kpiW, 22, 2, 2, 'FD');
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(...SLATE);
-    doc.text(kpi.label, x + 5, y + 17);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(0, 0, 0);
+      doc.text(kpi.value, x + 5, y + 10);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(0, 0, 0);
+      doc.text(kpi.label, x + 5, y + 17);
+    } else {
+      doc.setFillColor(...BG_BLOCK);
+      doc.setDrawColor(...BORDER);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(x, y, kpiW, 22, 2, 2, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(...DARK_TEXT);
+      doc.text(kpi.value, x + 5, y + 10);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...SLATE);
+      const labelLines = doc.splitTextToSize(kpi.label, kpiW - 10);
+      doc.text(labelLines, x + 5, y + 17);
+    }
   });
   y += 28;
 
   // ── VALOR TOTAL HIGHLIGHT (like PROPOSTA R$ 600,00 big) ──
-  y = ensureSpace(doc, y, 50);
+  y = ensureSpace(doc, y, 50, logoBase64);
 
   // Left: total amount
   doc.setFillColor(...BG_BLOCK);
