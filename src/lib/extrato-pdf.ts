@@ -157,7 +157,7 @@ const GLOBAL_STYLES = `
   .gradient-bottom { position: absolute; bottom: 20px; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #4C9F38 0%, #a3e635 100%); }
   .page-footer { position: absolute; bottom: 4px; left: 30px; right: 30px; display: flex; justify-content: space-between; font-size: 8px; color: #94a3b8; }
   .transparency-note { margin-top: 8px; padding: 7px 14px; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 0 3px 3px 0; }
-  .transparency-note p { font-size: 7px; color: #78350f; font-style: italic; line-height: 1.4; }
+  .transparency-note p { font-size: 9px; font-weight: 500; color: #78350f; font-style: italic; line-height: 1.4; }
   /* Progression bar */
   .prog-bar { display: flex; align-items: center; margin-top: 14px; margin-bottom: 12px; gap: 0; }
   .prog-step { flex: 1; padding: 10px 14px; border-radius: 5px; text-align: center; position: relative; }
