@@ -157,7 +157,7 @@ const GLOBAL_STYLES = `
   .gradient-bottom { position: absolute; bottom: 20px; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #4C9F38 0%, #a3e635 100%); }
   .page-footer { position: absolute; bottom: 4px; left: 30px; right: 30px; display: flex; justify-content: space-between; font-size: 8px; color: #94a3b8; }
   .transparency-note { margin-top: 8px; padding: 7px 14px; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 0 3px 3px 0; }
-  .transparency-note p { font-size: 7px; color: #78350f; font-style: italic; line-height: 1.4; }
+  .transparency-note p { font-size: 9px; font-weight: 500; color: #78350f; font-style: italic; line-height: 1.4; }
   /* Progression bar */
   .prog-bar { display: flex; align-items: center; margin-top: 14px; margin-bottom: 12px; gap: 0; }
   .prog-step { flex: 1; padding: 10px 14px; border-radius: 5px; text-align: center; position: relative; }
@@ -179,7 +179,7 @@ const GLOBAL_STYLES = `
   .process-card { background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #4C9F38; margin-bottom: 14px; overflow: hidden; }
   .process-header { background: #0f1f0f; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
   .ph-left { display: flex; align-items: center; gap: 10px; flex: 1; }
-  .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: #4C9F38; color: white; border-radius: 4px; font-size: 10px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; }
+  .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; background: #ffffff; color: #4C9F38; border-radius: 6px; font-size: 11px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; }
   .ph-info { flex: 1; }
   .ph-title { font-size: 10px; font-weight: 700; color: #ffffff; text-transform: uppercase; }
   .ph-date { font-size: 8px; color: rgba(255,255,255,0.5); margin-top: 2px; }
@@ -197,9 +197,9 @@ const GLOBAL_STYLES = `
   .tax-table .td-desc { color: #334155; font-weight: 500; }
   .tax-table .td-val { text-align: right; color: #1a1a2e; font-weight: 700; }
   .tax-table .td-val .prefix { color: #64748b; }
-  .subtotal-row { background: #f8fafc; border-top: 2px solid #e2e8f0; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .subtotal-row { background: #ffffff; border-left: 5px solid #4C9F38; border-top: 1px solid #e2e8f0; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
   .subtotal-calc { font-size: 9px; font-weight: 500; color: #64748b; }
-  .subtotal-result { font-size: 13px; font-weight: 800; color: #0f1f0f; background: #f0fdf4; border: 1px solid #dcfce7; padding: 4px 12px; border-radius: 4px; }
+  .subtotal-result { font-size: 13px; font-weight: 800; color: #0f1f0f; }
   .prog-block { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #86efac; border-radius: 5px; padding: 12px; margin-top: 14px; }
   .prog-title { font-size: 9px; font-weight: 700; color: #166534; text-transform: uppercase; margin-bottom: 8px; }
   .prog-table { width: 100%; border-collapse: collapse; font-size: 9px; }
@@ -316,7 +316,7 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
           <div class="total-tag">HONORÁRIOS DOS SERVIÇOS SOCIETÁRIOS</div>
           <div class="total-label">TOTAL</div>
           <div class="total-value"><span class="total-prefix">R$ </span>${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-          <div class="total-ctx">${selected.length} processo(s) • Competência ${mesRef}</div>
+          <div class="total-ctx">${selected.length} processo(s) cobrado(s) neste período</div>
         </div>
 
         <div class="kpi-row">
@@ -339,6 +339,17 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         <div class="vol-block">
           <div class="vol-text">Volume Acumulado (01/${mesNum} até ${emissao}): ${data.allCompetencia.length} processo(s)</div>
           <div class="vol-text">Valor Base: ${fmt(data.cliente.valor_base ?? 580)} • Desc. Contratual: ${descPct > 0 ? descPct + '% progressivo' : 'N/A'}</div>
+        </div>
+
+        <div style="background:#ffffff;border:2px solid #e2e8f0;border-top:4px solid #4C9F38;border-radius:0 0 6px 6px;padding:16px 20px;margin-top:14px;box-shadow:0 2px 6px rgba(0,0,0,0.04);display:flex;gap:18px;align-items:center;">
+          <div style="width:40px;height:40px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">💠</div>
+          <div style="flex:1;">
+            <div style="font-size:9px;font-weight:700;color:#4C9F38;text-transform:uppercase;letter-spacing:1px;">PAGAMENTO VIA PIX (CHAVE CNPJ)</div>
+            <div style="font-size:14px;font-weight:800;color:#0f1f0f;letter-spacing:0.5px;margin-top:2px;">39.969.412/0001-70</div>
+            <div style="font-size:9px;font-weight:500;color:#64748b;margin-top:1px;">Banco C6 Bank</div>
+            <div style="height:1px;background:#e2e8f0;margin:6px 0;"></div>
+            <div style="font-size:8px;font-weight:400;color:#94a3b8;font-style:italic;">Caso prefira boleto bancário, favor solicitar ao nosso setor administrativo.</div>
+          </div>
         </div>
       </div>
 
