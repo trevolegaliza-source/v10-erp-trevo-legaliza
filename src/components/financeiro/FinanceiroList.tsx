@@ -33,6 +33,8 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
   const [generating, setGenerating] = useState(false);
   const [showMarkDialog, setShowMarkDialog] = useState(false);
   const [lastPdfBlob, setLastPdfBlob] = useState<Blob | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
   const qc = useQueryClient();
 
   const allChecked = processos.length > 0 && selected.size === processos.length;
