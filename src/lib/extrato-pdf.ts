@@ -281,6 +281,8 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
           </div>
         </div>
 
+        ${buildProgressionBar(steps, data)}
+
         <div class="vol-block">
           <div class="vol-text">Volume Acumulado (01/${mesNum} até ${emissao}): ${data.allCompetencia.length} processo(s)</div>
           <div class="vol-text">Valor Base: ${fmt(data.cliente.valor_base ?? 580)} • Desc. Contratual: ${descPct > 0 ? descPct + '% progressivo' : 'N/A'}</div>
