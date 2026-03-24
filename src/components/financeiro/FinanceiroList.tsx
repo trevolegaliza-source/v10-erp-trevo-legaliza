@@ -181,7 +181,7 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
               const total = Number(lanc?.valor ?? p.valor ?? 0) + Number(lanc?.honorario_extra || 0);
               const status = (lanc?.status || 'pendente') as StatusFinanceiro;
               return (
-                <tr key={p.id} className={cn('border-t border-border/30', isOverdue && 'bg-destructive/5')}>
+                <tr key={p.id} className={cn('border-t border-border/30 cursor-pointer hover:bg-muted/30', isOverdue && 'bg-destructive/5')} onDoubleClick={() => { setEditProcesso(p); setEditModalOpen(true); }}>
                   <td className="px-3 py-2.5">
                     <Checkbox
                       checked={selected.has(p.id)}
