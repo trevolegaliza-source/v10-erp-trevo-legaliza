@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, Clock, Receipt, LayoutGrid, List } from 'lucide-react';
+import { DollarSign, Clock, Receipt, LayoutGrid, List, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useFinanceiroDashboard } from '@/hooks/useFinanceiro';
@@ -9,6 +9,9 @@ import { Toggle } from '@/components/ui/toggle';
 import FinanceiroKanban from '@/components/financeiro/FinanceiroKanban';
 import FinanceiroList from '@/components/financeiro/FinanceiroList';
 import { formatBRL } from '@/lib/pricing-engine';
+import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
+import { ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
+import { toast } from 'sonner';
 
 export default function Financeiro() {
   const { data: stats, isLoading: loadingStats } = useFinanceiroDashboard();
