@@ -254,7 +254,7 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         <div class="client-tag">EXTRATO DE FATURAMENTO</div>
         <div class="client-name">${data.cliente.nome}</div>
         ${data.cliente.cnpj ? `<div class="client-cnpj">${data.cliente.cnpj}</div>` : ''}
-        <div class="client-meta">Competência: ${mesRef}</div>
+        <div class="client-meta">Relatório de Performance: 01/${mesNum}/${now.getFullYear()} até ${emissao}</div>
         <div class="client-meta">Emissão: ${emissao} • ${data.processos.length} processo(s) cobrado(s)</div>
       </div>
 
