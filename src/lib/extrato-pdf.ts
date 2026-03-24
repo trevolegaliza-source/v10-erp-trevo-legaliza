@@ -317,22 +317,27 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
 
     for (const step of steps) {
       if (py > y + progH - 14) break;
-      const ratio = step.valorFinal / step.valorBase;
-      const barW = barMaxW * ratio;
+      const ratio = step.isManual ? 1 : (step.valorFinal / step.valorBase);
+      const barW = barMaxW * Math.min(ratio, 1);
 
       // Background
       doc.setFillColor(220, 252, 231);
       doc.roundedRect(MARGIN + 28, py - 2.5, barMaxW, 3.5, 1, 1, 'F');
 
-      // Filled bar
-      doc.setFillColor(step.isSelected ? 76 : 148, step.isSelected ? 159 : 163, step.isSelected ? 56 : 184);
+      // Filled bar - orange for manual, green for progressive
+      if (step.isManual) {
+        doc.setFillColor(234, 88, 12);
+      } else {
+        doc.setFillColor(step.isSelected ? 76 : 148, step.isSelected ? 159 : 163, step.isSelected ? 56 : 184);
+      }
       doc.roundedRect(MARGIN + 28, py - 2.5, barW, 3.5, 1, 1, 'F');
 
       // Label
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6);
-      doc.setTextColor(step.isSelected ? 22 : 148, step.isSelected ? 101 : 163, step.isSelected ? 52 : 184);
-      doc.text(`${step.index}º`, MARGIN + 5, py);
+      doc.setTextColor(step.isManual ? 234 : (step.isSelected ? 22 : 148), step.isManual ? 88 : (step.isSelected ? 101 : 163), step.isManual ? 12 : (step.isSelected ? 52 : 184));
+      const label = step.isManual ? `${step.index}º ✦` : `${step.index}º`;
+      doc.text(label, MARGIN + 5, py);
 
       // Value
       doc.setFont('helvetica', 'normal');
