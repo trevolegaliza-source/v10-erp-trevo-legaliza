@@ -1,5 +1,5 @@
 /**
- * Relatório de Performance Societária — TREVO ENGINE V14
+ * Relatório de Performance Societária — TREVO ENGINE V15
  * Estilo visual baseado na PROPOSTA CERTA ASSESSORIA (PDF anexo).
  * Regra JGVCO: Valor Manual > Urgência > Progressão -5% cumulativa.
  */
@@ -8,6 +8,9 @@ import autoTable from 'jspdf-autotable';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import type { ValorAdicional } from '@/hooks/useValoresAdicionais';
 import { supabase } from '@/integrations/supabase/client';
+
+const LOGO_PUBLIC_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png';
+const NEON_GREEN = [57, 255, 20] as const; // #39FF14
 
 // ── Brand constants (PROPOSTA style) ──
 const GREEN = [76, 159, 56] as const;     // #4C9F38
