@@ -456,7 +456,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   y += 48;
 
   // ── Footer expiry line (like PROPOSTA "EXPIRA EM") ──
-  y = ensureSpace(doc, y, 12);
+  y = ensureSpace(doc, y, 12, logoBase64);
   doc.setDrawColor(...BORDER);
   doc.line(MARGIN, y, pw - MARGIN, y);
   y += 1;
@@ -488,7 +488,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
     const taxTableH = pTaxas.length > 0 ? 10 + pTaxas.length * 7 : 0;
     const subtotalH = pTaxas.length > 0 ? 10 : 0;
 
-    y = ensureSpace(doc, y, boxH + taxTableH + subtotalH + 10);
+    y = ensureSpace(doc, y, boxH + taxTableH + subtotalH + 10, logoBase64);
 
     // ── Process box with green left border ──
     doc.setFillColor(...BG_BLOCK);
@@ -616,7 +616,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   // ── Non-selected (contabilizado) summary ──
   const nonSelected = steps.filter(s => !s.isSelected);
   if (nonSelected.length > 0) {
-    y = ensureSpace(doc, y, 20 + nonSelected.length * 7);
+    y = ensureSpace(doc, y, 20 + nonSelected.length * 7, logoBase64);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
@@ -646,7 +646,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
 
   // ── PROGRESSÃO DE INCENTIVO POR VOLUME (like PROPOSTA page 3 table) ──
   if (descPct > 0 && steps.length > 0) {
-    y = ensureSpace(doc, y, 20 + steps.length * 7 + 14);
+    y = ensureSpace(doc, y, 20 + steps.length * 7 + 14, logoBase64);
 
     doc.setFillColor(...BG_BLOCK);
     doc.setDrawColor(...GREEN);
@@ -709,7 +709,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   }
 
   // ── TOTALIZADOR FINAL (dark bar like PROPOSTA) ──
-  y = ensureSpace(doc, y, 20);
+  y = ensureSpace(doc, y, 20, logoBase64);
 
   doc.setFillColor(...DARK);
   doc.roundedRect(MARGIN, y, w, 16, 3, 3, 'F');
