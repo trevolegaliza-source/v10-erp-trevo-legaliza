@@ -348,7 +348,8 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
           </table>
         </div>
         <div class="subtotal-row">
-          Subtotal: ${fmt(step.valorFinal)} (Hon.) + ${fmt(taxTotal)} (Taxas) = <span class="bold">${fmt(blockTotal)}</span>
+          <span class="subtotal-calc">${fmt(step.valorFinal)} (Hon.) + ${fmt(taxTotal)} (Taxas)</span>
+          <span class="subtotal-result">= ${fmt(blockTotal)}</span>
         </div>
       `;
     }
