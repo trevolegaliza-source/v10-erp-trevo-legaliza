@@ -197,9 +197,9 @@ const GLOBAL_STYLES = `
   .tax-table .td-desc { color: #334155; font-weight: 500; }
   .tax-table .td-val { text-align: right; color: #1a1a2e; font-weight: 700; }
   .tax-table .td-val .prefix { color: #64748b; }
-  .subtotal-row { background: #f8fafc; border-top: 2px solid #e2e8f0; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .subtotal-row { background: #ffffff; border-left: 5px solid #4C9F38; border-top: 1px solid #e2e8f0; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
   .subtotal-calc { font-size: 9px; font-weight: 500; color: #64748b; }
-  .subtotal-result { font-size: 13px; font-weight: 800; color: #0f1f0f; background: #f0fdf4; border: 1px solid #dcfce7; padding: 4px 12px; border-radius: 4px; }
+  .subtotal-result { font-size: 13px; font-weight: 800; color: #0f1f0f; }
   .prog-block { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #86efac; border-radius: 5px; padding: 12px; margin-top: 14px; }
   .prog-title { font-size: 9px; font-weight: 700; color: #166534; text-transform: uppercase; margin-bottom: 8px; }
   .prog-table { width: 100%; border-collapse: collapse; font-size: 9px; }
