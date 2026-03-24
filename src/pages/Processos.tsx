@@ -246,6 +246,23 @@ export default function Processos() {
               </SelectContent>
             </Select>
 
+            <Button size="sm" variant="outline" className="h-9" onClick={() => {
+              if (filtered.length === 0) { toast.info('Sem dados'); return; }
+              downloadCSV(filtered.map(p => ({
+                'Razão Social': p.razao_social,
+                'Cliente': p.cliente?.apelido || p.cliente?.nome || '-',
+                'Tipo': PROCESS_TYPE_LABELS[p.tipo] || p.tipo,
+                'Etapa': KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa,
+                'Prioridade': p.prioridade,
+                'Valor': p.valor ? formatBRLPlain(Number(p.valor)) : '-',
+                'Criado em': formatDateBR(p.created_at),
+              })), `processos_${new Date().toISOString().split('T')[0]}.csv`);
+              toast.success('Exportado!');
+            }}>
+              <Download className="h-4 w-4 mr-1" />
+              Exportar
+            </Button>
+
             <Button size="sm" className="h-9" asChild>
               <a href="/cadastro-rapido">
                 <Plus className="h-4 w-4 mr-1" />
