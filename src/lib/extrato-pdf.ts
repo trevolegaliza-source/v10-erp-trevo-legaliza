@@ -156,6 +156,23 @@ const GLOBAL_STYLES = `
   .footer-contact { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 10px 30px; text-align: center; font-size: 9px; color: #94a3b8; position: absolute; bottom: 30px; left: 0; right: 0; }
   .gradient-bottom { position: absolute; bottom: 20px; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #4C9F38 0%, #a3e635 100%); }
   .page-footer { position: absolute; bottom: 4px; left: 30px; right: 30px; display: flex; justify-content: space-between; font-size: 8px; color: #94a3b8; }
+  .transparency-note { margin-top: 8px; padding: 7px 14px; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 0 3px 3px 0; }
+  .transparency-note p { font-size: 7px; color: #78350f; font-style: italic; line-height: 1.4; }
+  /* Progression bar */
+  .prog-bar { display: flex; align-items: center; margin-top: 14px; margin-bottom: 12px; gap: 0; }
+  .prog-step { flex: 1; padding: 10px 14px; border-radius: 5px; text-align: center; position: relative; }
+  .prog-step.active { background: #1a3a1a; }
+  .prog-step.next { background: #f0fdf4; border: 2px dashed #86efac; }
+  .prog-step .ps-label { font-size: 8px; font-weight: 700; color: #ffffff; }
+  .prog-step.next .ps-label { color: #166534; }
+  .prog-step .ps-value { font-size: 12px; font-weight: 800; color: #4ade80; margin-top: 2px; }
+  .prog-step.next .ps-value { color: #166534; }
+  .prog-step .ps-desc { font-size: 7px; color: rgba(255,255,255,0.5); margin-top: 1px; }
+  .prog-step.next .ps-desc { color: #64748b; }
+  .prog-step .ps-next-label { font-size: 7px; font-weight: 700; color: #4C9F38; text-transform: uppercase; margin-top: 3px; }
+  .prog-step .ps-limit { display: inline-block; font-size: 6px; background: #f59e0b; color: white; padding: 1px 5px; border-radius: 2px; margin-top: 3px; }
+  .prog-arrow { width: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .prog-arrow svg { width: 10px; height: 10px; }
   /* Page 2 */
   .section-banner { background: #0f1f0f; padding: 12px 30px; }
   .section-banner-text { font-size: 9px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; }
