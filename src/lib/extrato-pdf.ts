@@ -340,6 +340,17 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
           <div class="vol-text">Volume Acumulado (01/${mesNum} até ${emissao}): ${data.allCompetencia.length} processo(s)</div>
           <div class="vol-text">Valor Base: ${fmt(data.cliente.valor_base ?? 580)} • Desc. Contratual: ${descPct > 0 ? descPct + '% progressivo' : 'N/A'}</div>
         </div>
+
+        <div style="background:#ffffff;border:2px solid #e2e8f0;border-top:4px solid #4C9F38;border-radius:0 0 6px 6px;padding:16px 20px;margin-top:14px;box-shadow:0 2px 6px rgba(0,0,0,0.04);display:flex;gap:18px;align-items:center;">
+          <div style="width:40px;height:40px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">💠</div>
+          <div style="flex:1;">
+            <div style="font-size:9px;font-weight:700;color:#4C9F38;text-transform:uppercase;letter-spacing:1px;">PAGAMENTO VIA PIX (CHAVE CNPJ)</div>
+            <div style="font-size:14px;font-weight:800;color:#0f1f0f;letter-spacing:0.5px;margin-top:2px;">39.969.412/0001-70</div>
+            <div style="font-size:9px;font-weight:500;color:#64748b;margin-top:1px;">Banco C6 Bank</div>
+            <div style="height:1px;background:#e2e8f0;margin:6px 0;"></div>
+            <div style="font-size:8px;font-weight:400;color:#94a3b8;font-style:italic;">Caso prefira boleto bancário, favor solicitar ao nosso setor administrativo.</div>
+          </div>
+        </div>
       </div>
 
       <div class="footer-contact">
