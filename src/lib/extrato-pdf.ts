@@ -1,5 +1,5 @@
 /**
- * Relatório de Performance Societária — TREVO ENGINE V14
+ * Relatório de Performance Societária — TREVO ENGINE V15
  * Estilo visual baseado na PROPOSTA CERTA ASSESSORIA (PDF anexo).
  * Regra JGVCO: Valor Manual > Urgência > Progressão -5% cumulativa.
  */
@@ -8,6 +8,9 @@ import autoTable from 'jspdf-autotable';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import type { ValorAdicional } from '@/hooks/useValoresAdicionais';
 import { supabase } from '@/integrations/supabase/client';
+
+const LOGO_PUBLIC_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png';
+const NEON_GREEN = [57, 255, 20] as const; // #39FF14
 
 // ── Brand constants (PROPOSTA style) ──
 const GREEN = [76, 159, 56] as const;     // #4C9F38
@@ -86,11 +89,9 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
     const isMudancaUF = (p.notas || '').includes('Mudança de UF');
     const notas = p.notas || '';
     const isUrgencia = notas.toLowerCase().includes('urgência') || notas.toLowerCase().includes('urgencia');
-    const hasManualValue = p.valor != null && p.valor > 0 && (
-      notas.includes('Valor Manual') || notas.includes('VALOR MANUAL') ||
-      notas.includes('is_manual') || isUrgencia ||
-      Math.abs(p.valor - valorBase) > 1
-    );
+    // ONLY mark as manual if explicitly flagged — never infer from value difference
+    const hasManualValue = notas.includes('Valor Manual') || notas.includes('VALOR MANUAL') ||
+      notas.includes('is_manual') || notas.includes('IS_MANUAL');
     const slots = isMudancaUF ? 2 : 1;
 
     for (let slot = 0; slot < slots; slot++) {
@@ -153,31 +154,56 @@ function drawGradientLine(doc: jsPDF, y: number, h = 2.5) {
   }
 }
 
-// Dark header bar (like PROPOSTA page 1 top)
-function drawDarkHeaderBar(doc: jsPDF, y: number): number {
+// Dark header bar with LOGO from Supabase Storage
+let _cachedLogoBase64: string | null = null;
+
+async function preloadLogo(): Promise<string | null> {
+  if (_cachedLogoBase64) return _cachedLogoBase64;
+  try {
+    const resp = await fetch(LOGO_PUBLIC_URL);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => { _cachedLogoBase64 = reader.result as string; resolve(_cachedLogoBase64); };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
+function drawDarkHeaderBar(doc: jsPDF, y: number, logoBase64?: string | null): number {
   const pw = getPageW(doc);
-  const w = getW(doc);
 
   // Dark bar
   doc.setFillColor(...DARK);
-  doc.rect(0, y, pw, 16, 'F');
+  doc.rect(0, y, pw, 18, 'F');
+
+  // Logo on the left (if loaded)
+  if (logoBase64) {
+    try {
+      doc.addImage(logoBase64, 'PNG', MARGIN, y + 2, 28, 14, undefined, 'FAST');
+    } catch { /* fallback to text */ }
+  }
+
+  const textX = logoBase64 ? MARGIN + 32 : MARGIN;
 
   // Brand name
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(...WHITE);
-  doc.text(BRAND.nome, MARGIN, y + 6);
+  doc.text(BRAND.fantasia, textX, y + 7);
 
-  // CNPJ line
+  // Slogan
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   doc.setTextColor(163, 230, 53); // lime
-  doc.text(`CNPJ ${BRAND.cnpj}  •  Atuação Nacional`, MARGIN, y + 12);
+  doc.text(`${BRAND.slogan}  •  CNPJ ${BRAND.cnpj}`, textX, y + 13);
 
   // Gradient line below
-  drawGradientLine(doc, y + 16, 2);
+  drawGradientLine(doc, y + 18, 2);
 
-  return y + 20;
+  return y + 22;
 }
 
 // Spaced letter section header (like "P R O P O S T A  P R E P A R A D A")
@@ -209,10 +235,10 @@ function drawSectionBanner(doc: jsPDF, y: number, tag: string, title: string): n
 }
 
 // Ensure space, add page if needed
-function ensureSpace(doc: jsPDF, y: number, needed: number): number {
+function ensureSpace(doc: jsPDF, y: number, needed: number, logoBase64?: string | null): number {
   if (y + needed > getPageH(doc) - 25) {
     doc.addPage();
-    return drawDarkHeaderBar(doc, 0) + 4;
+    return drawDarkHeaderBar(doc, 0, logoBase64) + 4;
   }
   return y;
 }
@@ -228,6 +254,9 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   const w = getW(doc);
   const now = new Date();
 
+  // Preload logo from Supabase Storage
+  const logoBase64 = await preloadLogo();
+
   const steps = buildEscadinha(data);
   const selectedSteps = steps.filter(s => s.isSelected);
   const descPct = data.cliente.desconto_progressivo ?? 0;
@@ -242,8 +271,8 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   // PAGE 1 — CAPA (Estilo PROPOSTA)
   // ═══════════════════════════════════════════════
 
-  // Dark header
-  let y = drawDarkHeaderBar(doc, 0);
+  // Dark header with logo
+  let y = drawDarkHeaderBar(doc, 0, logoBase64);
   y += 4;
 
   // Spaced section title
@@ -314,34 +343,56 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   y += 14;
 
   // ── KPI STATS ROW (like "12 Anos | 26 Estados" row) ──
+  const emissaoStr = now.toLocaleDateString('pt-BR');
   const kpiW = (w - 9) / 4;
   const kpis = [
-    { label: 'Processos Cobrados', value: String(data.processos.length) },
-    { label: 'Total no Mês', value: String(data.allCompetencia.length) },
-    { label: 'Valor Base', value: fmt(data.cliente.valor_base ?? 580) },
-    { label: 'Desc. Contratual', value: descPct > 0 ? `${descPct}% progressivo` : 'N/A' },
+    { label: 'Processos Cobrados', value: String(data.processos.length), neon: false },
+    { label: `Volume Acumulado (01/${String(now.getMonth()+1).padStart(2,'0')} até ${emissaoStr})`, value: String(data.allCompetencia.length), neon: false },
+    { label: 'Valor Base Unitário', value: fmt(data.cliente.valor_base ?? 580), neon: true },
+    { label: 'Desc. Contratual', value: descPct > 0 ? `${descPct}% progressivo` : 'N/A', neon: descPct > 0 },
   ];
   doc.setDrawColor(...BORDER);
   kpis.forEach((kpi, i) => {
     const x = MARGIN + i * (kpiW + 3);
-    doc.setFillColor(...BG_BLOCK);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(x, y, kpiW, 22, 2, 2, 'FD');
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(...DARK_TEXT);
-    doc.text(kpi.value, x + 5, y + 10);
+    if (kpi.neon) {
+      // Neon green highlight for advantage cards
+      doc.setFillColor(...NEON_GREEN);
+      doc.setDrawColor(...NEON_GREEN);
+      doc.setLineWidth(1.2);
+      doc.roundedRect(x, y, kpiW, 22, 2, 2, 'FD');
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(...SLATE);
-    doc.text(kpi.label, x + 5, y + 17);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(0, 0, 0);
+      doc.text(kpi.value, x + 5, y + 10);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(0, 0, 0);
+      doc.text(kpi.label, x + 5, y + 17);
+    } else {
+      doc.setFillColor(...BG_BLOCK);
+      doc.setDrawColor(...BORDER);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(x, y, kpiW, 22, 2, 2, 'FD');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(...DARK_TEXT);
+      doc.text(kpi.value, x + 5, y + 10);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...SLATE);
+      const labelLines = doc.splitTextToSize(kpi.label, kpiW - 10);
+      doc.text(labelLines, x + 5, y + 17);
+    }
   });
   y += 28;
 
   // ── VALOR TOTAL HIGHLIGHT (like PROPOSTA R$ 600,00 big) ──
-  y = ensureSpace(doc, y, 50);
+  y = ensureSpace(doc, y, 50, logoBase64);
 
   // Left: total amount
   doc.setFillColor(...BG_BLOCK);
@@ -405,7 +456,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   y += 48;
 
   // ── Footer expiry line (like PROPOSTA "EXPIRA EM") ──
-  y = ensureSpace(doc, y, 12);
+  y = ensureSpace(doc, y, 12, logoBase64);
   doc.setDrawColor(...BORDER);
   doc.line(MARGIN, y, pw - MARGIN, y);
   y += 1;
@@ -425,7 +476,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   // PAGE 2+ — DETALHAMENTO (Master-Detail)
   // ═══════════════════════════════════════════════
   doc.addPage();
-  y = drawDarkHeaderBar(doc, 0);
+  y = drawDarkHeaderBar(doc, 0, logoBase64);
   y = drawSectionBanner(doc, y, 'DETALHAMENTO UNITÁRIO', 'Honorários e Taxas por Processo');
   y += 2;
 
@@ -437,7 +488,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
     const taxTableH = pTaxas.length > 0 ? 10 + pTaxas.length * 7 : 0;
     const subtotalH = pTaxas.length > 0 ? 10 : 0;
 
-    y = ensureSpace(doc, y, boxH + taxTableH + subtotalH + 10);
+    y = ensureSpace(doc, y, boxH + taxTableH + subtotalH + 10, logoBase64);
 
     // ── Process box with green left border ──
     doc.setFillColor(...BG_BLOCK);
@@ -565,7 +616,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   // ── Non-selected (contabilizado) summary ──
   const nonSelected = steps.filter(s => !s.isSelected);
   if (nonSelected.length > 0) {
-    y = ensureSpace(doc, y, 20 + nonSelected.length * 7);
+    y = ensureSpace(doc, y, 20 + nonSelected.length * 7, logoBase64);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
@@ -595,7 +646,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
 
   // ── PROGRESSÃO DE INCENTIVO POR VOLUME (like PROPOSTA page 3 table) ──
   if (descPct > 0 && steps.length > 0) {
-    y = ensureSpace(doc, y, 20 + steps.length * 7 + 14);
+    y = ensureSpace(doc, y, 20 + steps.length * 7 + 14, logoBase64);
 
     doc.setFillColor(...BG_BLOCK);
     doc.setDrawColor(...GREEN);
@@ -658,7 +709,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   }
 
   // ── TOTALIZADOR FINAL (dark bar like PROPOSTA) ──
-  y = ensureSpace(doc, y, 20);
+  y = ensureSpace(doc, y, 20, logoBase64);
 
   doc.setFillColor(...DARK);
   doc.roundedRect(MARGIN, y, w, 16, 3, 3, 'F');
