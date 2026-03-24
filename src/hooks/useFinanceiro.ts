@@ -511,11 +511,11 @@ export function useFinanceiroDashboard() {
         .gte('data_vencimento', today)
         .lte('data_vencimento', in7days);
 
+      // Taxas a Reembolsar: sum of valores_adicionais without comprovante_url
       const { data: taxasReemb } = await supabase
-        .from('lancamentos')
-        .select('valor')
-        .eq('is_taxa_reembolsavel', true)
-        .eq('status', 'pendente');
+        .from('valores_adicionais')
+        .select('valor, comprovante_url')
+        .is('comprovante_url', null);
 
       const sum = (arr: any[] | null) => (arr || []).reduce((s, r) => s + Number(r.valor), 0);
 

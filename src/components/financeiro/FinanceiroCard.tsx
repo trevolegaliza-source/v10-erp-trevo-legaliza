@@ -258,10 +258,6 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
             </div>
           </div>
 
-          {/* Creation date */}
-          {createdAt && (
-            <p className="text-[10px] text-muted-foreground">📅 Criado em: {createdAt}</p>
-          )}
 
           {/* Faturamento info with tooltip */}
           {momentoFat === 'no_deferimento' && (
