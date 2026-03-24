@@ -53,6 +53,8 @@ interface StepInfo {
   valorFinal: number;
   isSelected: boolean;
   isMudancaUF: boolean;
+  isManual: boolean;
+  isUrgencia: boolean;
 }
 
 // ── Progressive discount staircase ──
