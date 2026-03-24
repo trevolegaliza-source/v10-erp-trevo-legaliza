@@ -260,7 +260,7 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
 
       <div class="fin-section">
         <div class="total-card">
-          <div class="total-tag">HONORÁRIOS DO PROCESSO</div>
+          <div class="total-tag">HONORÁRIOS DOS SERVIÇOS SOCIETÁRIOS</div>
           <div class="total-label">TOTAL</div>
           <div class="total-value"><span class="total-prefix">R$ </span>${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
           <div class="total-ctx">${selected.length} processo(s) • Competência ${mesRef}</div>
