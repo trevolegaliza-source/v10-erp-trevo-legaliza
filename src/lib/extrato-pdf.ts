@@ -154,31 +154,56 @@ function drawGradientLine(doc: jsPDF, y: number, h = 2.5) {
   }
 }
 
-// Dark header bar (like PROPOSTA page 1 top)
-function drawDarkHeaderBar(doc: jsPDF, y: number): number {
+// Dark header bar with LOGO from Supabase Storage
+let _cachedLogoBase64: string | null = null;
+
+async function preloadLogo(): Promise<string | null> {
+  if (_cachedLogoBase64) return _cachedLogoBase64;
+  try {
+    const resp = await fetch(LOGO_PUBLIC_URL);
+    if (!resp.ok) return null;
+    const blob = await resp.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => { _cachedLogoBase64 = reader.result as string; resolve(_cachedLogoBase64); };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
+function drawDarkHeaderBar(doc: jsPDF, y: number, logoBase64?: string | null): number {
   const pw = getPageW(doc);
-  const w = getW(doc);
 
   // Dark bar
   doc.setFillColor(...DARK);
-  doc.rect(0, y, pw, 16, 'F');
+  doc.rect(0, y, pw, 18, 'F');
+
+  // Logo on the left (if loaded)
+  if (logoBase64) {
+    try {
+      doc.addImage(logoBase64, 'PNG', MARGIN, y + 2, 28, 14, undefined, 'FAST');
+    } catch { /* fallback to text */ }
+  }
+
+  const textX = logoBase64 ? MARGIN + 32 : MARGIN;
 
   // Brand name
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(...WHITE);
-  doc.text(BRAND.nome, MARGIN, y + 6);
+  doc.text(BRAND.fantasia, textX, y + 7);
 
-  // CNPJ line
+  // Slogan
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
+  doc.setFontSize(6);
   doc.setTextColor(163, 230, 53); // lime
-  doc.text(`CNPJ ${BRAND.cnpj}  •  Atuação Nacional`, MARGIN, y + 12);
+  doc.text(`${BRAND.slogan}  •  CNPJ ${BRAND.cnpj}`, textX, y + 13);
 
   // Gradient line below
-  drawGradientLine(doc, y + 16, 2);
+  drawGradientLine(doc, y + 18, 2);
 
-  return y + 20;
+  return y + 22;
 }
 
 // Spaced letter section header (like "P R O P O S T A  P R E P A R A D A")
