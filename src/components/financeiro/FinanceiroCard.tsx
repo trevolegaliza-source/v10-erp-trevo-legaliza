@@ -187,7 +187,9 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
       <Card
         className={cn(
           'border-l-4 cursor-pointer transition-all hover:border-primary/40 hover:shadow-[0_0_15px_-3px_hsl(var(--primary)/0.3)]',
-          isOverdue ? 'border-l-destructive bg-destructive/5' : 'border-l-border bg-zinc-900',
+          isOverdue ? 'border-l-destructive bg-destructive/5' :
+          isPago ? 'border-l-success bg-zinc-900' :
+          'border-l-warning bg-zinc-900',
         )}
         onDoubleClick={() => onDoubleClick?.(processo)}
       >
