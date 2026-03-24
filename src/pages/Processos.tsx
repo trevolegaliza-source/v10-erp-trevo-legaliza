@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { KANBAN_STAGES, PROCESS_TYPE_LABELS, type KanbanStage } from '@/types/process';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, GripVertical, LayoutGrid, List, MoreHorizontal, Receipt, EyeOff, Trash2, Pencil } from 'lucide-react';
+import { Plus, Filter, GripVertical, LayoutGrid, List, MoreHorizontal, Receipt, EyeOff, Trash2, Pencil, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -20,6 +20,7 @@ import ValoresAdicionaisModal from '@/components/financeiro/ValoresAdicionaisMod
 import { Skeleton } from '@/components/ui/skeleton';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
+import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
 
 type ViewMode = 'kanban' | 'list';
 
@@ -95,6 +96,7 @@ function ProcessCard({
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-bold truncate leading-tight text-white">{clientName}</p>
+              <p className="text-[10px] text-zinc-400 mt-0.5">📅 {new Date(process.created_at).toLocaleDateString('pt-BR')}</p>
               <p className="text-[11px] text-zinc-400 mt-0.5 truncate">{process.razao_social}</p>
               <p className="text-[12px] font-semibold text-primary mt-0.5 truncate">{typeLabel}</p>
             </div>
@@ -244,6 +246,23 @@ export default function Processos() {
                 <SelectItem value="orcamento">Orçamento</SelectItem>
               </SelectContent>
             </Select>
+
+            <Button size="sm" variant="outline" className="h-9" onClick={() => {
+              if (filtered.length === 0) { toast.info('Sem dados'); return; }
+              downloadCSV(filtered.map(p => ({
+                'Razão Social': p.razao_social,
+                'Cliente': p.cliente?.apelido || p.cliente?.nome || '-',
+                'Tipo': PROCESS_TYPE_LABELS[p.tipo] || p.tipo,
+                'Etapa': KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa,
+                'Prioridade': p.prioridade,
+                'Valor': p.valor ? formatBRLPlain(Number(p.valor)) : '-',
+                'Criado em': formatDateBR(p.created_at),
+              })), `processos_${new Date().toISOString().split('T')[0]}.csv`);
+              toast.success('Exportado!');
+            }}>
+              <Download className="h-4 w-4 mr-1" />
+              Exportar
+            </Button>
 
             <Button size="sm" className="h-9" asChild>
               <a href="/cadastro-rapido">

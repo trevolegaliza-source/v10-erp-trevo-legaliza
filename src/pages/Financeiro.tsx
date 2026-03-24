@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, Clock, Receipt, LayoutGrid, List } from 'lucide-react';
+import { DollarSign, Clock, Receipt, LayoutGrid, List, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useFinanceiroDashboard } from '@/hooks/useFinanceiro';
@@ -9,6 +9,9 @@ import { Toggle } from '@/components/ui/toggle';
 import FinanceiroKanban from '@/components/financeiro/FinanceiroKanban';
 import FinanceiroList from '@/components/financeiro/FinanceiroList';
 import { formatBRL } from '@/lib/pricing-engine';
+import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
+import { ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
+import { toast } from 'sonner';
 
 export default function Financeiro() {
   const { data: stats, isLoading: loadingStats } = useFinanceiroDashboard();
@@ -16,6 +19,21 @@ export default function Financeiro() {
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
 
   const items = processos || [];
+
+  const handleExportCSV = () => {
+    if (items.length === 0) { toast.info('Sem dados para exportar'); return; }
+    const rows = items.map(p => ({
+      'Cliente': (p.cliente as any)?.apelido || (p.cliente as any)?.nome || '-',
+      'Razão Social': p.razao_social,
+      'Valor': formatBRLPlain(Number(p.lancamento?.valor ?? p.valor ?? 0)),
+      'Vencimento': formatDateBR(p.lancamento?.data_vencimento),
+      'Etapa': ETAPA_FINANCEIRO_LABELS[p.etapa_financeiro] || p.etapa_financeiro,
+      'Status': p.lancamento?.status || 'pendente',
+      'Criado em': formatDateBR(p.created_at),
+    }));
+    downloadCSV(rows, `financeiro_${new Date().toISOString().split('T')[0]}.csv`);
+    toast.success('Relatório exportado!');
+  };
 
   const kpis = [
     {
@@ -69,6 +87,10 @@ export default function Financeiro() {
               <span className="text-xs">Lista</span>
             </Toggle>
           </div>
+          <Button variant="outline" size="sm" className="text-zinc-400 hover:text-white hover:bg-muted/50 transition-colors" onClick={handleExportCSV}>
+            <Download className="h-3.5 w-3.5 mr-1" />
+            Exportar CSV
+          </Button>
           <Button variant="outline" size="sm" className="text-zinc-400 hover:text-white hover:bg-muted/50 transition-colors" asChild>
             <Link to="/contas-receber">Contas a Receber</Link>
           </Button>

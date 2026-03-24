@@ -69,7 +69,9 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
   const somaAdicionais = valoresAdicionais.reduce((s, i) => s + Number(i.valor), 0);
 
   const isOverdue = processo.etapa_financeiro === 'honorario_vencido';
+  const isPago = processo.etapa_financeiro === 'honorario_pago';
   const isUrgente = processo.prioridade === 'urgente';
+  const hasTaxasSemGuia = valoresAdicionais.length > 0 && valoresAdicionais.some(v => !v.anexo_url);
   const cliente = processo.cliente as any;
 
   // Retroactive negotiation detection
@@ -185,16 +187,37 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
       <Card
         className={cn(
           'border-l-4 cursor-pointer transition-all hover:border-primary/40 hover:shadow-[0_0_15px_-3px_hsl(var(--primary)/0.3)]',
-          isOverdue ? 'border-l-destructive bg-destructive/5' : 'border-l-border bg-zinc-900',
+          isOverdue ? 'border-l-destructive bg-destructive/5' :
+          isPago ? 'border-l-success bg-zinc-900' :
+          'border-l-warning bg-zinc-900',
         )}
         onDoubleClick={() => onDoubleClick?.(processo)}
       >
         <CardContent className="p-3 pb-5 space-y-2.5">
+          {/* Creation date - prominent */}
+          {createdAt && (
+            <div className="text-[10px] font-medium text-zinc-400 bg-muted/50 rounded px-2 py-0.5 w-fit">
+              📅 {createdAt}
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />}
+                {hasTaxasSemGuia && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0 animate-pulse" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs max-w-[260px]">
+                        Atenção: Taxas cadastradas sem comprovante de pagamento anexo
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               <p className="text-sm font-bold truncate text-white">{clienteApelido}</p>
               </div>
               <p className="text-[11px] text-zinc-400 truncate">{processo.razao_social}</p>
@@ -235,10 +258,6 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
             </div>
           </div>
 
-          {/* Creation date */}
-          {createdAt && (
-            <p className="text-[10px] text-muted-foreground">📅 Criado em: {createdAt}</p>
-          )}
 
           {/* Faturamento info with tooltip */}
           {momentoFat === 'no_deferimento' && (
