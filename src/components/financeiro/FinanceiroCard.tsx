@@ -69,7 +69,9 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
   const somaAdicionais = valoresAdicionais.reduce((s, i) => s + Number(i.valor), 0);
 
   const isOverdue = processo.etapa_financeiro === 'honorario_vencido';
+  const isPago = processo.etapa_financeiro === 'honorario_pago';
   const isUrgente = processo.prioridade === 'urgente';
+  const hasTaxasSemGuia = valoresAdicionais.length > 0 && valoresAdicionais.some(v => !v.anexo_url);
   const cliente = processo.cliente as any;
 
   // Retroactive negotiation detection
