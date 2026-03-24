@@ -235,10 +235,10 @@ function drawSectionBanner(doc: jsPDF, y: number, tag: string, title: string): n
 }
 
 // Ensure space, add page if needed
-function ensureSpace(doc: jsPDF, y: number, needed: number): number {
+function ensureSpace(doc: jsPDF, y: number, needed: number, logoBase64?: string | null): number {
   if (y + needed > getPageH(doc) - 25) {
     doc.addPage();
-    return drawDarkHeaderBar(doc, 0) + 4;
+    return drawDarkHeaderBar(doc, 0, logoBase64) + 4;
   }
   return y;
 }
