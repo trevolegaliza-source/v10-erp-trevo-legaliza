@@ -70,6 +70,11 @@ export default function ClienteDetalhe() {
   const [showCobrancaDialog, setShowCobrancaDialog] = useState(false);
   const [selectedRelatorioProcessos, setSelectedRelatorioProcessos] = useState<Set<string>>(new Set());
   const [selectedCobrancaProcessos, setSelectedCobrancaProcessos] = useState<Set<string>>(new Set());
+  const [selectedProcessosTab, setSelectedProcessosTab] = useState<Set<string>>(new Set());
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
+  const [generatingExtrato, setGeneratingExtrato] = useState(false);
+  const [showMarkFaturadoDialog, setShowMarkFaturadoDialog] = useState(false);
 
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
