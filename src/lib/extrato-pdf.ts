@@ -316,7 +316,7 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
           <div class="total-tag">HONORÁRIOS DOS SERVIÇOS SOCIETÁRIOS</div>
           <div class="total-label">TOTAL</div>
           <div class="total-value"><span class="total-prefix">R$ </span>${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-          <div class="total-ctx">${selected.length} processo(s) • Competência ${mesRef}</div>
+          <div class="total-ctx">${selected.length} processo(s) cobrado(s) neste período</div>
         </div>
 
         <div class="kpi-row">
