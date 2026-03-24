@@ -127,7 +127,7 @@ const GLOBAL_STYLES = `
   .page { width: 794px; min-height: 1123px; background: #ffffff; position: relative; overflow: hidden; }
   .stripe-top { width: 100%; height: 5px; background: #1a3a1a; }
   .header { display: flex; justify-content: space-between; align-items: center; padding: 10px 30px; border-bottom: 1px solid #e2e8f0; background: #fff; }
-  .header-logo img { height: 28px; display: block; }
+  .header-logo img { width: 208px; height: auto; object-fit: contain; display: block; }
   .header-right { text-align: right; }
   .header-right .line1 { font-size: 9px; font-weight: 700; color: #64748b; }
   .header-right .line2 { font-size: 9px; font-weight: 500; color: #64748b; }
