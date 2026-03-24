@@ -1,7 +1,7 @@
 /**
- * Relatório de Performance Societária – TREVO ENGINE V10
- * Layout de elite com master-detail (por processo + sub-tabela de taxas).
- * Fonte única: Code.gs V10 (cores, branding, regra JGVCO).
+ * Relatório de Performance Societária — TREVO ENGINE V14
+ * Estilo visual baseado na PROPOSTA CERTA ASSESSORIA (PDF anexo).
+ * Regra JGVCO: Valor Manual > Urgência > Progressão -5% cumulativa.
  */
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -9,10 +9,18 @@ import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import type { ValorAdicional } from '@/hooks/useValoresAdicionais';
 import { supabase } from '@/integrations/supabase/client';
 
-// ── Brand ──
-const GREEN = '#4C9F38';
-const DARK = '#0f1f0f';
-const BG_BLOCK = '#f8fafc';
+// ── Brand constants (PROPOSTA style) ──
+const GREEN = [76, 159, 56] as const;     // #4C9F38
+const DARK = [15, 31, 15] as const;        // #0f1f0f
+const SLATE = [100, 116, 139] as const;    // #64748b
+const DARK_TEXT = [30, 41, 59] as const;   // #1e293b
+const BG_BLOCK = [248, 250, 252] as const; // #f8fafc
+const GREEN_LIGHT = [240, 253, 244] as const;
+const BORDER = [226, 232, 240] as const;
+const GREEN_ACCENT = [74, 222, 128] as const;
+const WHITE = [255, 255, 255] as const;
+const ORANGE = [234, 88, 12] as const;
+
 const BRAND = {
   nome: 'TREVO ASSESSORIA SOCIETÁRIA LTDA',
   fantasia: 'TREVO LEGALIZA',
@@ -21,7 +29,10 @@ const BRAND = {
   email: 'administrativo@trevolegaliza.com.br',
   telefone: '(11) 93492-7001',
   site: 'trevolegaliza.com',
+  slogan: 'LÍDER NACIONAL EM ASSESSORIA SOCIETÁRIA',
 };
+
+const MARGIN = 15;
 
 function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -57,7 +68,7 @@ interface StepInfo {
   isUrgencia: boolean;
 }
 
-// ── Progressive discount staircase ──
+// ── Progressive discount staircase (JGVCO Rule) ──
 function buildEscadinha(data: ExtratoData): StepInfo[] {
   const valorBase = data.cliente.valor_base ?? 580;
   const descPct = data.cliente.desconto_progressivo ?? 0;
@@ -75,34 +86,26 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
     const isMudancaUF = (p.notas || '').includes('Mudança de UF');
     const notas = p.notas || '';
     const isUrgencia = notas.toLowerCase().includes('urgência') || notas.toLowerCase().includes('urgencia');
-    // Manual value: processo.valor exists AND differs from progressive calculation OR notes indicate manual
     const hasManualValue = p.valor != null && p.valor > 0 && (
       notas.includes('Valor Manual') || notas.includes('VALOR MANUAL') ||
       notas.includes('is_manual') || isUrgencia ||
-      // If valor doesn't match the base, treat as manual
       Math.abs(p.valor - valorBase) > 1
     );
     const slots = isMudancaUF ? 2 : 1;
 
     for (let slot = 0; slot < slots; slot++) {
       stepIdx++;
-
       let valorAtual: number;
       let isManual = false;
       let desconto = 0;
 
       if (hasManualValue && slot === 0) {
-        // PRIORITY 1: Manual value is sovereign - use exactly what was set
         valorAtual = p.valor!;
         isManual = true;
-        desconto = 0;
       } else if (isUrgencia && !hasManualValue) {
-        // PRIORITY 2: Urgency = +50% on base
         valorAtual = valorBase * 1.5;
         isManual = true;
-        desconto = 0;
       } else {
-        // PRIORITY 3: Progressive discount
         valorAtual = valorBase;
         if (descPct > 0 && stepIdx > 1) {
           for (let i = 1; i < stepIdx; i++) {
@@ -130,78 +133,86 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
   return steps;
 }
 
-// ── Shared constants ──
-const MARGIN = 15;
+// ── Helpers ──
+function getW(doc: jsPDF) { return doc.internal.pageSize.getWidth() - MARGIN * 2; }
+function getPageW(doc: jsPDF) { return doc.internal.pageSize.getWidth(); }
+function getPageH(doc: jsPDF) { return doc.internal.pageSize.getHeight(); }
 
-function getContentW(doc: jsPDF) {
-  return doc.internal.pageSize.getWidth() - MARGIN * 2;
-}
-
-// ── Draw gradient rule ──
-function drawGradientRule(doc: jsPDF, y: number) {
-  const contentW = getContentW(doc);
-  const steps = 80;
+// Gradient line (green #4C9F38 → #a3e635)
+function drawGradientLine(doc: jsPDF, y: number, h = 2.5) {
+  const w = getW(doc);
+  const steps = 100;
   for (let i = 0; i < steps; i++) {
     const ratio = i / steps;
     const r = Math.round(76 + (163 - 76) * ratio);
     const g = Math.round(159 + (230 - 159) * ratio);
     const b = Math.round(56 + (53 - 56) * ratio);
-    doc.setDrawColor(r, g, b);
-    doc.setLineWidth(1.2);
-    const segW = contentW / steps;
-    doc.line(MARGIN + segW * i, y, MARGIN + segW * (i + 1), y);
+    doc.setFillColor(r, g, b);
+    const segW = w / steps;
+    doc.rect(MARGIN + segW * i, y, segW + 0.2, h, 'F');
   }
 }
 
-// ── Header (reused on every page) ──
-function drawHeader(doc: jsPDF, yStart: number): number {
-  const pageW = doc.internal.pageSize.getWidth();
+// Dark header bar (like PROPOSTA page 1 top)
+function drawDarkHeaderBar(doc: jsPDF, y: number): number {
+  const pw = getPageW(doc);
+  const w = getW(doc);
 
-  // Gradient rule at very top
-  drawGradientRule(doc, yStart);
+  // Dark bar
+  doc.setFillColor(...DARK);
+  doc.rect(0, y, pw, 16, 'F');
 
-  // Logo text
+  // Brand name
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.setTextColor(76, 159, 56);
-  doc.text('TREVO LEGALIZA', MARGIN, yStart + 10);
+  doc.setFontSize(8);
+  doc.setTextColor(...WHITE);
+  doc.text(BRAND.nome, MARGIN, y + 6);
 
-  // Company block right
-  const rightX = pageW - MARGIN;
+  // CNPJ line
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
-  doc.setTextColor(100, 116, 139);
-  doc.text(BRAND.nome, rightX, yStart + 5, { align: 'right' });
-  doc.text(`CNPJ ${BRAND.cnpj} • Atuação Nacional`, rightX, yStart + 9, { align: 'right' });
-  doc.text(BRAND.endereco, rightX, yStart + 13, { align: 'right' });
+  doc.setTextColor(163, 230, 53); // lime
+  doc.text(`CNPJ ${BRAND.cnpj}  •  Atuação Nacional`, MARGIN, y + 12);
 
-  // Second gradient
-  drawGradientRule(doc, yStart + 17);
+  // Gradient line below
+  drawGradientLine(doc, y + 16, 2);
 
-  return yStart + 21;
+  return y + 20;
 }
 
-// ── Dark banner ──
-function drawBanner(doc: jsPDF, y: number, tag: string, title: string): number {
-  const contentW = getContentW(doc);
-  doc.setFillColor(15, 31, 15);
-  doc.rect(MARGIN, y, contentW, 14, 'F');
+// Spaced letter section header (like "P R O P O S T A  P R E P A R A D A")
+function drawSpacedHeader(doc: jsPDF, y: number, text: string): number {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(6.5);
-  doc.setTextColor(74, 222, 128);
-  doc.text(tag, MARGIN + 5, y + 5);
-  doc.setFontSize(11);
-  doc.setTextColor(255, 255, 255);
-  doc.text(title, MARGIN + 5, y + 11);
-  return y + 18;
+  doc.setTextColor(...GREEN);
+  const spaced = text.split('').join(' ');
+  doc.text(spaced, MARGIN, y);
+  return y + 6;
 }
 
-// ── Ensure space, add page if needed ──
+// Dark section banner (like PROPOSTA "INVESTIMENTO" banner)
+function drawSectionBanner(doc: jsPDF, y: number, tag: string, title: string): number {
+  const pw = getPageW(doc);
+  doc.setFillColor(...DARK);
+  doc.rect(0, y, pw, 18, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...GREEN_ACCENT);
+  doc.text(tag, MARGIN, y + 6);
+
+  doc.setFontSize(13);
+  doc.setTextColor(...WHITE);
+  doc.text(title, MARGIN, y + 14);
+
+  return y + 22;
+}
+
+// Ensure space, add page if needed
 function ensureSpace(doc: jsPDF, y: number, needed: number): number {
-  const pageH = doc.internal.pageSize.getHeight();
-  if (y + needed > pageH - 20) {
+  if (y + needed > getPageH(doc) - 25) {
     doc.addPage();
-    return drawHeader(doc, MARGIN + 2);
+    return drawDarkHeaderBar(doc, 0) + 4;
   }
   return y;
 }
@@ -212,9 +223,9 @@ function ensureSpace(doc: jsPDF, y: number, needed: number): number {
 
 export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   const doc = new jsPDF('p', 'mm', 'a4');
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const contentW = getContentW(doc);
+  const pw = getPageW(doc);
+  const ph = getPageH(doc);
+  const w = getW(doc);
   const now = new Date();
 
   const steps = buildEscadinha(data);
@@ -226,243 +237,278 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   const totalTaxas = allTaxas.reduce((s, va) => s + Number(va.valor), 0);
   const totalGeral = totalHonorarios + totalTaxas;
   const economiaMes = steps.reduce((s, st) => s + st.desconto, 0);
-  const economiaSelected = selectedSteps.reduce((s, st) => s + st.desconto, 0);
 
   // ═══════════════════════════════════════════════
-  // PAGE 1 — CAPA / RESUMO EXECUTIVO
+  // PAGE 1 — CAPA (Estilo PROPOSTA)
   // ═══════════════════════════════════════════════
-  let y = drawHeader(doc, MARGIN + 2);
-  y = drawBanner(doc, y, 'RELATÓRIO DE PERFORMANCE SOCIETÁRIA', 'Extrato de Faturamento');
 
-  // Client info box
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(226, 232, 240);
+  // Dark header
+  let y = drawDarkHeaderBar(doc, 0);
+  y += 4;
+
+  // Spaced section title
+  y = drawSpacedHeader(doc, y, 'RELATÓRIO DE PERFORMANCE SOCIETÁRIA');
+  y += 2;
+
+  // Client name (large, like PROPOSTA)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(22);
+  doc.setTextColor(...DARK_TEXT);
+  const clientName = data.cliente.nome;
+  const splitName = doc.splitTextToSize(clientName, w);
+  doc.text(splitName, MARGIN, y);
+  y += splitName.length * 9 + 2;
+
+  // CNPJ
+  if (data.cliente.cnpj) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...SLATE);
+    doc.text(data.cliente.cnpj, MARGIN, y);
+    y += 6;
+  }
+
+  // Badge "EXTRATO DE FATURAMENTO"
+  const badgeText = 'EXTRATO DE FATURAMENTO';
+  doc.setFillColor(...GREEN);
+  const badgeW = doc.getTextWidth(badgeText) * 1.4 + 10;
+  doc.roundedRect(MARGIN, y, badgeW > 60 ? badgeW : 60, 8, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(...WHITE);
+  doc.text(badgeText, MARGIN + 4, y + 5.5);
+  y += 16;
+
+  // ── Big white section (like PROPOSTA hero text area) ──
+  // Divider line
+  doc.setDrawColor(...BORDER);
   doc.setLineWidth(0.3);
-  doc.roundedRect(MARGIN, y, contentW, 28, 2, 2, 'FD');
-  doc.setFillColor(76, 159, 56);
-  doc.rect(MARGIN, y, 1.2, 28, 'F');
+  doc.line(MARGIN, y, pw - MARGIN, y);
+  y += 8;
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(76, 159, 56);
-  doc.text('CONTRATANTE', MARGIN + 5, y + 5);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(30, 41, 59);
-  doc.text(data.cliente.nome, MARGIN + 5, y + 12);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(100, 116, 139);
-  if (data.cliente.cnpj) doc.text(`CNPJ: ${data.cliente.cnpj}`, MARGIN + 5, y + 17);
+  // Competência text
   const mesRef = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  doc.text(`Competência: ${mesRef}  •  Emissão: ${now.toLocaleDateString('pt-BR')}`, MARGIN + 5, y + 23);
-
-  // Total on right
-  const rightX = pageW - MARGIN - 5;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(76, 159, 56);
-  doc.text(fmt(totalGeral), rightX, y + 13, { align: 'right' });
+  doc.setFontSize(16);
+  doc.setTextColor(...DARK_TEXT);
+  doc.text(`Competência: ${mesRef}`, MARGIN, y);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...SLATE);
+  doc.text(`Emissão: ${now.toLocaleDateString('pt-BR')}  •  ${data.processos.length} processo(s) cobrado(s)  •  ${data.allCompetencia.length} no mês`, MARGIN, y);
+  y += 14;
+
+  // ── CONTACT BAR (like PROPOSTA "ENTRE EM CONTATO") ──
+  doc.setDrawColor(...BORDER);
+  doc.setLineWidth(0.3);
+  doc.line(MARGIN, y, pw - MARGIN, y);
+  y += 1;
+  doc.setFillColor(...BG_BLOCK);
+  doc.rect(MARGIN, y, w, 10, 'F');
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.setTextColor(100, 116, 139);
-  doc.text('VALOR TOTAL DO EXTRATO', rightX, y + 19, { align: 'right' });
-  y += 34;
+  doc.setTextColor(...SLATE);
+  doc.text(`${BRAND.site}     ${BRAND.email}     ${BRAND.telefone}`, pw / 2, y + 6, { align: 'center' });
+  y += 14;
 
-  // KPI row
-  const kpiW = (contentW - 9) / 4;
+  // ── KPI STATS ROW (like "12 Anos | 26 Estados" row) ──
+  const kpiW = (w - 9) / 4;
   const kpis = [
     { label: 'Processos Cobrados', value: String(data.processos.length) },
     { label: 'Total no Mês', value: String(data.allCompetencia.length) },
-    { label: 'Valor Base Unitário', value: fmt(data.cliente.valor_base ?? 580) },
+    { label: 'Valor Base', value: fmt(data.cliente.valor_base ?? 580) },
     { label: 'Desc. Contratual', value: descPct > 0 ? `${descPct}% progressivo` : 'N/A' },
   ];
+  doc.setDrawColor(...BORDER);
   kpis.forEach((kpi, i) => {
     const x = MARGIN + i * (kpiW + 3);
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(x, y, kpiW, 18, 2, 2, 'FD');
-    doc.setFillColor(76, 159, 56);
-    doc.rect(x, y, kpiW, 0.8, 'F');
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6);
-    doc.setTextColor(76, 159, 56);
-    doc.text(kpi.label, x + 4, y + 6);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(30, 41, 59);
-    doc.text(kpi.value, x + 4, y + 14);
-  });
-  y += 24;
-
-  // ── PERFORMANCE DE ECONOMIA ──
-  if (descPct > 0 && steps.length > 0) {
-    const progH = Math.min(8 + steps.length * 5.5 + 16, 100);
-    y = ensureSpace(doc, y, progH + 4);
-
-    doc.setFillColor(240, 253, 244);
-    doc.setDrawColor(134, 239, 172);
+    doc.setFillColor(...BG_BLOCK);
     doc.setLineWidth(0.3);
-    doc.roundedRect(MARGIN, y, contentW, progH, 2, 2, 'FD');
+    doc.roundedRect(x, y, kpiW, 22, 2, 2, 'FD');
 
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.setTextColor(22, 101, 52);
-    doc.text('PERFORMANCE DE ECONOMIA — PROGRESSÃO NO MÊS', MARGIN + 5, y + 6);
+    doc.setFontSize(13);
+    doc.setTextColor(...DARK_TEXT);
+    doc.text(kpi.value, x + 5, y + 10);
 
-    let py = y + 12;
-    const barMaxW = contentW - 60;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...SLATE);
+    doc.text(kpi.label, x + 5, y + 17);
+  });
+  y += 28;
 
-    for (const step of steps) {
-      if (py > y + progH - 14) break;
-      const ratio = step.isManual ? 1 : (step.valorFinal / step.valorBase);
-      const barW = barMaxW * Math.min(ratio, 1);
+  // ── VALOR TOTAL HIGHLIGHT (like PROPOSTA R$ 600,00 big) ──
+  y = ensureSpace(doc, y, 50);
 
-      // Background
-      doc.setFillColor(220, 252, 231);
-      doc.roundedRect(MARGIN + 28, py - 2.5, barMaxW, 3.5, 1, 1, 'F');
+  // Left: total amount
+  doc.setFillColor(...BG_BLOCK);
+  doc.setDrawColor(...GREEN);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(MARGIN, y, w * 0.48, 40, 3, 3, 'FD');
 
-      // Filled bar - orange for manual, green for progressive
-      if (step.isManual) {
-        doc.setFillColor(234, 88, 12);
-      } else {
-        doc.setFillColor(step.isSelected ? 76 : 148, step.isSelected ? 159 : 163, step.isSelected ? 56 : 184);
-      }
-      doc.roundedRect(MARGIN + 28, py - 2.5, barW, 3.5, 1, 1, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(...GREEN);
+  doc.text('VALOR TOTAL DO EXTRATO', MARGIN + 8, y + 9);
 
-      // Label
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6);
-      doc.setTextColor(step.isManual ? 234 : (step.isSelected ? 22 : 148), step.isManual ? 88 : (step.isSelected ? 101 : 163), step.isManual ? 12 : (step.isSelected ? 52 : 184));
-      const label = step.isManual ? `${step.index}º ✦` : `${step.index}º`;
-      doc.text(label, MARGIN + 5, py);
+  doc.setFontSize(26);
+  doc.setTextColor(...DARK_TEXT);
+  doc.text(fmt(totalGeral), MARGIN + 8, y + 26);
 
-      // Value
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6);
-      doc.text(fmt(step.valorFinal), MARGIN + 28 + barMaxW + 2, py);
-
-      py += 5.5;
-    }
-
-    // Economy badge
-    if (economiaMes > 0) {
-      const badgeY = y + progH - 10;
-      doc.setFillColor(76, 159, 56);
-      doc.roundedRect(MARGIN + 5, badgeY, contentW - 10, 7, 2, 2, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
-      doc.setTextColor(255, 255, 255);
-      doc.text(
-        `ECONOMIA ACUMULADA NO MÊS: ${fmt(economiaMes)}`,
-        pageW / 2, badgeY + 4.5, { align: 'center' }
-      );
-    }
-
-    y += progH + 4;
-  }
-
-  // Contacts footer on cover
-  y = ensureSpace(doc, y, 16);
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(MARGIN, y, contentW, 12, 2, 2, 'FD');
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.setTextColor(100, 116, 139);
-  doc.text(
-    `${BRAND.site}  •  ${BRAND.email}  •  ${BRAND.telefone}`,
-    pageW / 2, y + 7.5, { align: 'center' }
-  );
+  doc.setTextColor(...SLATE);
+  doc.text('Honorários + Taxas Reembolsáveis', MARGIN + 8, y + 34);
+
+  // Right: breakdown cards
+  const rightX = MARGIN + w * 0.52;
+  const rightW = w * 0.48;
+  const cardH = 18;
+
+  doc.setFillColor(...BG_BLOCK);
+  doc.setDrawColor(...BORDER);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(rightX, y, rightW, cardH, 2, 2, 'FD');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(...SLATE);
+  doc.text('Subtotal Honorários', rightX + 5, y + 7);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(...DARK_TEXT);
+  doc.text(fmt(totalHonorarios), rightX + rightW - 5, y + 7, { align: 'right' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(...SLATE);
+  doc.text('Subtotal Taxas Reembolsáveis', rightX + 5, y + 14);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(...DARK_TEXT);
+  doc.text(fmt(totalTaxas), rightX + rightW - 5, y + 14, { align: 'right' });
+
+  // Economy card below
+  if (economiaMes > 0) {
+    doc.setFillColor(...GREEN);
+    doc.roundedRect(rightX, y + cardH + 2, rightW, cardH, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...WHITE);
+    doc.text('ECONOMIA ACUMULADA NO MÊS', rightX + 5, y + cardH + 9);
+    doc.setFontSize(12);
+    doc.text(fmt(economiaMes), rightX + rightW - 5, y + cardH + 15, { align: 'right' });
+  }
+
+  y += 48;
+
+  // ── Footer expiry line (like PROPOSTA "EXPIRA EM") ──
+  y = ensureSpace(doc, y, 12);
+  doc.setDrawColor(...BORDER);
+  doc.line(MARGIN, y, pw - MARGIN, y);
+  y += 1;
+  doc.setFillColor(245, 245, 245);
+  doc.rect(MARGIN, y, w, 8, 'F');
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...SLATE);
+  doc.text(`Reconhecida nacionalmente • 12 anos de mercado • @trevolegaliza`, MARGIN + 3, y + 5);
+
+  // Green short line accent (like PROPOSTA)
+  const shortLineW = 22;
+  drawGradientLine(doc, y + 10, 1.5);
 
   // ═══════════════════════════════════════════════
-  // PAGE 2+ — DETALHAMENTO MASTER-DETAIL
+  // PAGE 2+ — DETALHAMENTO (Master-Detail)
   // ═══════════════════════════════════════════════
   doc.addPage();
-  y = drawHeader(doc, MARGIN + 2);
-  y = drawBanner(doc, y, 'DETALHAMENTO UNITÁRIO', 'Honorários e Taxas por Processo');
+  y = drawDarkHeaderBar(doc, 0);
+  y = drawSectionBanner(doc, y, 'DETALHAMENTO UNITÁRIO', 'Honorários e Taxas por Processo');
+  y += 2;
 
-  // For each selected process, render a box + sub-table of taxes
   for (let pi = 0; pi < selectedSteps.length; pi++) {
     const step = selectedSteps[pi];
     const p = step.processo;
     const pTaxas = data.valoresAdicionais[p.id] || [];
-    const boxH = 22;
-    const taxTableH = pTaxas.length > 0 ? 8 + pTaxas.length * 6.5 : 0;
-    const totalNeeded = boxH + taxTableH + 8;
+    const boxH = 24;
+    const taxTableH = pTaxas.length > 0 ? 10 + pTaxas.length * 7 : 0;
+    const subtotalH = pTaxas.length > 0 ? 10 : 0;
 
-    y = ensureSpace(doc, y, totalNeeded);
+    y = ensureSpace(doc, y, boxH + taxTableH + subtotalH + 10);
 
-    // Process box with green left border
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
+    // ── Process box with green left border ──
+    doc.setFillColor(...BG_BLOCK);
+    doc.setDrawColor(...BORDER);
     doc.setLineWidth(0.3);
-    doc.roundedRect(MARGIN, y, contentW, boxH, 2, 2, 'FD');
-    doc.setFillColor(76, 159, 56);
-    doc.rect(MARGIN, y, 1.5, boxH, 'F');
+    doc.roundedRect(MARGIN, y, w, boxH, 2, 2, 'FD');
+    // Green left accent
+    doc.setFillColor(...GREEN);
+    doc.rect(MARGIN, y + 1, 2, boxH - 2, 'F');
 
     // Process number badge
-    doc.setFillColor(26, 58, 26);
-    doc.roundedRect(MARGIN + 5, y + 3, 14, 7, 2, 2, 'F');
+    doc.setFillColor(...DARK);
+    doc.roundedRect(MARGIN + 6, y + 4, 16, 8, 2, 2, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.setTextColor(74, 222, 128);
-    doc.text(`${step.index}º`, MARGIN + 12, y + 8, { align: 'center' });
+    doc.setFontSize(8);
+    doc.setTextColor(...GREEN_ACCENT);
+    doc.text(`${step.index}º`, MARGIN + 14, y + 9.5, { align: 'center' });
 
-    // Service name
-    const tipo = p.tipo.charAt(0).toUpperCase() + p.tipo.slice(1);
+    // Service name in UPPERCASE
+    const tipo = p.tipo.toUpperCase();
     let serviceName = `${tipo} — ${p.razao_social}`;
-    if (step.isMudancaUF) serviceName += ' (Mudança de UF - 2 vagas)';
+    if (step.isMudancaUF) serviceName += ' (MUDANÇA DE UF - 2 VAGAS)';
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    doc.setTextColor(30, 41, 59);
-    doc.text(serviceName, MARGIN + 22, y + 8, { maxWidth: contentW - 70 });
+    doc.setTextColor(...DARK_TEXT);
+    doc.text(serviceName, MARGIN + 25, y + 9, { maxWidth: w - 75 });
 
-    // Date + manual/urgency badge
+    // Date
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
-    doc.setTextColor(100, 116, 139);
-    let infoLine = `Data: ${fmtDate(p.created_at)}`;
-    doc.text(infoLine, MARGIN + 22, y + 14);
+    doc.setTextColor(...SLATE);
+    doc.text(`Data: ${fmtDate(p.created_at)}`, MARGIN + 25, y + 16);
 
+    // Manual/Urgência badge
     if (step.isManual || step.isUrgencia) {
-      const badgeLabel = step.isUrgencia ? 'URGÊNCIA' : 'VALOR MANUAL';
-      const badgeX = MARGIN + 22 + doc.getTextWidth(infoLine) + 4;
-      doc.setFillColor(234, 88, 12); // orange
-      doc.roundedRect(badgeX, y + 10.5, doc.getTextWidth(badgeLabel) + 6, 5, 1, 1, 'F');
+      const badgeLabel = step.isUrgencia ? 'MÉTODO TREVO / URGÊNCIA' : 'VALOR MANUAL';
+      const bx = MARGIN + 25 + doc.getTextWidth(`Data: ${fmtDate(p.created_at)}`) + 4;
+      doc.setFillColor(...ORANGE);
+      doc.roundedRect(bx, y + 12.5, doc.getTextWidth(badgeLabel) + 8, 5.5, 1.5, 1.5, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(5.5);
-      doc.setTextColor(255, 255, 255);
-      doc.text(badgeLabel, badgeX + 3, y + 14);
+      doc.setTextColor(...WHITE);
+      doc.text(badgeLabel, bx + 4, y + 16);
     }
 
-    // Discount info (only for progressive, not manual)
-    if (step.desconto > 0 && !step.isManual) {
-      doc.setFontSize(6.5);
-      doc.setTextColor(22, 101, 52);
-      doc.text(`Desc. Progressivo: -${fmt(step.desconto)}`, MARGIN + 22, y + 19);
-    }
-
-    // Value on the right
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(step.isManual ? 234 : 76, step.isManual ? 88 : 159, step.isManual ? 12 : 56);
-    doc.text(fmt(step.valorFinal), pageW - MARGIN - 5, y + 10, { align: 'right' });
-
-    // Base value reference if discounted (not for manual)
+    // Discount info
     if (step.desconto > 0 && !step.isManual) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.5);
-      doc.setTextColor(148, 163, 184);
-      doc.text(`Base: ${fmt(step.valorBase)}`, pageW - MARGIN - 5, y + 16, { align: 'right' });
+      doc.setTextColor(22, 101, 52);
+      doc.text(`Desc. Progressivo: -${fmt(step.desconto)}`, MARGIN + 25, y + 21);
+    }
+
+    // Value on right
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(step.isManual ? ORANGE[0] : GREEN[0], step.isManual ? ORANGE[1] : GREEN[1], step.isManual ? ORANGE[2] : GREEN[2]);
+    doc.text(fmt(step.valorFinal), pw - MARGIN - 5, y + 11, { align: 'right' });
+
+    // Base reference
+    if (step.desconto > 0 && !step.isManual) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...SLATE);
+      doc.text(`Base: ${fmt(step.valorBase)}`, pw - MARGIN - 5, y + 17, { align: 'right' });
     }
 
     y += boxH + 1;
 
-    // Sub-table: Taxas vinculadas a este processo
+    // ── Sub-table: Taxas linked to this process ──
     if (pTaxas.length > 0) {
       const taxRows = pTaxas.map(va => [
         fmtDate(va.created_at),
@@ -470,30 +516,47 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
         fmt(Number(va.valor)),
       ]);
 
+      const subtotalTaxas = pTaxas.reduce((s, va) => s + Number(va.valor), 0);
+
       autoTable(doc, {
         startY: y,
-        head: [['Data', 'Descrição da Taxa', 'Valor']],
+        head: [['Data', 'Descrição da Taxa / Reembolso', 'Valor']],
         body: taxRows,
-        theme: 'grid',
+        theme: 'striped',
         headStyles: {
           fillColor: [241, 245, 249],
-          textColor: [100, 116, 139],
+          textColor: [...SLATE],
           fontSize: 6.5,
           fontStyle: 'bold',
+          lineWidth: 0.2,
+          lineColor: [...BORDER],
         },
         bodyStyles: {
           fontSize: 7,
-          textColor: [30, 41, 59],
-          fillColor: [248, 250, 252],
+          textColor: [...DARK_TEXT],
+        },
+        alternateRowStyles: {
+          fillColor: [...BG_BLOCK],
         },
         columnStyles: {
-          2: { halign: 'right', fontStyle: 'bold', textColor: [22, 101, 52] },
+          0: { cellWidth: 22 },
+          2: { halign: 'right' as const, fontStyle: 'bold', textColor: [22, 101, 52] },
         },
-        margin: { left: MARGIN + 6, right: MARGIN },
-        tableWidth: contentW - 6,
+        margin: { left: MARGIN + 8, right: MARGIN },
+        tableWidth: w - 8,
       });
 
-      y = (doc as any).lastAutoTable.finalY + 2;
+      y = (doc as any).lastAutoTable.finalY + 1;
+
+      // Subtotal line for this process
+      doc.setFillColor(240, 253, 244);
+      doc.roundedRect(MARGIN + 8, y, w - 8, 7, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.setTextColor(22, 101, 52);
+      doc.text(`Subtotal Processo: ${fmt(step.valorFinal)} (Hon.) + ${fmt(subtotalTaxas)} (Taxas) = ${fmt(step.valorFinal + subtotalTaxas)}`, MARGIN + 12, y + 4.5);
+
+      y += 9;
     }
 
     y += 4;
@@ -506,12 +569,12 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
-    doc.setTextColor(148, 163, 184);
+    doc.setTextColor(...SLATE);
     doc.text('PROCESSOS CONTABILIZADOS (JÁ FATURADOS ANTERIORMENTE)', MARGIN, y);
     y += 4;
 
     const contabRows = nonSelected.map(s => {
-      const tipo = s.processo.tipo.charAt(0).toUpperCase() + s.processo.tipo.slice(1);
+      const tipo = s.processo.tipo.toUpperCase();
       return [`${s.index}º`, fmtDate(s.processo.created_at), `${tipo} — ${s.processo.razao_social}`, fmt(s.valorFinal)];
     });
 
@@ -519,82 +582,94 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
       startY: y,
       head: [['Pos.', 'Data', 'Descrição', 'Valor Progressivo']],
       body: contabRows,
-      theme: 'grid',
-      headStyles: { fillColor: [226, 232, 240], textColor: [148, 163, 184], fontSize: 6.5 },
-      bodyStyles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'italic' },
-      columnStyles: { 0: { halign: 'center', cellWidth: 12 }, 3: { halign: 'right' } },
+      theme: 'striped',
+      headStyles: { fillColor: [...BORDER], textColor: [...SLATE], fontSize: 6.5 },
+      bodyStyles: { fontSize: 7, textColor: [...SLATE], fontStyle: 'italic' },
+      alternateRowStyles: { fillColor: [...BG_BLOCK] },
+      columnStyles: { 0: { halign: 'center' as const, cellWidth: 12 }, 3: { halign: 'right' as const } },
       margin: { left: MARGIN, right: MARGIN },
     });
 
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
-  // ── TOTALIZADOR FINAL ──
-  y = ensureSpace(doc, y, 40);
+  // ── PROGRESSÃO DE INCENTIVO POR VOLUME (like PROPOSTA page 3 table) ──
+  if (descPct > 0 && steps.length > 0) {
+    y = ensureSpace(doc, y, 20 + steps.length * 7 + 14);
 
-  // Subtotals
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(MARGIN, y, contentW, 20, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(100, 116, 139);
-  doc.text('Subtotal Honorários:', MARGIN + 5, y + 7);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 41, 59);
-  doc.text(fmt(totalHonorarios), pageW / 2 - 5, y + 7, { align: 'right' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 116, 139);
-  doc.text('Subtotal Taxas Reembolsáveis:', MARGIN + 5, y + 14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 41, 59);
-  doc.text(fmt(totalTaxas), pageW / 2 - 5, y + 14, { align: 'right' });
-
-  // Economy on right side
-  if (economiaSelected > 0) {
-    doc.setFont('helvetica', 'normal');
+    doc.setFillColor(...BG_BLOCK);
+    doc.setDrawColor(...GREEN);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(MARGIN, y, w, 12, 2, 2, 'FD');
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
-    doc.setTextColor(22, 101, 52);
-    doc.text('Economia neste extrato:', pageW / 2 + 10, y + 7);
-    doc.setFont('helvetica', 'bold');
-    doc.text(fmt(economiaSelected), pageW - MARGIN - 5, y + 7, { align: 'right' });
+    doc.setTextColor(...GREEN);
+    doc.text('PROGRESSÃO DE INCENTIVO POR VOLUME — MESMA COMPETÊNCIA', MARGIN + 5, y + 7.5);
+    y += 14;
+
+    const progRows = steps.map(s => {
+      const descStr = s.isManual ? '—' : (s.desconto > 0 ? `-${descPct}%` : '—');
+      let status = '—';
+      if (s.isManual) status = s.isUrgencia ? 'Método Trevo / Urgência' : 'Valor Manual';
+      else if (s.desconto > 0) {
+        const limite = data.cliente.valor_limite_desconto;
+        status = (limite && s.valorFinal <= limite) ? 'Limite atingido' : 'Desconto acumulado';
+      }
+      return [`${s.index}º`, fmt(s.valorFinal), descStr, status];
+    });
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Proc.', 'Valor', 'Desc.', 'Status']],
+      body: progRows,
+      theme: 'striped',
+      headStyles: {
+        fillColor: [...GREEN],
+        textColor: [...WHITE],
+        fontSize: 7,
+        fontStyle: 'bold',
+      },
+      bodyStyles: {
+        fontSize: 7.5,
+        textColor: [...DARK_TEXT],
+      },
+      alternateRowStyles: { fillColor: [...BG_BLOCK] },
+      columnStyles: {
+        0: { halign: 'center' as const, cellWidth: 16, fontStyle: 'bold' },
+        1: { fontStyle: 'bold' },
+        2: { halign: 'center' as const, cellWidth: 18, textColor: [22, 101, 52] },
+        3: { fontStyle: 'italic', textColor: [...SLATE] },
+      },
+      margin: { left: MARGIN, right: MARGIN },
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 3;
+
+    // Rule note
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(...SLATE);
+    const ruleText = `Regra: Desconto composto de ${descPct}% a cada processo na mesma competência mensal` +
+      (data.cliente.valor_limite_desconto ? `, até atingir o limite mínimo de ${fmt(data.cliente.valor_limite_desconto)}` : '') +
+      `. No mês seguinte, o valor retorna automaticamente ao valor base.`;
+    const ruleSplit = doc.splitTextToSize(ruleText, w - 4);
+    doc.text(ruleSplit, MARGIN + 2, y + 3);
+    y += ruleSplit.length * 3.5 + 6;
   }
 
-  y += 24;
+  // ── TOTALIZADOR FINAL (dark bar like PROPOSTA) ──
+  y = ensureSpace(doc, y, 20);
 
-  // Total bar
-  doc.setFillColor(15, 31, 15);
-  doc.roundedRect(MARGIN, y, contentW, 16, 3, 3, 'F');
+  doc.setFillColor(...DARK);
+  doc.roundedRect(MARGIN, y, w, 16, 3, 3, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.setTextColor(74, 222, 128);
+  doc.setTextColor(...GREEN_ACCENT);
   doc.text('TOTAL GERAL', MARGIN + 6, y + 7);
-  doc.setFontSize(16);
-  doc.setTextColor(255, 255, 255);
-  doc.text(fmt(totalGeral), pageW - MARGIN - 6, y + 12, { align: 'right' });
+  doc.setFontSize(18);
+  doc.setTextColor(...WHITE);
+  doc.text(fmt(totalGeral), pw - MARGIN - 6, y + 12, { align: 'right' });
   y += 22;
-
-  // Discount rule note
-  if (descPct > 0) {
-    y = ensureSpace(doc, y, 16);
-    doc.setFillColor(240, 253, 244);
-    doc.setDrawColor(134, 239, 172);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(MARGIN, y, contentW, 14, 2, 2, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6);
-    doc.setTextColor(22, 101, 52);
-    doc.text('REGRA DE DESCONTO PROGRESSIVO (CLÁUSULA CONTRATUAL)', MARGIN + 4, y + 5);
-    doc.setFont('helvetica', 'normal');
-    doc.text(
-      `Desconto composto de ${descPct}% a cada processo na mesma competência mensal. ` +
-      `No mês seguinte, o valor retorna ao valor base de ${fmt(data.cliente.valor_base ?? 580)}.` +
-      (data.cliente.valor_limite_desconto ? ` Limite mínimo: ${fmt(data.cliente.valor_limite_desconto)}.` : ''),
-      MARGIN + 4, y + 10
-    );
-  }
 
   // ── Attachment pages ──
   await renderAttachmentPages(doc, data);
@@ -603,15 +678,20 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    doc.setDrawColor(76, 159, 56);
-    doc.setLineWidth(0.4);
-    doc.line(MARGIN, pageH - 12, pageW - MARGIN, pageH - 12);
+
+    // Short gradient accent
+    drawGradientLine(doc, ph - 14, 1);
+
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6);
-    doc.setTextColor(148, 163, 184);
+    doc.setTextColor(...SLATE);
     doc.text(
-      `${BRAND.fantasia} — Extrato gerado em ${now.toLocaleDateString('pt-BR')} — Página ${i}/${totalPages}`,
-      pageW / 2, pageH - 7, { align: 'center' }
+      `${BRAND.fantasia} • ${BRAND.slogan}`,
+      MARGIN, ph - 8
+    );
+    doc.text(
+      `PÁGINA ${i} DE ${totalPages}`,
+      pw - MARGIN, ph - 8, { align: 'right' }
     );
   }
 
@@ -620,9 +700,9 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
 
 // ── Render attachment images as extra pages ──
 async function renderAttachmentPages(doc: jsPDF, data: ExtratoData) {
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const contentW = getContentW(doc);
+  const pw = getPageW(doc);
+  const ph = getPageH(doc);
+  const w = getW(doc);
 
   const attachments: { label: string; url: string }[] = [];
 
@@ -647,22 +727,26 @@ async function renderAttachmentPages(doc: jsPDF, data: ExtratoData) {
       if (!imgData) continue;
 
       doc.addPage();
-      doc.setFillColor(15, 31, 15);
-      doc.rect(0, 0, pageW, 14, 'F');
+
+      // Dark banner header
+      doc.setFillColor(...DARK);
+      doc.rect(0, 0, pw, 16, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7);
-      doc.setTextColor(74, 222, 128);
-      doc.text('ANEXO', MARGIN, 6);
+      doc.setTextColor(...GREEN_ACCENT);
+      doc.text('ANEXO DE COMPROVANTE', MARGIN, 6);
       doc.setFontSize(9);
-      doc.setTextColor(255, 255, 255);
-      doc.text(att.label, MARGIN, 11);
+      doc.setTextColor(...WHITE);
+      doc.text(att.label, MARGIN, 12);
 
-      doc.addImage(imgData, 'JPEG', MARGIN, 20, contentW, pageH - 40, undefined, 'FAST');
+      drawGradientLine(doc, 16, 2);
+
+      doc.addImage(imgData, 'JPEG', MARGIN, 24, w, ph - 50, undefined, 'FAST');
     } catch {
       doc.addPage();
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9);
-      doc.setTextColor(100);
+      doc.setTextColor(100, 100, 100);
       doc.text(`Anexo não disponível: ${att.label}`, MARGIN, 30);
     }
   }
