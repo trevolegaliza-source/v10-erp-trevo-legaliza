@@ -254,6 +254,9 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   const w = getW(doc);
   const now = new Date();
 
+  // Preload logo from Supabase Storage
+  const logoBase64 = await preloadLogo();
+
   const steps = buildEscadinha(data);
   const selectedSteps = steps.filter(s => s.isSelected);
   const descPct = data.cliente.desconto_progressivo ?? 0;
@@ -268,8 +271,8 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   // PAGE 1 — CAPA (Estilo PROPOSTA)
   // ═══════════════════════════════════════════════
 
-  // Dark header
-  let y = drawDarkHeaderBar(doc, 0);
+  // Dark header with logo
+  let y = drawDarkHeaderBar(doc, 0, logoBase64);
   y += 4;
 
   // Spaced section title
