@@ -89,11 +89,9 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
     const isMudancaUF = (p.notas || '').includes('Mudança de UF');
     const notas = p.notas || '';
     const isUrgencia = notas.toLowerCase().includes('urgência') || notas.toLowerCase().includes('urgencia');
-    const hasManualValue = p.valor != null && p.valor > 0 && (
-      notas.includes('Valor Manual') || notas.includes('VALOR MANUAL') ||
-      notas.includes('is_manual') || isUrgencia ||
-      Math.abs(p.valor - valorBase) > 1
-    );
+    // ONLY mark as manual if explicitly flagged — never infer from value difference
+    const hasManualValue = notas.includes('Valor Manual') || notas.includes('VALOR MANUAL') ||
+      notas.includes('is_manual') || notas.includes('IS_MANUAL');
     const slots = isMudancaUF ? 2 : 1;
 
     for (let slot = 0; slot < slots; slot++) {
