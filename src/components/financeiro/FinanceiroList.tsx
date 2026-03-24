@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
+import ProcessoEditModal from './ProcessoEditModal';
 
 interface FinanceiroListProps {
   processos: ProcessoFinanceiro[];
