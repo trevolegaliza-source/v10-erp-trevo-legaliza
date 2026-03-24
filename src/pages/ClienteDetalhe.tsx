@@ -1206,6 +1206,56 @@ export default function ClienteDetalhe() {
           })()}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Process Modal (double-click) */}
+      <ProcessoEditModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        processo={editProcesso}
+      />
+
+      {/* Mark as Faturado after extrato */}
+      <AlertDialog open={showMarkFaturadoDialog} onOpenChange={setShowMarkFaturadoDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Extrato gerado com sucesso!</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja marcar os {selectedProcessosTab.size} processo(s) selecionado(s) como "Faturado"?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Não, manter</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              const selectedProcs = processos.filter(p => selectedProcessosTab.has(p.id));
+              const now = new Date().toISOString();
+              const dateStr = new Date().toLocaleDateString('pt-BR');
+              try {
+                for (const p of selectedProcs) {
+                  const lanc = lancamentos.find(l => l.processo_id === p.id && l.tipo === 'receber');
+                  if (lanc) {
+                    await supabase
+                      .from('lancamentos')
+                      .update({
+                        etapa_financeiro: 'cobranca_gerada',
+                        observacoes_financeiro: `Extrato emitido em ${dateStr}`,
+                        updated_at: now,
+                      })
+                      .eq('id', lanc.id);
+                  }
+                }
+                toast.success('Processos marcados como faturados!');
+                setSelectedProcessosTab(new Set());
+                loadAll(cliente!.id);
+              } catch (err: any) {
+                toast.error('Erro: ' + err.message);
+              }
+              setShowMarkFaturadoDialog(false);
+            }}>
+              Marcar como Faturado
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
