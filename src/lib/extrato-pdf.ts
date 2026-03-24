@@ -53,6 +53,8 @@ interface StepInfo {
   valorFinal: number;
   isSelected: boolean;
   isMudancaUF: boolean;
+  isManual: boolean;
+  isUrgencia: boolean;
 }
 
 // ── Progressive discount staircase ──
@@ -71,27 +73,57 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
 
   for (const p of sorted) {
     const isMudancaUF = (p.notas || '').includes('Mudança de UF');
+    const notas = p.notas || '';
+    const isUrgencia = notas.toLowerCase().includes('urgência') || notas.toLowerCase().includes('urgencia');
+    // Manual value: processo.valor exists AND differs from progressive calculation OR notes indicate manual
+    const hasManualValue = p.valor != null && p.valor > 0 && (
+      notas.includes('Valor Manual') || notas.includes('VALOR MANUAL') ||
+      notas.includes('is_manual') || isUrgencia ||
+      // If valor doesn't match the base, treat as manual
+      Math.abs(p.valor - valorBase) > 1
+    );
     const slots = isMudancaUF ? 2 : 1;
 
     for (let slot = 0; slot < slots; slot++) {
       stepIdx++;
-      let valorAtual = valorBase;
-      if (descPct > 0 && stepIdx > 1) {
-        for (let i = 1; i < stepIdx; i++) {
-          valorAtual = valorAtual * (1 - descPct / 100);
+
+      let valorAtual: number;
+      let isManual = false;
+      let desconto = 0;
+
+      if (hasManualValue && slot === 0) {
+        // PRIORITY 1: Manual value is sovereign - use exactly what was set
+        valorAtual = p.valor!;
+        isManual = true;
+        desconto = 0;
+      } else if (isUrgencia && !hasManualValue) {
+        // PRIORITY 2: Urgency = +50% on base
+        valorAtual = valorBase * 1.5;
+        isManual = true;
+        desconto = 0;
+      } else {
+        // PRIORITY 3: Progressive discount
+        valorAtual = valorBase;
+        if (descPct > 0 && stepIdx > 1) {
+          for (let i = 1; i < stepIdx; i++) {
+            valorAtual = valorAtual * (1 - descPct / 100);
+          }
         }
+        if (limite > 0 && valorAtual < limite) valorAtual = limite;
+        desconto = valorBase - valorAtual;
       }
-      if (limite > 0 && valorAtual < limite) valorAtual = limite;
       valorAtual = Math.round(valorAtual * 100) / 100;
 
       steps.push({
         index: stepIdx,
         processo: p,
-        valorBase,
-        desconto: valorBase - valorAtual,
+        valorBase: isManual ? valorAtual : valorBase,
+        desconto,
         valorFinal: valorAtual,
         isSelected: selectedIds.has(p.id),
         isMudancaUF: isMudancaUF && slot === 0,
+        isManual,
+        isUrgencia,
       });
     }
   }
@@ -285,22 +317,27 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
 
     for (const step of steps) {
       if (py > y + progH - 14) break;
-      const ratio = step.valorFinal / step.valorBase;
-      const barW = barMaxW * ratio;
+      const ratio = step.isManual ? 1 : (step.valorFinal / step.valorBase);
+      const barW = barMaxW * Math.min(ratio, 1);
 
       // Background
       doc.setFillColor(220, 252, 231);
       doc.roundedRect(MARGIN + 28, py - 2.5, barMaxW, 3.5, 1, 1, 'F');
 
-      // Filled bar
-      doc.setFillColor(step.isSelected ? 76 : 148, step.isSelected ? 159 : 163, step.isSelected ? 56 : 184);
+      // Filled bar - orange for manual, green for progressive
+      if (step.isManual) {
+        doc.setFillColor(234, 88, 12);
+      } else {
+        doc.setFillColor(step.isSelected ? 76 : 148, step.isSelected ? 159 : 163, step.isSelected ? 56 : 184);
+      }
       doc.roundedRect(MARGIN + 28, py - 2.5, barW, 3.5, 1, 1, 'F');
 
       // Label
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6);
-      doc.setTextColor(step.isSelected ? 22 : 148, step.isSelected ? 101 : 163, step.isSelected ? 52 : 184);
-      doc.text(`${step.index}º`, MARGIN + 5, py);
+      doc.setTextColor(step.isManual ? 234 : (step.isSelected ? 22 : 148), step.isManual ? 88 : (step.isSelected ? 101 : 163), step.isManual ? 12 : (step.isSelected ? 52 : 184));
+      const label = step.isManual ? `${step.index}º ✦` : `${step.index}º`;
+      doc.text(label, MARGIN + 5, py);
 
       // Value
       doc.setFont('helvetica', 'normal');
@@ -384,14 +421,26 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
     doc.setTextColor(30, 41, 59);
     doc.text(serviceName, MARGIN + 22, y + 8, { maxWidth: contentW - 70 });
 
-    // Date
+    // Date + manual/urgency badge
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Data: ${fmtDate(p.created_at)}`, MARGIN + 22, y + 14);
+    let infoLine = `Data: ${fmtDate(p.created_at)}`;
+    doc.text(infoLine, MARGIN + 22, y + 14);
 
-    // Discount info
-    if (step.desconto > 0) {
+    if (step.isManual || step.isUrgencia) {
+      const badgeLabel = step.isUrgencia ? 'URGÊNCIA' : 'VALOR MANUAL';
+      const badgeX = MARGIN + 22 + doc.getTextWidth(infoLine) + 4;
+      doc.setFillColor(234, 88, 12); // orange
+      doc.roundedRect(badgeX, y + 10.5, doc.getTextWidth(badgeLabel) + 6, 5, 1, 1, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(badgeLabel, badgeX + 3, y + 14);
+    }
+
+    // Discount info (only for progressive, not manual)
+    if (step.desconto > 0 && !step.isManual) {
       doc.setFontSize(6.5);
       doc.setTextColor(22, 101, 52);
       doc.text(`Desc. Progressivo: -${fmt(step.desconto)}`, MARGIN + 22, y + 19);
@@ -400,11 +449,11 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
     // Value on the right
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
-    doc.setTextColor(76, 159, 56);
+    doc.setTextColor(step.isManual ? 234 : 76, step.isManual ? 88 : 159, step.isManual ? 12 : 56);
     doc.text(fmt(step.valorFinal), pageW - MARGIN - 5, y + 10, { align: 'right' });
 
-    // Base value reference if discounted
-    if (step.desconto > 0) {
+    // Base value reference if discounted (not for manual)
+    if (step.desconto > 0 && !step.isManual) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.5);
       doc.setTextColor(148, 163, 184);
