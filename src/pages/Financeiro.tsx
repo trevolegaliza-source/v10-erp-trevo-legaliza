@@ -20,6 +20,21 @@ export default function Financeiro() {
 
   const items = processos || [];
 
+  const handleExportCSV = () => {
+    if (items.length === 0) { toast.info('Sem dados para exportar'); return; }
+    const rows = items.map(p => ({
+      'Cliente': (p.cliente as any)?.apelido || (p.cliente as any)?.nome || '-',
+      'Razão Social': p.razao_social,
+      'Valor': formatBRLPlain(Number(p.lancamento?.valor ?? p.valor ?? 0)),
+      'Vencimento': formatDateBR(p.lancamento?.data_vencimento),
+      'Etapa': ETAPA_FINANCEIRO_LABELS[p.etapa_financeiro] || p.etapa_financeiro,
+      'Status': p.lancamento?.status || 'pendente',
+      'Criado em': formatDateBR(p.created_at),
+    }));
+    downloadCSV(rows, `financeiro_${new Date().toISOString().split('T')[0]}.csv`);
+    toast.success('Relatório exportado!');
+  };
+
   const kpis = [
     {
       label: 'Receita Prevista do Mês',
