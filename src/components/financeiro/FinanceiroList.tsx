@@ -9,7 +9,7 @@ import type { StatusFinanceiro } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { gerarExtratoPDF, fetchValoresAdicionaisMulti } from '@/lib/extrato-pdf';
+import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
 import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
