@@ -29,6 +29,13 @@ import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
+import ProcessoEditModal from '@/components/financeiro/ProcessoEditModal';
+import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
+import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
