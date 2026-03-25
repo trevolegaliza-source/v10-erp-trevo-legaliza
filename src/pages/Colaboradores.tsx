@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Users, Search, Pencil, Trash2, Zap, Copy, Cake } from 'lucide-react';
+import { Plus, Users, Search, Pencil, Trash2, Zap, Copy, Cake, DollarSign, CalendarDays } from 'lucide-react';
 import { useColaboradores, useCreateColaborador, useUpdateColaborador, useDeleteColaborador, type Colaborador } from '@/hooks/useColaboradores';
-import { getBusinessDaysInMonth, calcularCustoMensal } from '@/lib/business-days';
-import { gerarVerbasDoMes } from '@/lib/gerar-verbas';
+import { getBusinessDaysInMonth } from '@/lib/business-days';
+import { gerarVerbasDoMes, estimarCustoTotal } from '@/lib/gerar-verbas';
 import ColaboradorForm, { EMPTY_FORM, type ColaboradorFormData } from '@/components/colaboradores/ColaboradorForm';
 import ColaboradorDetalheModal from '@/components/colaboradores/ColaboradorDetalheModal';
+import GerarVerbasModal from '@/components/colaboradores/GerarVerbasModal';
 import { toast } from 'sonner';
 
 function isBirthdayThisMonth(aniversario: string | null): boolean {
@@ -30,6 +31,7 @@ export default function Colaboradores() {
   const [form, setForm] = useState<ColaboradorFormData>(EMPTY_FORM);
   const [search, setSearch] = useState('');
   const [gerando, setGerando] = useState(false);
+  const [verbasModal, setVerbasModal] = useState(false);
   const [detalheColab, setDetalheColab] = useState<Colaborador | null>(null);
 
   const diasUteis = getBusinessDaysInMonth();
@@ -39,9 +41,7 @@ export default function Colaboradores() {
   );
 
   const totalAtivos = (colaboradores || []).filter(c => c.status === 'ativo');
-  const custoTotalMensal = totalAtivos.reduce((s, c) =>
-    s + calcularCustoMensal(Number(c.salario_base), Number(c.vt_diario), Number(c.vr_diario), diasUteis), 0
-  );
+  const custoTotalMensal = totalAtivos.reduce((s, c) => s + estimarCustoTotal(c, diasUteis), 0);
 
   const openCreate = () => { setEditId(null); setForm(EMPTY_FORM); setDialog(true); };
   const openEdit = (c: Colaborador, e?: React.MouseEvent) => {
@@ -61,6 +61,15 @@ export default function Colaboradores() {
       aumento_previsto_data: c.aumento_previsto_data || '',
       data_inicio: c.data_inicio || '',
       aniversario: c.aniversario || '',
+      dia_adiantamento: String(c.dia_adiantamento ?? 20),
+      dia_salario: String(c.dia_salario ?? 5),
+      dia_vt_vr: String(c.dia_vt_vr ?? 0),
+      dia_das: String(c.dia_das ?? 20),
+      fgts_percentual: String(c.fgts_percentual ?? 8),
+      inss_patronal_percentual: String(c.inss_patronal_percentual ?? 20),
+      provisionar_13: c.provisionar_13 ?? true,
+      provisionar_ferias: c.provisionar_ferias ?? true,
+      observacoes_pagamento: c.observacoes_pagamento || '',
     });
     setDialog(true);
   };
@@ -86,6 +95,15 @@ export default function Colaboradores() {
       aumento_previsto_data: form.aumento_previsto_data || null,
       data_inicio: form.data_inicio || null,
       aniversario: form.aniversario || null,
+      dia_adiantamento: Number(form.dia_adiantamento) || 20,
+      dia_salario: Number(form.dia_salario) || 5,
+      dia_vt_vr: Number(form.dia_vt_vr) || 0,
+      dia_das: Number(form.dia_das) || 20,
+      fgts_percentual: Number(form.fgts_percentual) || 8,
+      inss_patronal_percentual: Number(form.inss_patronal_percentual) || 20,
+      provisionar_13: form.provisionar_13,
+      provisionar_ferias: form.provisionar_ferias,
+      observacoes_pagamento: form.observacoes_pagamento || null,
     };
     if (!payload.nome) return toast.error('Nome é obrigatório');
 
@@ -96,17 +114,14 @@ export default function Colaboradores() {
     }
   };
 
-  const handleGerarVerbas = async () => {
-    if (!colaboradores || totalAtivos.length === 0) return toast.error('Nenhum colaborador ativo.');
+  const handleGerarVerbas = async (selectedIds: string[], year: number, month: number) => {
+    if (!colaboradores) return;
     setGerando(true);
     try {
-      const now = new Date();
-      const total = await gerarVerbasDoMes(colaboradores, now.getFullYear(), now.getMonth());
-      if (total === 0) {
-        toast.info('Verbas já geradas para este mês. Valores atualizados se houve mudança.');
-      } else {
-        toast.success(`${total} novos lançamentos gerados para ${totalAtivos.length} colaboradores!`);
-      }
+      const selected = colaboradores.filter(c => selectedIds.includes(c.id));
+      const total = await gerarVerbasDoMes(selected, year, month);
+      toast.success(`${total} lançamentos gerados para ${selected.length} colaboradores!`);
+      setVerbasModal(false);
     } catch { /* handled */ }
     setGerando(false);
   };
@@ -124,11 +139,11 @@ export default function Colaboradores() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Colaboradores</h1>
-          <p className="text-sm text-muted-foreground">Gestão de RH e custo de pessoal</p>
+          <p className="text-sm text-muted-foreground">Gestão de RH, custo de pessoal e verbas automáticas</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" className="h-9 bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleGerarVerbas} disabled={gerando}>
-            <Zap className="h-4 w-4 mr-1" /> {gerando ? 'Gerando...' : 'Gerar Verbas do Mês'}
+          <Button size="sm" className="h-9 bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setVerbasModal(true)}>
+            <Zap className="h-4 w-4 mr-1" /> Gerar Verbas do Mês
           </Button>
           <Dialog open={dialog} onOpenChange={setDialog}>
             <DialogTrigger asChild>
@@ -160,15 +175,21 @@ export default function Colaboradores() {
           </CardContent>
         </Card>
         <Card className="border-border/60 card-hover">
-          <CardContent className="p-5">
-            <p className="text-xs text-muted-foreground mb-1">Custo Total Mensal</p>
-            <p className="text-2xl font-bold text-primary">{fmt(custoTotalMensal)}</p>
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2.5"><DollarSign className="h-5 w-5 text-primary" /></div>
+            <div>
+              <p className="text-2xl font-bold text-primary">{fmt(custoTotalMensal)}</p>
+              <p className="text-xs text-muted-foreground">Custo Total Mensal</p>
+            </div>
           </CardContent>
         </Card>
         <Card className="border-border/60 card-hover">
-          <CardContent className="p-5">
-            <p className="text-xs text-muted-foreground mb-1">Dias Úteis (Mês Atual)</p>
-            <p className="text-2xl font-bold text-foreground">{diasUteis}</p>
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="rounded-lg bg-primary/10 p-2.5"><CalendarDays className="h-5 w-5 text-primary" /></div>
+            <div>
+              <p className="text-2xl font-bold text-foreground">{diasUteis}</p>
+              <p className="text-xs text-muted-foreground">Dias Úteis (Mês Atual)</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -192,7 +213,7 @@ export default function Colaboradores() {
                     <TableHead className="text-foreground">Nome</TableHead>
                     <TableHead className="text-foreground">Regime</TableHead>
                     <TableHead className="text-right text-foreground">Salário</TableHead>
-                    <TableHead className="text-right text-foreground">Custo Mensal</TableHead>
+                    <TableHead className="text-right text-foreground">Custo Total</TableHead>
                     <TableHead className="text-foreground">Chave PIX</TableHead>
                     <TableHead className="text-center text-foreground">Status</TableHead>
                     <TableHead className="text-center text-foreground">Ações</TableHead>
@@ -200,7 +221,7 @@ export default function Colaboradores() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map(c => {
-                    const custo = calcularCustoMensal(Number(c.salario_base), Number(c.vt_diario), Number(c.vr_diario), diasUteis);
+                    const custo = estimarCustoTotal(c, diasUteis);
                     const birthday = isBirthdayThisMonth(c.aniversario);
                     return (
                       <TableRow key={c.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => setDetalheColab(c)}>
@@ -266,6 +287,15 @@ export default function Colaboradores() {
           )}
         </CardContent>
       </Card>
+
+      {/* Gerar Verbas Modal */}
+      <GerarVerbasModal
+        open={verbasModal}
+        onOpenChange={setVerbasModal}
+        colaboradores={colaboradores || []}
+        onConfirm={handleGerarVerbas}
+        isPending={gerando}
+      />
 
       {/* Collaborator Detail Modal */}
       <ColaboradorDetalheModal
