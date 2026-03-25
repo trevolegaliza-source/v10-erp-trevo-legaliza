@@ -397,6 +397,35 @@ export function useCreateProcesso() {
           .eq('id', processo.id);
       }
 
+      // Debit prepaid balance if PRE_PAGO
+      if (isPrePago && valorFinal > 0) {
+        const saldoAtual = Number(cliente.saldo_prepago ?? 0);
+        const novoSaldo = saldoAtual - valorFinal;
+        await supabase
+          .from('clientes')
+          .update({ saldo_prepago: novoSaldo, updated_at: new Date().toISOString() } as any)
+          .eq('id', input.cliente_id);
+        await supabase
+          .from('prepago_movimentacoes')
+          .insert({
+            cliente_id: input.cliente_id,
+            tipo: 'consumo',
+            valor: valorFinal,
+            saldo_anterior: saldoAtual,
+            saldo_posterior: novoSaldo,
+            descricao: `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`,
+            processo_id: processo.id,
+          } as any);
+      }
+
+      // Mark boas-vindas as applied
+      if (input.desconto_boas_vindas && input.desconto_boas_vindas > 0) {
+        await supabase
+          .from('clientes')
+          .update({ desconto_boas_vindas_aplicado: true, updated_at: new Date().toISOString() } as any)
+          .eq('id', input.cliente_id);
+      }
+
       return processo as ProcessoDB;
     },
     onSuccess: () => {
