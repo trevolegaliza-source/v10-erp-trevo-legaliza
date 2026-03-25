@@ -935,8 +935,25 @@ export default function ClienteDetalhe() {
               <div className="grid gap-2">
                 <Label className="text-muted-foreground">Email</Label>
                 <Input value={editCadastroForm.email || ''} onChange={e => setEditCadastroForm(f => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-muted-foreground">Estado (UF)</Label>
+                <Select value={editCadastroForm.estado || ''} onValueChange={(v) => setEditCadastroForm(f => ({ ...f, estado: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {UFS_BRASIL.map(uf => (
+                      <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
+                <Label className="text-muted-foreground">Cidade</Label>
+                <Input value={editCadastroForm.cidade || ''} onChange={e => setEditCadastroForm(f => ({ ...f, cidade: e.target.value }))} placeholder="Ex: São Paulo" />
+              </div>
+            </div>
+            <div className="grid gap-2">
                 <Label className="text-muted-foreground">Telefone</Label>
                 <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
               </div>
