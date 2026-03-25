@@ -277,15 +277,34 @@ export function useCreateProcesso() {
         valorFinal = isManualPrice ? Number(input.valor_manual) : 0;
       } else if (isManualPrice) {
         valorFinal = Number(input.valor_manual);
+      } else if (isPrePago) {
+        // For pre-paid, value should come from valor_manual (set by service negotiation)
+        valorFinal = isManualPrice ? Number(input.valor_manual) : 0;
+      } else if (isMensalista) {
+        const franquia = Number(cliente.franquia_processos ?? 0);
+        if (franquia > 0 && monthCount < franquia) {
+          // Within franchise
+          valorFinal = 0;
+          discountInfo = `Dentro da franquia (${monthCount + 1}/${franquia})`;
+        } else {
+          // Exceeded franchise — use valor_base with progressive discount
+          const excedenteCount = franquia > 0 ? monthCount - franquia : monthCount;
+          if (descontoPercent > 0) {
+            const calc = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, excedenteCount, valorLimite);
+            valorFinal = calc.valorFinal;
+            discountInfo = `Excedente nº ${excedenteCount + 1} | Base: R$ ${valorBaseCliente.toFixed(2)} | Desc: R$ ${calc.descontoAcumulado.toFixed(2)}`;
+          } else {
+            valorFinal = valorBaseCliente;
+          }
+          if (isUrgente) valorFinal *= 1.5;
+        }
       } else if (cliente.tipo !== 'MENSALISTA') {
         if (slots === 2 && descontoPercent > 0) {
-          // Mudança de UF: sum of process N and process N+1
           const calc1 = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount, valorLimite);
           const calc2 = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount + 1, valorLimite);
           valorFinal = calc1.valorFinal + calc2.valorFinal;
           discountInfo = `Mudança de UF (2 Processos) | Proc ${calc1.processoNumero}: R$ ${calc1.valorFinal.toFixed(2)} + Proc ${calc2.processoNumero}: R$ ${calc2.valorFinal.toFixed(2)}`;
         } else if (slots === 2) {
-          // Mudança de UF without progressive discount
           valorFinal = valorBaseCliente * 2;
           discountInfo = `Mudança de UF (2 Processos) | 2 × R$ ${valorBaseCliente.toFixed(2)}`;
         } else if (descontoPercent > 0) {
