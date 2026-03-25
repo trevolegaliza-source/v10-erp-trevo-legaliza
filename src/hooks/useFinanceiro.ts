@@ -244,13 +244,15 @@ export function useCreateProcesso() {
 
       const { data: clienteData, error: clienteError } = await supabase
         .from('clientes')
-        .select('id, tipo, valor_base, momento_faturamento, desconto_progressivo, valor_limite_desconto')
+        .select('id, tipo, valor_base, momento_faturamento, desconto_progressivo, valor_limite_desconto, franquia_processos, saldo_prepago')
         .eq('id', input.cliente_id)
         .single();
       if (clienteError) throw clienteError;
 
       const cliente = clienteData as any;
-      const valorBaseCliente = cliente.tipo === 'MENSALISTA' ? 0 : Number(cliente.valor_base ?? 0);
+      const isPrePago = cliente.tipo === 'PRE_PAGO';
+      const isMensalista = cliente.tipo === 'MENSALISTA';
+      const valorBaseCliente = isMensalista ? Number(cliente.valor_base ?? 0) : Number(cliente.valor_base ?? 0);
       const descontoPercent = Number(cliente.desconto_progressivo ?? 0);
       const valorLimite = cliente.valor_limite_desconto != null ? Number(cliente.valor_limite_desconto) : null;
 
