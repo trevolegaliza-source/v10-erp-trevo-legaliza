@@ -943,6 +943,7 @@ export default function ClienteDetalhe() {
                 <SelectContent>
                   <SelectItem value="MENSALISTA">Mensalista</SelectItem>
                   <SelectItem value="AVULSO_4D">Avulso</SelectItem>
+                  <SelectItem value="PRE_PAGO">Pré-Pago</SelectItem>
                 </SelectContent>
               </Select>
             </div>
