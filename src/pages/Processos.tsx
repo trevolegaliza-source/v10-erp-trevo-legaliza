@@ -95,9 +95,9 @@ function ProcessCard({
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-bold truncate leading-tight text-white">{clientName}</p>
-              <p className="text-[10px] text-zinc-400 mt-0.5">📅 {new Date(process.created_at).toLocaleDateString('pt-BR')}</p>
-              <p className="text-[11px] text-zinc-400 mt-0.5 truncate">{process.razao_social}</p>
+              <p className="text-[13px] font-bold truncate leading-tight text-foreground">{clientName}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">📅 {new Date(process.created_at).toLocaleDateString('pt-BR')}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{process.razao_social}</p>
               <p className="text-[12px] font-semibold text-primary mt-0.5 truncate">{typeLabel}</p>
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
