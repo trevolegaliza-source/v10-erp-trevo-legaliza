@@ -95,7 +95,7 @@ export function useUpdateCliente() {
       if (updates.apelido !== undefined) payload.apelido = normalizeRequiredText(updates.apelido);
 
       // Financial columns
-      const numericFields = ['valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'dia_vencimento_mensal'] as const;
+      const numericFields = ['valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'dia_vencimento_mensal', 'franquia_processos', 'saldo_prepago', 'saldo_ultima_recarga'] as const;
       for (const field of numericFields) {
         if ((updates as any)[field] !== undefined) payload[field] = (updates as any)[field];
       }
