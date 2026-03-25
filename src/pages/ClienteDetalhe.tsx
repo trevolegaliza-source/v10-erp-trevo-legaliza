@@ -451,7 +451,7 @@ export default function ClienteDetalhe() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label className="text-xs text-muted-foreground">Tipo de Cliente</Label>
-                  <p className="font-medium">{isMensalista ? 'Mensalista' : 'Avulso'}</p>
+                  <p className="font-medium">{isMensalista ? 'Mensalista' : isPrePago ? 'Pré-Pago' : 'Avulso'}</p>
                 </div>
                 <div className="grid gap-1.5">
                   <Label className="text-xs text-muted-foreground">Momento do Faturamento</Label>
