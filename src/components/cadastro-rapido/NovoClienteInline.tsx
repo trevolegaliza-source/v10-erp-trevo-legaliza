@@ -66,6 +66,10 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Código do Cliente *</Label>
+            <Input required value={form.codigo_identificador} onChange={e => setForm(f => ({ ...f, codigo_identificador: e.target.value }))} placeholder="Ex: CLI-001" />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Nome *</Label>
