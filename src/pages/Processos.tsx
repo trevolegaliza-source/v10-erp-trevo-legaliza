@@ -339,13 +339,13 @@ export default function Processos() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-semibold text-zinc-300">Razão Social</TableHead>
-                  <TableHead className="text-xs font-semibold text-zinc-300">Cliente</TableHead>
-                  <TableHead className="text-xs font-semibold text-zinc-300">Tipo</TableHead>
-                  <TableHead className="text-xs font-semibold text-zinc-300">Etapa</TableHead>
-                  <TableHead className="text-xs font-semibold text-zinc-300">Prioridade</TableHead>
-                  <TableHead className="text-right text-xs font-semibold text-zinc-300">Valor</TableHead>
-                  <TableHead className="text-center text-xs font-semibold text-zinc-300">Ações</TableHead>
+                  <TableHead className="text-xs font-semibold">Razão Social</TableHead>
+                  <TableHead className="text-xs font-semibold">Cliente</TableHead>
+                  <TableHead className="text-xs font-semibold">Tipo</TableHead>
+                  <TableHead className="text-xs font-semibold">Etapa</TableHead>
+                  <TableHead className="text-xs font-semibold">Prioridade</TableHead>
+                  <TableHead className="text-right text-xs font-semibold">Valor</TableHead>
+                  <TableHead className="text-center text-xs font-semibold">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
