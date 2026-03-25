@@ -13,16 +13,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useClientes, useUpdateCliente, useDeleteCliente, useArchiveCliente, useUnarchiveCliente } from '@/hooks/useFinanceiro';
 import { useProcessos } from '@/hooks/useFinanceiro';
 import type { ClienteDB, TipoCliente } from '@/types/financial';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
+import { UFS_BRASIL, UF_NOMES } from '@/constants/estados-brasil';
 
 export default function Clientes() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const estadoFiltro = searchParams.get('estado');
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -56,6 +59,7 @@ export default function Clientes() {
     const archived = !!(c as any).is_archived;
     if (showArchived) return archived;
     if (archived) return false;
+    if (estadoFiltro && (c as any).estado !== estadoFiltro) return false;
     if (showInactive) return isInactive(c.id);
     return true;
   });
@@ -269,6 +273,11 @@ export default function Clientes() {
           <Archive className="h-3.5 w-3.5" />
           Arquivados ({(clientes || []).filter(c => (c as any).is_archived).length})
         </Button>
+        {estadoFiltro && (
+          <Badge variant="outline" className="h-9 px-3 flex items-center gap-1.5 cursor-pointer border-primary/30 text-primary" onClick={() => setSearchParams({})}>
+            Estado: {estadoFiltro} ✕
+          </Badge>
+        )}
       </div>
 
       {/* Table */}

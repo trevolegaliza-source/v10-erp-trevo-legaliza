@@ -10,6 +10,7 @@ import { useCreateCliente } from '@/hooks/useFinanceiro';
 import { maskCNPJ, isValidCNPJ } from '@/lib/cnpj';
 import { toast } from 'sonner';
 import type { TipoCliente } from '@/types/financial';
+import { UFS_BRASIL } from '@/constants/estados-brasil';
 
 interface Props {
   onClose: () => void;
@@ -30,6 +31,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     desconto_progressivo: '',
     valor_limite_desconto: '',
     observacoes: '',
+    estado: '',
+    cidade: '',
   });
   const [codigoManual, setCodigoManual] = useState(false);
   const createCliente = useCreateCliente();
@@ -74,6 +77,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
         desconto_progressivo: form.desconto_progressivo ? Number(form.desconto_progressivo) : null,
         valor_limite_desconto: form.valor_limite_desconto ? Number(form.valor_limite_desconto) : null,
         observacoes: form.observacoes || null,
+        estado: form.estado || null,
+        cidade: form.cidade || null,
       } as any,
       {
         onSuccess: (data: any) => {
@@ -136,7 +141,24 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
             </div>
           </div>
 
-          {/* Tipo + Valor Base + Desc. Progressivo + Valor Limite */}
+          {/* Estado + Cidade */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Estado (UF)</Label>
+              <Select value={form.estado} onValueChange={v => setForm(f => ({ ...f, estado: v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {UFS_BRASIL.map(uf => (
+                    <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Cidade</Label>
+              <Input value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} placeholder="Ex: São Paulo" />
+            </div>
+          </div>
           <div className="grid grid-cols-4 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Tipo</Label>

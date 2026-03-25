@@ -25,6 +25,7 @@ import { KANBAN_STAGES } from '@/types/process';
 import { STATUS_LABELS, STATUS_STYLES, TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso, TipoCliente } from '@/types/financial';
 import { cn } from '@/lib/utils';
+import { UFS_BRASIL } from '@/constants/estados-brasil';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
@@ -170,6 +171,8 @@ export default function ClienteDetalhe() {
       email: cliente.email || '',
       telefone: cliente.telefone || '',
       tipo: cliente.tipo,
+      estado: (cliente as any).estado || '',
+      cidade: (cliente as any).cidade || '',
     });
     // Load existing negotiations into inline rows
     setEditHonorariosRows(
@@ -215,6 +218,8 @@ export default function ClienteDetalhe() {
         email: editCadastroForm.email || null,
         telefone: editCadastroForm.telefone || null,
         tipo: editCadastroForm.tipo,
+        estado: editCadastroForm.estado || null,
+        cidade: editCadastroForm.cidade || null,
       };
       await new Promise<void>((resolve, reject) => {
         updateCliente.mutate(payload as any, {
@@ -930,8 +935,25 @@ export default function ClienteDetalhe() {
               <div className="grid gap-2">
                 <Label className="text-muted-foreground">Email</Label>
                 <Input value={editCadastroForm.email || ''} onChange={e => setEditCadastroForm(f => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-muted-foreground">Estado (UF)</Label>
+                <Select value={editCadastroForm.estado || ''} onValueChange={(v) => setEditCadastroForm(f => ({ ...f, estado: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {UFS_BRASIL.map(uf => (
+                      <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
+                <Label className="text-muted-foreground">Cidade</Label>
+                <Input value={editCadastroForm.cidade || ''} onChange={e => setEditCadastroForm(f => ({ ...f, cidade: e.target.value }))} placeholder="Ex: São Paulo" />
+              </div>
+            </div>
+            <div className="grid gap-2">
                 <Label className="text-muted-foreground">Telefone</Label>
                 <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
               </div>

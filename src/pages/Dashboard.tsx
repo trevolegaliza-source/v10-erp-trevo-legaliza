@@ -11,6 +11,7 @@ import Rankings from '@/components/dashboard/Rankings';
 import InadimplenciaResumo from '@/components/dashboard/InadimplenciaResumo';
 import ProcessosParados from '@/components/dashboard/ProcessosParados';
 import ProvisaoResumo from '@/components/dashboard/ProvisaoResumo';
+import MapaBrasil from '@/components/dashboard/MapaBrasil';
 import {
   getSaudacao,
   getNomeUsuario,
@@ -127,6 +128,9 @@ export default function Dashboard() {
           />
         </div>
       </div>
+
+      {/* Mapa do Brasil */}
+      <MapaBrasil />
     </div>
   );
 }
