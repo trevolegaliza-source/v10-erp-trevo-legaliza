@@ -208,6 +208,65 @@ export type Database = {
         }
         Relationships: []
       }
+      despesas_recorrentes: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          colaborador_id: string | null
+          created_at: string | null
+          data_fim: string | null
+          data_inicio: string
+          descricao: string
+          dia_vencimento: number
+          fornecedor: string | null
+          id: string
+          observacoes: string | null
+          subcategoria: string | null
+          updated_at: string | null
+          valor: number
+        }
+        Insert: {
+          ativo?: boolean
+          categoria: string
+          colaborador_id?: string | null
+          created_at?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          descricao: string
+          dia_vencimento?: number
+          fornecedor?: string | null
+          id?: string
+          observacoes?: string | null
+          subcategoria?: string | null
+          updated_at?: string | null
+          valor?: number
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          colaborador_id?: string | null
+          created_at?: string | null
+          data_fim?: string | null
+          data_inicio?: string
+          descricao?: string
+          dia_vencimento?: number
+          fornecedor?: string | null
+          id?: string
+          observacoes?: string | null
+          subcategoria?: string | null
+          updated_at?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "despesas_recorrentes_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documentos: {
         Row: {
           created_at: string | null
@@ -253,13 +312,17 @@ export type Database = {
           cliente_id: string | null
           cobranca_encaminhada: boolean | null
           colaborador_id: string | null
+          competencia_ano: number | null
+          competencia_mes: number | null
           comprovante_url: string | null
           confirmado_recebimento: boolean | null
           created_at: string | null
           data_pagamento: string | null
           data_vencimento: string
           descricao: string
+          despesa_recorrente_id: string | null
           etapa_financeiro: string
+          fornecedor: string | null
           honorario_extra: number | null
           id: string
           is_taxa_reembolsavel: boolean | null
@@ -267,6 +330,7 @@ export type Database = {
           processo_id: string | null
           recibo_assinado_url: string | null
           status: Database["public"]["Enums"]["status_financeiro"]
+          subcategoria: string | null
           tipo: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at: string | null
           url_comprovante: string | null
@@ -279,13 +343,17 @@ export type Database = {
           cliente_id?: string | null
           cobranca_encaminhada?: boolean | null
           colaborador_id?: string | null
+          competencia_ano?: number | null
+          competencia_mes?: number | null
           comprovante_url?: string | null
           confirmado_recebimento?: boolean | null
           created_at?: string | null
           data_pagamento?: string | null
           data_vencimento: string
           descricao: string
+          despesa_recorrente_id?: string | null
           etapa_financeiro?: string
+          fornecedor?: string | null
           honorario_extra?: number | null
           id?: string
           is_taxa_reembolsavel?: boolean | null
@@ -293,6 +361,7 @@ export type Database = {
           processo_id?: string | null
           recibo_assinado_url?: string | null
           status?: Database["public"]["Enums"]["status_financeiro"]
+          subcategoria?: string | null
           tipo: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at?: string | null
           url_comprovante?: string | null
@@ -305,13 +374,17 @@ export type Database = {
           cliente_id?: string | null
           cobranca_encaminhada?: boolean | null
           colaborador_id?: string | null
+          competencia_ano?: number | null
+          competencia_mes?: number | null
           comprovante_url?: string | null
           confirmado_recebimento?: boolean | null
           created_at?: string | null
           data_pagamento?: string | null
           data_vencimento?: string
           descricao?: string
+          despesa_recorrente_id?: string | null
           etapa_financeiro?: string
+          fornecedor?: string | null
           honorario_extra?: number | null
           id?: string
           is_taxa_reembolsavel?: boolean | null
@@ -319,6 +392,7 @@ export type Database = {
           processo_id?: string | null
           recibo_assinado_url?: string | null
           status?: Database["public"]["Enums"]["status_financeiro"]
+          subcategoria?: string | null
           tipo?: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at?: string | null
           url_comprovante?: string | null
@@ -338,6 +412,13 @@ export type Database = {
             columns: ["colaborador_id"]
             isOneToOne: false
             referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_despesa_recorrente_id_fkey"
+            columns: ["despesa_recorrente_id"]
+            isOneToOne: false
+            referencedRelation: "despesas_recorrentes"
             referencedColumns: ["id"]
           },
           {
