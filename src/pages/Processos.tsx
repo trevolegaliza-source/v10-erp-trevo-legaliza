@@ -355,8 +355,8 @@ export default function Processos() {
                     className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
                     onDoubleClick={() => openEditModal(proc)}
                   >
-                    <TableCell className="font-medium text-zinc-100">{proc.razao_social}</TableCell>
-                    <TableCell className="text-sm text-zinc-100">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
+                    <TableCell className="font-medium text-foreground">{proc.razao_social}</TableCell>
+                    <TableCell className="text-sm text-foreground">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
                         {(() => {
