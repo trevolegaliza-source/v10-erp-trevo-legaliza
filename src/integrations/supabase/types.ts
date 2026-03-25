@@ -21,10 +21,13 @@ export type Database = {
           codigo_identificador: string
           contrato_url: string | null
           created_at: string | null
+          data_ultima_recarga: string | null
+          desconto_boas_vindas_aplicado: boolean | null
           desconto_progressivo: number | null
           dia_cobranca: number | null
           dia_vencimento_mensal: number | null
           email: string | null
+          franquia_processos: number | null
           id: string
           is_archived: boolean | null
           mensalidade: number | null
@@ -33,6 +36,8 @@ export type Database = {
           nome_contador: string | null
           observacoes: string | null
           qtd_processos: number | null
+          saldo_prepago: number | null
+          saldo_ultima_recarga: number | null
           telefone: string | null
           tipo: Database["public"]["Enums"]["tipo_cliente"]
           tipo_desconto: string | null
@@ -47,10 +52,13 @@ export type Database = {
           codigo_identificador: string
           contrato_url?: string | null
           created_at?: string | null
+          data_ultima_recarga?: string | null
+          desconto_boas_vindas_aplicado?: boolean | null
           desconto_progressivo?: number | null
           dia_cobranca?: number | null
           dia_vencimento_mensal?: number | null
           email?: string | null
+          franquia_processos?: number | null
           id?: string
           is_archived?: boolean | null
           mensalidade?: number | null
@@ -59,6 +67,8 @@ export type Database = {
           nome_contador?: string | null
           observacoes?: string | null
           qtd_processos?: number | null
+          saldo_prepago?: number | null
+          saldo_ultima_recarga?: number | null
           telefone?: string | null
           tipo?: Database["public"]["Enums"]["tipo_cliente"]
           tipo_desconto?: string | null
@@ -73,10 +83,13 @@ export type Database = {
           codigo_identificador?: string
           contrato_url?: string | null
           created_at?: string | null
+          data_ultima_recarga?: string | null
+          desconto_boas_vindas_aplicado?: boolean | null
           desconto_progressivo?: number | null
           dia_cobranca?: number | null
           dia_vencimento_mensal?: number | null
           email?: string | null
+          franquia_processos?: number | null
           id?: string
           is_archived?: boolean | null
           mensalidade?: number | null
@@ -85,6 +98,8 @@ export type Database = {
           nome_contador?: string | null
           observacoes?: string | null
           qtd_processos?: number | null
+          saldo_prepago?: number | null
+          saldo_ultima_recarga?: number | null
           telefone?: string | null
           tipo?: Database["public"]["Enums"]["tipo_cliente"]
           tipo_desconto?: string | null
@@ -490,6 +505,57 @@ export type Database = {
         }
         Relationships: []
       }
+      prepago_movimentacoes: {
+        Row: {
+          cliente_id: string
+          created_at: string | null
+          descricao: string
+          id: string
+          processo_id: string | null
+          saldo_anterior: number
+          saldo_posterior: number
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string | null
+          descricao: string
+          id?: string
+          processo_id?: string | null
+          saldo_anterior: number
+          saldo_posterior: number
+          tipo: string
+          valor: number
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string | null
+          descricao?: string
+          id?: string
+          processo_id?: string | null
+          saldo_anterior?: number
+          saldo_posterior?: number
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prepago_movimentacoes_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prepago_movimentacoes_processo_id_fkey"
+            columns: ["processo_id"]
+            isOneToOne: false
+            referencedRelation: "processos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       processos: {
         Row: {
           cliente_id: string
@@ -551,9 +617,11 @@ export type Database = {
           fixed_price: number
           id: string
           is_custom: boolean
+          observacoes: string | null
           service_name: string
           trigger_days: number | null
           updated_at: string | null
+          valor_prepago: number | null
         }
         Insert: {
           billing_trigger?: string
@@ -562,9 +630,11 @@ export type Database = {
           fixed_price?: number
           id?: string
           is_custom?: boolean
+          observacoes?: string | null
           service_name: string
           trigger_days?: number | null
           updated_at?: string | null
+          valor_prepago?: number | null
         }
         Update: {
           billing_trigger?: string
@@ -573,9 +643,11 @@ export type Database = {
           fixed_price?: number
           id?: string
           is_custom?: boolean
+          observacoes?: string | null
           service_name?: string
           trigger_days?: number | null
           updated_at?: string | null
+          valor_prepago?: number | null
         }
         Relationships: [
           {
@@ -668,7 +740,7 @@ export type Database = {
     }
     Enums: {
       status_financeiro: "pendente" | "pago" | "atrasado" | "cancelado"
-      tipo_cliente: "MENSALISTA" | "AVULSO_4D"
+      tipo_cliente: "MENSALISTA" | "AVULSO_4D" | "PRE_PAGO"
       tipo_lancamento: "receber" | "pagar"
       tipo_processo:
         | "abertura"
@@ -805,7 +877,7 @@ export const Constants = {
   public: {
     Enums: {
       status_financeiro: ["pendente", "pago", "atrasado", "cancelado"],
-      tipo_cliente: ["MENSALISTA", "AVULSO_4D"],
+      tipo_cliente: ["MENSALISTA", "AVULSO_4D", "PRE_PAGO"],
       tipo_lancamento: ["receber", "pagar"],
       tipo_processo: [
         "abertura",
