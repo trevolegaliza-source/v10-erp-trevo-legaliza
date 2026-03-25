@@ -68,6 +68,7 @@ export function useCreateCliente() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clientes'] });
+      qc.invalidateQueries({ queryKey: ['mapa_clientes_estado'] });
       toast.success('Cliente criado com sucesso!');
     },
     onError: (e: Error) => toast.error(e.message),
@@ -105,6 +106,8 @@ export function useUpdateCliente() {
       if ((updates as any).tipo !== undefined) payload.tipo = (updates as any).tipo;
       if ((updates as any).desconto_boas_vindas_aplicado !== undefined) payload.desconto_boas_vindas_aplicado = (updates as any).desconto_boas_vindas_aplicado;
       if ((updates as any).data_ultima_recarga !== undefined) payload.data_ultima_recarga = (updates as any).data_ultima_recarga;
+      if ((updates as any).estado !== undefined) payload.estado = (updates as any).estado;
+      if ((updates as any).cidade !== undefined) payload.cidade = (updates as any).cidade;
 
       const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
       if (error) throw error;
@@ -112,6 +115,7 @@ export function useUpdateCliente() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clientes'] });
+      qc.invalidateQueries({ queryKey: ['mapa_clientes_estado'] });
       toast.success('Cliente atualizado!');
     },
     onError: (e: Error) => toast.error(e.message),
