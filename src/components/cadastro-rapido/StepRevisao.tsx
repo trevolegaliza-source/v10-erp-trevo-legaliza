@@ -8,7 +8,7 @@ interface ProcessoResumo {
   tipo: string;
   prioridade: 'normal' | 'urgente';
   mudancaUF: boolean;
-  metodoPreco: 'automatico' | 'manual';
+  metodoPreco: 'automatico' | 'manual' | 'servico_preacordado';
   valorManual: string;
   boasVindas: boolean;
   boasVindasPct: string;

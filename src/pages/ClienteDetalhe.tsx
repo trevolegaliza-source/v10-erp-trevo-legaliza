@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useUpsertServiceNegotiations } from '@/hooks/useServiceNegotiations';
 import HonorariosInlineRepeater, { type InlineNegotiationRow, emptyNegotiationRow } from '@/components/clientes/HonorariosInlineRepeater';
-import HonorariosRepeater from '@/components/clientes/HonorariosRepeater';
+import ServicosPreAcordados from '@/components/clientes/ServicosPreAcordados';
+import PrepagoTab from '@/components/clientes/PrepagoTab';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -147,7 +148,7 @@ export default function ClienteDetalhe() {
   const handleSaveParams = () => {
     if (!cliente) return;
     const payload: Record<string, any> = { id: cliente.id };
-    const fields = ['valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'momento_faturamento', 'dia_vencimento_mensal'] as const;
+    const fields = ['valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'momento_faturamento', 'dia_vencimento_mensal', 'franquia_processos'] as const;
     for (const f of fields) {
       if ((editForm as any)[f] !== undefined) payload[f] = (editForm as any)[f];
     }
@@ -307,6 +308,7 @@ export default function ClienteDetalhe() {
   }
 
   const isMensalista = cliente.tipo === 'MENSALISTA';
+  const isPrePago = cliente.tipo === 'PRE_PAGO';
   const momentoFat = (cliente as any).momento_faturamento || 'na_solicitacao';
   const isDeferimento = momentoFat === 'no_deferimento';
   const totalProcessos = processos.length;
@@ -339,8 +341,8 @@ export default function ClienteDetalhe() {
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight">{cliente.apelido || cliente.nome}</h1>
-            <Badge className={cn('text-xs', isMensalista ? 'bg-primary/10 text-primary border-primary/30' : 'bg-warning/10 text-warning border-warning/30')} variant="outline">
-              {isMensalista ? 'Mensalista' : 'Avulso'}
+            <Badge className={cn('text-xs', isMensalista ? 'bg-primary/10 text-primary border-primary/30' : isPrePago ? 'bg-info/10 text-info border-info/30' : 'bg-warning/10 text-warning border-warning/30')} variant="outline">
+              {isMensalista ? 'Mensalista' : isPrePago ? 'Pré-Pago' : 'Avulso'}
             </Badge>
             {isDeferimento && (
               <Badge variant="outline" className="text-xs border-warning/30 text-warning">
@@ -420,13 +422,14 @@ export default function ClienteDetalhe() {
 
       {/* Tabs */}
       <Tabs defaultValue="financeiro-config" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="financeiro-config" className="text-xs gap-1"><Settings className="h-3.5 w-3.5" />Config. Financeira</TabsTrigger>
-          <TabsTrigger value="honorarios" className="text-xs gap-1"><List className="h-3.5 w-3.5" />Honorários</TabsTrigger>
+        <TabsList className={cn("grid w-full", isPrePago ? "grid-cols-7" : "grid-cols-6")}>
+          <TabsTrigger value="financeiro-config" className="text-xs gap-1"><Settings className="h-3.5 w-3.5" />Financeiro</TabsTrigger>
+          <TabsTrigger value="honorarios" className="text-xs gap-1"><List className="h-3.5 w-3.5" />Serviços</TabsTrigger>
           <TabsTrigger value="processos" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Processos</TabsTrigger>
-          <TabsTrigger value="faturas" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Financeiro</TabsTrigger>
+          <TabsTrigger value="faturas" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Faturas</TabsTrigger>
           <TabsTrigger value="contratos" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Contratos</TabsTrigger>
-          <TabsTrigger value="observacoes" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Observações</TabsTrigger>
+          {isPrePago && <TabsTrigger value="prepago" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Pré-Pago</TabsTrigger>}
+          <TabsTrigger value="observacoes" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Obs.</TabsTrigger>
         </TabsList>
 
         {/* ── Config Financeira ── */}
@@ -449,7 +452,7 @@ export default function ClienteDetalhe() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label className="text-xs text-muted-foreground">Tipo de Cliente</Label>
-                  <p className="font-medium">{isMensalista ? 'Mensalista' : 'Avulso'}</p>
+                  <p className="font-medium">{isMensalista ? 'Mensalista' : isPrePago ? 'Pré-Pago' : 'Avulso'}</p>
                 </div>
                 <div className="grid gap-1.5">
                   <Label className="text-xs text-muted-foreground">Momento do Faturamento</Label>
@@ -476,6 +479,14 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
+                      <Label className="text-xs text-muted-foreground">Franquia de Processos/mês</Label>
+                      {editing ? (
+                        <Input type="number" min={0} value={(editForm as any).franquia_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, franquia_processos: e.target.value ? Number(e.target.value) : 0 }))} placeholder="0" />
+                      ) : (
+                        <p className="font-medium">{(cliente as any).franquia_processos ?? 0} processos</p>
+                      )}
+                    </div>
+                    <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Vencimento</Label>
                       {editing ? (
                         <Input type="number" min={1} max={31} value={(editForm as any).vencimento ?? (editForm as any).dia_vencimento_mensal ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : null; setEditForm(f => ({ ...f, vencimento: v, dia_vencimento_mensal: v ?? undefined })); }} />
@@ -484,12 +495,44 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Qtd Processos Inclusos</Label>
+                      <Label className="text-xs text-muted-foreground">Valor Base (proc. excedente)</Label>
                       {editing ? (
-                        <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
+                        <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{formatValueOrZero((cliente as any).qtd_processos)}</p>
+                        <p className="font-medium">{formatCurrencyOrZero((cliente as any).valor_base)}</p>
                       )}
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs text-muted-foreground">Desc. Progressivo % (excedente)</Label>
+                      {editing ? (
+                        <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
+                      ) : (
+                        <p className="font-medium">{formatValueOrZero((cliente as any).desconto_progressivo)}%</p>
+                      )}
+                    </div>
+                    <div className="col-span-2 p-3 rounded-lg bg-muted/30 border border-border/40">
+                      <p className="text-xs text-muted-foreground">
+                        Processos dentro da franquia: R$ 0,00. Processos excedentes usam valor base com desconto progressivo configurado acima.
+                      </p>
+                    </div>
+                  </>
+                ) : isPrePago ? (
+                  <>
+                    <div className="col-span-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                      <p className="text-xs text-muted-foreground">Saldo Atual</p>
+                      <p className={`text-2xl font-bold ${Number((cliente as any).saldo_prepago ?? 0) >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                        {formatCurrencyOrZero((cliente as any).saldo_prepago)}
+                      </p>
+                      {(cliente as any).data_ultima_recarga && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Última recarga: {formatCurrencyOrZero((cliente as any).saldo_ultima_recarga)} em {new Date((cliente as any).data_ultima_recarga).toLocaleDateString('pt-BR')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="col-span-2 p-3 rounded-lg bg-muted/30 border border-border/40">
+                      <p className="text-xs text-muted-foreground">
+                        Para clientes pré-pagos, o valor de cada processo é definido nos Serviços Pré-Acordados. O saldo é debitado automaticamente ao cadastrar o processo.
+                      </p>
                     </div>
                   </>
                 ) : (
@@ -535,17 +578,9 @@ export default function ClienteDetalhe() {
           </Card>
         </TabsContent>
 
-        {/* ── Honorários Específicos ── */}
+        {/* ── Serviços Pré-Acordados ── */}
         <TabsContent value="honorarios">
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Tabela de Honorários Específicos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <HonorariosRepeater clienteId={cliente.id} />
-              {/* Using the standalone HonorariosRepeater for the tab */}
-            </CardContent>
-          </Card>
+          <ServicosPreAcordados clienteId={cliente.id} isPrePago={isPrePago} />
         </TabsContent>
 
         {/* ── Processos ── */}
@@ -802,6 +837,13 @@ export default function ClienteDetalhe() {
           </Card>
         </TabsContent>
 
+        {/* ── Pré-Pago ── */}
+        {isPrePago && (
+          <TabsContent value="prepago">
+            <PrepagoTab cliente={cliente} onReload={() => loadAll(cliente.id)} />
+          </TabsContent>
+        )}
+
         {/* ── Observações ── */}
         <TabsContent value="observacoes">
           <Card className="border-border/60">
@@ -901,6 +943,7 @@ export default function ClienteDetalhe() {
                 <SelectContent>
                   <SelectItem value="MENSALISTA">Mensalista</SelectItem>
                   <SelectItem value="AVULSO_4D">Avulso</SelectItem>
+                  <SelectItem value="PRE_PAGO">Pré-Pago</SelectItem>
                 </SelectContent>
               </Select>
             </div>

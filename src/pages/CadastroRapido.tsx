@@ -31,9 +31,10 @@ const INITIAL_VALOR: ValorFormData = {
   valorManual: '',
   motivoManual: '',
   boasVindas: false,
-  boasVindasPct: '10',
+  boasVindasPct: '50',
   jaPago: false,
   observacoes: '',
+  servicoPreAcordadoId: '',
 };
 
 export default function CadastroRapido() {
@@ -80,7 +81,7 @@ export default function CadastroRapido() {
     },
   });
 
-  // First process detection
+  // First process detection (also check desconto_boas_vindas_aplicado)
   const { data: isFirstProcess = false } = useQuery({
     queryKey: ['is_first_process', clienteId],
     enabled: !!clienteId,
@@ -89,11 +90,17 @@ export default function CadastroRapido() {
         .from('processos')
         .select('id', { count: 'exact', head: true })
         .eq('cliente_id', clienteId!);
-      return (count ?? 0) === 0;
+      if ((count ?? 0) > 0) return false;
+      // Check if boas-vindas already applied
+      if (selectedCliente && (selectedCliente as any).desconto_boas_vindas_aplicado) return false;
+      return true;
     },
   });
 
   const isAvulso = processoForm.tipo === 'avulso';
+  const clienteTipo = selectedCliente?.tipo || 'AVULSO_4D';
+  const saldoPrepago = Number((selectedCliente as any)?.saldo_prepago ?? 0);
+  const franquiaProcessos = Number((selectedCliente as any)?.franquia_processos ?? 0);
   const nextSlot = processosNoMes + fila.length + 1;
 
   // Preview calculation
@@ -158,9 +165,7 @@ export default function CadastroRapido() {
   const handleAddToQueue = () => {
     const item = buildQueueItem();
     const newFila = [...fila, item];
-    // Recalculate all slots
     setFila(recalcFila(newFila, selectedCliente!, processosNoMes));
-    // Reset form for next process, keep client
     setProcessoForm(INITIAL_PROCESSO);
     setValorForm(INITIAL_VALOR);
     setStep(2);
@@ -172,7 +177,7 @@ export default function CadastroRapido() {
     let slotOffset = mesCount;
     return items.map(item => {
       const isItemAvulso = item.tipo === 'avulso';
-      if (isItemAvulso || item.metodoPreco === 'manual') {
+      if (isItemAvulso || item.metodoPreco === 'manual' || item.metodoPreco === 'servico_preacordado') {
         const slot = slotOffset + 1;
         slotOffset += item.mudancaUF ? 2 : 1;
         return { ...item, slotNumero: slot, valorFinal: Number(item.valorManual) || 0, descontoAplicado: 0 };
@@ -213,7 +218,7 @@ export default function CadastroRapido() {
       for (const item of items) {
         const neg = (negotiations || []).find(n => n.id === item.tipo);
         const tipoFinal = neg ? 'avulso' : item.tipo;
-        const valorFinal = item.metodoPreco === 'manual' || item.tipo === 'avulso'
+        const valorFinal = item.metodoPreco === 'manual' || item.metodoPreco === 'servico_preacordado' || item.tipo === 'avulso'
           ? Number(item.valorManual) || 0
           : undefined;
 
@@ -321,6 +326,12 @@ export default function CadastroRapido() {
                 onChange={setValorForm}
                 isFirstProcess={isFirstProcess}
                 isAvulso={isAvulso}
+                clienteTipo={clienteTipo}
+                negotiations={negotiations || []}
+                saldoPrepago={saldoPrepago}
+                valorPreview={preview.valorFinal}
+                franquiaProcessos={franquiaProcessos}
+                processosNoMes={processosNoMes + fila.length}
                 onBack={() => goToStep(2)}
                 onNext={handleNextStep3}
               />

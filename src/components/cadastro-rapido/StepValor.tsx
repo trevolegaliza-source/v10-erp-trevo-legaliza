@@ -2,19 +2,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, ArrowRight, AlertTriangle } from 'lucide-react';
+import type { ServiceNegotiation } from '@/hooks/useServiceNegotiations';
 
 export interface ValorFormData {
-  metodoPreco: 'automatico' | 'manual';
+  metodoPreco: 'automatico' | 'manual' | 'servico_preacordado';
   valorManual: string;
   motivoManual: string;
   boasVindas: boolean;
   boasVindasPct: string;
   jaPago: boolean;
   observacoes: string;
+  servicoPreAcordadoId: string;
 }
 
 interface Props {
@@ -22,21 +24,87 @@ interface Props {
   onChange: (form: ValorFormData) => void;
   isFirstProcess: boolean;
   isAvulso: boolean;
+  clienteTipo: string;
+  negotiations: ServiceNegotiation[];
+  saldoPrepago: number;
+  valorPreview: number;
+  franquiaProcessos: number;
+  processosNoMes: number;
   onBack: () => void;
   onNext: () => void;
 }
 
-export default function StepValor({ form, onChange, isFirstProcess, isAvulso, onBack, onNext }: Props) {
+const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+export default function StepValor({ form, onChange, isFirstProcess, isAvulso, clienteTipo, negotiations, saldoPrepago, valorPreview, franquiaProcessos, processosNoMes, onBack, onNext }: Props) {
   const update = (field: keyof ValorFormData, value: any) => onChange({ ...form, [field]: value });
+  const isPrePago = clienteTipo === 'PRE_PAGO';
+  const isMensalista = clienteTipo === 'MENSALISTA';
+  const dentroFranquia = isMensalista && franquiaProcessos > 0 && processosNoMes < franquiaProcessos;
+  const saldoInsuficiente = isPrePago && valorPreview > saldoPrepago;
+
+  const selectedNeg = negotiations.find(n => n.id === form.servicoPreAcordadoId);
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-foreground">Configuração Financeira</h2>
-        <p className="text-sm text-muted-foreground">Defina como o valor será calculado</p>
+        <p className="text-sm text-muted-foreground">
+          {isPrePago ? 'Selecione o serviço pré-acordado' : isMensalista && dentroFranquia ? 'Processo dentro da franquia' : 'Defina como o valor será calculado'}
+        </p>
       </div>
 
-      {!isAvulso && (
+      {/* PRE_PAGO: force service selection */}
+      {isPrePago && (
+        <div className="space-y-3">
+          <Label>Serviço Pré-Acordado *</Label>
+          <Select value={form.servicoPreAcordadoId} onValueChange={v => {
+            const neg = negotiations.find(n => n.id === v);
+            const valor = neg ? String((neg as any).valor_prepago > 0 ? (neg as any).valor_prepago : neg.fixed_price) : '';
+            onChange({ ...form, servicoPreAcordadoId: v, metodoPreco: 'servico_preacordado', valorManual: valor });
+          }}>
+            <SelectTrigger><SelectValue placeholder="Selecione um serviço..." /></SelectTrigger>
+            <SelectContent>
+              {negotiations.map(n => (
+                <SelectItem key={n.id} value={n.id}>
+                  {n.service_name} — {fmt((n as any).valor_prepago > 0 ? (n as any).valor_prepago : n.fixed_price)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {negotiations.length === 0 && (
+            <p className="text-xs text-warning">Nenhum serviço pré-acordado cadastrado. Configure na aba "Serviços" do cliente.</p>
+          )}
+
+          {saldoInsuficiente && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="font-semibold text-sm">Saldo Insuficiente</span>
+              </div>
+              <div className="text-xs space-y-1">
+                <p>Valor do serviço: {fmt(valorPreview)}</p>
+                <p>Saldo atual: {fmt(saldoPrepago)}</p>
+                <p className="text-destructive font-medium">Diferença: {fmt(valorPreview - saldoPrepago)}</p>
+              </div>
+              <p className="text-xs text-muted-foreground">O cliente precisa realizar uma recarga para prosseguir.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MENSALISTA within franchise */}
+      {isMensalista && dentroFranquia && (
+        <div className="rounded-lg border border-success/30 bg-success/5 p-4">
+          <p className="text-sm font-medium text-success">✅ Dentro da Franquia</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Processo {processosNoMes + 1} de {franquiaProcessos} — Valor: R$ 0,00
+          </p>
+        </div>
+      )}
+
+      {/* AVULSO or MENSALISTA excedente: show auto/manual */}
+      {!isPrePago && !(isMensalista && dentroFranquia) && !isAvulso && (
         <div className="space-y-2">
           <Label>Método de precificação</Label>
           <RadioGroup
@@ -46,7 +114,9 @@ export default function StepValor({ form, onChange, isFirstProcess, isAvulso, on
           >
             <div className="flex items-center gap-2">
               <RadioGroupItem value="automatico" id="preco-auto" />
-              <Label htmlFor="preco-auto" className="font-normal cursor-pointer">Automático (desconto progressivo)</Label>
+              <Label htmlFor="preco-auto" className="font-normal cursor-pointer">
+                Automático{isMensalista ? ' (excedente)' : ' (desconto progressivo)'}
+              </Label>
             </div>
             <div className="flex items-center gap-2">
               <RadioGroupItem value="manual" id="preco-manual" />
@@ -56,7 +126,7 @@ export default function StepValor({ form, onChange, isFirstProcess, isAvulso, on
         </div>
       )}
 
-      {(form.metodoPreco === 'manual' || isAvulso) && (
+      {(form.metodoPreco === 'manual' || isAvulso) && !isPrePago && (
         <div className="space-y-3 rounded-lg border border-border p-4">
           <div className="space-y-2">
             <Label>Valor (R$) *</Label>
@@ -82,7 +152,7 @@ export default function StepValor({ form, onChange, isFirstProcess, isAvulso, on
         </div>
       )}
 
-      {isFirstProcess && !isAvulso && (
+      {isFirstProcess && !isAvulso && !isPrePago && (
         <div className="rounded-lg border border-success/30 bg-success/5 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
@@ -131,7 +201,7 @@ export default function StepValor({ form, onChange, isFirstProcess, isAvulso, on
         <Button variant="outline" onClick={onBack} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Button>
-        <Button onClick={onNext} className="gap-2">
+        <Button onClick={onNext} className="gap-2" disabled={isPrePago && (saldoInsuficiente || !form.servicoPreAcordadoId)}>
           Próximo <ArrowRight className="h-4 w-4" />
         </Button>
       </div>

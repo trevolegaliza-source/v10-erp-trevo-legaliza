@@ -95,7 +95,7 @@ export function useUpdateCliente() {
       if (updates.apelido !== undefined) payload.apelido = normalizeRequiredText(updates.apelido);
 
       // Financial columns
-      const numericFields = ['valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'dia_vencimento_mensal'] as const;
+      const numericFields = ['valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'dia_vencimento_mensal', 'franquia_processos', 'saldo_prepago', 'saldo_ultima_recarga'] as const;
       for (const field of numericFields) {
         if ((updates as any)[field] !== undefined) payload[field] = (updates as any)[field];
       }
@@ -103,6 +103,8 @@ export function useUpdateCliente() {
       if ((updates as any).observacoes !== undefined) payload.observacoes = (updates as any).observacoes;
       if ((updates as any).cnpj !== undefined) payload.cnpj = (updates as any).cnpj;
       if ((updates as any).tipo !== undefined) payload.tipo = (updates as any).tipo;
+      if ((updates as any).desconto_boas_vindas_aplicado !== undefined) payload.desconto_boas_vindas_aplicado = (updates as any).desconto_boas_vindas_aplicado;
+      if ((updates as any).data_ultima_recarga !== undefined) payload.data_ultima_recarga = (updates as any).data_ultima_recarga;
 
       const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
       if (error) throw error;
@@ -242,13 +244,15 @@ export function useCreateProcesso() {
 
       const { data: clienteData, error: clienteError } = await supabase
         .from('clientes')
-        .select('id, tipo, valor_base, momento_faturamento, desconto_progressivo, valor_limite_desconto')
+        .select('id, tipo, valor_base, momento_faturamento, desconto_progressivo, valor_limite_desconto, franquia_processos, saldo_prepago')
         .eq('id', input.cliente_id)
         .single();
       if (clienteError) throw clienteError;
 
       const cliente = clienteData as any;
-      const valorBaseCliente = cliente.tipo === 'MENSALISTA' ? 0 : Number(cliente.valor_base ?? 0);
+      const isPrePago = cliente.tipo === 'PRE_PAGO';
+      const isMensalista = cliente.tipo === 'MENSALISTA';
+      const valorBaseCliente = isMensalista ? Number(cliente.valor_base ?? 0) : Number(cliente.valor_base ?? 0);
       const descontoPercent = Number(cliente.desconto_progressivo ?? 0);
       const valorLimite = cliente.valor_limite_desconto != null ? Number(cliente.valor_limite_desconto) : null;
 
@@ -273,15 +277,34 @@ export function useCreateProcesso() {
         valorFinal = isManualPrice ? Number(input.valor_manual) : 0;
       } else if (isManualPrice) {
         valorFinal = Number(input.valor_manual);
+      } else if (isPrePago) {
+        // For pre-paid, value should come from valor_manual (set by service negotiation)
+        valorFinal = isManualPrice ? Number(input.valor_manual) : 0;
+      } else if (isMensalista) {
+        const franquia = Number(cliente.franquia_processos ?? 0);
+        if (franquia > 0 && monthCount < franquia) {
+          // Within franchise
+          valorFinal = 0;
+          discountInfo = `Dentro da franquia (${monthCount + 1}/${franquia})`;
+        } else {
+          // Exceeded franchise — use valor_base with progressive discount
+          const excedenteCount = franquia > 0 ? monthCount - franquia : monthCount;
+          if (descontoPercent > 0) {
+            const calc = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, excedenteCount, valorLimite);
+            valorFinal = calc.valorFinal;
+            discountInfo = `Excedente nº ${excedenteCount + 1} | Base: R$ ${valorBaseCliente.toFixed(2)} | Desc: R$ ${calc.descontoAcumulado.toFixed(2)}`;
+          } else {
+            valorFinal = valorBaseCliente;
+          }
+          if (isUrgente) valorFinal *= 1.5;
+        }
       } else if (cliente.tipo !== 'MENSALISTA') {
         if (slots === 2 && descontoPercent > 0) {
-          // Mudança de UF: sum of process N and process N+1
           const calc1 = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount, valorLimite);
           const calc2 = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount + 1, valorLimite);
           valorFinal = calc1.valorFinal + calc2.valorFinal;
           discountInfo = `Mudança de UF (2 Processos) | Proc ${calc1.processoNumero}: R$ ${calc1.valorFinal.toFixed(2)} + Proc ${calc2.processoNumero}: R$ ${calc2.valorFinal.toFixed(2)}`;
         } else if (slots === 2) {
-          // Mudança de UF without progressive discount
           valorFinal = valorBaseCliente * 2;
           discountInfo = `Mudança de UF (2 Processos) | 2 × R$ ${valorBaseCliente.toFixed(2)}`;
         } else if (descontoPercent > 0) {
@@ -372,6 +395,35 @@ export function useCreateProcesso() {
           .from('processos')
           .update({ etapa: 'finalizados', updated_at: new Date().toISOString() })
           .eq('id', processo.id);
+      }
+
+      // Debit prepaid balance if PRE_PAGO
+      if (isPrePago && valorFinal > 0) {
+        const saldoAtual = Number(cliente.saldo_prepago ?? 0);
+        const novoSaldo = saldoAtual - valorFinal;
+        await supabase
+          .from('clientes')
+          .update({ saldo_prepago: novoSaldo, updated_at: new Date().toISOString() } as any)
+          .eq('id', input.cliente_id);
+        await supabase
+          .from('prepago_movimentacoes')
+          .insert({
+            cliente_id: input.cliente_id,
+            tipo: 'consumo',
+            valor: valorFinal,
+            saldo_anterior: saldoAtual,
+            saldo_posterior: novoSaldo,
+            descricao: `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`,
+            processo_id: processo.id,
+          } as any);
+      }
+
+      // Mark boas-vindas as applied
+      if (input.desconto_boas_vindas && input.desconto_boas_vindas > 0) {
+        await supabase
+          .from('clientes')
+          .update({ desconto_boas_vindas_aplicado: true, updated_at: new Date().toISOString() } as any)
+          .eq('id', input.cliente_id);
       }
 
       return processo as ProcessoDB;
