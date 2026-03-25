@@ -24,6 +24,8 @@ import { UFS_BRASIL, UF_NOMES } from '@/constants/estados-brasil';
 
 export default function Clientes() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const estadoFiltro = searchParams.get('estado');
   const [search, setSearch] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
