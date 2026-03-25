@@ -89,7 +89,7 @@ function ProcessCard({
           {...provided.dragHandleProps}
           onDoubleClick={() => onDoubleClick(process)}
           className={cn(
-            'group rounded-lg border border-border bg-zinc-900 p-3 shadow-sm cursor-pointer transition-all hover:border-primary/40 hover:shadow-[0_0_12px_-3px_hsl(var(--primary)/0.25)]',
+            'group rounded-lg border border-border bg-card p-3 shadow-sm cursor-pointer transition-all hover:border-primary/40 hover:shadow-[0_0_12px_-3px_hsl(var(--primary)/0.25)]',
             snapshot.isDragging && 'shadow-lg ring-2 ring-primary/30'
           )}
         >
