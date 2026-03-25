@@ -60,13 +60,55 @@ export default function Configuracoes() {
         <p className="text-sm text-muted-foreground">Gerenciamento do sistema</p>
       </div>
 
-      <Tabs defaultValue="pricing">
+      <Tabs defaultValue="aparencia">
         <TabsList>
+          <TabsTrigger value="aparencia" className="gap-1.5"><Palette className="h-3.5 w-3.5" />Aparência</TabsTrigger>
           <TabsTrigger value="pricing" className="gap-1.5"><DollarSign className="h-3.5 w-3.5" />Preços</TabsTrigger>
           <TabsTrigger value="rbac" className="gap-1.5"><Shield className="h-3.5 w-3.5" />RBAC</TabsTrigger>
           <TabsTrigger value="colaboradores" className="gap-1.5"><UserCog className="h-3.5 w-3.5" />Colaboradores</TabsTrigger>
           <TabsTrigger value="webhooks" className="gap-1.5"><Webhook className="h-3.5 w-3.5" />Webhooks</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="aparencia">
+          <Card className="border-border/60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base"><Palette className="h-4 w-4 text-primary" />Aparência</CardTitle>
+              <CardDescription>Tema e personalização visual do sistema</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Tema do Sistema</Label>
+                <RadioGroup value={theme} onValueChange={setTheme} className="grid grid-cols-3 gap-3">
+                  <Label
+                    htmlFor="theme-light"
+                    className="flex flex-col items-center gap-2 rounded-lg border-2 border-border/40 p-4 cursor-pointer hover:bg-muted/50 transition-colors [&:has(:checked)]:border-primary [&:has(:checked)]:bg-primary/5"
+                  >
+                    <RadioGroupItem value="light" id="theme-light" className="sr-only" />
+                    <Sun className="h-6 w-6 text-warning" />
+                    <span className="text-sm font-medium">Claro</span>
+                  </Label>
+                  <Label
+                    htmlFor="theme-dark"
+                    className="flex flex-col items-center gap-2 rounded-lg border-2 border-border/40 p-4 cursor-pointer hover:bg-muted/50 transition-colors [&:has(:checked)]:border-primary [&:has(:checked)]:bg-primary/5"
+                  >
+                    <RadioGroupItem value="dark" id="theme-dark" className="sr-only" />
+                    <Moon className="h-6 w-6 text-info" />
+                    <span className="text-sm font-medium">Escuro</span>
+                  </Label>
+                  <Label
+                    htmlFor="theme-system"
+                    className="flex flex-col items-center gap-2 rounded-lg border-2 border-border/40 p-4 cursor-pointer hover:bg-muted/50 transition-colors [&:has(:checked)]:border-primary [&:has(:checked)]:bg-primary/5"
+                  >
+                    <RadioGroupItem value="system" id="theme-system" className="sr-only" />
+                    <Monitor className="h-6 w-6 text-muted-foreground" />
+                    <span className="text-sm font-medium">Automático</span>
+                  </Label>
+                </RadioGroup>
+                <p className="text-xs text-muted-foreground">O tema automático segue a preferência do seu sistema operacional.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="pricing">
           <Card className="border-border/60">
