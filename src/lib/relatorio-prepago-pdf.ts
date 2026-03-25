@@ -7,8 +7,8 @@ import html2canvas from 'html2canvas';
 import type { PrepagoMovimentacao } from '@/types/supabase';
 
 const BRAND = {
-  nome: 'TESTE AZUL LTDA',
-  fantasia: 'TESTE AZUL',
+  nome: 'TREVO LEGALIZA LTDA',
+  fantasia: 'TREVO LEGALIZA',
   cnpj: '39.969.412/0001-70',
   endereco: 'Rua Brasil, nº 1170, Rudge Ramos, SBC/SP',
   email: 'administrativo@trevolegaliza.com.br',
