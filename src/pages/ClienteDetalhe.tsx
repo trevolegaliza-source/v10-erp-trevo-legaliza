@@ -217,6 +217,8 @@ export default function ClienteDetalhe() {
         email: editCadastroForm.email || null,
         telefone: editCadastroForm.telefone || null,
         tipo: editCadastroForm.tipo,
+        estado: editCadastroForm.estado || null,
+        cidade: editCadastroForm.cidade || null,
       };
       await new Promise<void>((resolve, reject) => {
         updateCliente.mutate(payload as any, {
