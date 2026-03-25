@@ -298,7 +298,7 @@ export default function Processos() {
                         >
                           <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/30">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-white uppercase tracking-wide">{stage.label}</span>
+                              <span className="text-xs font-semibold text-foreground uppercase tracking-wide">{stage.label}</span>
                               <span className={cn(
                                 'flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold',
                                 stageProcesses.length > 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
