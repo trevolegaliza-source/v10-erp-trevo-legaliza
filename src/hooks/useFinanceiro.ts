@@ -68,6 +68,7 @@ export function useCreateCliente() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clientes'] });
+      qc.invalidateQueries({ queryKey: ['mapa_clientes_estado'] });
       toast.success('Cliente criado com sucesso!');
     },
     onError: (e: Error) => toast.error(e.message),
