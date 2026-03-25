@@ -103,6 +103,8 @@ export function useUpdateCliente() {
       if ((updates as any).observacoes !== undefined) payload.observacoes = (updates as any).observacoes;
       if ((updates as any).cnpj !== undefined) payload.cnpj = (updates as any).cnpj;
       if ((updates as any).tipo !== undefined) payload.tipo = (updates as any).tipo;
+      if ((updates as any).desconto_boas_vindas_aplicado !== undefined) payload.desconto_boas_vindas_aplicado = (updates as any).desconto_boas_vindas_aplicado;
+      if ((updates as any).data_ultima_recarga !== undefined) payload.data_ultima_recarga = (updates as any).data_ultima_recarga;
 
       const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
       if (error) throw error;
