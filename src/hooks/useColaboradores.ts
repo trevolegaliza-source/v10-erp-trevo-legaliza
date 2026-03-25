@@ -22,6 +22,16 @@ export interface Colaborador {
   aumento_previsto_data: string | null;
   data_inicio: string | null;
   aniversario: string | null;
+  // Payment rule fields
+  dia_adiantamento: number;
+  dia_salario: number;
+  dia_vt_vr: number;
+  dia_das: number;
+  fgts_percentual: number;
+  inss_patronal_percentual: number;
+  provisionar_13: boolean;
+  provisionar_ferias: boolean;
+  observacoes_pagamento: string | null;
   created_at: string;
   updated_at: string;
 }
