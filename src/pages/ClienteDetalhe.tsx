@@ -307,6 +307,7 @@ export default function ClienteDetalhe() {
   }
 
   const isMensalista = cliente.tipo === 'MENSALISTA';
+  const isPrePago = cliente.tipo === 'PRE_PAGO';
   const momentoFat = (cliente as any).momento_faturamento || 'na_solicitacao';
   const isDeferimento = momentoFat === 'no_deferimento';
   const totalProcessos = processos.length;
