@@ -220,8 +220,8 @@ const GLOBAL_STYLES = `
 
 function buildHeaderHTML(logoDataUrl: string | null): string {
   const logoHtml = logoDataUrl
-    ? `<div class="header-logo"><img src="${logoDataUrl}" alt="Trevo Legaliza" /></div>`
-    : `<div class="header-logo" style="font-size:12px;font-weight:800;color:#4C9F38;">TREVO LEGALIZA</div>`;
+    ? `<div class="header-logo"><img src="${logoDataUrl}" alt="Teste Azul" /></div>`
+    : `<div class="header-logo" style="font-size:12px;font-weight:800;color:#4C9F38;">TESTE AZUL</div>`;
   return `
     <div class="stripe-top"></div>
     <div class="header">
