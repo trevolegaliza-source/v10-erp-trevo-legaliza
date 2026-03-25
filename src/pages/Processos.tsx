@@ -365,7 +365,7 @@ export default function Processos() {
                         })()}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-zinc-100">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
+                    <TableCell className="text-sm text-foreground">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
                     <TableCell>
                       {proc.prioridade === 'urgente' ? (
                         <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
