@@ -10,8 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 // ═══ BRAND ═══
 const BRAND = {
-  nome: 'TESTE AZUL LTDA',
-  fantasia: 'TESTE AZUL',
+  nome: 'TREVO LEGALIZA LTDA',
+  fantasia: 'TREVO LEGALIZA',
   cnpj: '39.969.412/0001-70',
   endereco: 'Rua Brasil, nº 1170, Rudge Ramos, SBC/SP',
   email: 'administrativo@trevolegaliza.com.br',
@@ -94,7 +94,7 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
       } else if (isUrgencia && !hasManualFlag && s === 0) {
         valorFinal = base * 1.5;
         isManual = true;
-        label = 'MÉTODO TESTE AZUL / URGÊNCIA';
+        label = 'MÉTODO TREVO / URGÊNCIA';
       } else {
         valorFinal = base;
         if (descPct > 0 && slot > 1) {
@@ -220,8 +220,8 @@ const GLOBAL_STYLES = `
 
 function buildHeaderHTML(logoDataUrl: string | null): string {
   const logoHtml = logoDataUrl
-    ? `<div class="header-logo"><img src="${logoDataUrl}" alt="Teste Azul" /></div>`
-    : `<div class="header-logo" style="font-size:12px;font-weight:800;color:#4C9F38;">TESTE AZUL</div>`;
+    ? `<div class="header-logo"><img src="${logoDataUrl}" alt="Trevo Legaliza" /></div>`
+    : `<div class="header-logo" style="font-size:12px;font-weight:800;color:#4C9F38;">TREVO LEGALIZA</div>`;
   return `
     <div class="stripe-top"></div>
     <div class="header">

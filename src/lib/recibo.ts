@@ -38,11 +38,11 @@ export function abrirRecibo(data: ReciboData) {
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo">TESTE <span>AZUL</span></div>
+      <div class="logo">TREVO <span>LEGALIZA</span></div>
       <div class="titulo">Recibo de Pagamento</div>
     </div>
     <div class="corpo">
-      <p>Recebi de <strong>TESTE AZUL</strong> a importância de
+      <p>Recebi de <strong>TREVO LEGALIZA</strong> a importância de
         <span class="valor">${valorFormatado}</span>
         (<span class="extenso">${extenso}</span>)
         referente a <strong>${data.descricao}</strong> do mês de <strong>${data.mesAno}</strong>.
@@ -60,7 +60,7 @@ export function abrirRecibo(data: ReciboData) {
       </div>
       <div class="campo-assinatura">
         <div class="linha"></div>
-        <div class="campo-label">TESTE AZUL</div>
+        <div class="campo-label">TREVO LEGALIZA</div>
         <div class="campo-label">Pagador</div>
       </div>
     </div>

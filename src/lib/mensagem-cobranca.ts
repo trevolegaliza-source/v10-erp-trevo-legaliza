@@ -8,7 +8,7 @@ export function gerarMensagemCobranca(params: {
   const valorFmt = params.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const dataFmt = new Date(params.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
 
-  return `Olá! Aqui é da Teste Azul.
+  return `Olá! Aqui é da Trevo Legaliza.
 
 Identificamos que o pagamento referente ao processo de ${params.tipo} - ${params.razao_social} no valor de ${valorFmt} com vencimento em ${dataFmt} encontra-se em aberto há ${params.diasAtraso} dias.
 
@@ -18,6 +18,6 @@ Banco: C6 Bank
 Caso já tenha realizado o pagamento, por favor desconsidere esta mensagem e nos envie o comprovante.
 
 Atenciosamente,
-Teste Azul
+Trevo Legaliza
 (11) 93492-7001`;
 }

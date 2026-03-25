@@ -1,4 +1,4 @@
-Design system and architecture notes for ERP Teste Azul
+Design system and architecture notes for ERP Trevo Legaliza
 
 ## Brand Colors (HSL)
 - Primary: 142 71% 45% (green neon #22c55e)
