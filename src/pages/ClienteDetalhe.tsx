@@ -340,8 +340,8 @@ export default function ClienteDetalhe() {
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight">{cliente.apelido || cliente.nome}</h1>
-            <Badge className={cn('text-xs', isMensalista ? 'bg-primary/10 text-primary border-primary/30' : 'bg-warning/10 text-warning border-warning/30')} variant="outline">
-              {isMensalista ? 'Mensalista' : 'Avulso'}
+            <Badge className={cn('text-xs', isMensalista ? 'bg-primary/10 text-primary border-primary/30' : isPrePago ? 'bg-info/10 text-info border-info/30' : 'bg-warning/10 text-warning border-warning/30')} variant="outline">
+              {isMensalista ? 'Mensalista' : isPrePago ? 'Pré-Pago' : 'Avulso'}
             </Badge>
             {isDeferimento && (
               <Badge variant="outline" className="text-xs border-warning/30 text-warning">
