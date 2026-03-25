@@ -5,9 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Users, Webhook, DollarSign, UserCog, Loader2, CheckCircle2 } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Shield, Users, Webhook, DollarSign, UserCog, Loader2, CheckCircle2, Palette, Sun, Moon, Monitor } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTheme } from 'next-themes';
 
 export default function Configuracoes() {
   const [webhookNovo, setWebhookNovo] = useState('');
