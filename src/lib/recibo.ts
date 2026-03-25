@@ -60,7 +60,7 @@ export function abrirRecibo(data: ReciboData) {
       </div>
       <div class="campo-assinatura">
         <div class="linha"></div>
-        <div class="campo-label">TREVO LEGALIZA</div>
+        <div class="campo-label">TESTE AZUL</div>
         <div class="campo-label">Pagador</div>
       </div>
     </div>

@@ -18,6 +18,6 @@ Banco: C6 Bank
 Caso já tenha realizado o pagamento, por favor desconsidere esta mensagem e nos envie o comprovante.
 
 Atenciosamente,
-Trevo Assessoria Societária
+Teste Azul
 (11) 93492-7001`;
 }
