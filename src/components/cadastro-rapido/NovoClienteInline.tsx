@@ -17,6 +17,7 @@ interface Props {
 
 export default function NovoClienteInline({ onClose, onCreated }: Props) {
   const [form, setForm] = useState({
+    codigo_identificador: `CLI-${Date.now()}`,
     nome: '',
     cnpj: '',
     email: '',
