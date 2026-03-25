@@ -59,6 +59,7 @@ export default function Clientes() {
     const archived = !!(c as any).is_archived;
     if (showArchived) return archived;
     if (archived) return false;
+    if (estadoFiltro && (c as any).estado !== estadoFiltro) return false;
     if (showInactive) return isInactive(c.id);
     return true;
   });
