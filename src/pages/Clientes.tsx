@@ -327,12 +327,12 @@ export default function Clientes() {
                       <TableCell>
                         <div>
                           <p className="font-medium text-foreground">{client.nome}</p>
-                          {client.apelido && <p className="text-xs text-slate-400">{client.apelido}</p>}
-                          {client.nome_contador && <p className="text-[10px] text-slate-400">Contador: {client.nome_contador}</p>}
+                          {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
+                          {client.nome_contador && <p className="text-[10px] text-muted-foreground">Contador: {client.nome_contador}</p>}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className={`text-xs font-mono ${!cnpjInfo.valid ? 'text-destructive font-semibold' : 'text-slate-300'}`}>
+                        <span className={`text-xs font-mono ${!cnpjInfo.valid ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
                           {cnpjInfo.formatted}
                         </span>
                       </TableCell>
@@ -348,7 +348,7 @@ export default function Clientes() {
                             : '—'}
                         </span>
                         {isMens && (client as any).qtd_processos != null && (
-                          <p className="text-[10px] text-slate-400">{(client as any).qtd_processos} proc. inclusos</p>
+                          <p className="text-[10px] text-muted-foreground">{(client as any).qtd_processos} proc. inclusos</p>
                         )}
                       </TableCell>
                       <TableCell>
@@ -356,13 +356,13 @@ export default function Clientes() {
                           <div>
                             <span className="text-sm font-medium">{descontoExibir}%</span>
                             {limiteExibir != null && (
-                              <p className="text-[10px] text-slate-400">
+                              <p className="text-[10px] text-muted-foreground">
                                 Mín. {Number(limiteExibir).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                               </p>
                             )}
                           </div>
                         ) : (
-                          <span className="text-slate-500">—</span>
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell className="text-center">
@@ -396,7 +396,7 @@ export default function Clientes() {
               </TableBody>
             </Table>
           )}
-          <p className="text-[11px] text-slate-400 mt-3">💡 Dê um duplo-clique para editar um cliente</p>
+          <p className="text-[11px] text-muted-foreground mt-3">💡 Dê um duplo-clique para editar um cliente</p>
         </CardContent>
       </Card>
 
@@ -408,22 +408,22 @@ export default function Clientes() {
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label className="text-slate-300">Nome da Contabilidade *</Label>
+              <Label className="text-muted-foreground">Nome da Contabilidade *</Label>
               <Input value={editForm.nome || ''} onChange={e => setEditForm(f => ({ ...f, nome: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label className="text-slate-300">Nome do Contador</Label>
+                <Label className="text-muted-foreground">Nome do Contador</Label>
                 <Input value={editForm.nome_contador || ''} onChange={e => setEditForm(f => ({ ...f, nome_contador: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label className="text-slate-300">Apelido</Label>
+                <Label className="text-muted-foreground">Apelido</Label>
                 <Input value={editForm.apelido || ''} onChange={e => setEditForm(f => ({ ...f, apelido: e.target.value }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label className="text-slate-300">CNPJ</Label>
+                <Label className="text-muted-foreground">CNPJ</Label>
                 <Input
                   value={maskCNPJ((editForm as any).cnpj || '')}
                   onChange={e => {
@@ -444,7 +444,7 @@ export default function Clientes() {
                 )}
               </div>
               <div className="grid gap-2">
-                <Label className="text-slate-300">Código do Cliente</Label>
+                <Label className="text-muted-foreground">Código do Cliente</Label>
                 <Input
                   value={maskCodigo(editForm.codigo_identificador || '')}
                   onChange={e => setEditForm(f => ({ ...f, codigo_identificador: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
@@ -456,7 +456,7 @@ export default function Clientes() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label className="text-slate-300">Tipo</Label>
+                <Label className="text-muted-foreground">Tipo</Label>
                 <Select value={editForm.tipo} onValueChange={(v) => setEditForm(f => ({ ...f, tipo: v as TipoCliente }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -466,7 +466,7 @@ export default function Clientes() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label className="text-slate-300">Momento do Faturamento</Label>
+                <Label className="text-muted-foreground">Momento do Faturamento</Label>
                 <Select value={(editForm as any).momento_faturamento || 'na_solicitacao'} onValueChange={(v) => setEditForm(f => ({ ...f, momento_faturamento: v as any }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -478,11 +478,11 @@ export default function Clientes() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label className="text-slate-300">Email</Label>
+                <Label className="text-muted-foreground">Email</Label>
                 <Input value={editForm.email || ''} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label className="text-slate-300">Telefone</Label>
+                <Label className="text-muted-foreground">Telefone</Label>
                 <Input value={editForm.telefone || ''} onChange={e => setEditForm(f => ({ ...f, telefone: e.target.value }))} />
               </div>
             </div>
@@ -492,15 +492,15 @@ export default function Clientes() {
                 <p className="text-xs font-medium text-primary">Configuração Mensalista</p>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="grid gap-1">
-                    <Label className="text-xs text-slate-400">Mensalidade (R$)</Label>
+                    <Label className="text-xs text-muted-foreground">Mensalidade (R$)</Label>
                     <Input type="number" step="0.01" value={(editForm as any).mensalidade ?? ''} onChange={e => setEditForm(f => ({ ...f, mensalidade: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                   <div className="grid gap-1">
-                    <Label className="text-xs text-slate-400">Dia Vencimento</Label>
+                    <Label className="text-xs text-muted-foreground">Dia Vencimento</Label>
                     <Input type="number" min={1} max={31} value={(editForm as any).vencimento ?? editForm.dia_vencimento_mensal ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : null; setEditForm(f => ({ ...f, vencimento: v, dia_vencimento_mensal: v ?? undefined })); }} />
                   </div>
                   <div className="grid gap-1">
-                    <Label className="text-xs text-slate-400">Processos Inclusos</Label>
+                    <Label className="text-xs text-muted-foreground">Processos Inclusos</Label>
                     <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                 </div>
@@ -510,20 +510,20 @@ export default function Clientes() {
                 <p className="text-xs font-medium text-warning">Configuração Avulso</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-1">
-                    <Label className="text-xs text-slate-400">Valor Base (R$)</Label>
+                    <Label className="text-xs text-muted-foreground">Valor Base (R$)</Label>
                     <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                   <div className="grid gap-1">
-                    <Label className="text-xs text-slate-400">Desconto (%)</Label>
+                    <Label className="text-xs text-muted-foreground">Desconto (%)</Label>
                     <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                   <div className="grid gap-1">
-                    <Label className="text-xs text-slate-400">Limite Desconto (R$)</Label>
+                    <Label className="text-xs text-muted-foreground">Limite Desconto (R$)</Label>
                     <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} />
                   </div>
                   {(editForm as any).momento_faturamento !== 'no_deferimento' && (
                     <div className="grid gap-1">
-                      <Label className="text-xs text-slate-400">Dia Cobrança (D+X)</Label>
+                      <Label className="text-xs text-muted-foreground">Dia Cobrança (D+X)</Label>
                       <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} />
                     </div>
                   )}
@@ -532,13 +532,13 @@ export default function Clientes() {
             )}
             {/* Contratos */}
             <div className="grid gap-2 border-t border-border/40 pt-3">
-              <Label className="flex items-center gap-1.5 text-slate-300"><FileText className="h-3.5 w-3.5" /> Contratos Anexados</Label>
+              <Label className="flex items-center gap-1.5 text-muted-foreground"><FileText className="h-3.5 w-3.5" /> Contratos Anexados</Label>
               {contracts.length > 0 ? (
                 <div className="space-y-1.5 max-h-32 overflow-y-auto">
                   {contracts.map((c) => (
                     <div key={c.name} className="flex items-center gap-2 text-sm bg-muted/30 rounded-md px-3 py-1.5">
-                      <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      <span className="flex-1 truncate text-slate-300">{c.name}</span>
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate text-muted-foreground">{c.name}</span>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePreviewContract(c.name)} title="Preview">
                         <Eye className="h-3 w-3" />
                       </Button>
@@ -552,7 +552,7 @@ export default function Clientes() {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-slate-500">Nenhum contrato anexado</p>
+                <p className="text-xs text-muted-foreground">Nenhum contrato anexado</p>
               )}
               <ContractDropzone uploading={uploadingContract} onUpload={handleUploadContract} />
             </div>
