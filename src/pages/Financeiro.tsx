@@ -87,14 +87,14 @@ export default function Financeiro() {
               <span className="text-xs">Lista</span>
             </Toggle>
           </div>
-          <Button variant="outline" size="sm" className="text-zinc-400 hover:text-white hover:bg-muted/50 transition-colors" onClick={handleExportCSV}>
+          <Button variant="outline" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors" onClick={handleExportCSV}>
             <Download className="h-3.5 w-3.5 mr-1" />
             Exportar CSV
           </Button>
-          <Button variant="outline" size="sm" className="text-zinc-400 hover:text-white hover:bg-muted/50 transition-colors" asChild>
+          <Button variant="outline" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors" asChild>
             <Link to="/contas-receber">Contas a Receber</Link>
           </Button>
-          <Button variant="outline" size="sm" className="text-zinc-400 hover:text-white hover:bg-muted/50 transition-colors" asChild>
+          <Button variant="outline" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors" asChild>
             <Link to="/contas-pagar">Contas a Pagar</Link>
           </Button>
         </div>

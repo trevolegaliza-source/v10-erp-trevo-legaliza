@@ -166,12 +166,12 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
               <th className="px-3 py-2.5 w-10">
                 <Checkbox checked={allChecked} onCheckedChange={toggleAll} />
               </th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Cliente</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Razão Social</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Valor</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Vencimento</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Etapa</th>
-              <th className="px-4 py-2.5 text-xs font-semibold text-zinc-300">Status</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Cliente</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Razão Social</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Valor</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Vencimento</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Etapa</th>
+              <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -188,15 +188,15 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
                       onCheckedChange={() => toggle(p.id)}
                     />
                   </td>
-                  <td className="px-4 py-2.5 font-medium text-zinc-100 flex items-center gap-1.5">
+                  <td className="px-4 py-2.5 font-medium text-foreground flex items-center gap-1.5">
                     {isOverdue && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
                     {(p.cliente as any)?.apelido || (p.cliente as any)?.nome || '-'}
                   </td>
-                  <td className="px-4 py-2.5 text-zinc-300 truncate max-w-[200px]">{p.razao_social}</td>
-                  <td className="px-4 py-2.5 font-semibold text-zinc-100">
+                  <td className="px-4 py-2.5 text-muted-foreground truncate max-w-[200px]">{p.razao_social}</td>
+                  <td className="px-4 py-2.5 font-semibold text-foreground">
                     {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </td>
-                  <td className="px-4 py-2.5 text-zinc-300">
+                  <td className="px-4 py-2.5 text-muted-foreground">
                     {lanc?.data_vencimento ? new Date(lanc.data_vencimento).toLocaleDateString('pt-BR') : '-'}
                   </td>
                   <td className="px-4 py-2.5">
