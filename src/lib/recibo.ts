@@ -38,7 +38,7 @@ export function abrirRecibo(data: ReciboData) {
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo">TESTE <span>AZUL</span></div>
+      <div class="logo">TREVO <span>LEGALIZA</span></div>
       <div class="titulo">Recibo de Pagamento</div>
     </div>
     <div class="corpo">
