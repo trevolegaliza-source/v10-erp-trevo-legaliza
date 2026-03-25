@@ -98,6 +98,7 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
                 <SelectContent>
                   <SelectItem value="AVULSO_4D">Avulso</SelectItem>
                   <SelectItem value="MENSALISTA">Mensalista</SelectItem>
+                  <SelectItem value="PRE_PAGO">Pré-Pago</SelectItem>
                 </SelectContent>
               </Select>
             </div>
