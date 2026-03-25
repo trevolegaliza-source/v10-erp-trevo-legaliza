@@ -837,6 +837,13 @@ export default function ClienteDetalhe() {
           </Card>
         </TabsContent>
 
+        {/* ── Pré-Pago ── */}
+        {isPrePago && (
+          <TabsContent value="prepago">
+            <PrepagoTab cliente={cliente} onReload={() => loadAll(cliente.id)} />
+          </TabsContent>
+        )}
+
         {/* ── Observações ── */}
         <TabsContent value="observacoes">
           <Card className="border-border/60">
