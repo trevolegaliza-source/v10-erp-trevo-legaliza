@@ -97,7 +97,7 @@ export default function StepProcesso({ form, onChange, negotiations, colaborador
         <Select value={form.responsavel} onValueChange={v => update('responsavel', v)}>
           <SelectTrigger><SelectValue placeholder="Selecionar (opcional)" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Nenhum</SelectItem>
+            <SelectItem value="__none__">Nenhum</SelectItem>
             {colaboradores.map(c => (
               <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
             ))}
