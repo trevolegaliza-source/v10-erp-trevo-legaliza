@@ -31,6 +31,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     desconto_progressivo: '',
     valor_limite_desconto: '',
     observacoes: '',
+    estado: '',
+    cidade: '',
   });
   const [codigoManual, setCodigoManual] = useState(false);
   const createCliente = useCreateCliente();
