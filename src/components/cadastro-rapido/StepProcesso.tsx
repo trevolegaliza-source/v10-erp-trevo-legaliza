@@ -94,10 +94,10 @@ export default function StepProcesso({ form, onChange, negotiations, colaborador
 
       <div className="space-y-2">
         <Label>Responsável</Label>
-        <Select value={form.responsavel} onValueChange={v => update('responsavel', v)}>
+        <Select value={form.responsavel || '__none__'} onValueChange={v => update('responsavel', v === '__none__' ? '' : v)}>
           <SelectTrigger><SelectValue placeholder="Selecionar (opcional)" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Nenhum</SelectItem>
+            <SelectItem value="__none__">Nenhum</SelectItem>
             {colaboradores.map(c => (
               <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
             ))}
