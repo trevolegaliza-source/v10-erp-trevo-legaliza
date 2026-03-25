@@ -1,761 +1,397 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { UserPlus, FileText, Upload, X, Check, ChevronsUpDown } from 'lucide-react';
-import { useClientes, useCreateCliente, useCreateProcesso, calcularDescontoProgressivo } from '@/hooks/useFinanceiro';
-import type { TipoCliente, TipoProcesso } from '@/types/financial';
+import { useClientes, useCreateProcesso, calcularDescontoProgressivo } from '@/hooks/useFinanceiro';
+import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import { STORAGE_BUCKETS } from '@/constants/storage';
-import { maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
-import { TIPO_PROCESSO_LABELS } from '@/types/financial';
-import { useServiceNegotiations, useUpsertServiceNegotiations } from '@/hooks/useServiceNegotiations';
-import HonorariosInlineRepeater, { type InlineNegotiationRow } from '@/components/clientes/HonorariosInlineRepeater';
+import type { ClienteDB, TipoProcesso } from '@/types/financial';
 
-const INITIAL_CLIENTE = {
-  codigo_identificador: '',
-  nome: '',
-  cnpj: '',
-  tipo: 'AVULSO_4D' as TipoCliente,
-  email: '',
-  telefone: '',
-  nome_contador: '',
-  apelido: '',
-  dia_vencimento_mensal: 15,
-  momento_faturamento: 'na_solicitacao' as 'na_solicitacao' | 'no_deferimento',
-  observacoes: '',
-  valor_base: '',
-  desconto_tier2: '',
-  dia_cobranca: '4',
-  valor_limite_desconto: '',
-  valor_mensalidade: '',
-  qtd_processos_inclusos: '',
+import WizardSteps from '@/components/cadastro-rapido/WizardSteps';
+import StepCliente from '@/components/cadastro-rapido/StepCliente';
+import StepProcesso, { type ProcessoFormData } from '@/components/cadastro-rapido/StepProcesso';
+import StepValor, { type ValorFormData } from '@/components/cadastro-rapido/StepValor';
+import StepRevisao from '@/components/cadastro-rapido/StepRevisao';
+import FichaCliente from '@/components/cadastro-rapido/FichaCliente';
+import PreviewFinanceiro, { calcPreview } from '@/components/cadastro-rapido/PreviewFinanceiro';
+import UltimosProcessos from '@/components/cadastro-rapido/UltimosProcessos';
+import FilaBatch, { type ProcessoNaFila } from '@/components/cadastro-rapido/FilaBatch';
+import FeedbackSucesso, { type ProcessoSalvo } from '@/components/cadastro-rapido/FeedbackSucesso';
+
+const INITIAL_PROCESSO: ProcessoFormData = {
+  razaoSocial: '',
+  tipo: 'abertura',
+  responsavel: '',
+  prioridade: 'normal',
+  mudancaUF: false,
+  descricaoAvulso: '',
 };
 
-function CalculatedValuePreview({ cliente, tipo, isManual }: { cliente: any; tipo: string; isManual: boolean }) {
-  const [monthCount, setMonthCount] = useState<number>(0);
-
-  useEffect(() => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    supabase
-      .from('processos')
-      .select('id', { count: 'exact', head: true })
-      .eq('cliente_id', cliente.id)
-      .gte('created_at', startOfMonth)
-      .then(({ count }) => setMonthCount(count ?? 0));
-  }, [cliente.id]);
-
-  if (isManual || cliente.tipo === 'MENSALISTA') {
-    return (
-      <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
-        <p className="text-xs text-muted-foreground">
-          Cliente: <span className="font-medium text-foreground">{cliente.nome}</span> · {cliente.tipo === 'MENSALISTA' ? 'Mensalista' : 'Avulso'}
-          {isManual && <span className="ml-1 text-warning">(Valor manual)</span>}
-        </p>
-      </div>
-    );
-  }
-
-  const valorBase = Number(cliente.valor_base ?? 0);
-  const descontoPercent = Number(cliente.desconto_progressivo ?? 0);
-  const valorLimite = cliente.valor_limite_desconto != null ? Number(cliente.valor_limite_desconto) : null;
-
-  if (descontoPercent > 0) {
-    const calc = calcularDescontoProgressivo(valorBase, descontoPercent, monthCount, valorLimite);
-    return (
-      <div className="rounded-lg border border-info/30 bg-info/5 p-3 space-y-1">
-        <p className="text-xs text-muted-foreground">
-          Cliente: <span className="font-medium text-foreground">{cliente.nome}</span> · Avulso
-        </p>
-        <div className="text-xs space-y-0.5">
-          <p>Valor Base: <span className="font-medium">{valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></p>
-          <p className="text-info">📊 Processo nº {calc.processoNumero} do mês · Desconto: {descontoPercent}%</p>
-          {calc.descontoAcumulado > 0 && (
-            <p className="text-info">Desconto acumulado: -{calc.descontoAcumulado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-          )}
-          <p className="font-semibold text-foreground">
-            Valor calculado: {calc.valorFinal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            {valorLimite && calc.valorFinal === valorLimite && <span className="text-warning ml-1">(piso mínimo atingido)</span>}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
-      <p className="text-xs text-muted-foreground">
-        Cliente: <span className="font-medium text-foreground">{cliente.nome}</span> · Avulso · Base: {valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-      </p>
-    </div>
-  );
-}
+const INITIAL_VALOR: ValorFormData = {
+  metodoPreco: 'automatico',
+  valorManual: '',
+  motivoManual: '',
+  boasVindas: false,
+  boasVindasPct: '10',
+  jaPago: false,
+  observacoes: '',
+};
 
 export default function CadastroRapido() {
-  const [clienteForm, setClienteForm] = useState(INITIAL_CLIENTE);
-  const [contratoFile, setContratoFile] = useState<File | null>(null);
-  const createCliente = useCreateCliente();
-  const upsertNegotiations = useUpsertServiceNegotiations();
-  const [honorariosRows, setHonorariosRows] = useState<InlineNegotiationRow[]>([]);
-
-  const [processoForm, setProcessoForm] = useState({
-    cliente_id: '',
-    razao_social: '',
-    tipo: 'abertura' as string,
-    prioridade: 'normal',
-    responsavel: '',
-    valor_manual: '',
-    definir_manual: false,
-    descricao_avulso: '',
-    ja_pago: false,
-    observacoes: '',
-    desconto_boas_vindas: false,
-    desconto_boas_vindas_percent: '10',
-    mudanca_uf: false,
-  });
-  const createProcesso = useCreateProcesso();
   const { data: clientes } = useClientes();
-  const [clienteComboOpen, setClienteComboOpen] = useState(false);
-  const { data: negotiations } = useServiceNegotiations(processoForm.cliente_id || undefined);
+  const createProcesso = useCreateProcesso();
 
-  const selectedCliente = (clientes || []).find(c => c.id === processoForm.cliente_id);
+  // State
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [clienteId, setClienteId] = useState<string | null>(null);
+  const [processoForm, setProcessoForm] = useState<ProcessoFormData>(INITIAL_PROCESSO);
+  const [valorForm, setValorForm] = useState<ValorFormData>(INITIAL_VALOR);
+  const [fila, setFila] = useState<ProcessoNaFila[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [savedProcessos, setSavedProcessos] = useState<ProcessoSalvo[]>([]);
+  const [totalEconomia, setTotalEconomia] = useState(0);
 
-  // Check if selected client has zero processes (first-time client)
-  const [isFirstProcess, setIsFirstProcess] = useState(false);
-  useEffect(() => {
-    if (!processoForm.cliente_id) { setIsFirstProcess(false); return; }
-    supabase
-      .from('processos')
-      .select('id', { count: 'exact', head: true })
-      .eq('cliente_id', processoForm.cliente_id)
-      .then(({ count }) => {
-        setIsFirstProcess((count ?? 0) === 0);
-        if ((count ?? 0) > 0) {
-          setProcessoForm(f => ({ ...f, desconto_boas_vindas: false }));
-        }
-      });
-  }, [processoForm.cliente_id]);
+  const selectedCliente = (clientes || []).find(c => c.id === clienteId) || null;
+  const { data: negotiations } = useServiceNegotiations(clienteId || undefined);
 
+  // Fetch colaboradores for responsavel select
+  const { data: colaboradores } = useQuery({
+    queryKey: ['colaboradores_ativos_cadastro'],
+    queryFn: async () => {
+      const { data } = await supabase.from('colaboradores').select('id, nome').eq('status', 'ativo');
+      return data || [];
+    },
+  });
 
+  // Count processes this month
+  const { data: processosNoMes = 0 } = useQuery({
+    queryKey: ['processos_mes_count', clienteId],
+    enabled: !!clienteId,
+    queryFn: async () => {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const { count } = await supabase
+        .from('processos')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId!)
+        .gte('created_at', startOfMonth);
+      return count ?? 0;
+    },
+  });
 
+  // First process detection
+  const { data: isFirstProcess = false } = useQuery({
+    queryKey: ['is_first_process', clienteId],
+    enabled: !!clienteId,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('processos')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId!);
+      return (count ?? 0) === 0;
+    },
+  });
 
-  const isAvulso = clienteForm.tipo === 'AVULSO_4D';
-  const isMensalista = clienteForm.tipo === 'MENSALISTA';
+  const isAvulso = processoForm.tipo === 'avulso';
+  const nextSlot = processosNoMes + fila.length + 1;
 
-  // Auto-fill codigo from CNPJ (first 6 digits)
-  const handleCnpjChange = (value: string) => {
-    const masked = maskCNPJ(value);
-    const digits = value.replace(/\D/g, '');
-    const codigo = digits.slice(0, 6);
-    setClienteForm(f => ({
-      ...f,
-      cnpj: masked,
-      codigo_identificador: codigo ? maskCodigo(codigo) : f.codigo_identificador,
-    }));
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('Arquivo muito grande (máx. 10MB)');
-        return;
-      }
-      setContratoFile(file);
-    }
-  };
-
-  const uploadContrato = useCallback(async (clienteId: string) => {
-    if (!contratoFile) return;
-    const ext = contratoFile.name.split('.').pop();
-    const path = `${clienteId}/contrato_${Date.now()}.${ext}`;
-    const { error } = await supabase.storage
-      .from(STORAGE_BUCKETS.CONTRACTS)
-      .upload(path, contratoFile, { upsert: true });
-
-    if (error) {
-      toast.error('Erro ao enviar contrato: ' + error.message);
-      return;
-    }
-
-    const { error: updateError } = await supabase
-      .from('clientes')
-      .update({ contrato_url: path, updated_at: new Date().toISOString() } as any)
-      .eq('id', clienteId);
-
-    if (updateError) {
-      toast.error('Contrato enviado, mas não foi possível salvar o vínculo: ' + updateError.message);
-      return;
-    }
-
-    toast.success('Contrato anexado com sucesso!');
-  }, [contratoFile]);
-
-  const handleCreateCliente = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Validate CNPJ if provided
-    const cnpjDigits = clienteForm.cnpj.replace(/\D/g, '');
-    if (cnpjDigits.length > 0 && !isValidCNPJ(clienteForm.cnpj)) {
-      toast.error('Erro ao validar CNPJ: deve conter 14 dígitos.');
-      return;
-    }
-
-    const payload: Record<string, any> = {
-      codigo_identificador: clienteForm.codigo_identificador.replace(/\D/g, ''),
-      nome: clienteForm.nome,
-      cnpj: cnpjDigits || null,
-      tipo: clienteForm.tipo,
-      email: clienteForm.email || null,
-      telefone: clienteForm.telefone || null,
-      nome_contador: clienteForm.nome_contador || '',
-      apelido: clienteForm.apelido || '',
-      momento_faturamento: clienteForm.momento_faturamento,
-      observacoes: clienteForm.observacoes || null,
-    };
-
-    if (isAvulso) {
-      payload.valor_base = clienteForm.valor_base ? Number(clienteForm.valor_base) : null;
-      payload.desconto_progressivo = clienteForm.desconto_tier2 ? Number(clienteForm.desconto_tier2) : null;
-      payload.dia_cobranca = clienteForm.dia_cobranca ? Number(clienteForm.dia_cobranca) : null;
-      payload.valor_limite_desconto = clienteForm.valor_limite_desconto ? Number(clienteForm.valor_limite_desconto) : null;
-      payload.dia_vencimento_mensal = 0;
-    } else {
-      payload.mensalidade = clienteForm.valor_mensalidade ? Number(clienteForm.valor_mensalidade) : null;
-      payload.vencimento = clienteForm.dia_vencimento_mensal;
-      payload.dia_vencimento_mensal = clienteForm.dia_vencimento_mensal;
-      payload.qtd_processos = clienteForm.qtd_processos_inclusos ? Number(clienteForm.qtd_processos_inclusos) : null;
-    }
-
-    createCliente.mutate(
-      payload as any,
-      {
-        onSuccess: async (data: any) => {
-          const clienteId = data?.id || data?.[0]?.id;
-          if (contratoFile && clienteId) {
-            uploadContrato(clienteId);
-          }
-          // Save honorários if any
-          if (clienteId && honorariosRows.length > 0) {
-            const validRows = honorariosRows.filter(r => r.service_name.trim() && r.fixed_price);
-            if (validRows.length > 0) {
-              await upsertNegotiations.mutateAsync({
-                clienteId,
-                negotiations: validRows.map(r => ({
-                  service_name: r.service_name.trim(),
-                  fixed_price: Number(r.fixed_price),
-                  billing_trigger: r.billing_trigger,
-                  trigger_days: Number(r.trigger_days) || 0,
-                  is_custom: true as const,
-                })),
-              });
-            }
-          }
-          setClienteForm(INITIAL_CLIENTE);
-          setContratoFile(null);
-          setHonorariosRows([]);
-        },
-      },
-    );
-  };
-
-  const isProcessoAvulso = processoForm.tipo === 'avulso';
-
-  const handleCreateProcesso = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isProcessoAvulso && !processoForm.descricao_avulso.trim()) {
-      toast.error('Preencha a Descrição do Serviço Avulso.');
-      return;
-    }
-    // Check if negotiated service selected
-    const neg = negotiations?.find(n => n.id === processoForm.tipo);
-    const tipoFinal = neg ? 'avulso' : processoForm.tipo;
-    const valorFinal = neg
-      ? neg.fixed_price
-      : isProcessoAvulso
-        ? (processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined)
-        : (processoForm.definir_manual && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined);
-
-    // Build notas: for avulso, prefix with description marker
-    let notas = processoForm.observacoes || null;
-    if (isProcessoAvulso && processoForm.descricao_avulso.trim()) {
-      notas = `[AVULSO:${processoForm.descricao_avulso.trim()}]${notas ? '\n' + notas : ''}`;
-    }
-    if (neg) {
-      notas = `Valor fixo conforme negociação contratual para o serviço: ${neg.service_name}. Gatilho: ${neg.billing_trigger}.${notas ? '\n' + notas : ''}`;
-    }
-
-    createProcesso.mutate(
-      {
-        cliente_id: processoForm.cliente_id,
-        razao_social: processoForm.razao_social,
-        tipo: tipoFinal as TipoProcesso,
+  // Preview calculation
+  const preview = selectedCliente
+    ? calcPreview({
+        cliente: selectedCliente,
+        processosNoMes,
+        filaLength: fila.length,
         prioridade: processoForm.prioridade,
-        responsavel: processoForm.responsavel,
-        valor_manual: valorFinal,
-        notas,
-        ja_pago: processoForm.ja_pago,
-        descricao_avulso: isProcessoAvulso ? processoForm.descricao_avulso.trim() : undefined,
-        desconto_boas_vindas: processoForm.desconto_boas_vindas ? Number(processoForm.desconto_boas_vindas_percent) : undefined,
-        mudanca_uf: processoForm.mudanca_uf,
-      },
-      {
-        onSuccess: () =>
-          setProcessoForm({ cliente_id: '', razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, descricao_avulso: '', ja_pago: false, observacoes: '', desconto_boas_vindas: false, desconto_boas_vindas_percent: '10', mudanca_uf: false }),
-      },
-    );
+        metodoPreco: valorForm.metodoPreco,
+        valorManual: valorForm.valorManual,
+        boasVindas: valorForm.boasVindas,
+        boasVindasPct: valorForm.boasVindasPct,
+        mudancaUF: processoForm.mudancaUF,
+        isAvulso,
+      })
+    : { valorFinal: 0, slotNumero: 1, descontoAplicado: 0 };
+
+  // Step navigation
+  const goToStep = (s: number) => setStep(s as 1 | 2 | 3 | 4);
+
+  const handleSelectCliente = (id: string) => {
+    setClienteId(id);
   };
 
-  const update = (field: string, value: any) => setClienteForm((f) => ({ ...f, [field]: value }));
+  const handleNextStep1 = () => {
+    setCompletedSteps(prev => prev.includes(1) ? prev : [...prev, 1]);
+    setStep(2);
+  };
+
+  const handleNextStep2 = () => {
+    setCompletedSteps(prev => prev.includes(2) ? prev : [...prev, 2]);
+    setStep(3);
+  };
+
+  const handleNextStep3 = () => {
+    setCompletedSteps(prev => prev.includes(3) ? prev : [...prev, 3]);
+    setStep(4);
+  };
+
+  // Build a queue item from current form state
+  const buildQueueItem = (): ProcessoNaFila => ({
+    id: crypto.randomUUID(),
+    razaoSocial: processoForm.razaoSocial,
+    tipo: processoForm.tipo,
+    responsavel: processoForm.responsavel,
+    prioridade: processoForm.prioridade,
+    mudancaUF: processoForm.mudancaUF,
+    metodoPreco: valorForm.metodoPreco,
+    valorManual: valorForm.valorManual,
+    motivoManual: valorForm.motivoManual,
+    boasVindas: valorForm.boasVindas,
+    boasVindasPct: valorForm.boasVindasPct,
+    jaPago: valorForm.jaPago,
+    observacoes: valorForm.observacoes,
+    descricaoAvulso: processoForm.descricaoAvulso,
+    valorFinal: preview.valorFinal,
+    slotNumero: preview.slotNumero,
+    descontoAplicado: preview.descontoAplicado,
+  });
+
+  const handleAddToQueue = () => {
+    const item = buildQueueItem();
+    const newFila = [...fila, item];
+    // Recalculate all slots
+    setFila(recalcFila(newFila, selectedCliente!, processosNoMes));
+    // Reset form for next process, keep client
+    setProcessoForm(INITIAL_PROCESSO);
+    setValorForm(INITIAL_VALOR);
+    setStep(2);
+    setCompletedSteps([1]);
+    toast.success('Adicionado à fila!');
+  };
+
+  const recalcFila = (items: ProcessoNaFila[], cliente: ClienteDB, mesCount: number): ProcessoNaFila[] => {
+    let slotOffset = mesCount;
+    return items.map(item => {
+      const isItemAvulso = item.tipo === 'avulso';
+      if (isItemAvulso || item.metodoPreco === 'manual') {
+        const slot = slotOffset + 1;
+        slotOffset += item.mudancaUF ? 2 : 1;
+        return { ...item, slotNumero: slot, valorFinal: Number(item.valorManual) || 0, descontoAplicado: 0 };
+      }
+      const p = calcPreview({
+        cliente,
+        processosNoMes: slotOffset,
+        filaLength: 0,
+        prioridade: item.prioridade,
+        metodoPreco: item.metodoPreco,
+        valorManual: item.valorManual,
+        boasVindas: item.boasVindas,
+        boasVindasPct: item.boasVindasPct,
+        mudancaUF: item.mudancaUF,
+        isAvulso: false,
+      });
+      slotOffset += item.mudancaUF ? 2 : 1;
+      return { ...item, valorFinal: p.valorFinal, slotNumero: p.slotNumero, descontoAplicado: p.descontoAplicado };
+    });
+  };
+
+  const handleRemoveFromQueue = (id: string) => {
+    const newFila = fila.filter(p => p.id !== id);
+    setFila(selectedCliente ? recalcFila(newFila, selectedCliente, processosNoMes) : newFila);
+  };
+
+  const handleClearQueue = () => {
+    setFila([]);
+  };
+
+  // Save processes
+  const saveProcessos = async (items: ProcessoNaFila[]) => {
+    setIsSaving(true);
+    const saved: ProcessoSalvo[] = [];
+    let economia = 0;
+
+    try {
+      for (const item of items) {
+        const neg = (negotiations || []).find(n => n.id === item.tipo);
+        const tipoFinal = neg ? 'avulso' : item.tipo;
+        const valorFinal = item.metodoPreco === 'manual' || item.tipo === 'avulso'
+          ? Number(item.valorManual) || 0
+          : undefined;
+
+        let notas = item.observacoes || '';
+        if (item.tipo === 'avulso' && item.descricaoAvulso) {
+          notas = `[AVULSO:${item.descricaoAvulso}]${notas ? '\n' + notas : ''}`;
+        }
+        if (item.motivoManual) {
+          notas = `Motivo valor manual: ${item.motivoManual}${notas ? '\n' + notas : ''}`;
+        }
+        if (neg) {
+          notas = `Valor fixo conforme negociação: ${neg.service_name}.${notas ? '\n' + notas : ''}`;
+        }
+
+        await createProcesso.mutateAsync({
+          cliente_id: clienteId!,
+          razao_social: item.razaoSocial,
+          tipo: tipoFinal as TipoProcesso,
+          prioridade: item.prioridade,
+          responsavel: item.responsavel || undefined,
+          valor_manual: valorFinal,
+          notas: notas || undefined,
+          ja_pago: item.jaPago,
+          descricao_avulso: item.tipo === 'avulso' ? item.descricaoAvulso : undefined,
+          desconto_boas_vindas: item.boasVindas ? Number(item.boasVindasPct) : undefined,
+          mudanca_uf: item.mudancaUF,
+        });
+
+        saved.push({
+          razaoSocial: item.razaoSocial,
+          tipo: tipoFinal,
+          valorFinal: item.valorFinal,
+        });
+        economia += item.descontoAplicado;
+      }
+
+      setSavedProcessos(saved);
+      setTotalEconomia(economia);
+      setFeedbackOpen(true);
+      setFila([]);
+      setProcessoForm(INITIAL_PROCESSO);
+      setValorForm(INITIAL_VALOR);
+      setStep(1);
+      setCompletedSteps([]);
+      setClienteId(null);
+    } catch (err: any) {
+      toast.error('Erro ao salvar: ' + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSave = () => {
+    const allItems = [...fila, buildQueueItem()];
+    saveProcessos(allItems);
+  };
+
+  const handleSaveAll = () => {
+    saveProcessos(fila);
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Cadastro Rápido</h1>
-        <p className="text-sm text-muted-foreground">Registre clientes e processos manualmente</p>
+        <p className="text-sm text-muted-foreground">Cadastre processos com preview financeiro em tempo real</p>
       </div>
 
-      <Tabs defaultValue="cliente" className="w-full">
-        <TabsList>
-          <TabsTrigger value="cliente" className="gap-1.5">
-            <UserPlus className="h-3.5 w-3.5" />
-            Novo Cliente
-          </TabsTrigger>
-          <TabsTrigger value="processo" className="gap-1.5">
-            <FileText className="h-3.5 w-3.5" />
-            Novo Processo
-          </TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Left: Wizard */}
+        <div className="lg:col-span-3">
+          <div className="rounded-lg border border-border bg-card p-6">
+            <WizardSteps
+              currentStep={step}
+              completedSteps={completedSteps}
+              onStepClick={goToStep}
+            />
 
-        {/* ── CLIENTE TAB ── */}
-        <TabsContent value="cliente">
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Cadastro de Contabilidade</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateCliente} className="grid gap-5 max-w-xl">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-1.5">
-                    <Label>CNPJ *</Label>
-                    <Input
-                      required
-                      placeholder="00.000.000/0000-00"
-                      value={clienteForm.cnpj}
-                      onChange={(e) => handleCnpjChange(e.target.value)}
-                      maxLength={18}
-                    />
-                    {clienteForm.cnpj && clienteForm.cnpj.replace(/\D/g, '').length > 0 && !isValidCNPJ(clienteForm.cnpj) && (
-                      <p className="text-[10px] text-destructive">CNPJ deve conter 14 dígitos</p>
-                    )}
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label>Código do Cliente</Label>
-                    <Input
-                      placeholder="000.000 (auto)"
-                      value={clienteForm.codigo_identificador}
-                      onChange={(e) => update('codigo_identificador', maskCodigo(e.target.value))}
-                      maxLength={7}
-                    />
-                    <p className="text-[10px] text-muted-foreground">Preenchido automaticamente a partir do CNPJ</p>
-                  </div>
-                </div>
+            {step === 1 && (
+              <StepCliente
+                clientes={clientes || []}
+                clienteId={clienteId}
+                onSelectCliente={handleSelectCliente}
+                onNext={handleNextStep1}
+                onClienteCreated={(id) => {
+                  setClienteId(id);
+                }}
+              />
+            )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-1.5">
-                    <Label>Nome da Contabilidade *</Label>
-                    <Input required placeholder="Nome da contabilidade" value={clienteForm.nome} onChange={(e) => update('nome', e.target.value)} />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label>Apelido</Label>
-                    <Input placeholder="Apelido da contabilidade" value={clienteForm.apelido} onChange={(e) => update('apelido', e.target.value)} />
-                  </div>
-                </div>
+            {step === 2 && (
+              <StepProcesso
+                form={processoForm}
+                onChange={setProcessoForm}
+                negotiations={negotiations || []}
+                colaboradores={colaboradores || []}
+                onBack={() => goToStep(1)}
+                onNext={handleNextStep2}
+              />
+            )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-1.5">
-                    <Label>Nome do Contador</Label>
-                    <Input placeholder="Contador responsável" value={clienteForm.nome_contador} onChange={(e) => update('nome_contador', e.target.value)} />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label>Telefone</Label>
-                    <Input placeholder="(11) 99999-0000" value={clienteForm.telefone} onChange={(e) => update('telefone', e.target.value)} />
-                  </div>
-                </div>
+            {step === 3 && (
+              <StepValor
+                form={valorForm}
+                onChange={setValorForm}
+                isFirstProcess={isFirstProcess}
+                isAvulso={isAvulso}
+                onBack={() => goToStep(2)}
+                onNext={handleNextStep3}
+              />
+            )}
 
-                <div className="grid gap-1.5">
-                  <Label>Email</Label>
-                  <Input type="email" placeholder="email@contabilidade.com" value={clienteForm.email} onChange={(e) => update('email', e.target.value)} />
-                </div>
+            {step === 4 && selectedCliente && (
+              <StepRevisao
+                cliente={selectedCliente}
+                processo={{
+                  ...processoForm,
+                  ...valorForm,
+                }}
+                valorCalculado={preview.valorFinal}
+                slotNumero={preview.slotNumero}
+                descontoAplicado={preview.descontoAplicado}
+                onBack={() => goToStep(3)}
+                onSave={handleSave}
+                onAddToQueue={handleAddToQueue}
+                isSaving={isSaving}
+                filaLength={fila.length}
+              />
+            )}
+          </div>
+        </div>
 
-                <div className="grid gap-1.5">
-                  <Label>Tipo de Cliente *</Label>
-                  <Select value={clienteForm.tipo} onValueChange={(v) => update('tipo', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AVULSO_4D">Avulso</SelectItem>
-                      <SelectItem value="MENSALISTA">Mensalista</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+        {/* Right: Context Panel */}
+        <div className="lg:col-span-2 space-y-4">
+          {selectedCliente && (
+            <>
+              <FichaCliente
+                cliente={selectedCliente}
+                processosNoMes={processosNoMes}
+                nextSlot={nextSlot}
+              />
 
-                <div className="grid gap-1.5">
-                  <Label>Momento do Faturamento *</Label>
-                  <Select value={clienteForm.momento_faturamento} onValueChange={(v) => update('momento_faturamento', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>
-                      <SelectItem value="no_deferimento">No Deferimento (Sucesso)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-muted-foreground">
-                    {clienteForm.momento_faturamento === 'no_deferimento'
-                      ? 'A cobrança será gerada somente quando o processo for deferido.'
-                      : 'A cobrança será gerada no momento da criação do processo.'}
-                  </p>
-                </div>
+              {step >= 2 && (
+                <PreviewFinanceiro
+                  cliente={selectedCliente}
+                  processosNoMes={processosNoMes}
+                  filaLength={fila.length}
+                  prioridade={processoForm.prioridade}
+                  metodoPreco={valorForm.metodoPreco}
+                  valorManual={valorForm.valorManual}
+                  boasVindas={valorForm.boasVindas}
+                  boasVindasPct={valorForm.boasVindasPct}
+                  mudancaUF={processoForm.mudancaUF}
+                  isAvulso={isAvulso}
+                />
+              )}
 
-                {isAvulso && (
-                  <div className="rounded-lg border border-warning/30 bg-warning/5 p-4 space-y-4">
-                    <p className="text-xs font-medium text-warning">Configuração Avulso</p>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-1.5">
-                        <Label>Valor Base (R$)</Label>
-                        <Input type="number" step="0.01" min="0" placeholder="0,00" value={clienteForm.valor_base} onChange={(e) => update('valor_base', e.target.value)} />
-                      </div>
-                      <div className="grid gap-1.5">
-                        <Label>Desconto Progressivo (%)</Label>
-                        <Input type="number" step="0.1" min="0" max="100" placeholder="0" value={clienteForm.desconto_tier2} onChange={(e) => update('desconto_tier2', e.target.value)} />
-                      </div>
-                    </div>
-                    <div className={cn("grid gap-4", clienteForm.momento_faturamento === 'no_deferimento' ? 'grid-cols-1' : 'grid-cols-2')}>
-                      {clienteForm.momento_faturamento !== 'no_deferimento' && (
-                        <div className="grid gap-1.5">
-                          <Label>Dia de Cobrança (dias após solicitação)</Label>
-                          <Input type="number" min={1} max={30} placeholder="4" value={clienteForm.dia_cobranca} onChange={(e) => update('dia_cobranca', e.target.value)} />
-                        </div>
-                      )}
-                      <div className="grid gap-1.5">
-                        <Label>Valor Limite de Desconto (R$) *</Label>
-                        <Input type="number" step="0.01" min="0" placeholder="Piso mínimo do valor" value={clienteForm.valor_limite_desconto} onChange={(e) => update('valor_limite_desconto', e.target.value)} />
-                        <p className="text-[10px] text-muted-foreground">O valor final nunca será inferior a este limite, mesmo com desconto progressivo.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <UltimosProcessos clienteId={selectedCliente.id} />
+            </>
+          )}
 
-                {isMensalista && (
-                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
-                    <p className="text-xs font-medium text-primary">Configuração Mensalista</p>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="grid gap-1.5">
-                        <Label>Valor Mensalidade (R$)</Label>
-                        <Input type="number" step="0.01" min="0" placeholder="0,00" value={clienteForm.valor_mensalidade} onChange={(e) => update('valor_mensalidade', e.target.value)} />
-                      </div>
-                      <div className="grid gap-1.5">
-                        <Label>Dia de Vencimento</Label>
-                        <Input type="number" min={1} max={28} value={clienteForm.dia_vencimento_mensal} onChange={(e) => update('dia_vencimento_mensal', Number(e.target.value))} />
-                      </div>
-                      <div className="grid gap-1.5">
-                        <Label>Qtd Processos Inclusos</Label>
-                        <Input type="number" min={0} placeholder="Ex: 5" value={clienteForm.qtd_processos_inclusos} onChange={(e) => update('qtd_processos_inclusos', e.target.value)} />
-                        <p className="text-[10px] text-muted-foreground">Processos inclusos no contrato mensal.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+          <FilaBatch
+            fila={fila}
+            onRemove={handleRemoveFromQueue}
+            onClear={handleClearQueue}
+            onSaveAll={handleSaveAll}
+            isSaving={isSaving}
+          />
+        </div>
+      </div>
 
-                {/* Observações */}
-                <div className="grid gap-1.5">
-                  <Label>Observações Adicionais</Label>
-                  <textarea
-                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                    placeholder="Observações sobre o cliente, condições especiais, etc."
-                    value={clienteForm.observacoes}
-                    onChange={(e) => update('observacoes', e.target.value)}
-                  />
-                </div>
-
-                {/* Honorários Específicos */}
-                <HonorariosInlineRepeater rows={honorariosRows} onChange={setHonorariosRows} />
-
-                {/* Document Upload */}
-                <div className="grid gap-1.5">
-                  <Label>Anexar Contrato Assinado</Label>
-                  {contratoFile ? (
-                    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="truncate flex-1">{contratoFile.name}</span>
-                      <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setContratoFile(null)}>
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <label className="flex items-center justify-center gap-2 rounded-md border border-dashed border-border bg-muted/20 px-3 py-4 text-sm text-muted-foreground cursor-pointer hover:bg-muted/40 transition-colors">
-                      <Upload className="h-4 w-4" />
-                      Clique para selecionar (PDF, PNG, JPG — máx. 10MB)
-                      <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={handleFileChange} />
-                    </label>
-                  )}
-                </div>
-
-                <Button type="submit" disabled={createCliente.isPending} className="mt-1 w-fit">
-                  {createCliente.isPending ? 'Criando...' : 'Cadastrar Cliente'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ── PROCESSO TAB ── */}
-        <TabsContent value="processo">
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Novo Processo</CardTitle>
-              <p className="text-xs text-muted-foreground">Valor calculado automaticamente pela metodologia do cliente. Use o toggle para definir valor manual.</p>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateProcesso} className="grid gap-4 max-w-lg">
-                {/* Searchable Client Combobox */}
-                <div className="grid gap-2">
-                  <Label>Contabilidade / Cliente *</Label>
-                  <Popover open={clienteComboOpen} onOpenChange={setClienteComboOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={clienteComboOpen}
-                        className="w-full justify-between font-normal"
-                      >
-                        {selectedCliente
-                          ? `${selectedCliente.apelido || selectedCliente.nome} (${selectedCliente.codigo_identificador})`
-                          : 'Buscar por nome, código ou apelido...'}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Buscar cliente..." />
-                        <CommandList>
-                          <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                          <CommandGroup>
-                            {(clientes || []).filter(c => !(c as any).is_archived).map(c => (
-                              <CommandItem
-                                key={c.id}
-                                value={`${c.nome} ${c.apelido || ''} ${c.codigo_identificador}`}
-                                onSelect={() => {
-                                  setProcessoForm(f => ({ ...f, cliente_id: c.id }));
-                                  setClienteComboOpen(false);
-                                }}
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", processoForm.cliente_id === c.id ? "opacity-100" : "opacity-0")} />
-                                <div>
-                                  <p className="text-sm font-medium">{c.apelido || c.nome}</p>
-                                  <p className="text-xs text-muted-foreground">{c.codigo_identificador} · {c.tipo === 'MENSALISTA' ? 'Mensalista' : 'Avulso'}</p>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label>Razão Social *</Label>
-                  <Input required placeholder="Nome da empresa" value={processoForm.razao_social} onChange={(e) => setProcessoForm(f => ({ ...f, razao_social: e.target.value }))} />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label>Tipo de Serviço</Label>
-                    <Select
-                      value={processoForm.tipo}
-                      onValueChange={v => {
-                        const neg = negotiations?.find(n => n.id === v);
-                        if (neg) {
-                          setProcessoForm(f => ({
-                            ...f,
-                            tipo: v,
-                            definir_manual: true,
-                            valor_manual: String(neg.fixed_price),
-                            descricao_avulso: '',
-                          }));
-                        } else {
-                          setProcessoForm(f => ({ ...f, tipo: v as TipoProcesso, definir_manual: v === 'avulso', valor_manual: v === 'avulso' ? f.valor_manual : '', descricao_avulso: v === 'avulso' ? f.descricao_avulso : '' }));
-                        }
-                      }}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem disabled value="__header_std" className="text-[10px] font-semibold text-muted-foreground">— Serviços Padrão —</SelectItem>
-                        {Object.entries(TIPO_PROCESSO_LABELS).map(([k, v]) => (
-                          <SelectItem key={k} value={k}>{v}</SelectItem>
-                        ))}
-                        {negotiations && negotiations.length > 0 && (
-                          <>
-                            <SelectItem disabled value="__header_neg" className="text-[10px] font-semibold text-muted-foreground">— Serviços Negociados —</SelectItem>
-                            {negotiations.map(n => (
-                              <SelectItem key={n.id} value={n.id}>
-                                {n.service_name} — {Number(n.fixed_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                              </SelectItem>
-                            ))}
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Prioridade</Label>
-                    <Select value={processoForm.prioridade} onValueChange={v => setProcessoForm(f => ({ ...f, prioridade: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="normal">Normal</SelectItem>
-                        <SelectItem value="urgente">Urgente (+50%)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Conditional: Avulso description */}
-                {isProcessoAvulso && (
-                  <div className="grid gap-2">
-                    <Label>Descrição do Serviço Avulso *</Label>
-                    <Input
-                      required
-                      placeholder="Ex: Inscrição Municipal, Certidão Negativa..."
-                      value={processoForm.descricao_avulso}
-                      onChange={e => setProcessoForm(f => ({ ...f, descricao_avulso: e.target.value }))}
-                    />
-                    <p className="text-[10px] text-muted-foreground">Este nome será exibido no Kanban em vez de &quot;Avulso&quot;.</p>
-                  </div>
-                )}
-
-                {/* Mudança de UF switch — only for 'alteracao' */}
-                {processoForm.tipo === 'alteracao' && (
-                  <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                    <div>
-                      <Label className="text-sm font-medium text-amber-400">🔄 Envolve mudança entre Estados (UF)?</Label>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {processoForm.mudanca_uf
-                          ? 'Será tratado como 2 processos simultâneos para faturamento e contagem progressiva.'
-                          : 'Processo simples de alteração, sem duplicidade.'}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={processoForm.mudanca_uf}
-                      onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, mudanca_uf: checked }))}
-                    />
-                  </div>
-                )}
-
-                {/* Welcome discount — only for first-time clients */}
-                {isFirstProcess && selectedCliente && (
-                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label className="text-sm font-medium text-emerald-400">🎁 Primeiro Processo Detectado!</Label>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          Aplicar desconto de Anúncio/Marketing?
-                        </p>
-                      </div>
-                      <Switch
-                        checked={processoForm.desconto_boas_vindas}
-                        onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, desconto_boas_vindas: checked }))}
-                      />
-                    </div>
-                    {processoForm.desconto_boas_vindas && (
-                      <div className="grid gap-1.5">
-                        <Label className="text-xs">Porcentagem do desconto (%)</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={100}
-                          step={1}
-                          value={processoForm.desconto_boas_vindas_percent}
-                          onChange={e => setProcessoForm(f => ({ ...f, desconto_boas_vindas_percent: e.target.value }))}
-                          className="w-32"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="grid gap-2">
-                  <Label>Responsável (opcional)</Label>
-                  <Input value={processoForm.responsavel} onChange={(e) => setProcessoForm(f => ({ ...f, responsavel: e.target.value }))} placeholder="Nome do responsável" />
-                </div>
-
-                {/* Manual value toggle — always enabled for avulso */}
-                {!isProcessoAvulso && (
-                  <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-                    <div>
-                      <Label className="text-sm font-medium">Definir Valor Manualmente</Label>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {processoForm.definir_manual ? 'Valor digitado abaixo será usado.' : 'Sistema calcula pela Metodologia de Cobrança.'}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={processoForm.definir_manual}
-                      onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, definir_manual: checked }))}
-                    />
-                  </div>
-                )}
-                {(processoForm.definir_manual || isProcessoAvulso) && (
-                  <div className="grid gap-2">
-                    <Label>{isProcessoAvulso ? 'Valor do Serviço (R$) *' : 'Valor Manual (R$)'}</Label>
-                    <Input type="number" step="0.01" value={processoForm.valor_manual} onChange={e => setProcessoForm(f => ({ ...f, valor_manual: e.target.value }))} placeholder="0,00" />
-                    {isProcessoAvulso && <p className="text-[10px] text-muted-foreground">O valor digitado é final — sem desconto progressivo.</p>}
-                  </div>
-                )}
-
-                {/* Já pago switch */}
-                <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/5 p-3">
-                  <div>
-                    <Label className="text-sm font-medium">Este serviço já foi pago/liquidado?</Label>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {processoForm.ja_pago ? 'O processo entrará direto como Honorário Pago.' : 'Seguirá o fluxo normal de cobrança.'}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={processoForm.ja_pago}
-                    onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, ja_pago: checked }))}
-                  />
-                </div>
-
-                {/* Observações */}
-                <div className="grid gap-2">
-                  <Label>Observações</Label>
-                  <textarea
-                    className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
-                    placeholder="Protocolo, detalhes da Receita Federal, etc."
-                    value={processoForm.observacoes}
-                    onChange={e => setProcessoForm(f => ({ ...f, observacoes: e.target.value }))}
-                  />
-                </div>
-
-                {selectedCliente && (
-                  <CalculatedValuePreview cliente={selectedCliente} tipo={processoForm.tipo} isManual={processoForm.definir_manual || isProcessoAvulso} />
-                )}
-
-                <Button type="submit" disabled={createProcesso.isPending || !processoForm.cliente_id || !processoForm.razao_social} className="w-fit">
-                  {createProcesso.isPending ? 'Criando...' : 'Criar Processo'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <FeedbackSucesso
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        clienteNome={selectedCliente?.apelido || selectedCliente?.nome || ''}
+        processos={savedProcessos}
+        totalEconomia={totalEconomia}
+      />
     </div>
   );
 }
