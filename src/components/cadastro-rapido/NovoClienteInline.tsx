@@ -17,6 +17,7 @@ interface Props {
 
 export default function NovoClienteInline({ onClose, onCreated }: Props) {
   const [form, setForm] = useState({
+    codigo_identificador: `CLI-${Date.now()}`,
     nome: '',
     cnpj: '',
     email: '',
@@ -37,7 +38,7 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
 
     createCliente.mutate(
       {
-        codigo_identificador: cnpjDigits.slice(0, 6) || '000000',
+        codigo_identificador: form.codigo_identificador.trim() || `CLI-${Date.now()}`,
         nome: form.nome,
         cnpj: cnpjDigits || null,
         tipo: form.tipo,
@@ -65,6 +66,10 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Código do Cliente *</Label>
+            <Input required value={form.codigo_identificador} onChange={e => setForm(f => ({ ...f, codigo_identificador: e.target.value }))} placeholder="Ex: CLI-001" />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Nome *</Label>
@@ -93,6 +98,7 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
                 <SelectContent>
                   <SelectItem value="AVULSO_4D">Avulso</SelectItem>
                   <SelectItem value="MENSALISTA">Mensalista</SelectItem>
+                  <SelectItem value="PRE_PAGO">Pré-Pago</SelectItem>
                 </SelectContent>
               </Select>
             </div>
