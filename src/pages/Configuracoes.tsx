@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
 
 export default function Configuracoes() {
+  const { theme, setTheme } = useTheme();
   const [webhookNovo, setWebhookNovo] = useState('');
   const [webhookQsa, setWebhookQsa] = useState('');
   const [savingWebhooks, setSavingWebhooks] = useState(false);
