@@ -42,7 +42,7 @@ export function abrirRecibo(data: ReciboData) {
       <div class="titulo">Recibo de Pagamento</div>
     </div>
     <div class="corpo">
-      <p>Recebi de <strong>TESTE AZUL</strong> a importância de
+      <p>Recebi de <strong>TREVO LEGALIZA</strong> a importância de
         <span class="valor">${valorFormatado}</span>
         (<span class="extenso">${extenso}</span>)
         referente a <strong>${data.descricao}</strong> do mês de <strong>${data.mesAno}</strong>.
