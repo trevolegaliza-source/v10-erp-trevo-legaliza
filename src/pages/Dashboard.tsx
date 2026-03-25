@@ -128,6 +128,9 @@ export default function Dashboard() {
           />
         </div>
       </div>
+
+      {/* Mapa do Brasil */}
+      <MapaBrasil />
     </div>
   );
 }
