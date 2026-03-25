@@ -10,8 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 // ═══ BRAND ═══
 const BRAND = {
-  nome: 'TREVO LEGALIZA LTDA',
-  fantasia: 'TREVO LEGALIZA',
+  nome: 'TESTE 01 LTDA',
+  fantasia: 'TESTE 01',
   cnpj: '39.969.412/0001-70',
   endereco: 'Rua Brasil, nº 1170, Rudge Ramos, SBC/SP',
   email: 'administrativo@trevolegaliza.com.br',
