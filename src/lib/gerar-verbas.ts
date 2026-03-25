@@ -1,197 +1,159 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Colaborador } from '@/hooks/useColaboradores';
-import {
-  getBusinessDaysInMonth,
-  getFifthBusinessDay,
-} from '@/lib/business-days';
+import { getBusinessDaysInMonth, getLastBusinessDay, calcularAdiantamento } from '@/lib/business-days';
 import { toast } from 'sonner';
 
 const fmt = (d: Date) => d.toISOString().split('T')[0];
 
-/**
- * Check if a verba already exists for this collaborator/month/type.
- */
-async function findExistingVerba(
-  colaboradorId: string,
-  tipoVerba: string,
-  mesRef: number,
-  anoRef: number,
-): Promise<string | null> {
-  const monthLabel = new Date(anoRef, mesRef).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  const { data } = await (supabase as any)
-    .from('lancamentos')
-    .select('id')
-    .eq('colaborador_id', colaboradorId)
-    .eq('tipo', 'pagar')
-    .ilike('descricao', `%${monthLabel}%`)
-    .ilike('descricao', `%${tipoVerba}%`)
-    .limit(1);
-  return data && data.length > 0 ? data[0].id : null;
-}
-
 interface VerbaEntry {
-  tipoVerba: string;
   descricao: string;
   valor: number;
   data_vencimento: string;
   categoria: string;
+  subcategoria: string;
 }
 
-/**
- * Build entries for collaborator WITHOUT adiantamento (e.g. Michele).
- * 2 entries: full salary on configured day + benefits on last day of month.
- */
-function buildEntriesSemAdiantamento(colab: Colaborador, year: number, month: number, diasUteis: number): VerbaEntry[] {
-  const sal = Number(colab.salario_base);
-  const vt = Number(colab.vt_diario);
-  const vr = Number(colab.vr_diario);
-  const beneficios = (vt + vr) * diasUteis;
-  const das = colab.regime === 'INDEFINIDO' ? 0 : (Number(colab.valor_das) || 0);
-  const monthLabel = new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  const diaPagamento = colab.dia_pagamento_integral || 5;
-  const diaPag = new Date(year, month, diaPagamento);
-  const ultimoDia = new Date(year, month + 1, 0);
-
-  const entries: VerbaEntry[] = [];
-
-  if (sal > 0) {
-    entries.push({
-      tipoVerba: 'Salário Integral',
-      descricao: `${colab.nome} - Salário Integral (${monthLabel})`,
-      valor: sal,
-      data_vencimento: fmt(diaPag),
-      categoria: 'colaborador',
-    });
-  }
-
-  if (beneficios > 0) {
-    entries.push({
-      tipoVerba: 'Benefícios',
-      descricao: `${colab.nome} - VT/VR (${monthLabel})`,
-      valor: beneficios,
-      data_vencimento: fmt(ultimoDia),
-      categoria: 'colaborador',
-    });
-  }
-
-  if (das > 0) {
-    entries.push({
-      tipoVerba: 'Guia DAS',
-      descricao: `${colab.nome} - Guia DAS (${monthLabel})`,
-      valor: das,
-      data_vencimento: fmt(new Date(year, month, 20)),
-      categoria: 'imposto',
-    });
-  }
-
-  return entries;
-}
-
-/**
- * Build entries for collaborator WITH adiantamento (default).
- * 4 entries: benefits day 1, 50% on 5th biz day, 50% on day 20, DAS day 20.
- */
-function buildEntriesComAdiantamento(colab: Colaborador, year: number, month: number, diasUteis: number): VerbaEntry[] {
-  const sal = Number(colab.salario_base);
-  const vt = Number(colab.vt_diario);
-  const vr = Number(colab.vr_diario);
-  const beneficios = (vt + vr) * diasUteis;
-  const das = colab.regime === 'INDEFINIDO' ? 0 : (Number(colab.valor_das) || 0);
-  const metadeSalario = sal / 2;
-  const monthLabel = new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-
-  const dia01 = new Date(year, month, 1);
-  const dia20 = new Date(year, month, 20);
-  const quintoDiaUtil = getFifthBusinessDay(year, month);
-
-  const entries: VerbaEntry[] = [];
-
-  if (beneficios > 0) {
-    entries.push({
-      tipoVerba: 'Benefícios',
-      descricao: `${colab.nome} - VT/VR (${monthLabel})`,
-      valor: beneficios,
-      data_vencimento: fmt(dia01),
-      categoria: 'colaborador',
-    });
-  }
-
-  if (metadeSalario > 0) {
-    entries.push({
-      tipoVerba: '50% Salário',
-      descricao: `${colab.nome} - 50% Salário (${monthLabel})`,
-      valor: metadeSalario,
-      data_vencimento: fmt(quintoDiaUtil),
-      categoria: 'colaborador',
-    });
-  }
-
-  if (metadeSalario > 0) {
-    entries.push({
-      tipoVerba: '50% Salário (2ª parcela)',
-      descricao: `${colab.nome} - 50% Salário 2ª parcela (${monthLabel})`,
-      valor: metadeSalario,
-      data_vencimento: fmt(dia20),
-      categoria: 'colaborador',
-    });
-  }
-
-  if (das > 0) {
-    entries.push({
-      tipoVerba: 'Guia DAS',
-      descricao: `${colab.nome} - Guia DAS (${monthLabel})`,
-      valor: das,
-      data_vencimento: fmt(dia20),
-      categoria: 'imposto',
-    });
-  }
-
-  return entries;
-}
-
-/**
- * Generate all financial entries for a collaborator for a given month/year.
- * IDEMPOTENT: checks for existing records before inserting, updates if salary changed.
- */
-export async function gerarVerbasColaborador(
-  colab: Colaborador,
-  year: number,
-  month: number,
-) {
+function buildVerbas(colab: Colaborador, year: number, month: number): VerbaEntry[] {
   const diasUteis = getBusinessDaysInMonth(year, month);
+  const sal = Number(colab.salario_base);
+  const vt = Number(colab.vt_diario);
+  const vr = Number(colab.vr_diario);
+  const das = Number(colab.valor_das) || 0;
+  const diaSalario = colab.dia_salario || colab.dia_pagamento_integral || 5;
+  const diaAdiantamento = colab.dia_adiantamento || 20;
+  const diaVtVr = colab.dia_vt_vr || 0;
+  const diaDas = colab.dia_das || 20;
+  const ultimoDia = new Date(year, month + 1, 0);
+  const lastBizDay = getLastBusinessDay(year, month);
 
-  const entries = colab.possui_adiantamento === false
-    ? buildEntriesSemAdiantamento(colab, year, month, diasUteis)
-    : buildEntriesComAdiantamento(colab, year, month, diasUteis);
+  const vencVtVr = diaVtVr > 0 ? fmt(new Date(year, month, diaVtVr)) : fmt(lastBizDay);
 
-  if (entries.length === 0) return 0;
+  const entries: VerbaEntry[] = [];
 
-  let created = 0;
-  for (const entry of entries) {
-    const existingId = await findExistingVerba(colab.id, entry.tipoVerba, month, year);
-    if (existingId) {
-      await (supabase as any)
-        .from('lancamentos')
-        .update({ valor: entry.valor, updated_at: new Date().toISOString() })
-        .eq('id', existingId);
-    } else {
-      const { error } = await (supabase as any).from('lancamentos').insert({
-        tipo: 'pagar',
-        descricao: entry.descricao,
-        valor: entry.valor,
-        categoria: entry.categoria,
-        status: 'pendente',
-        data_vencimento: entry.data_vencimento,
-        colaborador_id: colab.id,
+  // 1. ADIANTAMENTO
+  if (colab.possui_adiantamento && sal > 0) {
+    const valorAdiant = calcularAdiantamento(sal, colab.adiantamento_tipo, Number(colab.adiantamento_valor) || 0);
+    if (valorAdiant > 0) {
+      entries.push({
+        descricao: `Adiantamento - ${colab.nome}`,
+        valor: valorAdiant,
+        data_vencimento: fmt(new Date(year, month, diaAdiantamento)),
+        categoria: 'folha',
+        subcategoria: 'Adiantamento',
       });
-      if (error) {
-        toast.error(`Erro ao gerar verba de ${colab.nome}: ${error.message}`);
-        throw error;
-      }
-      created++;
     }
   }
-  return created;
+
+  // 2. SALÁRIO
+  if (sal > 0) {
+    let valorSalario = sal;
+    let label = `Salário - ${colab.nome}`;
+    if (colab.possui_adiantamento) {
+      const adiant = calcularAdiantamento(sal, colab.adiantamento_tipo, Number(colab.adiantamento_valor) || 0);
+      valorSalario = sal - adiant;
+      label = `Salário (Restante) - ${colab.nome}`;
+    }
+    if (valorSalario > 0) {
+      entries.push({
+        descricao: label,
+        valor: valorSalario,
+        data_vencimento: fmt(new Date(year, month, diaSalario)),
+        categoria: 'folha',
+        subcategoria: 'Salário',
+      });
+    }
+  }
+
+  // 3. VT
+  if (vt > 0) {
+    entries.push({
+      descricao: `VT (${diasUteis}d) - ${colab.nome}`,
+      valor: vt * diasUteis,
+      data_vencimento: vencVtVr,
+      categoria: 'folha',
+      subcategoria: 'Vale Transporte (VT)',
+    });
+  }
+
+  // 4. VR
+  if (vr > 0) {
+    entries.push({
+      descricao: `VR (${diasUteis}d) - ${colab.nome}`,
+      valor: vr * diasUteis,
+      data_vencimento: vencVtVr,
+      categoria: 'folha',
+      subcategoria: 'Vale Refeição (VR)',
+    });
+  }
+
+  // 5. DAS
+  if (das > 0 && colab.regime !== 'INDEFINIDO') {
+    entries.push({
+      descricao: `DAS - ${colab.nome}`,
+      valor: das,
+      data_vencimento: fmt(new Date(year, month, diaDas)),
+      categoria: 'folha',
+      subcategoria: 'DAS Colaborador',
+    });
+  }
+
+  // --- CLT only ---
+  if (colab.regime === 'CLT') {
+    const fgtsPct = Number(colab.fgts_percentual) || 8;
+    const inssPct = Number(colab.inss_patronal_percentual) || 20;
+
+    // 6. FGTS — due 7th of NEXT month
+    if (sal > 0) {
+      const nextMonth = month + 1;
+      const fgtsYear = nextMonth > 11 ? year + 1 : year;
+      const fgtsMonth = nextMonth > 11 ? 0 : nextMonth;
+      entries.push({
+        descricao: `FGTS - ${colab.nome}`,
+        valor: sal * (fgtsPct / 100),
+        data_vencimento: fmt(new Date(fgtsYear, fgtsMonth, 7)),
+        categoria: 'folha',
+        subcategoria: 'FGTS',
+      });
+    }
+
+    // 7. INSS Patronal — due 20th of NEXT month
+    if (sal > 0) {
+      const nextMonth = month + 1;
+      const inssYear = nextMonth > 11 ? year + 1 : year;
+      const inssMonth = nextMonth > 11 ? 0 : nextMonth;
+      entries.push({
+        descricao: `INSS Patronal - ${colab.nome}`,
+        valor: sal * (inssPct / 100),
+        data_vencimento: fmt(new Date(inssYear, inssMonth, 20)),
+        categoria: 'impostos',
+        subcategoria: 'INSS',
+      });
+    }
+
+    // 8. Provisão 13º
+    if (colab.provisionar_13 && sal > 0) {
+      entries.push({
+        descricao: `Provisão 13º - ${colab.nome}`,
+        valor: sal / 12,
+        data_vencimento: fmt(ultimoDia),
+        categoria: 'folha',
+        subcategoria: '13º Salário (Provisão)',
+      });
+    }
+
+    // 9. Provisão Férias
+    if (colab.provisionar_ferias && sal > 0) {
+      entries.push({
+        descricao: `Provisão Férias - ${colab.nome}`,
+        valor: (sal + sal / 3) / 12,
+        data_vencimento: fmt(ultimoDia),
+        categoria: 'folha',
+        subcategoria: 'Férias (Provisão)',
+      });
+    }
+  }
+
+  return entries;
 }
 
 /**
@@ -217,6 +179,66 @@ async function aplicarAumentos(colaboradores: Colaborador[], year: number, month
 }
 
 /**
+ * Estimate total monthly cost for a single collaborator (used in previews).
+ */
+export function estimarCustoTotal(colab: Colaborador, diasUteis?: number): number {
+  const du = diasUteis ?? 22;
+  const sal = Number(colab.salario_base);
+  const vt = Number(colab.vt_diario) * du;
+  const vr = Number(colab.vr_diario) * du;
+  const das = colab.regime !== 'INDEFINIDO' ? (Number(colab.valor_das) || 0) : 0;
+  let total = sal + vt + vr + das;
+  if (colab.regime === 'CLT') {
+    total += sal * ((Number(colab.fgts_percentual) || 8) / 100);
+    total += sal * ((Number(colab.inss_patronal_percentual) || 20) / 100);
+    if (colab.provisionar_13) total += sal / 12;
+    if (colab.provisionar_ferias) total += (sal + sal / 3) / 12;
+  }
+  return total;
+}
+
+/**
+ * Generate all financial entries for a collaborator for a given month/year.
+ * Returns count of newly created entries.
+ */
+export async function gerarVerbasColaborador(colab: Colaborador, year: number, month: number): Promise<number> {
+  const entries = buildVerbas(colab, year, month);
+  if (entries.length === 0) return 0;
+
+  // Delete existing PENDING entries for this collaborator/month
+  await (supabase as any)
+    .from('lancamentos')
+    .delete()
+    .eq('tipo', 'pagar')
+    .eq('colaborador_id', colab.id)
+    .eq('competencia_mes', month + 1)
+    .eq('competencia_ano', year)
+    .eq('status', 'pendente');
+
+  const rows = entries.map(e => ({
+    tipo: 'pagar' as const,
+    descricao: e.descricao,
+    valor: e.valor,
+    categoria: e.categoria,
+    subcategoria: e.subcategoria,
+    status: 'pendente' as const,
+    data_vencimento: e.data_vencimento,
+    colaborador_id: colab.id,
+    fornecedor: colab.nome,
+    competencia_mes: month + 1,
+    competencia_ano: year,
+    etapa_financeiro: 'solicitacao_criada',
+  }));
+
+  const { error } = await (supabase as any).from('lancamentos').insert(rows);
+  if (error) {
+    toast.error(`Erro ao gerar verbas de ${colab.nome}: ${error.message}`);
+    throw error;
+  }
+  return rows.length;
+}
+
+/**
  * Generate all verbas for all active collaborators for a given month.
  */
 export async function gerarVerbasDoMes(colaboradores: Colaborador[], year: number, month: number) {
@@ -229,3 +251,5 @@ export async function gerarVerbasDoMes(colaboradores: Colaborador[], year: numbe
   }
   return total;
 }
+
+export { buildVerbas };

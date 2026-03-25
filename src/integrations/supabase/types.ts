@@ -145,13 +145,22 @@ export type Database = {
           aumento_previsto_valor: number | null
           created_at: string | null
           data_inicio: string | null
+          dia_adiantamento: number | null
+          dia_das: number | null
           dia_pagamento_integral: number | null
+          dia_salario: number | null
+          dia_vt_vr: number | null
           email: string | null
+          fgts_percentual: number | null
           id: string
+          inss_patronal_percentual: number | null
           nome: string
+          observacoes_pagamento: string | null
           pix_chave: string | null
           pix_tipo: string | null
           possui_adiantamento: boolean
+          provisionar_13: boolean | null
+          provisionar_ferias: boolean | null
           regime: string
           salario_base: number
           status: string
@@ -168,13 +177,22 @@ export type Database = {
           aumento_previsto_valor?: number | null
           created_at?: string | null
           data_inicio?: string | null
+          dia_adiantamento?: number | null
+          dia_das?: number | null
           dia_pagamento_integral?: number | null
+          dia_salario?: number | null
+          dia_vt_vr?: number | null
           email?: string | null
+          fgts_percentual?: number | null
           id?: string
+          inss_patronal_percentual?: number | null
           nome: string
+          observacoes_pagamento?: string | null
           pix_chave?: string | null
           pix_tipo?: string | null
           possui_adiantamento?: boolean
+          provisionar_13?: boolean | null
+          provisionar_ferias?: boolean | null
           regime?: string
           salario_base?: number
           status?: string
@@ -191,13 +209,22 @@ export type Database = {
           aumento_previsto_valor?: number | null
           created_at?: string | null
           data_inicio?: string | null
+          dia_adiantamento?: number | null
+          dia_das?: number | null
           dia_pagamento_integral?: number | null
+          dia_salario?: number | null
+          dia_vt_vr?: number | null
           email?: string | null
+          fgts_percentual?: number | null
           id?: string
+          inss_patronal_percentual?: number | null
           nome?: string
+          observacoes_pagamento?: string | null
           pix_chave?: string | null
           pix_tipo?: string | null
           possui_adiantamento?: boolean
+          provisionar_13?: boolean | null
+          provisionar_ferias?: boolean | null
           regime?: string
           salario_base?: number
           status?: string
