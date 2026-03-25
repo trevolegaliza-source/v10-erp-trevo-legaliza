@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import ObrigacoesTimeline from './ObrigacoesTimeline';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
