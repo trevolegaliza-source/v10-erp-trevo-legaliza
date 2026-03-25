@@ -77,6 +77,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
         desconto_progressivo: form.desconto_progressivo ? Number(form.desconto_progressivo) : null,
         valor_limite_desconto: form.valor_limite_desconto ? Number(form.valor_limite_desconto) : null,
         observacoes: form.observacoes || null,
+        estado: form.estado || null,
+        cidade: form.cidade || null,
       } as any,
       {
         onSuccess: (data: any) => {
