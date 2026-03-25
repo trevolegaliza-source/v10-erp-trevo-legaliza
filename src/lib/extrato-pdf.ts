@@ -94,7 +94,7 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
       } else if (isUrgencia && !hasManualFlag && s === 0) {
         valorFinal = base * 1.5;
         isManual = true;
-        label = 'MÉTODO TESTE AZUL / URGÊNCIA';
+        label = 'MÉTODO TREVO / URGÊNCIA';
       } else {
         valorFinal = base;
         if (descPct > 0 && slot > 1) {
