@@ -1,11 +1,15 @@
 import { Outlet } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
-import { Search } from 'lucide-react';
+import { Search, Sun, Moon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { NotificationPopover } from '@/components/NotificationPopover';
+import { useTheme } from 'next-themes';
 
 export function AppLayout() {
+  const { theme, setTheme } = useTheme();
+
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar />
@@ -16,6 +20,15 @@ export function AppLayout() {
             <Input placeholder="Buscar processos, clientes..." className="pl-9 bg-muted/50 border-0" />
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              title={theme === 'dark' ? 'Tema Claro' : 'Tema Escuro'}
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
             <NotificationPopover />
             <div className="flex items-center gap-2.5">
               <Avatar className="h-8 w-8">

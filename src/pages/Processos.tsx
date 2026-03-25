@@ -373,7 +373,7 @@ export default function Processos() {
                         <span className="text-xs text-muted-foreground">Normal</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-sm font-semibold text-zinc-100">
+                    <TableCell className="text-right text-sm font-semibold text-foreground">
                       {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                     </TableCell>
                     <TableCell className="text-center">
