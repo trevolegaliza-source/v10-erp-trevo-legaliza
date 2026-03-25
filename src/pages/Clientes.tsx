@@ -20,6 +20,7 @@ import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
+import { UFS_BRASIL, UF_NOMES } from '@/constants/estados-brasil';
 
 export default function Clientes() {
   const navigate = useNavigate();
