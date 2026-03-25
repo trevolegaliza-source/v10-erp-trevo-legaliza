@@ -10,6 +10,7 @@ import { useCreateCliente } from '@/hooks/useFinanceiro';
 import { maskCNPJ, isValidCNPJ } from '@/lib/cnpj';
 import { toast } from 'sonner';
 import type { TipoCliente } from '@/types/financial';
+import { UFS_BRASIL } from '@/constants/estados-brasil';
 
 interface Props {
   onClose: () => void;
