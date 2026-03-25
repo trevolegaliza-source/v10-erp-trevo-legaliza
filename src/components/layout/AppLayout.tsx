@@ -7,7 +7,7 @@ import { NotificationPopover } from '@/components/NotificationPopover';
 
 export function AppLayout() {
   return (
-    <div className="min-h-screen bg-background dark">
+    <div className="min-h-screen bg-background">
       <AppSidebar />
       <div className="ml-60 flex min-h-screen flex-col">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 bg-card/80 glass px-6">
