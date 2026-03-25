@@ -345,6 +345,7 @@ export type Database = {
           confirmado_recebimento: boolean | null
           created_at: string | null
           data_pagamento: string | null
+          data_ultimo_contato: string | null
           data_vencimento: string
           descricao: string
           despesa_recorrente_id: string | null
@@ -353,11 +354,13 @@ export type Database = {
           honorario_extra: number | null
           id: string
           is_taxa_reembolsavel: boolean | null
+          notas_cobranca: string | null
           observacoes_financeiro: string | null
           processo_id: string | null
           recibo_assinado_url: string | null
           status: Database["public"]["Enums"]["status_financeiro"]
           subcategoria: string | null
+          tentativas_cobranca: number | null
           tipo: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at: string | null
           url_comprovante: string | null
@@ -376,6 +379,7 @@ export type Database = {
           confirmado_recebimento?: boolean | null
           created_at?: string | null
           data_pagamento?: string | null
+          data_ultimo_contato?: string | null
           data_vencimento: string
           descricao: string
           despesa_recorrente_id?: string | null
@@ -384,11 +388,13 @@ export type Database = {
           honorario_extra?: number | null
           id?: string
           is_taxa_reembolsavel?: boolean | null
+          notas_cobranca?: string | null
           observacoes_financeiro?: string | null
           processo_id?: string | null
           recibo_assinado_url?: string | null
           status?: Database["public"]["Enums"]["status_financeiro"]
           subcategoria?: string | null
+          tentativas_cobranca?: number | null
           tipo: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at?: string | null
           url_comprovante?: string | null
@@ -407,6 +413,7 @@ export type Database = {
           confirmado_recebimento?: boolean | null
           created_at?: string | null
           data_pagamento?: string | null
+          data_ultimo_contato?: string | null
           data_vencimento?: string
           descricao?: string
           despesa_recorrente_id?: string | null
@@ -415,11 +422,13 @@ export type Database = {
           honorario_extra?: number | null
           id?: string
           is_taxa_reembolsavel?: boolean | null
+          notas_cobranca?: string | null
           observacoes_financeiro?: string | null
           processo_id?: string | null
           recibo_assinado_url?: string | null
           status?: Database["public"]["Enums"]["status_financeiro"]
           subcategoria?: string | null
+          tentativas_cobranca?: number | null
           tipo?: Database["public"]["Enums"]["tipo_lancamento"]
           updated_at?: string | null
           url_comprovante?: string | null

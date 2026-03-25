@@ -1,166 +1,114 @@
-import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DollarSign, TrendingUp, CreditCard, Receipt, Search, CheckCircle } from 'lucide-react';
-import { useLancamentos, useUpdateLancamento } from '@/hooks/useFinanceiro';
-import { STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
-import type { StatusFinanceiro } from '@/types/financial';
+import { useState, useMemo } from 'react';
+import { startOfMonth, endOfMonth } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useLancamentosReceber, useValoresAdicionaisBatch } from '@/hooks/useContasReceber';
+import type { LancamentoReceber } from '@/hooks/useContasReceber';
+import PeriodoSelector from '@/components/contas-receber/PeriodoSelector';
+import ContasReceberKPIs from '@/components/contas-receber/ContasReceberKPIs';
+import AlertaInadimplencia from '@/components/contas-receber/AlertaInadimplencia';
+import ClienteAccordion from '@/components/contas-receber/ClienteAccordion';
+import ContasReceberLista from '@/components/contas-receber/ContasReceberLista';
+import InadimplenciaTab from '@/components/contas-receber/InadimplenciaTab';
+import MarcarRecebidoModal from '@/components/contas-receber/MarcarRecebidoModal';
+import RegistrarContatoModal from '@/components/contas-receber/RegistrarContatoModal';
+import ReenviarCobrancaModal from '@/components/contas-receber/ReenviarCobrancaModal';
+
+function toISO(d: Date) { return d.toISOString().split('T')[0]; }
 
 export default function ContasReceber() {
-  const { data: lancamentos, isLoading } = useLancamentos('receber');
-  const updateLancamento = useUpdateLancamento();
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [search, setSearch] = useState('');
+  const now = new Date();
+  const [dataInicio, setDataInicio] = useState(toISO(startOfMonth(now)));
+  const [dataFim, setDataFim] = useState(toISO(endOfMonth(now)));
+  const [activeTab, setActiveTab] = useState('clientes');
 
-  const filtered = (lancamentos || []).filter(l => {
-    if (filterStatus !== 'all' && l.status !== filterStatus) return false;
-    if (search && !l.descricao.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const { data: lancamentos, isLoading } = useLancamentosReceber(dataInicio, dataFim);
+  const processoIds = useMemo(() => (lancamentos || []).map(l => l.processo_id).filter(Boolean) as string[], [lancamentos]);
+  const { data: taxasPorProcesso } = useValoresAdicionaisBatch(processoIds);
 
-  const totalByStatus = (status: StatusFinanceiro) =>
-    (lancamentos || []).filter(l => l.status === status).reduce((s, l) => s + Number(l.valor), 0);
+  // Modals
+  const [marcarPagoTarget, setMarcarPagoTarget] = useState<LancamentoReceber | null>(null);
+  const [contatoTarget, setContatoTarget] = useState<LancamentoReceber | null>(null);
+  const [cobrancaTarget, setCobrancaTarget] = useState<LancamentoReceber | null>(null);
 
-  const totalGeral = (lancamentos || []).reduce((s, l) => s + Number(l.valor), 0);
+  const handlePeriodoChange = (inicio: string, fim: string) => {
+    setDataInicio(inicio);
+    setDataFim(fim);
+  };
 
-  const kpis = [
-    { label: 'Total', value: totalGeral, icon: DollarSign, bgClass: 'bg-primary/10', iconClass: 'text-primary' },
-    { label: 'Recebido', value: totalByStatus('pago'), icon: TrendingUp, bgClass: 'bg-success/10', iconClass: 'text-success' },
-    { label: 'Pendente', value: totalByStatus('pendente'), icon: CreditCard, bgClass: 'bg-warning/10', iconClass: 'text-warning' },
-    { label: 'Atrasado', value: totalByStatus('atrasado'), icon: Receipt, bgClass: 'bg-destructive/10', iconClass: 'text-destructive' },
-  ];
+  // Group by client
+  const clienteGroups = useMemo(() => {
+    const map: Record<string, { clienteId: string; clienteNome: string; lancamentos: LancamentoReceber[] }> = {};
+    (lancamentos || []).forEach(l => {
+      const cid = l.cliente_id || 'sem-cliente';
+      if (!map[cid]) map[cid] = { clienteId: cid, clienteNome: l.cliente?.nome || 'Sem cliente', lancamentos: [] };
+      map[cid].lancamentos.push(l);
+    });
+    return Object.values(map);
+  }, [lancamentos]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Contas a Receber</h1>
-          <p className="text-sm text-muted-foreground">{(lancamentos || []).length} lançamentos</p>
+          <p className="text-sm text-muted-foreground">Faturamento, recebimentos e inadimplência</p>
         </div>
+        <PeriodoSelector dataInicio={dataInicio} dataFim={dataFim} onChange={handlePeriodoChange} />
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-4">
-        {kpis.map(stat => (
-          <Card key={stat.label} className="border-border/60">
-            <CardContent className="p-5">
-              <div className={`rounded-lg ${stat.bgClass} p-2 w-fit`}>
-                <stat.icon className={`h-4.5 w-4.5 ${stat.iconClass}`} />
-              </div>
-              <p className="text-2xl font-bold mt-3">
-                {stat.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </p>
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">Carregando...</div>
+      ) : (
+        <>
+          {/* KPIs */}
+          <ContasReceberKPIs lancamentos={lancamentos || []} />
 
-      {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar lançamento..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-36 h-9">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="pendente">Pendente</SelectItem>
-            <SelectItem value="pago">Pago</SelectItem>
-            <SelectItem value="atrasado">Atrasado</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+          {/* Alert bar */}
+          <AlertaInadimplencia lancamentos={lancamentos || []} onVerClick={() => setActiveTab('inadimplencia')} />
 
-      {/* Table */}
-      <Card className="border-border/60">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">Carregando...</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="text-right">Taxa Reemb.</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-center">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map(l => {
-                  const taxa = l.is_taxa_reembolsavel ? Number(l.valor) : 0;
-                  const valorBase = Number(l.valor);
-                  return (
-                    <TableRow key={l.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {l.descricao}
-                          {l.is_taxa_reembolsavel && (
-                            <Badge className="bg-info/10 text-info border-0 text-[10px]">Reembolsável</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{(l as any).cliente?.nome || '-'}</TableCell>
-                      <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        {taxa > 0
-                          ? taxa.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                          : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-primary">
-                        {(valorBase + (l.is_taxa_reembolsavel ? 0 : taxa)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge className={`${STATUS_STYLES[l.status as StatusFinanceiro]} border-0 text-[10px]`}>
-                          {STATUS_LABELS[l.status as StatusFinanceiro]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {l.status === 'pendente' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs text-success hover:text-success"
-                            onClick={() => updateLancamento.mutate({ id: l.id, status: 'pago', data_pagamento: new Date().toISOString().split('T')[0] })}
-                          >
-                            <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                            Confirmar
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                {filtered.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      Nenhum lançamento encontrado
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-      <p className="text-[11px] text-muted-foreground">
-        💡 Taxas reembolsáveis agora são adicionadas individualmente na edição de cada processo.
-      </p>
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList>
+              <TabsTrigger value="clientes">Por Cliente</TabsTrigger>
+              <TabsTrigger value="lista">Lista Completa</TabsTrigger>
+              <TabsTrigger value="inadimplencia">Inadimplência</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="clientes">
+              <ClienteAccordion
+                groups={clienteGroups}
+                taxasPorProcesso={taxasPorProcesso || {}}
+                onMarcarPago={setMarcarPagoTarget}
+                onCobrar={setCobrancaTarget}
+              />
+            </TabsContent>
+
+            <TabsContent value="lista">
+              <ContasReceberLista
+                lancamentos={lancamentos || []}
+                taxasPorProcesso={taxasPorProcesso || {}}
+                onMarcarPago={setMarcarPagoTarget}
+                onCobrar={setCobrancaTarget}
+              />
+            </TabsContent>
+
+            <TabsContent value="inadimplencia">
+              <InadimplenciaTab
+                lancamentos={lancamentos || []}
+                onMarcarPago={setMarcarPagoTarget}
+                onRegistrarContato={setContatoTarget}
+                onReenviarCobranca={setCobrancaTarget}
+              />
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+
+      {/* Modals */}
+      <MarcarRecebidoModal lancamento={marcarPagoTarget} open={!!marcarPagoTarget} onOpenChange={v => !v && setMarcarPagoTarget(null)} />
+      <RegistrarContatoModal lancamento={contatoTarget} open={!!contatoTarget} onOpenChange={v => !v && setContatoTarget(null)} />
+      <ReenviarCobrancaModal lancamento={cobrancaTarget} open={!!cobrancaTarget} onOpenChange={v => !v && setCobrancaTarget(null)} />
     </div>
   );
 }
