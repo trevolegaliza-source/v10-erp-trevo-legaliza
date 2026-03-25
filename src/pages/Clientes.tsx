@@ -273,6 +273,11 @@ export default function Clientes() {
           <Archive className="h-3.5 w-3.5" />
           Arquivados ({(clientes || []).filter(c => (c as any).is_archived).length})
         </Button>
+        {estadoFiltro && (
+          <Badge variant="outline" className="h-9 px-3 flex items-center gap-1.5 cursor-pointer border-primary/30 text-primary" onClick={() => setSearchParams({})}>
+            Estado: {estadoFiltro} ✕
+          </Badge>
+        )}
       </div>
 
       {/* Table */}
