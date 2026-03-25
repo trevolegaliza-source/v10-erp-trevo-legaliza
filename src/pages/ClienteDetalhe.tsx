@@ -577,17 +577,9 @@ export default function ClienteDetalhe() {
           </Card>
         </TabsContent>
 
-        {/* ── Honorários Específicos ── */}
+        {/* ── Serviços Pré-Acordados ── */}
         <TabsContent value="honorarios">
-          <Card className="border-border/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Tabela de Honorários Específicos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <HonorariosRepeater clienteId={cliente.id} />
-              {/* Using the standalone HonorariosRepeater for the tab */}
-            </CardContent>
-          </Card>
+          <ServicosPreAcordados clienteId={cliente.id} isPrePago={isPrePago} />
         </TabsContent>
 
         {/* ── Processos ── */}
