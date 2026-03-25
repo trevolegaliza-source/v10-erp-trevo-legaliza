@@ -157,14 +157,20 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
         <input ref={fileInputRef} type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={onFileSelected} />
 
         <Tabs defaultValue="dashboard" className="mt-2">
-          <TabsList className="w-full grid grid-cols-6 h-9">
+          <TabsList className="w-full grid grid-cols-7 h-9">
             <TabsTrigger value="dashboard" className="text-xs">Dashboard</TabsTrigger>
+            <TabsTrigger value="obrigacoes" className="text-xs">Obrigações</TabsTrigger>
             <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
             <TabsTrigger value="avaliacoes" className="text-xs">Avaliações</TabsTrigger>
             <TabsTrigger value="gestao" className="text-xs">Gestão</TabsTrigger>
             <TabsTrigger value="ocorrencias" className="text-xs">Ocorrências</TabsTrigger>
             <TabsTrigger value="bancario" className="text-xs">Bancário</TabsTrigger>
           </TabsList>
+
+          {/* Obrigações do Mês */}
+          <TabsContent value="obrigacoes" className="mt-4">
+            <ObrigacoesTimeline colab={colab} />
+          </TabsContent>
 
           {/* Dashboard */}
           <TabsContent value="dashboard" className="space-y-4 mt-4">
