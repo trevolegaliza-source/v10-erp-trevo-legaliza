@@ -170,6 +170,8 @@ export default function ClienteDetalhe() {
       email: cliente.email || '',
       telefone: cliente.telefone || '',
       tipo: cliente.tipo,
+      estado: (cliente as any).estado || '',
+      cidade: (cliente as any).cidade || '',
     });
     // Load existing negotiations into inline rows
     setEditHonorariosRows(
