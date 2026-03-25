@@ -121,7 +121,7 @@ function ProcessCard({
             </div>
           )}
           {process.valor && (
-            <p className="text-sm font-semibold text-white mt-1.5">
+            <p className="text-sm font-semibold text-foreground mt-1.5">
               {Number(process.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </p>
           )}
