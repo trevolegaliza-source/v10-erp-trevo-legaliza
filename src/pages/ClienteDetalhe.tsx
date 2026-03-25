@@ -148,7 +148,7 @@ export default function ClienteDetalhe() {
   const handleSaveParams = () => {
     if (!cliente) return;
     const payload: Record<string, any> = { id: cliente.id };
-    const fields = ['valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'momento_faturamento', 'dia_vencimento_mensal'] as const;
+    const fields = ['valor_base', 'desconto_progressivo', 'dia_cobranca', 'valor_limite_desconto', 'mensalidade', 'vencimento', 'qtd_processos', 'momento_faturamento', 'dia_vencimento_mensal', 'franquia_processos'] as const;
     for (const f of fields) {
       if ((editForm as any)[f] !== undefined) payload[f] = (editForm as any)[f];
     }
