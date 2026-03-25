@@ -146,11 +146,11 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
     folder: string;
   }) => (
     <div className="flex items-center gap-1.5">
-      <FileText className={cn('h-3 w-3 shrink-0', storagePath ? 'text-[#22c55e]' : 'text-muted-foreground')} />
+      <FileText className={cn('h-3 w-3 shrink-0', storagePath ? 'text-success' : 'text-muted-foreground')} />
       {storagePath ? (
         <div className="flex items-center gap-1">
-          <CheckCircle2 className="h-3 w-3 text-[#22c55e]" />
-          <span className="text-[11px] font-medium text-[#22c55e]">{label}</span>
+          <CheckCircle2 className="h-3 w-3 text-success" />
+          <span className="text-[11px] font-medium text-success">{label}</span>
           <button onClick={() => viewFile(storagePath)} className="text-info hover:text-info/80 p-0.5" title="Visualizar">
             <Eye className="h-3 w-3" />
           </button>
@@ -188,15 +188,15 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
         className={cn(
           'border-l-4 cursor-pointer transition-all hover:border-primary/40 hover:shadow-[0_0_15px_-3px_hsl(var(--primary)/0.3)]',
           isOverdue ? 'border-l-destructive bg-destructive/5' :
-          isPago ? 'border-l-success bg-zinc-900' :
-          'border-l-warning bg-zinc-900',
+          isPago ? 'border-l-success bg-card' :
+          'border-l-warning bg-card',
         )}
         onDoubleClick={() => onDoubleClick?.(processo)}
       >
         <CardContent className="p-3 pb-5 space-y-2.5">
           {/* Creation date - prominent */}
           {createdAt && (
-            <div className="text-[10px] font-medium text-zinc-400 bg-muted/50 rounded px-2 py-0.5 w-fit">
+            <div className="text-[10px] font-medium text-muted-foreground bg-muted/50 rounded px-2 py-0.5 w-fit">
               📅 {createdAt}
             </div>
           )}
@@ -218,9 +218,9 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
                     </Tooltip>
                   </TooltipProvider>
                 )}
-              <p className="text-sm font-bold truncate text-white">{clienteApelido}</p>
+              <p className="text-sm font-bold truncate text-foreground">{clienteApelido}</p>
               </div>
-              <p className="text-[11px] text-zinc-400 truncate">{processo.razao_social}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{processo.razao_social}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <p className="text-[12px] font-semibold text-primary truncate">{serviceName}</p>
                 {isNegociado && (
@@ -231,7 +231,7 @@ export default function FinanceiroCard({ processo, onMoveRequest, onDoubleClick,
               </div>
             </div>
             <div className="text-right shrink-0 flex items-center gap-1">
-              <span className="text-sm font-bold text-white whitespace-nowrap">
+              <span className="text-sm font-bold text-foreground whitespace-nowrap">
                 {formatBRL(totalValue)}
               </span>
               <TooltipProvider>

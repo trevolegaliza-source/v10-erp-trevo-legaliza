@@ -260,7 +260,7 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
                           <div className="flex items-center justify-center gap-1 flex-wrap">
                             {hasComprovante ? (
                               <Button variant="ghost" size="sm"
-                                className="h-6 px-1.5 text-[10px] gap-1 text-[#22c55e] hover:text-[#22c55e]"
+                                className="h-6 px-1.5 text-[10px] gap-1 text-success hover:text-success"
                                 onClick={() => viewComprovante((l as any).comprovante_url)}>
                                 <CheckCircle2 className="h-3 w-3" /> Bancário ✅
                               </Button>
@@ -269,7 +269,7 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
                             )}
                             {hasRecibo ? (
                               <Button variant="ghost" size="sm"
-                                className="h-6 px-1.5 text-[10px] gap-1 text-[#22c55e] hover:text-[#22c55e]"
+                                className="h-6 px-1.5 text-[10px] gap-1 text-success hover:text-success"
                                 onClick={() => viewComprovante((l as any).recibo_assinado_url)}>
                                 <FileText className="h-3 w-3" /> Recibo 📄
                               </Button>

@@ -114,7 +114,7 @@ export default function HonorariosRepeater({ clienteId }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-semibold text-slate-300">Tabela de Honorários Específicos</Label>
+        <Label className="text-sm font-semibold text-muted-foreground">Tabela de Honorários Específicos</Label>
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs" onClick={addRow}>
             <Plus className="h-3.5 w-3.5" /> Adicionar Serviço Negociado
@@ -136,7 +136,7 @@ export default function HonorariosRepeater({ clienteId }: Props) {
           {rows.map((row) => (
             <div key={row.key} className="grid grid-cols-[1fr_120px_180px_80px_40px] gap-3 items-end rounded-lg border border-border/60 bg-muted/20 p-3">
               <div className="grid gap-1">
-                <Label className="text-[10px] text-slate-400">Nome do Serviço</Label>
+                <Label className="text-[10px] text-muted-foreground">Nome do Serviço</Label>
                 <Input
                   placeholder="Ex: Alteração Especial"
                   value={row.service_name}
@@ -145,7 +145,7 @@ export default function HonorariosRepeater({ clienteId }: Props) {
                 />
               </div>
               <div className="grid gap-1">
-                <Label className="text-[10px] text-slate-400">Valor (R$)</Label>
+                <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -157,7 +157,7 @@ export default function HonorariosRepeater({ clienteId }: Props) {
                 />
               </div>
               <div className="grid gap-1">
-                <Label className="text-[10px] text-slate-400">Gatilho de Cobrança</Label>
+                <Label className="text-[10px] text-muted-foreground">Gatilho de Cobrança</Label>
                 <Select value={row.billing_trigger} onValueChange={v => updateRow(row.key, 'billing_trigger', v)}>
                   <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -167,7 +167,7 @@ export default function HonorariosRepeater({ clienteId }: Props) {
                 </Select>
               </div>
               <div className="grid gap-1">
-                <Label className="text-[10px] text-slate-400">Dias</Label>
+                <Label className="text-[10px] text-muted-foreground">Dias</Label>
                 <Input
                   type="number"
                   min={0}

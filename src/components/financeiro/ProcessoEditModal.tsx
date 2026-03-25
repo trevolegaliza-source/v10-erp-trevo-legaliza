@@ -124,7 +124,7 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
       <div className="flex items-center gap-2">
         <FileText className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm text-foreground">{label}</span>
-        {storagePath && <CheckCircle2 className="h-3.5 w-3.5 text-[#22c55e]" />}
+        {storagePath && <CheckCircle2 className="h-3.5 w-3.5 text-success" />}
       </div>
       <div className="flex items-center gap-1.5">
         {storagePath && (

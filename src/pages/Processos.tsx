@@ -89,15 +89,15 @@ function ProcessCard({
           {...provided.dragHandleProps}
           onDoubleClick={() => onDoubleClick(process)}
           className={cn(
-            'group rounded-lg border border-border bg-zinc-900 p-3 shadow-sm cursor-pointer transition-all hover:border-primary/40 hover:shadow-[0_0_12px_-3px_hsl(var(--primary)/0.25)]',
+            'group rounded-lg border border-border bg-card p-3 shadow-sm cursor-pointer transition-all hover:border-primary/40 hover:shadow-[0_0_12px_-3px_hsl(var(--primary)/0.25)]',
             snapshot.isDragging && 'shadow-lg ring-2 ring-primary/30'
           )}
         >
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-bold truncate leading-tight text-white">{clientName}</p>
-              <p className="text-[10px] text-zinc-400 mt-0.5">📅 {new Date(process.created_at).toLocaleDateString('pt-BR')}</p>
-              <p className="text-[11px] text-zinc-400 mt-0.5 truncate">{process.razao_social}</p>
+              <p className="text-[13px] font-bold truncate leading-tight text-foreground">{clientName}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">📅 {new Date(process.created_at).toLocaleDateString('pt-BR')}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{process.razao_social}</p>
               <p className="text-[12px] font-semibold text-primary mt-0.5 truncate">{typeLabel}</p>
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
@@ -117,11 +117,11 @@ function ProcessCard({
               <div className="h-5 w-5 rounded-full bg-primary/15 flex items-center justify-center">
                 <span className="text-[9px] font-semibold text-primary">{process.responsavel[0]}</span>
               </div>
-              <span className="text-[11px] text-zinc-400">{process.responsavel}</span>
+              <span className="text-[11px] text-muted-foreground">{process.responsavel}</span>
             </div>
           )}
           {process.valor && (
-            <p className="text-sm font-semibold text-white mt-1.5">
+            <p className="text-sm font-semibold text-foreground mt-1.5">
               {Number(process.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </p>
           )}
@@ -298,7 +298,7 @@ export default function Processos() {
                         >
                           <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/30">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-white uppercase tracking-wide">{stage.label}</span>
+                              <span className="text-xs font-semibold text-foreground uppercase tracking-wide">{stage.label}</span>
                               <span className={cn(
                                 'flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10px] font-bold',
                                 stageProcesses.length > 0 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'
@@ -339,13 +339,13 @@ export default function Processos() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-semibold text-zinc-300">Razão Social</TableHead>
-                  <TableHead className="text-xs font-semibold text-zinc-300">Cliente</TableHead>
-                  <TableHead className="text-xs font-semibold text-zinc-300">Tipo</TableHead>
-                  <TableHead className="text-xs font-semibold text-zinc-300">Etapa</TableHead>
-                  <TableHead className="text-xs font-semibold text-zinc-300">Prioridade</TableHead>
-                  <TableHead className="text-right text-xs font-semibold text-zinc-300">Valor</TableHead>
-                  <TableHead className="text-center text-xs font-semibold text-zinc-300">Ações</TableHead>
+                  <TableHead className="text-xs font-semibold">Razão Social</TableHead>
+                  <TableHead className="text-xs font-semibold">Cliente</TableHead>
+                  <TableHead className="text-xs font-semibold">Tipo</TableHead>
+                  <TableHead className="text-xs font-semibold">Etapa</TableHead>
+                  <TableHead className="text-xs font-semibold">Prioridade</TableHead>
+                  <TableHead className="text-right text-xs font-semibold">Valor</TableHead>
+                  <TableHead className="text-center text-xs font-semibold">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -355,8 +355,8 @@ export default function Processos() {
                     className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
                     onDoubleClick={() => openEditModal(proc)}
                   >
-                    <TableCell className="font-medium text-zinc-100">{proc.razao_social}</TableCell>
-                    <TableCell className="text-sm text-zinc-100">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
+                    <TableCell className="font-medium text-foreground">{proc.razao_social}</TableCell>
+                    <TableCell className="text-sm text-foreground">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
                         {(() => {
@@ -365,15 +365,15 @@ export default function Processos() {
                         })()}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm text-zinc-100">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
+                    <TableCell className="text-sm text-foreground">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
                     <TableCell>
                       {proc.prioridade === 'urgente' ? (
                         <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
                       ) : (
-                        <span className="text-xs text-zinc-400">Normal</span>
+                        <span className="text-xs text-muted-foreground">Normal</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-sm font-semibold text-zinc-100">
+                    <TableCell className="text-right text-sm font-semibold text-foreground">
                       {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
                     </TableCell>
                     <TableCell className="text-center">

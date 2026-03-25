@@ -356,12 +356,12 @@ export default function ClienteDetalhe() {
           <div className="flex items-center gap-4 mt-1 text-sm flex-wrap">
             <span className="flex items-center gap-1 text-muted-foreground"><Building2 className="h-3.5 w-3.5" />{cliente.nome}</span>
             {(cliente as any).cnpj && (
-              <span className={`text-xs font-mono ${!cnpjInfo.valid ? 'text-destructive font-semibold' : 'text-slate-300'}`}>
+              <span className={`text-xs font-mono ${!cnpjInfo.valid ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
                 CNPJ: {cnpjInfo.formatted}
               </span>
             )}
-            <span className="text-xs text-slate-400">Código: {maskCodigo(codigoDisplay)}</span>
-            {cliente.nome_contador && <span className="flex items-center gap-1 text-slate-400"><User className="h-3.5 w-3.5" />{cliente.nome_contador}</span>}
+            <span className="text-xs text-muted-foreground">Código: {maskCodigo(codigoDisplay)}</span>
+            {cliente.nome_contador && <span className="flex items-center gap-1 text-muted-foreground"><User className="h-3.5 w-3.5" />{cliente.nome_contador}</span>}
           </div>
         </div>
         {/* Action Buttons */}
@@ -448,11 +448,11 @@ export default function ClienteDetalhe() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label className="text-xs text-slate-400">Tipo de Cliente</Label>
+                  <Label className="text-xs text-muted-foreground">Tipo de Cliente</Label>
                   <p className="font-medium">{isMensalista ? 'Mensalista' : 'Avulso'}</p>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label className="text-xs text-slate-400">Momento do Faturamento</Label>
+                  <Label className="text-xs text-muted-foreground">Momento do Faturamento</Label>
                   {editing ? (
                     <Select value={(editForm as any).momento_faturamento || 'na_solicitacao'} onValueChange={(v) => setEditForm(f => ({ ...f, momento_faturamento: v as any }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -468,7 +468,7 @@ export default function ClienteDetalhe() {
                 {isMensalista ? (
                   <>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-slate-400">Valor da Mensalidade</Label>
+                      <Label className="text-xs text-muted-foreground">Valor da Mensalidade</Label>
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).mensalidade ?? ''} onChange={e => setEditForm(f => ({ ...f, mensalidade: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
@@ -476,7 +476,7 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-slate-400">Vencimento</Label>
+                      <Label className="text-xs text-muted-foreground">Vencimento</Label>
                       {editing ? (
                         <Input type="number" min={1} max={31} value={(editForm as any).vencimento ?? (editForm as any).dia_vencimento_mensal ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : null; setEditForm(f => ({ ...f, vencimento: v, dia_vencimento_mensal: v ?? undefined })); }} />
                       ) : (
@@ -484,7 +484,7 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-slate-400">Qtd Processos Inclusos</Label>
+                      <Label className="text-xs text-muted-foreground">Qtd Processos Inclusos</Label>
                       {editing ? (
                         <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
                       ) : (
@@ -495,7 +495,7 @@ export default function ClienteDetalhe() {
                 ) : (
                   <>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-slate-400">Valor Base</Label>
+                      <Label className="text-xs text-muted-foreground">Valor Base</Label>
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
@@ -503,7 +503,7 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-slate-400">Desconto Progressivo (%)</Label>
+                      <Label className="text-xs text-muted-foreground">Desconto Progressivo (%)</Label>
                       {editing ? (
                         <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
                       ) : (
@@ -511,7 +511,7 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-slate-400">Valor Limite de Desconto</Label>
+                      <Label className="text-xs text-muted-foreground">Valor Limite de Desconto</Label>
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
@@ -520,7 +520,7 @@ export default function ClienteDetalhe() {
                     </div>
                     {(editForm as any).momento_faturamento !== 'no_deferimento' && (
                       <div className="grid gap-1.5">
-                        <Label className="text-xs text-slate-400">Dia de Cobrança (D+X)</Label>
+                        <Label className="text-xs text-muted-foreground">Dia de Cobrança (D+X)</Label>
                         {editing ? (
                           <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="4" />
                         ) : (
@@ -849,21 +849,21 @@ export default function ClienteDetalhe() {
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label className="text-slate-300">Nome da Contabilidade *</Label>
+                <Label className="text-muted-foreground">Nome da Contabilidade *</Label>
                 <Input value={editCadastroForm.nome || ''} onChange={e => setEditCadastroForm(f => ({ ...f, nome: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label className="text-slate-300">Apelido</Label>
+                <Label className="text-muted-foreground">Apelido</Label>
                 <Input value={editCadastroForm.apelido || ''} onChange={e => setEditCadastroForm(f => ({ ...f, apelido: e.target.value }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label className="text-slate-300">Nome do Contador</Label>
+                <Label className="text-muted-foreground">Nome do Contador</Label>
                 <Input value={editCadastroForm.nome_contador || ''} onChange={e => setEditCadastroForm(f => ({ ...f, nome_contador: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label className="text-slate-300">CNPJ</Label>
+                <Label className="text-muted-foreground">CNPJ</Label>
                 <Input
                   value={editCadastroForm.cnpj || ''}
                   onChange={e => handleCnpjEditChange(e.target.value)}
@@ -877,7 +877,7 @@ export default function ClienteDetalhe() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
-                <Label className="text-slate-300">Código do Cliente</Label>
+                <Label className="text-muted-foreground">Código do Cliente</Label>
                 <Input
                   value={maskCodigo(editCadastroForm.codigo_identificador || '')}
                   onChange={e => setEditCadastroForm(f => ({ ...f, codigo_identificador: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
@@ -886,16 +886,16 @@ export default function ClienteDetalhe() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label className="text-slate-300">Email</Label>
+                <Label className="text-muted-foreground">Email</Label>
                 <Input value={editCadastroForm.email || ''} onChange={e => setEditCadastroForm(f => ({ ...f, email: e.target.value }))} />
               </div>
               <div className="grid gap-2">
-                <Label className="text-slate-300">Telefone</Label>
+                <Label className="text-muted-foreground">Telefone</Label>
                 <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
               </div>
             </div>
             <div className="grid gap-2">
-              <Label className="text-slate-300">Tipo</Label>
+              <Label className="text-muted-foreground">Tipo</Label>
               <Select value={editCadastroForm.tipo} onValueChange={(v) => setEditCadastroForm(f => ({ ...f, tipo: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
