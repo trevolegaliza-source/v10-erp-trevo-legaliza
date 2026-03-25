@@ -25,6 +25,7 @@ import { KANBAN_STAGES } from '@/types/process';
 import { STATUS_LABELS, STATUS_STYLES, TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso, TipoCliente } from '@/types/financial';
 import { cn } from '@/lib/utils';
+import { UFS_BRASIL } from '@/constants/estados-brasil';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
