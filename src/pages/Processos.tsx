@@ -370,7 +370,7 @@ export default function Processos() {
                       {proc.prioridade === 'urgente' ? (
                         <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
                       ) : (
-                        <span className="text-xs text-zinc-400">Normal</span>
+                        <span className="text-xs text-muted-foreground">Normal</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right text-sm font-semibold text-zinc-100">
