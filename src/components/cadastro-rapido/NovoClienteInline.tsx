@@ -38,7 +38,7 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
 
     createCliente.mutate(
       {
-        codigo_identificador: cnpjDigits.slice(0, 6) || '000000',
+        codigo_identificador: form.codigo_identificador.trim() || `CLI-${Date.now()}`,
         nome: form.nome,
         cnpj: cnpjDigits || null,
         tipo: form.tipo,
