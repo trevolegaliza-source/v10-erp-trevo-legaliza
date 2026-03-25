@@ -17,6 +17,7 @@ export type Database = {
       clientes: {
         Row: {
           apelido: string | null
+          cidade: string | null
           cnpj: string | null
           codigo_identificador: string
           contrato_url: string | null
@@ -27,6 +28,7 @@ export type Database = {
           dia_cobranca: number | null
           dia_vencimento_mensal: number | null
           email: string | null
+          estado: string | null
           franquia_processos: number | null
           id: string
           is_archived: boolean | null
@@ -48,6 +50,7 @@ export type Database = {
         }
         Insert: {
           apelido?: string | null
+          cidade?: string | null
           cnpj?: string | null
           codigo_identificador: string
           contrato_url?: string | null
@@ -58,6 +61,7 @@ export type Database = {
           dia_cobranca?: number | null
           dia_vencimento_mensal?: number | null
           email?: string | null
+          estado?: string | null
           franquia_processos?: number | null
           id?: string
           is_archived?: boolean | null
@@ -79,6 +83,7 @@ export type Database = {
         }
         Update: {
           apelido?: string | null
+          cidade?: string | null
           cnpj?: string | null
           codigo_identificador?: string
           contrato_url?: string | null
@@ -89,6 +94,7 @@ export type Database = {
           dia_cobranca?: number | null
           dia_vencimento_mensal?: number | null
           email?: string | null
+          estado?: string | null
           franquia_processos?: number | null
           id?: string
           is_archived?: boolean | null
