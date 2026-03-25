@@ -478,6 +478,14 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
+                      <Label className="text-xs text-muted-foreground">Franquia de Processos/mês</Label>
+                      {editing ? (
+                        <Input type="number" min={0} value={(editForm as any).franquia_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, franquia_processos: e.target.value ? Number(e.target.value) : 0 }))} placeholder="0" />
+                      ) : (
+                        <p className="font-medium">{(cliente as any).franquia_processos ?? 0} processos</p>
+                      )}
+                    </div>
+                    <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Vencimento</Label>
                       {editing ? (
                         <Input type="number" min={1} max={31} value={(editForm as any).vencimento ?? (editForm as any).dia_vencimento_mensal ?? ''} onChange={e => { const v = e.target.value ? Number(e.target.value) : null; setEditForm(f => ({ ...f, vencimento: v, dia_vencimento_mensal: v ?? undefined })); }} />
@@ -486,12 +494,44 @@ export default function ClienteDetalhe() {
                       )}
                     </div>
                     <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Qtd Processos Inclusos</Label>
+                      <Label className="text-xs text-muted-foreground">Valor Base (proc. excedente)</Label>
                       {editing ? (
-                        <Input type="number" min={0} value={(editForm as any).qtd_processos ?? ''} onChange={e => setEditForm(f => ({ ...f, qtd_processos: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
+                        <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{formatValueOrZero((cliente as any).qtd_processos)}</p>
+                        <p className="font-medium">{formatCurrencyOrZero((cliente as any).valor_base)}</p>
                       )}
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs text-muted-foreground">Desc. Progressivo % (excedente)</Label>
+                      {editing ? (
+                        <Input type="number" step="0.1" value={(editForm as any).desconto_progressivo ?? ''} onChange={e => setEditForm(f => ({ ...f, desconto_progressivo: e.target.value ? Number(e.target.value) : null }))} placeholder="0" />
+                      ) : (
+                        <p className="font-medium">{formatValueOrZero((cliente as any).desconto_progressivo)}%</p>
+                      )}
+                    </div>
+                    <div className="col-span-2 p-3 rounded-lg bg-muted/30 border border-border/40">
+                      <p className="text-xs text-muted-foreground">
+                        Processos dentro da franquia: R$ 0,00. Processos excedentes usam valor base com desconto progressivo configurado acima.
+                      </p>
+                    </div>
+                  </>
+                ) : isPrePago ? (
+                  <>
+                    <div className="col-span-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
+                      <p className="text-xs text-muted-foreground">Saldo Atual</p>
+                      <p className={`text-2xl font-bold ${Number((cliente as any).saldo_prepago ?? 0) >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                        {formatCurrencyOrZero((cliente as any).saldo_prepago)}
+                      </p>
+                      {(cliente as any).data_ultima_recarga && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Última recarga: {formatCurrencyOrZero((cliente as any).saldo_ultima_recarga)} em {new Date((cliente as any).data_ultima_recarga).toLocaleDateString('pt-BR')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="col-span-2 p-3 rounded-lg bg-muted/30 border border-border/40">
+                      <p className="text-xs text-muted-foreground">
+                        Para clientes pré-pagos, o valor de cada processo é definido nos Serviços Pré-Acordados. O saldo é debitado automaticamente ao cadastrar o processo.
+                      </p>
                     </div>
                   </>
                 ) : (
