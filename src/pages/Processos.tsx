@@ -117,7 +117,7 @@ function ProcessCard({
               <div className="h-5 w-5 rounded-full bg-primary/15 flex items-center justify-center">
                 <span className="text-[9px] font-semibold text-primary">{process.responsavel[0]}</span>
               </div>
-              <span className="text-[11px] text-zinc-400">{process.responsavel}</span>
+              <span className="text-[11px] text-muted-foreground">{process.responsavel}</span>
             </div>
           )}
           {process.valor && (
