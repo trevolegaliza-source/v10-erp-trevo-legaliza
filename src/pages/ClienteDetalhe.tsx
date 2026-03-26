@@ -1212,6 +1212,47 @@ export default function ClienteDetalhe() {
                 <Input type="number" step="0.01" value={processoForm.valor_manual} onChange={e => setProcessoForm(f => ({ ...f, valor_manual: e.target.value }))} placeholder="0,00" />
               </div>
             )}
+            {/* Mudança de UF checkbox */}
+            {(processoForm.tipo === 'alteracao' || processoForm.tipo === 'transformacao') && (
+              <div className="flex items-center gap-3 rounded-lg border border-border/60 p-3">
+                <Checkbox
+                  id="mudanca_uf"
+                  checked={processoForm.mudanca_uf}
+                  onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, mudanca_uf: !!checked }))}
+                />
+                <div>
+                  <Label htmlFor="mudanca_uf" className="text-sm font-medium cursor-pointer">Mudança de UF</Label>
+                  <p className="text-[10px] text-muted-foreground">Consome 2 slots, cobra 2 processos</p>
+                </div>
+              </div>
+            )}
+            {/* Boas-vindas */}
+            {processos.length === 0 && !(cliente as any).desconto_boas_vindas_aplicado && (
+              <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-2">
+                <p className="text-sm font-medium flex items-center gap-2">🎉 Primeiro processo deste cliente!</p>
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="boas_vindas"
+                    checked={processoForm.boas_vindas}
+                    onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, boas_vindas: !!checked }))}
+                  />
+                  <Label htmlFor="boas_vindas" className="text-sm cursor-pointer">Aplicar desconto de boas-vindas</Label>
+                  {processoForm.boas_vindas && (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        className="w-16 h-7 text-xs"
+                        value={processoForm.boas_vindas_pct}
+                        onChange={e => setProcessoForm(f => ({ ...f, boas_vindas_pct: e.target.value }))}
+                        min={1}
+                        max={100}
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNovoProcesso(false)}>Cancelar</Button>
