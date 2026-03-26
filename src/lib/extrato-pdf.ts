@@ -162,11 +162,11 @@ const GLOBAL_STYLES = `
   .total-value { font-size: 42px; font-weight: 800; color: #ffffff; letter-spacing: -1px; line-height: 1.1; }
   .total-ctx { font-size: 9px; color: #94a3b8; margin-top: 4px; }
   .kpi-row { display: flex; gap: 12px; margin-top: 14px; }
-  .kpi-card { flex: 1; background: #f8fafc; border: 2px solid #e2e8f0; border-top: 4px solid #4C9F38; border-radius: 0 0 5px 5px; padding: 12px; }
+  .kpi-card { flex: 1; background: #f8fafc; border: 2px solid #e2e8f0; border-top: 4px solid #4C9F38; border-radius: 0 0 5px 5px; padding: 12px; min-height: 70px; display: flex; flex-direction: column; justify-content: center; }
   .kpi-card.eco { background: #4C9F38; border-color: #4C9F38; }
-  .kpi-label { font-size: 8px; font-weight: 700; color: #4C9F38; text-transform: uppercase; }
+  .kpi-label { font-size: 6.5px; font-weight: 700; color: #4C9F38; text-transform: uppercase; }
   .kpi-card.eco .kpi-label { color: #ffffff; }
-  .kpi-value { font-size: 14px; font-weight: 800; color: #1a1a2e; margin-top: 2px; }
+  .kpi-value { font-size: 11px; font-weight: 800; color: #1a1a2e; margin-top: 2px; }
   .kpi-card.eco .kpi-value { color: #ffffff; }
   .vol-block { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; margin-top: 12px; border-radius: 4px; }
   .vol-text { font-size: 9px; color: #64748b; line-height: 1.5; }
