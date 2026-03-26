@@ -342,7 +342,11 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
   const totalHon = selected.reduce((s, st) => s + st.valorFinal, 0);
   const totalTaxas = Object.values(data.valoresAdicionais).flat().reduce((s, va) => s + Number(va.valor), 0);
   const totalGeral = totalHon + totalTaxas;
-  const economia = steps.filter(s => !s.isManual).reduce((s, st) => s + st.desconto, 0);
+  const economiaProgressivo = steps.filter(s => !s.isManual).reduce((s, st) => s + st.desconto, 0);
+  // Include boas-vindas savings in economia
+  const base = data.cliente.valor_base ?? 580;
+  const economiaBoasVindas = steps.filter(s => s.label && s.label.includes('BOAS-VINDAS')).reduce((s, st) => s + (base - st.valorFinal), 0);
+  const economia = economiaProgressivo + economiaBoasVindas;
   const descPct = data.cliente.desconto_progressivo ?? 0;
 
   return `
