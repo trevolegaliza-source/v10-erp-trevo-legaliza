@@ -1523,7 +1523,16 @@ export default function ClienteDetalhe() {
       </AlertDialog>
 
       {/* Dialog Novo Processo — Reformulado */}
-      <Dialog open={showNovoProcesso} onOpenChange={setShowNovoProcesso}>
+      <Dialog
+        open={showNovoProcesso}
+        onOpenChange={(open) => {
+          setShowNovoProcesso(open);
+          if (!open) {
+            setAplicarBoasVindas(false);
+            setIsFirstProcessNovo(false);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Processo — {cliente.apelido || cliente.nome}</DialogTitle>
