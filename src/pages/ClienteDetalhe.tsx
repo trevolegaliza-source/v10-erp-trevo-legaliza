@@ -1678,6 +1678,47 @@ export default function ClienteDetalhe() {
                 </div>
               )}
 
+              {isFirstProcessNovo && (
+                <div className="rounded-lg border border-success/40 bg-success/10 p-3 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-success">🎉 Primeiro processo deste cliente</p>
+                      <p className="text-xs text-muted-foreground">Deseja aplicar desconto de boas-vindas neste cadastro?</p>
+                    </div>
+                    <Switch
+                      checked={aplicarBoasVindas}
+                      onCheckedChange={(checked) => {
+                        setAplicarBoasVindas(checked);
+                        setProcessoForm((f) => ({
+                          ...f,
+                          boas_vindas: checked,
+                          boas_vindas_pct: checked ? (boasVindasPct || '50') : '50',
+                        }));
+                      }}
+                    />
+                  </div>
+
+                  {aplicarBoasVindas && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs">Percentual</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        className="w-20 h-8"
+                        value={boasVindasPct}
+                        onChange={(e) => {
+                          const pct = e.target.value;
+                          setBoasVindasPct(pct);
+                          setProcessoForm((f) => ({ ...f, boas_vindas: true, boas_vindas_pct: pct || '50' }));
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Manual fields */}
               {isManualPrice && (
                 <div className="space-y-3">
