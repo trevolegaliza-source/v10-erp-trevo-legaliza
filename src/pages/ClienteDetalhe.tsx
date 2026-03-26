@@ -1414,6 +1414,50 @@ export default function ClienteDetalhe() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Deferimento Alert */}
+      <AlertDialog open={showDeferimentoAlert} onOpenChange={setShowDeferimentoAlert}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              ⚠️ Cliente com Faturamento no Deferimento
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  O cliente <strong>{cliente?.apelido || cliente?.nome}</strong> está configurado para faturar apenas no deferimento.
+                </p>
+                <p className="font-medium text-foreground">Processos ainda NÃO deferidos:</p>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  {deferimentoPendentes.map(p => (
+                    <li key={p.id}>
+                      {TIPO_PROCESSO_LABELS[p.tipo] || p.tipo} — {p.razao_social}{' '}
+                      <span className="text-muted-foreground">(Etapa: {p.etapa})</span>
+                    </li>
+                  ))}
+                </ul>
+                <p>Deseja gerar o extrato mesmo assim?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {deferimentoDeferidos.length > 0 && (
+              <Button variant="outline" onClick={() => {
+                setShowDeferimentoAlert(false);
+                gerarExtratoClienteDetalhe(deferimentoDeferidos);
+              }}>
+                Gerar Apenas Deferidos ({deferimentoDeferidos.length})
+              </Button>
+            )}
+            <AlertDialogAction onClick={() => {
+              setShowDeferimentoAlert(false);
+              gerarExtratoClienteDetalhe(deferimentoTodos);
+            }}>
+              Gerar Todos Mesmo Assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
