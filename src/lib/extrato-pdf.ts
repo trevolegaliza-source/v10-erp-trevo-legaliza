@@ -205,7 +205,7 @@ const GLOBAL_STYLES = `
   .ph-values-inline { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; }
   .ph-value { font-size: 14px; font-weight: 800; color: #ffffff; }
   .ph-base { font-size: 8px; color: rgba(255,255,255,0.4); }
-  .ph-base-strike { font-size: 10px; color: rgba(255,255,255,0.4); text-decoration: line-through; opacity: 0.4; }
+  .ph-base-strike { font-size: 10px; color: rgba(255,255,255,0.55); text-decoration: line-through; }
   .cortesia-badge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 9999px; background: #dcfce7; color: #166534; font-size: 7px; font-weight: 700; letter-spacing: 0.3px; }
   .boas-vindas-badge { display: inline-block; vertical-align: middle; background: #22c55e; color: #ffffff; padding: 2px 8px; border-radius: 2px; font-size: 6.5px; font-weight: 700; text-transform: uppercase; margin-left: 6px; line-height: 1; }
   .boas-vindas-economia { font-size: 7px; color: #4ade80; margin-top: 2px; }
