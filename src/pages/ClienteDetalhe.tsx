@@ -111,7 +111,7 @@ export default function ClienteDetalhe() {
     try {
       const { data: clienteData } = await supabase
         .from('clientes')
-        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador')
         .eq('id', cliente.id)
         .single();
       const processosFin: ProcessoFinanceiro[] = procsToGenerate.map(p => ({
