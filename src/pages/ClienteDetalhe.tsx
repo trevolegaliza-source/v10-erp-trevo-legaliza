@@ -1418,7 +1418,7 @@ export default function ClienteDetalhe() {
       <AlertDialog open={showDeferimentoAlert} onOpenChange={setShowDeferimentoAlert}>
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+            <AlertDialogTitle className="flex items-center gap-2 text-warning">
               ⚠️ Cliente com Faturamento no Deferimento
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
