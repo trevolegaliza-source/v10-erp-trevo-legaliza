@@ -259,6 +259,17 @@ export default function ClienteDetalhe() {
       numero: (cliente as any).numero || '',
       complemento: (cliente as any).complemento || '',
       bairro: (cliente as any).bairro || '',
+      // Financial fields
+      momento_faturamento: (cliente as any).momento_faturamento || 'na_solicitacao',
+      forma_cobranca: Number((cliente as any).dia_vencimento_mensal) > 0 && !(cliente as any).dia_cobranca ? 'fatura_mensal' : 'por_processo',
+      dia_cobranca: String((cliente as any).dia_cobranca ?? '4'),
+      dia_vencimento_mensal: String((cliente as any).dia_vencimento_mensal ?? '15'),
+      valor_base: String((cliente as any).valor_base ?? ''),
+      desconto_progressivo: String((cliente as any).desconto_progressivo ?? ''),
+      valor_limite_desconto: String((cliente as any).valor_limite_desconto ?? ''),
+      mensalidade: String((cliente as any).mensalidade ?? ''),
+      franquia_processos: String((cliente as any).franquia_processos ?? ''),
+      saldo_prepago: String((cliente as any).saldo_prepago ?? ''),
     });
     // Load existing negotiations into inline rows
     setEditHonorariosRows(
