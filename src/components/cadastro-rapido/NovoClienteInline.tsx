@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { X, Loader2 } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { X, Loader2, Info } from 'lucide-react';
 import { useCreateCliente } from '@/hooks/useFinanceiro';
 import { maskCNPJ, isValidCNPJ } from '@/lib/cnpj';
 import { formatCEP, buscarCEP, buscarCoordenadas } from '@/lib/cep';
@@ -36,7 +37,11 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     cidade: '',
     cep: '',
     momento_faturamento: 'na_solicitacao',
+    dia_vencimento_mensal: '',
     dia_cobranca: '',
+    mensalidade: '',
+    franquia_processos: '',
+    saldo_prepago: '',
   });
   const [codigoManual, setCodigoManual] = useState(false);
   const [buscandoCep, setBuscandoCep] = useState(false);
@@ -77,6 +82,26 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     }
   };
 
+  const handleTipoChange = (v: TipoCliente) => {
+    setForm(f => ({
+      ...f,
+      tipo: v,
+      // Reset financial fields when switching type
+      valor_base: '',
+      desconto_progressivo: '',
+      valor_limite_desconto: '',
+      momento_faturamento: v === 'AVULSO_4D' ? 'na_solicitacao' : f.momento_faturamento,
+      dia_vencimento_mensal: v === 'MENSALISTA' ? '10' : '',
+      dia_cobranca: '',
+      mensalidade: '',
+      franquia_processos: '',
+      saldo_prepago: '',
+    }));
+  };
+
+  const diaVencNum = Number(form.dia_vencimento_mensal) || 0;
+  const showDiaCobranca = form.tipo === 'AVULSO_4D' && diaVencNum === 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cnpjDigits = form.cnpj.replace(/\D/g, '');
@@ -88,10 +113,19 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
       toast.error('Preencha o Código do Cliente (ou digite o CNPJ)');
       return;
     }
+    if (form.tipo === 'MENSALISTA') {
+      if (!form.mensalidade || Number(form.mensalidade) <= 0) {
+        toast.error('Preencha o Valor da Mensalidade');
+        return;
+      }
+      if (!form.franquia_processos || Number(form.franquia_processos) <= 0) {
+        toast.error('Preencha a Franquia de Processos');
+        return;
+      }
+    }
 
     const cepDigits = form.cep.replace(/\D/g, '');
 
-    // Try to get coordinates in background
     let latitude: number | null = null;
     let longitude: number | null = null;
     if (form.cidade && form.estado) {
@@ -101,6 +135,10 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
         longitude = coords.lng;
       }
     }
+
+    const isAvulso = form.tipo === 'AVULSO_4D';
+    const isMensalista = form.tipo === 'MENSALISTA';
+    const isPrePago = form.tipo === 'PRE_PAGO';
 
     createCliente.mutate(
       {
@@ -112,17 +150,24 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
         tipo: form.tipo,
         email: form.email || null,
         telefone: form.telefone || null,
-        valor_base: form.valor_base ? Number(form.valor_base) : null,
-        desconto_progressivo: form.desconto_progressivo ? Number(form.desconto_progressivo) : null,
-        valor_limite_desconto: form.valor_limite_desconto ? Number(form.valor_limite_desconto) : null,
         observacoes: form.observacoes || null,
         estado: form.estado || null,
         cidade: form.cidade || null,
         cep: cepDigits || null,
         latitude,
         longitude,
-        momento_faturamento: form.momento_faturamento,
-        dia_cobranca: form.dia_cobranca ? Number(form.dia_cobranca) : null,
+        // Avulso fields
+        momento_faturamento: isAvulso ? form.momento_faturamento : isMensalista ? 'na_solicitacao' : null,
+        dia_vencimento_mensal: isAvulso ? (diaVencNum || null) : isMensalista ? (Number(form.dia_vencimento_mensal) || 10) : null,
+        dia_cobranca: isAvulso && showDiaCobranca && form.dia_cobranca ? Number(form.dia_cobranca) : null,
+        valor_base: (isAvulso || isMensalista) && form.valor_base ? Number(form.valor_base) : isPrePago && form.valor_base ? Number(form.valor_base) : null,
+        desconto_progressivo: (isAvulso || isMensalista) && form.desconto_progressivo ? Number(form.desconto_progressivo) : null,
+        valor_limite_desconto: (isAvulso || isMensalista) && form.valor_limite_desconto ? Number(form.valor_limite_desconto) : null,
+        // Mensalista fields
+        mensalidade: isMensalista && form.mensalidade ? Number(form.mensalidade) : null,
+        franquia_processos: isMensalista && form.franquia_processos ? Number(form.franquia_processos) : 0,
+        // Pré-Pago fields
+        saldo_prepago: isPrePago && form.saldo_prepago ? Number(form.saldo_prepago) : 0,
       } as any,
       {
         onSuccess: (data: any) => {
@@ -211,48 +256,135 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-5 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Tipo</Label>
-              <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v as TipoCliente }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="AVULSO_4D">Avulso</SelectItem>
-                  <SelectItem value="MENSALISTA">Mensalista</SelectItem>
-                  <SelectItem value="PRE_PAGO">Pré-Pago</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Faturamento</Label>
-              <Select value={form.momento_faturamento} onValueChange={v => setForm(f => ({ ...f, momento_faturamento: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>
-                  <SelectItem value="no_deferimento">No Deferimento</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Valor Base (R$)</Label>
-              <Input type="number" step="0.01" value={form.valor_base} onChange={e => setForm(f => ({ ...f, valor_base: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Desc. Progr. (%)</Label>
-              <Input type="number" step="0.1" value={form.desconto_progressivo} onChange={e => setForm(f => ({ ...f, desconto_progressivo: e.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Limite/Piso (R$)</Label>
-              <Input type="number" step="0.01" value={form.valor_limite_desconto} onChange={e => setForm(f => ({ ...f, valor_limite_desconto: e.target.value }))} />
-            </div>
+          <Separator className="my-1" />
+
+          {/* Tipo selector */}
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold">Modalidade do Cliente</Label>
+            <Select value={form.tipo} onValueChange={v => handleTipoChange(v as TipoCliente)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AVULSO_4D">Avulso</SelectItem>
+                <SelectItem value="MENSALISTA">Mensalista</SelectItem>
+                <SelectItem value="PRE_PAGO">Pré-Pago</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Dia de Vencimento — only when na_solicitacao */}
-          {form.momento_faturamento === 'na_solicitacao' && (
-            <div className="grid grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Dias p/ vencimento (D+X)</Label>
-                <Input type="number" min={1} max={31} value={form.dia_cobranca} onChange={e => setForm(f => ({ ...f, dia_cobranca: e.target.value }))} placeholder="Ex: 4" />
+          {/* ═══ AVULSO fields ═══ */}
+          {form.tipo === 'AVULSO_4D' && (
+            <div className="space-y-3 rounded-lg border border-border/40 bg-muted/20 p-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Faturamento</Label>
+                  <Select value={form.momento_faturamento} onValueChange={v => setForm(f => ({ ...f, momento_faturamento: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>
+                      <SelectItem value="no_deferimento">No Deferimento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Dia de Faturamento</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={31}
+                    value={form.dia_vencimento_mensal}
+                    onChange={e => setForm(f => ({ ...f, dia_vencimento_mensal: e.target.value }))}
+                    placeholder="0 = D+X"
+                  />
+                  <p className="text-[10px] text-muted-foreground">0 = D+X após solicitação; 1-31 = dia fixo mensal</p>
+                </div>
+              </div>
+              {showDiaCobranca && (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Dias p/ vencimento (D+X)</Label>
+                    <Input type="number" min={1} max={60} value={form.dia_cobranca} onChange={e => setForm(f => ({ ...f, dia_cobranca: e.target.value }))} placeholder="Ex: 4" />
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Valor Base (R$)</Label>
+                  <Input type="number" step="0.01" value={form.valor_base} onChange={e => setForm(f => ({ ...f, valor_base: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Desc. Progr. (%)</Label>
+                  <Input type="number" step="0.1" value={form.desconto_progressivo} onChange={e => setForm(f => ({ ...f, desconto_progressivo: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Limite/Piso (R$)</Label>
+                  <Input type="number" step="0.01" value={form.valor_limite_desconto} onChange={e => setForm(f => ({ ...f, valor_limite_desconto: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ MENSALISTA fields ═══ */}
+          {form.tipo === 'MENSALISTA' && (
+            <div className="space-y-3 rounded-lg border border-border/40 bg-muted/20 p-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Mensalidade (R$) *</Label>
+                  <Input type="number" step="0.01" required value={form.mensalidade} onChange={e => setForm(f => ({ ...f, mensalidade: e.target.value }))} placeholder="0,00" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Franquia Processos *</Label>
+                  <Input type="number" min={0} required value={form.franquia_processos} onChange={e => setForm(f => ({ ...f, franquia_processos: e.target.value }))} placeholder="Qtd inclusos" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Dia Vencimento</Label>
+                  <Input type="number" min={1} max={31} value={form.dia_vencimento_mensal} onChange={e => setForm(f => ({ ...f, dia_vencimento_mensal: e.target.value }))} placeholder="10" />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Separator className="flex-1" />
+                <span>Processos Excedentes</span>
+                <Separator className="flex-1" />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Valor Base Excedente (R$)</Label>
+                  <Input type="number" step="0.01" value={form.valor_base} onChange={e => setForm(f => ({ ...f, valor_base: e.target.value }))} placeholder="0,00" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Desc. Progr. Exc. (%)</Label>
+                  <Input type="number" step="0.1" value={form.desconto_progressivo} onChange={e => setForm(f => ({ ...f, desconto_progressivo: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Limite/Piso Exc. (R$)</Label>
+                  <Input type="number" step="0.01" value={form.valor_limite_desconto} onChange={e => setForm(f => ({ ...f, valor_limite_desconto: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="flex items-start gap-1.5 rounded bg-muted/40 p-2 text-[10px] text-muted-foreground">
+                <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                Processos dentro da franquia: R$ 0,00. Excedentes usam valor base com desconto progressivo.
+              </div>
+            </div>
+          )}
+
+          {/* ═══ PRÉ-PAGO fields ═══ */}
+          {form.tipo === 'PRE_PAGO' && (
+            <div className="space-y-3 rounded-lg border border-border/40 bg-muted/20 p-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Saldo Inicial (R$)</Label>
+                  <Input type="number" step="0.01" value={form.saldo_prepago} onChange={e => setForm(f => ({ ...f, saldo_prepago: e.target.value }))} placeholder="Valor depositado" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Valor por Processo (R$)</Label>
+                  <Input type="number" step="0.01" value={form.valor_base} onChange={e => setForm(f => ({ ...f, valor_base: e.target.value }))} placeholder="Cobrado do saldo" />
+                </div>
+              </div>
+              <div className="flex items-start gap-1.5 rounded bg-muted/40 p-2 text-[10px] text-muted-foreground">
+                <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                O saldo será debitado a cada processo cadastrado. Quando insuficiente, o sistema bloqueará novos cadastros.
               </div>
             </div>
           )}
