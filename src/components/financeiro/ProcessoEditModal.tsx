@@ -32,10 +32,16 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   const deleteProcesso = useDeleteProcesso();
   const { data: allNegotiations = [] } = useAllServiceNegotiations();
 
-  const [notes, setNotes] = useState(processo?.lancamento?.observacoes_financeiro || '');
+  const currentNotes = processo?.lancamento?.observacoes_financeiro || '';
+  const [notes, setNotes] = useState(currentNotes);
   const [valoresOpen, setValoresOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+
+  // Sync notes when processo changes
+  useEffect(() => {
+    setNotes(processo?.lancamento?.observacoes_financeiro || '');
+  }, [processo?.id, processo?.lancamento?.observacoes_financeiro]);
 
   const boletoRef = useRef<HTMLInputElement>(null);
   const comprovanteRef = useRef<HTMLInputElement>(null);
