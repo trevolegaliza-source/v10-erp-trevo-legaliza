@@ -459,7 +459,7 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     }
     // Boas-vindas gets a green badge instead of orange manual badge
     if (isBoasVindasDiscount) {
-      manualBadge = `<span class="boas-vindas-badge">BOAS-VINDAS: ${bvPct || ''}% de desconto</span>`;
+      manualBadge = `<span class="boas-vindas-badge">BOAS-VINDAS: ${bvPct ? bvPct + '%' : ''}</span>`;
     }
 
     let baseRef = '';
