@@ -263,6 +263,7 @@ export function useRankingFaturamento(mes: number, ano: number) {
 export function useRankingVolume(mes: number, ano: number) {
   return useQuery({
     queryKey: ['dashboard_ranking_vol', mes, ano],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const inicio = startOfMonth(new Date(ano, mes - 1, 1)).toISOString();
       const fim = endOfMonth(new Date(ano, mes - 1, 1)).toISOString();
