@@ -60,18 +60,28 @@ export function calcPreview(props: Props): PreviewResult {
     slotOffset = processosNoMes + filaLength;
   }
 
+  // URGÊNCIA: valor fixo = base × 1.5, SEM desconto progressivo
+  if (prioridade === 'urgente') {
+    let urgFinal = valorBase * 1.5;
+    if (mudancaUF) urgFinal *= 2;
+    if (boasVindas) urgFinal *= (1 - Number(boasVindasPct) / 100);
+    return {
+      valorFinal: Math.round(urgFinal * 100) / 100,
+      slotNumero: slotOffset + 1,
+      descontoAplicado: 0,
+    };
+  }
+
   if (mudancaUF && descontoPercent > 0) {
     const calc1 = calcularDescontoProgressivo(valorBase, descontoPercent, slotOffset, valorLimite);
     const calc2 = calcularDescontoProgressivo(valorBase, descontoPercent, slotOffset + 1, valorLimite);
     let total = calc1.valorFinal + calc2.valorFinal;
-    if (prioridade === 'urgente') total *= 1.5;
     if (boasVindas) total *= (1 - Number(boasVindasPct) / 100);
     return { valorFinal: Math.round(total * 100) / 100, slotNumero: calc1.processoNumero, descontoAplicado: calc1.descontoAcumulado + calc2.descontoAcumulado };
   }
 
   const calc = calcularDescontoProgressivo(valorBase, descontoPercent, slotOffset, valorLimite);
   let final = mudancaUF ? calc.valorFinal * 2 : calc.valorFinal;
-  if (prioridade === 'urgente') final *= 1.5;
   if (boasVindas) final *= (1 - Number(boasVindasPct) / 100);
 
   return {
