@@ -102,8 +102,7 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     }));
   };
 
-  const diaVencNum = Number(form.dia_vencimento_mensal) || 0;
-  const showDiaCobranca = form.tipo === 'AVULSO_4D' && diaVencNum === 0;
+  const isFormaProcesso = form.forma_cobranca === 'por_processo';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
