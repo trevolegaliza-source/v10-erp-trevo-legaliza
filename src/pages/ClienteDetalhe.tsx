@@ -1041,7 +1041,7 @@ export default function ClienteDetalhe() {
                         if (result) {
                           setEditCadastroForm(f => ({ ...f, logradouro: result.logradouro, bairro: result.bairro, cidade: result.cidade, estado: result.estado }));
                         } else {
-                          toast.error('CEP não encontrado');
+                          toast.info('CEP não encontrado na base. Preencha os campos manualmente.');
                         }
                       }
                     }}
