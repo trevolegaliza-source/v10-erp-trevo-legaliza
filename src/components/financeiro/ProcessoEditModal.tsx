@@ -32,8 +32,7 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   const deleteProcesso = useDeleteProcesso();
   const { data: allNegotiations = [] } = useAllServiceNegotiations();
 
-  const currentNotes = processo?.lancamento?.observacoes_financeiro || '';
-  const [notes, setNotes] = useState(currentNotes);
+  const [notes, setNotes] = useState(processo?.lancamento?.observacoes_financeiro || '');
   const [valoresOpen, setValoresOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
