@@ -35,6 +35,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     estado: '',
     cidade: '',
     cep: '',
+    momento_faturamento: 'na_solicitacao',
+    dia_cobranca: '',
   });
   const [codigoManual, setCodigoManual] = useState(false);
   const [buscandoCep, setBuscandoCep] = useState(false);
