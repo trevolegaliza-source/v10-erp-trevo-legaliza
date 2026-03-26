@@ -173,6 +173,11 @@ export default function ClienteDetalhe() {
       tipo: cliente.tipo,
       estado: (cliente as any).estado || '',
       cidade: (cliente as any).cidade || '',
+      cep: (cliente as any).cep || '',
+      logradouro: (cliente as any).logradouro || '',
+      numero: (cliente as any).numero || '',
+      complemento: (cliente as any).complemento || '',
+      bairro: (cliente as any).bairro || '',
     });
     // Load existing negotiations into inline rows
     setEditHonorariosRows(
