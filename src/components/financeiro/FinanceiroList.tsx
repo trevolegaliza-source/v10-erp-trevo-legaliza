@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertTriangle, FileText } from 'lucide-react';
+import { AlertTriangle, FileText, Clock } from 'lucide-react';
 import type { EtapaFinanceiro } from '@/types/financial';
 import { ETAPA_FINANCEIRO_LABELS, STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
 import type { StatusFinanceiro } from '@/types/financial';
@@ -23,6 +23,16 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import ProcessoEditModal from './ProcessoEditModal';
+import { TIPO_PROCESSO_LABELS } from '@/types/financial';
+
+const ETAPAS_DEFERIDAS = ['registro', 'finalizados'];
+
+interface DeferimentoInfo {
+  clienteNome: string;
+  naoDeferidos: ProcessoFinanceiro[];
+  deferidos: ProcessoFinanceiro[];
+  allSelected: ProcessoFinanceiro[];
+}
 
 interface FinanceiroListProps {
   processos: ProcessoFinanceiro[];
@@ -35,6 +45,8 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
   const [lastPdfBlob, setLastPdfBlob] = useState<Blob | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
+  const [showDeferimentoDialog, setShowDeferimentoDialog] = useState(false);
+  const [deferimentoInfo, setDeferimentoInfo] = useState<DeferimentoInfo | null>(null);
   const qc = useQueryClient();
 
   const allChecked = processos.length > 0 && selected.size === processos.length;
@@ -54,23 +66,10 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
     setSelected(next);
   }
 
-  async function handleGerarExtrato() {
-    const selectedProcessos = processos.filter(p => selected.has(p.id));
-    if (selectedProcessos.length === 0) {
-      toast.warning('Selecione ao menos um processo.');
-      return;
-    }
-
-    // Validate same client
-    const clienteIds = new Set(selectedProcessos.map(p => p.cliente_id));
-    if (clienteIds.size > 1) {
-      toast.error('Apenas processos do mesmo cliente podem compor um extrato único.');
-      return;
-    }
-
+  async function gerarExtratoParaProcessos(processosParaGerar: ProcessoFinanceiro[]) {
     setGenerating(true);
     try {
-      const clienteId = selectedProcessos[0].cliente_id;
+      const clienteId = processosParaGerar[0].cliente_id;
       const { data: clienteData } = await supabase
         .from('clientes')
         .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
@@ -78,12 +77,12 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
         .single();
 
       const [valoresAdicionais, allCompetencia] = await Promise.all([
-        fetchValoresAdicionaisMulti(selectedProcessos.map(p => p.id)),
+        fetchValoresAdicionaisMulti(processosParaGerar.map(p => p.id)),
         fetchCompetenciaProcessos(clienteId),
       ]);
 
       const doc = await gerarExtratoPDF({
-        processos: selectedProcessos,
+        processos: processosParaGerar,
         allCompetencia,
         valoresAdicionais,
         cliente: clienteData as any,
@@ -92,7 +91,6 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
       const blob = doc.output('blob');
       setLastPdfBlob(blob);
 
-      // Download
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -108,6 +106,63 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
     } finally {
       setGenerating(false);
     }
+  }
+
+  async function handleGerarExtrato() {
+    const selectedProcessos = processos.filter(p => selected.has(p.id));
+    if (selectedProcessos.length === 0) {
+      toast.warning('Selecione ao menos um processo.');
+      return;
+    }
+
+    const clienteIds = new Set(selectedProcessos.map(p => p.cliente_id));
+    if (clienteIds.size > 1) {
+      toast.error('Apenas processos do mesmo cliente podem compor um extrato único.');
+      return;
+    }
+
+    const clienteId = selectedProcessos[0].cliente_id;
+
+    // Check deferimento
+    const { data: clienteCheck } = await supabase
+      .from('clientes')
+      .select('momento_faturamento, nome, apelido')
+      .eq('id', clienteId)
+      .single();
+
+    if (clienteCheck?.momento_faturamento === 'no_deferimento') {
+      const deferidos = selectedProcessos.filter(p => ETAPAS_DEFERIDAS.includes(p.etapa));
+      const naoDeferidos = selectedProcessos.filter(p => !ETAPAS_DEFERIDAS.includes(p.etapa));
+
+      if (naoDeferidos.length > 0) {
+        setDeferimentoInfo({
+          clienteNome: clienteCheck.apelido || clienteCheck.nome || 'Cliente',
+          naoDeferidos,
+          deferidos,
+          allSelected: selectedProcessos,
+        });
+        setShowDeferimentoDialog(true);
+        return;
+      }
+    }
+
+    // All good, generate normally
+    await gerarExtratoParaProcessos(selectedProcessos);
+  }
+
+  async function handleDeferimentoApenasDeferidos() {
+    setShowDeferimentoDialog(false);
+    if (!deferimentoInfo || deferimentoInfo.deferidos.length === 0) {
+      toast.warning('Nenhum processo deferido para gerar extrato.');
+      return;
+    }
+    await gerarExtratoParaProcessos(deferimentoInfo.deferidos);
+  }
+
+  async function handleDeferimentoTodos() {
+    setShowDeferimentoDialog(false);
+    if (!deferimentoInfo) return;
+    await gerarExtratoParaProcessos(deferimentoInfo.allSelected);
   }
 
   async function handleMarcarFaturado() {
@@ -138,6 +193,15 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
     }
     setShowMarkDialog(false);
   }
+
+  // Check which clients have deferimento
+  const clienteMomentoMap = new Map<string, string>();
+  processos.forEach(p => {
+    if (!clienteMomentoMap.has(p.cliente_id)) {
+      const momento = (p.cliente as any)?.momento_faturamento;
+      if (momento) clienteMomentoMap.set(p.cliente_id, momento);
+    }
+  });
 
   return (
     <div className="space-y-3">
@@ -180,6 +244,9 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
               const lanc = p.lancamento;
               const total = Number(lanc?.valor ?? p.valor ?? 0) + Number(lanc?.honorario_extra || 0);
               const status = (lanc?.status || 'pendente') as StatusFinanceiro;
+              const isDeferimentoCliente = clienteMomentoMap.get(p.cliente_id) === 'no_deferimento';
+              const isAguardandoDeferimento = isDeferimentoCliente && !ETAPAS_DEFERIDAS.includes(p.etapa);
+
               return (
                 <tr key={p.id} className={cn('border-t border-border/30 cursor-pointer hover:bg-muted/30', isOverdue && 'bg-destructive/5')} onDoubleClick={() => { setEditProcesso(p); setEditModalOpen(true); }}>
                   <td className="px-3 py-2.5">
@@ -200,9 +267,17 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
                     {lanc?.data_vencimento ? new Date(lanc.data_vencimento).toLocaleDateString('pt-BR') : '-'}
                   </td>
                   <td className="px-4 py-2.5">
-                    <Badge variant="outline" className="text-[10px]">
-                      {ETAPA_FINANCEIRO_LABELS[p.etapa_financeiro]}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge variant="outline" className="text-[10px]">
+                        {ETAPA_FINANCEIRO_LABELS[p.etapa_financeiro]}
+                      </Badge>
+                      {isAguardandoDeferimento && (
+                        <Badge className="bg-amber-500/15 text-amber-600 border-0 text-[9px] gap-0.5">
+                          <Clock className="h-2.5 w-2.5" />
+                          Ag. Deferimento
+                        </Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-2.5">
                     <Badge className={cn(STATUS_STYLES[status], 'border-0 text-[10px]')}>
@@ -241,6 +316,47 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Deferimento warning dialog */}
+      <AlertDialog open={showDeferimentoDialog} onOpenChange={setShowDeferimentoDialog}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Cliente com Faturamento no Deferimento
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  O cliente <strong>{deferimentoInfo?.clienteNome}</strong> está configurado para faturar apenas no deferimento.
+                </p>
+                <p className="font-medium text-foreground">Os seguintes processos ainda não foram deferidos:</p>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  {deferimentoInfo?.naoDeferidos.map(p => (
+                    <li key={p.id}>
+                      {TIPO_PROCESSO_LABELS[p.tipo] || p.tipo} — {p.razao_social}{' '}
+                      <span className="text-muted-foreground">(Etapa: {p.etapa})</span>
+                    </li>
+                  ))}
+                </ul>
+                <p>Deseja gerar o extrato mesmo assim?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {deferimentoInfo && deferimentoInfo.deferidos.length > 0 && (
+              <Button variant="outline" onClick={handleDeferimentoApenasDeferidos}>
+                Gerar Apenas Deferidos ({deferimentoInfo.deferidos.length})
+              </Button>
+            )}
+            <AlertDialogAction onClick={handleDeferimentoTodos}>
+              Gerar Todos Mesmo Assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <ProcessoEditModal
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
