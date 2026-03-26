@@ -17,9 +17,12 @@ export type Database = {
       clientes: {
         Row: {
           apelido: string | null
+          bairro: string | null
+          cep: string | null
           cidade: string | null
           cnpj: string | null
           codigo_identificador: string
+          complemento: string | null
           contrato_url: string | null
           created_at: string | null
           data_ultima_recarga: string | null
@@ -32,10 +35,14 @@ export type Database = {
           franquia_processos: number | null
           id: string
           is_archived: boolean | null
+          latitude: number | null
+          logradouro: string | null
+          longitude: number | null
           mensalidade: number | null
           momento_faturamento: string | null
           nome: string
           nome_contador: string | null
+          numero: string | null
           observacoes: string | null
           qtd_processos: number | null
           saldo_prepago: number | null
@@ -50,9 +57,12 @@ export type Database = {
         }
         Insert: {
           apelido?: string | null
+          bairro?: string | null
+          cep?: string | null
           cidade?: string | null
           cnpj?: string | null
           codigo_identificador: string
+          complemento?: string | null
           contrato_url?: string | null
           created_at?: string | null
           data_ultima_recarga?: string | null
@@ -65,10 +75,14 @@ export type Database = {
           franquia_processos?: number | null
           id?: string
           is_archived?: boolean | null
+          latitude?: number | null
+          logradouro?: string | null
+          longitude?: number | null
           mensalidade?: number | null
           momento_faturamento?: string | null
           nome: string
           nome_contador?: string | null
+          numero?: string | null
           observacoes?: string | null
           qtd_processos?: number | null
           saldo_prepago?: number | null
@@ -83,9 +97,12 @@ export type Database = {
         }
         Update: {
           apelido?: string | null
+          bairro?: string | null
+          cep?: string | null
           cidade?: string | null
           cnpj?: string | null
           codigo_identificador?: string
+          complemento?: string | null
           contrato_url?: string | null
           created_at?: string | null
           data_ultima_recarga?: string | null
@@ -98,10 +115,14 @@ export type Database = {
           franquia_processos?: number | null
           id?: string
           is_archived?: boolean | null
+          latitude?: number | null
+          logradouro?: string | null
+          longitude?: number | null
           mensalidade?: number | null
           momento_faturamento?: string | null
           nome?: string
           nome_contador?: string | null
+          numero?: string | null
           observacoes?: string | null
           qtd_processos?: number | null
           saldo_prepago?: number | null
