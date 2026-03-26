@@ -188,7 +188,9 @@ export default function ClienteDetalhe() {
     }
 
     // Boas-vindas: pass percentage to useCreateProcesso which handles discount calculation
-    const boasVindasPct = processoForm.boas_vindas ? Number(processoForm.boas_vindas_pct) || 50 : undefined;
+    const boasVindasPctToSend = processoForm.boas_vindas
+      ? Number(boasVindasPct || processoForm.boas_vindas_pct) || 50
+      : undefined;
 
     createProcesso.mutate(
       {
@@ -200,7 +202,7 @@ export default function ClienteDetalhe() {
         valor_manual: valorManualFinal,
         notas: notas || undefined,
         mudanca_uf: processoForm.mudanca_uf,
-        desconto_boas_vindas: boasVindasPct,
+        desconto_boas_vindas: boasVindasPctToSend,
       },
       {
         onSuccess: async () => {
