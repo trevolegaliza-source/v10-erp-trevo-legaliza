@@ -713,22 +713,28 @@ export default function ClienteDetalhe() {
                     variant="outline"
                     className="gap-1.5 text-xs"
                     disabled={generatingExtrato}
-                    onClick={() => {
+                    onClick={async () => {
                       if (!cliente) return;
                       const selectedProcs = processos.filter(p => selectedProcessosTab.has(p.id));
                       if (selectedProcs.length === 0) return;
 
-                      const DEFER_STAGES = ['registro', 'finalizados'];
-                      const momentoFat = (cliente as any).momento_faturamento || 'na_solicitacao';
+                      const clienteId = selectedProcs[0].cliente_id;
+                      const { data: clienteCheck } = await supabase
+                        .from('clientes')
+                        .select('momento_faturamento, nome')
+                        .eq('id', clienteId)
+                        .single();
 
-                      if (momentoFat === 'no_deferimento') {
-                        const deferidos = selectedProcs.filter(p => DEFER_STAGES.includes(p.etapa));
-                        const pendentes = selectedProcs.filter(p => !DEFER_STAGES.includes(p.etapa));
+                      if (clienteCheck?.momento_faturamento === 'no_deferimento') {
+                        const DEFER_STAGES = ['registro', 'finalizados'];
+                        const naoDeferidos = selectedProcs.filter(p => !DEFER_STAGES.includes(p.etapa));
 
-                        if (pendentes.length > 0) {
-                          setDeferimentoPendentes(pendentes);
-                          setDeferimentoDeferidos(deferidos);
-                          setDeferimentoTodos(selectedProcs);
+                        if (naoDeferidos.length > 0) {
+                          setDeferimentoAlertData({
+                            clienteNome: clienteCheck.nome || cliente.nome,
+                            naoDeferidos,
+                            todosSelecionados: selectedProcs,
+                          });
                           setShowDeferimentoAlert(true);
                           return;
                         }
