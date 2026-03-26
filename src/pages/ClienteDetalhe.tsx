@@ -139,7 +139,7 @@ export default function ClienteDetalhe() {
     }
   }
 
-
+  const handleCreateProcesso = () => {
     if (!cliente || !processoForm.razao_social.trim()) {
       toast.error('Preencha a Razão Social');
       return;
