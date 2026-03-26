@@ -234,7 +234,6 @@ export default function ClienteDetalhe() {
       };
       // Fetch coordinates in background
       if (editCadastroForm.cidade && editCadastroForm.estado) {
-        const { buscarCoordenadas } = await import('@/lib/cep');
         const coords = await buscarCoordenadas(editCadastroForm.logradouro || '', editCadastroForm.cidade, editCadastroForm.estado);
         if (coords) {
           payload.latitude = coords.lat;
