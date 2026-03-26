@@ -98,7 +98,48 @@ export default function ClienteDetalhe() {
   const isNegotiatedService = !!processoForm.negotiated_service_id;
   const isArchived = !!(cliente as any)?.is_archived;
 
-  const handleCreateProcesso = () => {
+  async function gerarExtratoClienteDetalhe(procsToGenerate: ProcessoDB[]) {
+    if (!cliente) return;
+    setGeneratingExtrato(true);
+    try {
+      const { data: clienteData } = await supabase
+        .from('clientes')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
+        .eq('id', cliente.id)
+        .single();
+      const processosFin: ProcessoFinanceiro[] = procsToGenerate.map(p => ({
+        ...p,
+        etapa_financeiro: 'gerar_cobranca' as const,
+        lancamento: lancamentos.find(l => l.processo_id === p.id && l.tipo === 'receber') || null,
+      }));
+      const [valoresAdicionais, allCompetencia] = await Promise.all([
+        fetchValoresAdicionaisMulti(procsToGenerate.map(p => p.id)),
+        fetchCompetenciaProcessos(cliente.id),
+      ]);
+      const doc = await gerarExtratoPDF({
+        processos: processosFin,
+        allCompetencia,
+        valoresAdicionais,
+        cliente: clienteData as any,
+      });
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const clienteName = clienteData?.apelido || clienteData?.nome || 'extrato';
+      a.download = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Extrato gerado com sucesso!');
+      setShowMarkFaturadoDialog(true);
+    } catch (err: any) {
+      toast.error('Erro ao gerar extrato: ' + err.message);
+    } finally {
+      setGeneratingExtrato(false);
+    }
+  }
+
+
     if (!cliente || !processoForm.razao_social.trim()) {
       toast.error('Preencha a Razão Social');
       return;
