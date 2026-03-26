@@ -955,7 +955,7 @@ export default function ClienteDetalhe() {
               <div className="grid gap-2">
                 <Label className="text-muted-foreground">Email</Label>
                 <Input value={editCadastroForm.email || ''} onChange={e => setEditCadastroForm(f => ({ ...f, email: e.target.value }))} />
-            </div>
+              </div>
             </div>
 
             {/* Endereço */}
