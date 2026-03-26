@@ -86,9 +86,7 @@ export default function ClienteDetalhe() {
   const [generatingExtrato, setGeneratingExtrato] = useState(false);
   const [showMarkFaturadoDialog, setShowMarkFaturadoDialog] = useState(false);
   const [showDeferimentoAlert, setShowDeferimentoAlert] = useState(false);
-  const [deferimentoPendentes, setDeferimentoPendentes] = useState<ProcessoDB[]>([]);
-  const [deferimentoDeferidos, setDeferimentoDeferidos] = useState<ProcessoDB[]>([]);
-  const [deferimentoTodos, setDeferimentoTodos] = useState<ProcessoDB[]>([]);
+  const [deferimentoAlertData, setDeferimentoAlertData] = useState<DeferimentoAlertData | null>(null);
 
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
