@@ -34,6 +34,8 @@ import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
 import ProcessoEditModal from '@/components/financeiro/ProcessoEditModal';
+import { useColaboradores } from '@/hooks/useColaboradores';
+import { Textarea } from '@/components/ui/textarea';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import {
