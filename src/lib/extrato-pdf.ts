@@ -370,7 +370,7 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
 
       <div class="footer-contact">
         ${BRAND.email} • ${BRAND.telefone} • trevolegaliza.com
-        <div class="transparency-note"><p>Nota: Os comprovantes de pagamento originais de todas as taxas reembolsáveis estão disponíveis para conferência em nossa plataforma de gestão (Trello), dentro do card correspondente a cada processo.</p></div>
+        ${totalTaxas > 0 ? `<div class="transparency-note"><p>Nota: Os comprovantes de pagamento originais de todas as taxas reembolsáveis estão disponíveis para conferência em nossa plataforma de gestão (Trello), dentro do card correspondente a cada processo.</p></div>` : ''}
       </div>
       <div class="gradient-bottom"></div>
       <div class="page-footer">
