@@ -641,25 +641,50 @@ export default function ClienteDetalhe() {
                   </>
                 ) : (
                   <>
-                    <div className="grid gap-1.5">
-                      <Label className="text-xs text-muted-foreground">Dia de Faturamento</Label>
+                    <div className="grid gap-1.5 col-span-2">
+                      <Label className="text-xs text-muted-foreground">Forma de Cobrança</Label>
                       {editing ? (
-                        <Input type="number" min={0} max={31} value={(editForm as any).dia_vencimento_mensal ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_vencimento_mensal: e.target.value ? Number(e.target.value) : null }))} placeholder="0 = D+X" />
+                        <RadioGroup
+                          value={Number((editForm as any).dia_vencimento_mensal) > 0 ? 'fatura_mensal' : 'por_processo'}
+                          onValueChange={(v) => {
+                            if (v === 'por_processo') {
+                              setEditForm(f => ({ ...f, dia_vencimento_mensal: null, dia_cobranca: (f as any).dia_cobranca ?? 4 }));
+                            } else {
+                              setEditForm(f => ({ ...f, dia_vencimento_mensal: 15, dia_cobranca: null }));
+                            }
+                          }}
+                          className="flex gap-4"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <RadioGroupItem value="por_processo" id="edit-fc-processo" />
+                            <Label htmlFor="edit-fc-processo" className="text-xs cursor-pointer">Por processo (D+X dias)</Label>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <RadioGroupItem value="fatura_mensal" id="edit-fc-mensal" />
+                            <Label htmlFor="edit-fc-mensal" className="text-xs cursor-pointer">Fatura mensal (dia fixo)</Label>
+                          </div>
+                        </RadioGroup>
                       ) : (
-                        <p className="font-medium">{Number(cliente.dia_vencimento_mensal) === 0 || !cliente.dia_vencimento_mensal ? 'D+X' : `Dia ${cliente.dia_vencimento_mensal}`}</p>
+                        <p className="font-medium">
+                          {Number(cliente.dia_vencimento_mensal) > 0 ? `Fatura mensal — dia ${cliente.dia_vencimento_mensal}` : `Por processo — D+${(cliente as any).dia_cobranca ?? 4}`}
+                        </p>
                       )}
-                      <p className="text-[10px] text-muted-foreground">0 = D+X após solicitação; 1-31 = dia fixo mensal</p>
                     </div>
-                    {(Number((editForm as any).dia_vencimento_mensal) === 0 || !(editForm as any).dia_vencimento_mensal) && (editForm as any).momento_faturamento !== 'no_deferimento' && (
+                    {editing && Number((editForm as any).dia_vencimento_mensal) > 0 ? (
                       <div className="grid gap-1.5">
-                        <Label className="text-xs text-muted-foreground">Dias p/ vencimento (D+X)</Label>
-                        {editing ? (
-                          <Input type="number" min={1} max={60} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="4" />
-                        ) : (
-                          <p className="font-medium">D+{(cliente as any).dia_cobranca ?? 0}</p>
-                        )}
+                        <Label className="text-xs text-muted-foreground">Dia de vencimento da fatura</Label>
+                        <Input type="number" min={1} max={31} value={(editForm as any).dia_vencimento_mensal ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_vencimento_mensal: e.target.value ? Number(e.target.value) : null }))} placeholder="15" />
                       </div>
-                    )}
+                    ) : editing ? (
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs text-muted-foreground">Vencimento após solicitação</Label>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-muted-foreground">D+</span>
+                          <Input type="number" min={1} max={60} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="4" className="w-20" />
+                          <span className="text-xs text-muted-foreground">dias</span>
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Valor Base</Label>
                       {editing ? (

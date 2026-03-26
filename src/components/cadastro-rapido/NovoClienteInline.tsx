@@ -287,27 +287,46 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Dia de Faturamento</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={31}
-                    value={form.dia_vencimento_mensal}
-                    onChange={e => setForm(f => ({ ...f, dia_vencimento_mensal: e.target.value }))}
-                    placeholder="0 = D+X"
-                  />
-                  <p className="text-[10px] text-muted-foreground">0 = D+X após solicitação; 1-31 = dia fixo mensal</p>
-                </div>
               </div>
-              {showDiaCobranca && (
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">Forma de Cobrança</Label>
+                <RadioGroup
+                  value={form.forma_cobranca}
+                  onValueChange={(v: 'por_processo' | 'fatura_mensal') => setForm(f => ({ ...f, forma_cobranca: v }))}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <RadioGroupItem value="por_processo" id="fc-processo" />
+                    <Label htmlFor="fc-processo" className="text-xs cursor-pointer">Por processo (D+X dias)</Label>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <RadioGroupItem value="fatura_mensal" id="fc-mensal" />
+                    <Label htmlFor="fc-mensal" className="text-xs cursor-pointer">Fatura mensal (dia fixo)</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {isFormaProcesso ? (
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">Dias p/ vencimento (D+X)</Label>
-                    <Input type="number" min={1} max={60} value={form.dia_cobranca} onChange={e => setForm(f => ({ ...f, dia_cobranca: e.target.value }))} placeholder="Ex: 4" />
+                    <Label className="text-xs">Vencimento após solicitação</Label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">D+</span>
+                      <Input type="number" min={1} max={60} value={form.dia_cobranca} onChange={e => setForm(f => ({ ...f, dia_cobranca: e.target.value }))} placeholder="4" className="w-20" />
+                      <span className="text-xs text-muted-foreground">dias</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Dia de vencimento da fatura</Label>
+                    <Input type="number" min={1} max={31} value={form.dia_vencimento_mensal} onChange={e => setForm(f => ({ ...f, dia_vencimento_mensal: e.target.value }))} placeholder="15" />
                   </div>
                 </div>
               )}
+
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Valor Base (R$)</Label>
