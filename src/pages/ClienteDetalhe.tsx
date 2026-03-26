@@ -28,6 +28,7 @@ import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso,
 import { cn } from '@/lib/utils';
 import { UFS_BRASIL } from '@/constants/estados-brasil';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
