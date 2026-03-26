@@ -64,6 +64,7 @@ export default function CadastroRapido() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [savedProcessos, setSavedProcessos] = useState<ProcessoSalvo[]>([]);
   const [totalEconomia, setTotalEconomia] = useState(0);
+  const [isFirstProcess, setIsFirstProcess] = useState(false);
   const [showBoasVindasAlert, setShowBoasVindasAlert] = useState(false);
   const [boasVindasPct, setBoasVindasPct] = useState('50');
   const [aplicarBoasVindas, setAplicarBoasVindas] = useState(false);
@@ -96,21 +97,26 @@ export default function CadastroRapido() {
     },
   });
 
-  // First process detection (also check desconto_boas_vindas_aplicado)
-  const { data: isFirstProcess = false } = useQuery({
-    queryKey: ['is_first_process', clienteId],
-    enabled: !!clienteId,
-    queryFn: async () => {
-      const { count } = await supabase
-        .from('processos')
-        .select('id', { count: 'exact', head: true })
-        .eq('cliente_id', clienteId!);
-      if ((count ?? 0) > 0) return false;
-      // Check if boas-vindas already applied
-      if (selectedCliente && (selectedCliente as any).desconto_boas_vindas_aplicado) return false;
-      return true;
-    },
-  });
+  const checkFirstProcess = useCallback(async (cliente: ClienteDB | null) => {
+    if (!cliente?.id) {
+      setIsFirstProcess(false);
+      return false;
+    }
+
+    const { count } = await supabase
+      .from('processos')
+      .select('*', { count: 'exact', head: true })
+      .eq('cliente_id', cliente.id);
+
+    const jaAplicou = (cliente as any).desconto_boas_vindas_aplicado === true;
+    const first = (count ?? 0) === 0 && !jaAplicou;
+    setIsFirstProcess(first);
+    return first;
+  }, []);
+
+  useEffect(() => {
+    checkFirstProcess(selectedCliente);
+  }, [selectedCliente?.id, checkFirstProcess]);
 
   const isAvulso = processoForm.tipo === 'avulso';
   const clienteTipo = selectedCliente?.tipo || 'AVULSO_4D';
@@ -148,20 +154,17 @@ export default function CadastroRapido() {
 
   const handleNextStep1 = async () => {
     if (!selectedCliente) return;
-    const { count } = await supabase
-      .from('processos')
-      .select('id', { count: 'exact', head: true })
-      .eq('cliente_id', selectedCliente.id);
 
-    if ((count ?? 0) === 0 && !(selectedCliente as any).desconto_boas_vindas_aplicado) {
-      setBoasVindasPct('50');
-      setShowBoasVindasAlert(true);
-      return;
-    }
+    const first = await checkFirstProcess(selectedCliente);
 
     setAplicarBoasVindas(false);
     setValorForm(prev => ({ ...prev, boasVindas: false, boasVindasPct: '50' }));
     proceedToStep2();
+
+    if (first) {
+      setBoasVindasPct('50');
+      setShowBoasVindasAlert(true);
+    }
   };
 
   const handleNextStep2 = () => {
@@ -442,23 +445,44 @@ export default function CadastroRapido() {
           <AlertDialogHeader>
             <AlertDialogTitle>🎉 Primeiro processo deste cliente!</AlertDialogTitle>
             <AlertDialogDescription>
-              Deseja aplicar desconto de boas-vindas?
+              Este é o primeiro processo de {selectedCliente?.apelido || selectedCliente?.nome}. Deseja aplicar desconto de boas-vindas?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="my-4">
-            <Label>Percentual de desconto (%)</Label>
-            <Input type="number" value={boasVindasPct} onChange={e => setBoasVindasPct(e.target.value)} />
-            <p className="text-sm text-muted-foreground mt-2">
-              Valor base: R$ {Number((selectedCliente as any)?.valor_base || 0).toFixed(2)} → Com desconto: R$ {((Number((selectedCliente as any)?.valor_base || 0)) * (1 - Number(boasVindasPct) / 100)).toFixed(2)}
-            </p>
-          </div>
+          {aplicarBoasVindas && (
+            <div className="my-4">
+              <Label>Percentual de desconto (%)</Label>
+              <div className="mt-1 flex items-center gap-2">
+                <Input type="number" min={1} max={100} className="w-24" value={boasVindasPct} onChange={e => setBoasVindasPct(e.target.value)} />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Valor base: R$ {Number((selectedCliente as any)?.valor_base || 0).toFixed(2)} → Com desconto: R$ {((Number((selectedCliente as any)?.valor_base || 0)) * (1 - Number(boasVindasPct) / 100)).toFixed(2)}
+              </p>
+            </div>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setAplicarBoasVindas(false); setShowBoasVindasAlert(false); setValorForm(prev => ({ ...prev, boasVindas: false, boasVindasPct: '50' })); proceedToStep2(); }}>
-              Não, cobrar normal
+            <AlertDialogCancel onClick={() => { setAplicarBoasVindas(false); setShowBoasVindasAlert(false); setValorForm(prev => ({ ...prev, boasVindas: false, boasVindasPct: '50' })); }}>
+              Não, obrigado
             </AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setAplicarBoasVindas(true); setShowBoasVindasAlert(false); setValorForm(prev => ({ ...prev, boasVindas: true, boasVindasPct: boasVindasPct || '50' })); proceedToStep2(); }}>
-              Sim, aplicar {boasVindasPct}%
-            </AlertDialogAction>
+            {!aplicarBoasVindas ? (
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  setAplicarBoasVindas(true);
+                }}
+              >
+                Sim, aplicar desconto
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                onClick={() => {
+                  setShowBoasVindasAlert(false);
+                  setValorForm(prev => ({ ...prev, boasVindas: true, boasVindasPct: boasVindasPct || '50' }));
+                }}
+              >
+                Confirmar {boasVindasPct}%
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

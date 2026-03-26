@@ -138,11 +138,12 @@ export default function ClienteDetalhe() {
 
     const { count } = await supabase
       .from('processos')
-      .select('id', { count: 'exact', head: true })
+      .select('*', { count: 'exact', head: true })
       .eq('cliente_id', cliente.id);
 
     if ((count ?? 0) === 0 && !(cliente as any).desconto_boas_vindas_aplicado) {
       setBoasVindasPct('50');
+      setAplicarBoasVindas(false);
       setShowBoasVindasAlert(true);
       return;
     }
@@ -1423,7 +1424,13 @@ export default function ClienteDetalhe() {
       />
 
       {/* Boas-vindas (1º processo) — AlertDialog antes do formulário */}
-      <AlertDialog open={showBoasVindasAlert} onOpenChange={setShowBoasVindasAlert}>
+      <AlertDialog
+        open={showBoasVindasAlert}
+        onOpenChange={(open) => {
+          setShowBoasVindasAlert(open);
+          if (!open) setAplicarBoasVindas(false);
+        }}
+      >
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">🎉 Primeiro processo deste cliente!</AlertDialogTitle>
@@ -1434,29 +1441,35 @@ export default function ClienteDetalhe() {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="space-y-3">
-            <div className="grid gap-1.5">
-              <Label className="text-sm">Percentual de desconto (%)</Label>
-              <Input
-                type="number"
-                min={1}
-                max={100}
-                value={boasVindasPct}
-                onChange={(e) => setBoasVindasPct(e.target.value)}
-              />
-            </div>
-            {(() => {
-              const valorBase = Number((cliente as any).valor_base ?? 0);
-              const pct = Number(boasVindasPct) || 0;
-              const valorComDesconto = Math.round(valorBase * (1 - pct / 100) * 100) / 100;
-              return valorBase > 0 ? (
-                <div className="rounded-lg bg-muted/50 p-3 text-sm">
-                  <p>Valor base: <strong>{valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></p>
-                  <p>Com desconto: <strong className="text-primary">{valorComDesconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></p>
+          {aplicarBoasVindas && (
+            <div className="space-y-3">
+              <div className="grid gap-1.5">
+                <Label className="text-sm">Percentual de desconto (%)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    className="w-24"
+                    value={boasVindasPct}
+                    onChange={(e) => setBoasVindasPct(e.target.value)}
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
                 </div>
-              ) : null;
-            })()}
-          </div>
+              </div>
+              {(() => {
+                const valorBase = Number((cliente as any).valor_base ?? 0);
+                const pct = Number(boasVindasPct) || 0;
+                const valorComDesconto = Math.round(valorBase * (1 - pct / 100) * 100) / 100;
+                return valorBase > 0 ? (
+                  <div className="rounded-lg bg-muted/50 p-3 text-sm">
+                    <p>Valor base: <strong>{valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></p>
+                    <p>Com desconto: <strong className="text-primary">{valorComDesconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></p>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+          )}
 
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel
@@ -1467,18 +1480,28 @@ export default function ClienteDetalhe() {
                 setShowNovoProcesso(true);
               }}
             >
-              Não, cobrar normal
+              Não, obrigado
             </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setAplicarBoasVindas(true);
-                setShowBoasVindasAlert(false);
-                setProcessoForm({ ...defaultProcessoForm, boas_vindas: true, boas_vindas_pct: boasVindasPct || '50' });
-                setShowNovoProcesso(true);
-              }}
-            >
-              Sim, aplicar {boasVindasPct}%
-            </AlertDialogAction>
+            {!aplicarBoasVindas ? (
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  setAplicarBoasVindas(true);
+                }}
+              >
+                Sim, aplicar desconto
+              </AlertDialogAction>
+            ) : (
+              <AlertDialogAction
+                onClick={() => {
+                  setShowBoasVindasAlert(false);
+                  setProcessoForm({ ...defaultProcessoForm, boas_vindas: true, boas_vindas_pct: boasVindasPct || '50' });
+                  setShowNovoProcesso(true);
+                }}
+              >
+                Confirmar {boasVindasPct}%
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
