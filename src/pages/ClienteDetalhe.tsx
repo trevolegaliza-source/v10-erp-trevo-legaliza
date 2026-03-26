@@ -79,6 +79,10 @@ export default function ClienteDetalhe() {
   const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
   const [generatingExtrato, setGeneratingExtrato] = useState(false);
   const [showMarkFaturadoDialog, setShowMarkFaturadoDialog] = useState(false);
+  const [showDeferimentoAlert, setShowDeferimentoAlert] = useState(false);
+  const [deferimentoPendentes, setDeferimentoPendentes] = useState<ProcessoDB[]>([]);
+  const [deferimentoDeferidos, setDeferimentoDeferidos] = useState<ProcessoDB[]>([]);
+  const [deferimentoTodos, setDeferimentoTodos] = useState<ProcessoDB[]>([]);
 
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
@@ -93,6 +97,47 @@ export default function ClienteDetalhe() {
   const isManualPrice = processoForm.definir_manual;
   const isNegotiatedService = !!processoForm.negotiated_service_id;
   const isArchived = !!(cliente as any)?.is_archived;
+
+  async function gerarExtratoClienteDetalhe(procsToGenerate: ProcessoDB[]) {
+    if (!cliente) return;
+    setGeneratingExtrato(true);
+    try {
+      const { data: clienteData } = await supabase
+        .from('clientes')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
+        .eq('id', cliente.id)
+        .single();
+      const processosFin: ProcessoFinanceiro[] = procsToGenerate.map(p => ({
+        ...p,
+        etapa_financeiro: 'gerar_cobranca' as const,
+        lancamento: lancamentos.find(l => l.processo_id === p.id && l.tipo === 'receber') || null,
+      }));
+      const [valoresAdicionais, allCompetencia] = await Promise.all([
+        fetchValoresAdicionaisMulti(procsToGenerate.map(p => p.id)),
+        fetchCompetenciaProcessos(cliente.id),
+      ]);
+      const doc = await gerarExtratoPDF({
+        processos: processosFin,
+        allCompetencia,
+        valoresAdicionais,
+        cliente: clienteData as any,
+      });
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const clienteName = clienteData?.apelido || clienteData?.nome || 'extrato';
+      a.download = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Extrato gerado com sucesso!');
+      setShowMarkFaturadoDialog(true);
+    } catch (err: any) {
+      toast.error('Erro ao gerar extrato: ' + err.message);
+    } finally {
+      setGeneratingExtrato(false);
+    }
+  }
 
   const handleCreateProcesso = () => {
     if (!cliente || !processoForm.razao_social.trim()) {
@@ -639,47 +684,28 @@ export default function ClienteDetalhe() {
                     variant="outline"
                     className="gap-1.5 text-xs"
                     disabled={generatingExtrato}
-                    onClick={async () => {
+                    onClick={() => {
                       if (!cliente) return;
                       const selectedProcs = processos.filter(p => selectedProcessosTab.has(p.id));
                       if (selectedProcs.length === 0) return;
-                      setGeneratingExtrato(true);
-                      try {
-                        const { data: clienteData } = await supabase
-                          .from('clientes')
-                          .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
-                          .eq('id', cliente.id)
-                          .single();
-                        const processosFin: ProcessoFinanceiro[] = selectedProcs.map(p => ({
-                          ...p,
-                          etapa_financeiro: 'gerar_cobranca' as const,
-                          lancamento: lancamentos.find(l => l.processo_id === p.id && l.tipo === 'receber') || null,
-                        }));
-                        const [valoresAdicionais, allCompetencia] = await Promise.all([
-                          fetchValoresAdicionaisMulti(selectedProcs.map(p => p.id)),
-                          fetchCompetenciaProcessos(cliente.id),
-                        ]);
-                        const doc = await gerarExtratoPDF({
-                          processos: processosFin,
-                          allCompetencia,
-                          valoresAdicionais,
-                          cliente: clienteData as any,
-                        });
-                        const blob = doc.output('blob');
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        const clienteName = clienteData?.apelido || clienteData?.nome || 'extrato';
-                        a.download = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        toast.success('Extrato gerado com sucesso!');
-                        setShowMarkFaturadoDialog(true);
-                      } catch (err: any) {
-                        toast.error('Erro ao gerar extrato: ' + err.message);
-                      } finally {
-                        setGeneratingExtrato(false);
+
+                      const DEFER_STAGES = ['registro', 'finalizados'];
+                      const momentoFat = (cliente as any).momento_faturamento || 'na_solicitacao';
+
+                      if (momentoFat === 'no_deferimento') {
+                        const deferidos = selectedProcs.filter(p => DEFER_STAGES.includes(p.etapa));
+                        const pendentes = selectedProcs.filter(p => !DEFER_STAGES.includes(p.etapa));
+
+                        if (pendentes.length > 0) {
+                          setDeferimentoPendentes(pendentes);
+                          setDeferimentoDeferidos(deferidos);
+                          setDeferimentoTodos(selectedProcs);
+                          setShowDeferimentoAlert(true);
+                          return;
+                        }
                       }
+
+                      gerarExtratoClienteDetalhe(selectedProcs);
                     }}
                   >
                     <FileText className="h-3.5 w-3.5" />
@@ -1384,6 +1410,50 @@ export default function ClienteDetalhe() {
               setShowMarkFaturadoDialog(false);
             }}>
               Marcar como Faturado
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* Deferimento Alert */}
+      <AlertDialog open={showDeferimentoAlert} onOpenChange={setShowDeferimentoAlert}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-warning">
+              ⚠️ Cliente com Faturamento no Deferimento
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  O cliente <strong>{cliente?.apelido || cliente?.nome}</strong> está configurado para faturar apenas no deferimento.
+                </p>
+                <p className="font-medium text-foreground">Processos ainda NÃO deferidos:</p>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  {deferimentoPendentes.map(p => (
+                    <li key={p.id}>
+                      {TIPO_PROCESSO_LABELS[p.tipo] || p.tipo} — {p.razao_social}{' '}
+                      <span className="text-muted-foreground">(Etapa: {p.etapa})</span>
+                    </li>
+                  ))}
+                </ul>
+                <p>Deseja gerar o extrato mesmo assim?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {deferimentoDeferidos.length > 0 && (
+              <Button variant="outline" onClick={() => {
+                setShowDeferimentoAlert(false);
+                gerarExtratoClienteDetalhe(deferimentoDeferidos);
+              }}>
+                Gerar Apenas Deferidos ({deferimentoDeferidos.length})
+              </Button>
+            )}
+            <AlertDialogAction onClick={() => {
+              setShowDeferimentoAlert(false);
+              gerarExtratoClienteDetalhe(deferimentoTodos);
+            }}>
+              Gerar Todos Mesmo Assim
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
