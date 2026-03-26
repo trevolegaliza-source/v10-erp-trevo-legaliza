@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { X, Loader2, Info } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useCreateCliente } from '@/hooks/useFinanceiro';
 import { maskCNPJ, isValidCNPJ } from '@/lib/cnpj';
 import { formatCEP, buscarCEP, buscarCoordenadas } from '@/lib/cep';
@@ -38,7 +39,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     cep: '',
     momento_faturamento: 'na_solicitacao',
     dia_vencimento_mensal: '',
-    dia_cobranca: '',
+    dia_cobranca: '4',
+    forma_cobranca: 'por_processo' as 'por_processo' | 'fatura_mensal',
     mensalidade: '',
     franquia_processos: '',
     saldo_prepago: '',
@@ -91,16 +93,16 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
       desconto_progressivo: '',
       valor_limite_desconto: '',
       momento_faturamento: v === 'AVULSO_4D' ? 'na_solicitacao' : f.momento_faturamento,
-      dia_vencimento_mensal: v === 'MENSALISTA' ? '10' : '',
-      dia_cobranca: '',
+      dia_vencimento_mensal: v === 'MENSALISTA' ? '10' : '15',
+      dia_cobranca: '4',
+      forma_cobranca: 'por_processo',
       mensalidade: '',
       franquia_processos: '',
       saldo_prepago: '',
     }));
   };
 
-  const diaVencNum = Number(form.dia_vencimento_mensal) || 0;
-  const showDiaCobranca = form.tipo === 'AVULSO_4D' && diaVencNum === 0;
+  const isFormaProcesso = form.forma_cobranca === 'por_processo';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,8 +160,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
         longitude,
         // Avulso fields
         momento_faturamento: isAvulso ? form.momento_faturamento : isMensalista ? 'na_solicitacao' : null,
-        dia_vencimento_mensal: isAvulso ? (diaVencNum || null) : isMensalista ? (Number(form.dia_vencimento_mensal) || 10) : null,
-        dia_cobranca: isAvulso && showDiaCobranca && form.dia_cobranca ? Number(form.dia_cobranca) : null,
+        dia_vencimento_mensal: isAvulso ? (isFormaProcesso ? null : (Number(form.dia_vencimento_mensal) || 15)) : isMensalista ? (Number(form.dia_vencimento_mensal) || 10) : null,
+        dia_cobranca: isAvulso && isFormaProcesso && form.dia_cobranca ? Number(form.dia_cobranca) : null,
         valor_base: (isAvulso || isMensalista) && form.valor_base ? Number(form.valor_base) : isPrePago && form.valor_base ? Number(form.valor_base) : null,
         desconto_progressivo: (isAvulso || isMensalista) && form.desconto_progressivo ? Number(form.desconto_progressivo) : null,
         valor_limite_desconto: (isAvulso || isMensalista) && form.valor_limite_desconto ? Number(form.valor_limite_desconto) : null,
@@ -285,27 +287,46 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Dia de Faturamento</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={31}
-                    value={form.dia_vencimento_mensal}
-                    onChange={e => setForm(f => ({ ...f, dia_vencimento_mensal: e.target.value }))}
-                    placeholder="0 = D+X"
-                  />
-                  <p className="text-[10px] text-muted-foreground">0 = D+X após solicitação; 1-31 = dia fixo mensal</p>
-                </div>
               </div>
-              {showDiaCobranca && (
+
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold">Forma de Cobrança</Label>
+                <RadioGroup
+                  value={form.forma_cobranca}
+                  onValueChange={(v: 'por_processo' | 'fatura_mensal') => setForm(f => ({ ...f, forma_cobranca: v }))}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <RadioGroupItem value="por_processo" id="fc-processo" />
+                    <Label htmlFor="fc-processo" className="text-xs cursor-pointer">Por processo (D+X dias)</Label>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <RadioGroupItem value="fatura_mensal" id="fc-mensal" />
+                    <Label htmlFor="fc-mensal" className="text-xs cursor-pointer">Fatura mensal (dia fixo)</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {isFormaProcesso ? (
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">Dias p/ vencimento (D+X)</Label>
-                    <Input type="number" min={1} max={60} value={form.dia_cobranca} onChange={e => setForm(f => ({ ...f, dia_cobranca: e.target.value }))} placeholder="Ex: 4" />
+                    <Label className="text-xs">Vencimento após solicitação</Label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">D+</span>
+                      <Input type="number" min={1} max={60} value={form.dia_cobranca} onChange={e => setForm(f => ({ ...f, dia_cobranca: e.target.value }))} placeholder="4" className="w-20" />
+                      <span className="text-xs text-muted-foreground">dias</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Dia de vencimento da fatura</Label>
+                    <Input type="number" min={1} max={31} value={form.dia_vencimento_mensal} onChange={e => setForm(f => ({ ...f, dia_vencimento_mensal: e.target.value }))} placeholder="15" />
                   </div>
                 </div>
               )}
+
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Valor Base (R$)</Label>
