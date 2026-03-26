@@ -89,6 +89,10 @@ export default function ClienteDetalhe() {
   const [showDeferimentoAlert, setShowDeferimentoAlert] = useState(false);
   const [deferimentoAlertData, setDeferimentoAlertData] = useState<DeferimentoAlertData | null>(null);
 
+  // Boas-vindas (1º processo) — alert antes de abrir o formulário
+  const [showBoasVindasAlert, setShowBoasVindasAlert] = useState(false);
+  const [boasVindasPct, setBoasVindasPct] = useState('50');
+
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
     razao_social: '',
@@ -105,6 +109,20 @@ export default function ClienteDetalhe() {
   const isManualPrice = processoForm.definir_manual;
   const isNegotiatedService = !!processoForm.negotiated_service_id;
   const isArchived = !!(cliente as any)?.is_archived;
+
+  const handleClickNovoProcesso = () => {
+    if (!cliente) return;
+
+    // Verificar se é primeiro processo
+    const isFirst = processos.length === 0 && !(cliente as any).desconto_boas_vindas_aplicado;
+    if (isFirst) {
+      setBoasVindasPct('50');
+      setShowBoasVindasAlert(true);
+      return;
+    }
+
+    setShowNovoProcesso(true);
+  };
 
   async function gerarExtratoClienteDetalhe(procsToGenerate: ProcessoDB[]) {
     if (!cliente) return;
@@ -170,7 +188,9 @@ export default function ClienteDetalhe() {
     }
 
     // Boas-vindas: pass percentage to useCreateProcesso which handles discount calculation
-    const boasVindasPct = processoForm.boas_vindas ? Number(processoForm.boas_vindas_pct) || 50 : undefined;
+    const boasVindasPctToSend = processoForm.boas_vindas
+      ? Number(boasVindasPct || processoForm.boas_vindas_pct) || 50
+      : undefined;
 
     createProcesso.mutate(
       {
@@ -182,7 +202,7 @@ export default function ClienteDetalhe() {
         valor_manual: valorManualFinal,
         notas: notas || undefined,
         mudanca_uf: processoForm.mudanca_uf,
-        desconto_boas_vindas: boasVindasPct,
+        desconto_boas_vindas: boasVindasPctToSend,
       },
       {
         onSuccess: async () => {
@@ -807,7 +827,7 @@ export default function ClienteDetalhe() {
                     {generatingExtrato ? 'Gerando...' : `Gerar Extrato (${selectedProcessosTab.size})`}
                   </Button>
                 )}
-                <Button size="sm" className="gap-1.5" onClick={() => setShowNovoProcesso(true)}>
+                <Button size="sm" className="gap-1.5" onClick={handleClickNovoProcesso}>
                   <Plus className="h-3.5 w-3.5" /> Novo Processo
                 </Button>
               </div>
@@ -1311,6 +1331,61 @@ export default function ClienteDetalhe() {
         onOpenChange={setShowDeletePassword}
         onConfirm={() => { pendingDeleteAction?.(); setPendingDeleteAction(null); }}
       />
+
+      {/* Boas-vindas (1º processo) — AlertDialog antes do formulário */}
+      <AlertDialog open={showBoasVindasAlert} onOpenChange={setShowBoasVindasAlert}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>🎉 Primeiro processo deste cliente!</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja aplicar desconto de boas-vindas antes de continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid gap-1.5">
+              <Label className="text-sm">Percentual (%)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={boasVindasPct}
+                onChange={(e) => setBoasVindasPct(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowBoasVindasAlert(false);
+                setProcessoForm((f) => ({
+                  ...f,
+                  boas_vindas: false,
+                  boas_vindas_pct: boasVindasPct || '50',
+                }));
+                setShowNovoProcesso(true);
+              }}
+            >
+              Não cobrar normal
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                setShowBoasVindasAlert(false);
+                setProcessoForm((f) => ({
+                  ...f,
+                  boas_vindas: true,
+                  boas_vindas_pct: boasVindasPct || '50',
+                }));
+                setShowNovoProcesso(true);
+              }}
+            >
+              Sim aplicar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog Novo Processo */}
       <Dialog open={showNovoProcesso} onOpenChange={setShowNovoProcesso}>
