@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { X, Loader2, Info } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useCreateCliente } from '@/hooks/useFinanceiro';
 import { maskCNPJ, isValidCNPJ } from '@/lib/cnpj';
 import { formatCEP, buscarCEP, buscarCoordenadas } from '@/lib/cep';
