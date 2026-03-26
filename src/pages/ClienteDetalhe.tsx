@@ -240,7 +240,6 @@ export default function ClienteDetalhe() {
           payload.longitude = coords.lng;
         }
       }
-      };
       await new Promise<void>((resolve, reject) => {
         updateCliente.mutate(payload as any, {
           onSuccess: () => resolve(),
