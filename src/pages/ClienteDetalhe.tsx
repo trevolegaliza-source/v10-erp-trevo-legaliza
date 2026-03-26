@@ -133,9 +133,12 @@ export default function ClienteDetalhe() {
     motivo_manual: '',
   };
 
-  const handleClickNovoProcesso = () => {
+  const handleNovoProcesso = () => {
     if (!cliente) return;
+    console.log('processos.length:', processos.length);
+    console.log('desconto_boas_vindas_aplicado:', (cliente as any).desconto_boas_vindas_aplicado);
     const isFirst = processos.length === 0 && !(cliente as any).desconto_boas_vindas_aplicado;
+    console.log('isFirst:', isFirst);
     if (isFirst) {
       setBoasVindasPct('50');
       setShowBoasVindasAlert(true);
@@ -894,7 +897,7 @@ export default function ClienteDetalhe() {
                     {generatingExtrato ? 'Gerando...' : `Gerar Extrato (${selectedProcessosTab.size})`}
                   </Button>
                 )}
-                <Button size="sm" className="gap-1.5" onClick={handleClickNovoProcesso}>
+                <Button size="sm" className="gap-1.5" onClick={handleNovoProcesso}>
                   <Plus className="h-3.5 w-3.5" /> Novo Processo
                 </Button>
               </div>
