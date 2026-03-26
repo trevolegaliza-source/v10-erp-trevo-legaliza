@@ -3,11 +3,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import {
-  FileText, Upload, CheckCircle2, Trash2, PlusCircle, Download, Eye, Loader2,
+  FileText, Upload, CheckCircle2, Trash2, PlusCircle, Download, Eye, Loader2, Pencil,
 } from 'lucide-react';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
@@ -19,6 +20,7 @@ import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { useDeleteProcesso } from '@/hooks/useProcessos';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface ProcessoEditModalProps {
@@ -36,10 +38,14 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   const [valoresOpen, setValoresOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [editValuePasswordOpen, setEditValuePasswordOpen] = useState(false);
+  const [editingValue, setEditingValue] = useState(false);
+  const [newValue, setNewValue] = useState('');
 
   // Sync notes when processo changes
   useEffect(() => {
     setNotes(processo?.lancamento?.observacoes_financeiro || '');
+    setEditingValue(false);
   }, [processo?.id, processo?.lancamento?.observacoes_financeiro]);
 
   const boletoRef = useRef<HTMLInputElement>(null);
@@ -114,6 +120,43 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
     deleteProcesso.mutate(processo.id, {
       onSuccess: () => onOpenChange(false),
     });
+  };
+
+  const handleEditValueUnlocked = () => {
+    const current = Number(lanc?.valor ?? processo.valor ?? 0);
+    setNewValue(String(current));
+    setEditingValue(true);
+  };
+
+  const handleSaveNewValue = async () => {
+    const novoValor = Number(newValue);
+    const valorAnterior = Number(lanc?.valor ?? processo.valor ?? 0);
+    if (isNaN(novoValor) || novoValor < 0) {
+      toast.error('Valor inválido');
+      return;
+    }
+    try {
+      await supabase.from('processos').update({ valor: novoValor, updated_at: new Date().toISOString() }).eq('id', processo.id);
+      if (lanc?.id) {
+        await supabase.from('lancamentos').update({ valor: novoValor, updated_at: new Date().toISOString() }).eq('id', lanc.id);
+      }
+      const dateStr = new Date().toLocaleDateString('pt-BR');
+      const notaValor = `Valor alterado manualmente de R$ ${valorAnterior.toFixed(2)} para R$ ${novoValor.toFixed(2)} em ${dateStr}`;
+      const currentNotas = processo.notas || '';
+      await supabase.from('processos').update({ notas: currentNotas ? `${currentNotas}\n${notaValor}` : notaValor }).eq('id', processo.id);
+      toast.success('Valor atualizado com sucesso');
+      setEditingValue(false);
+      // Force refresh
+      updateLanc.mutate({
+        processoId: processo.id,
+        lancamentoId: lanc?.id,
+        clienteId: processo.cliente_id,
+        valor: novoValor,
+        updates: {},
+      });
+    } catch (err: any) {
+      toast.error('Erro ao atualizar valor: ' + err.message);
+    }
   };
 
   const DocRow = ({
@@ -202,9 +245,38 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
                 const processNum = processNumMatch ? processNumMatch[1] : null;
                 return (
                   <>
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">Valor Base</span>
-                      <span className="text-foreground">{formatBRL(valorBase)}</span>
+                      <div className="flex items-center gap-2">
+                        {editingValue ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground">R$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              className="w-24 h-7 text-xs"
+                              value={newValue}
+                              onChange={e => setNewValue(e.target.value)}
+                              autoFocus
+                            />
+                            <Button size="sm" variant="default" className="h-7 text-xs px-2" onClick={handleSaveNewValue}>Salvar</Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditingValue(false)}>X</Button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-foreground">{formatBRL(valorBase)}</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                              onClick={() => setEditValuePasswordOpen(true)}
+                              title="Editar valor (requer senha master)"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     {descontoAcum > 0 && (
                       <div className="flex justify-between text-sm mt-1">
@@ -299,6 +371,14 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
         onConfirm={handleDeleteConfirm}
         title="Excluir Processo"
         description="Esta ação é irreversível. Confirme a senha master para excluir."
+      />
+
+      <PasswordConfirmDialog
+        open={editValuePasswordOpen}
+        onOpenChange={setEditValuePasswordOpen}
+        onConfirm={handleEditValueUnlocked}
+        title="Editar Valor do Processo"
+        description="Digite a senha de administração para liberar a edição do valor."
       />
     </>
   );

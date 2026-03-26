@@ -93,6 +93,9 @@ export default function ClienteDetalhe() {
     valor_manual: '',
     definir_manual: false,
     negotiated_service_id: '' as string,
+    mudanca_uf: false,
+    boas_vindas: false,
+    boas_vindas_pct: '50',
   });
   const isManualPrice = processoForm.definir_manual;
   const isNegotiatedService = !!processoForm.negotiated_service_id;
@@ -139,16 +142,31 @@ export default function ClienteDetalhe() {
     }
   }
 
-  const handleCreateProcesso = () => {
+  const handleCreateProcesso = async () => {
     if (!cliente || !processoForm.razao_social.trim()) {
       toast.error('Preencha a Razão Social');
       return;
     }
     // Determine valor: negotiated service uses fixed_price, otherwise normal flow
     const negotiatedService = negotiations?.find(n => n.id === processoForm.negotiated_service_id);
-    const valorManualFinal = negotiatedService
+    let valorManualFinal = negotiatedService
       ? negotiatedService.fixed_price
       : (isManualPrice && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined);
+
+    let notas = '';
+
+    // Boas-vindas discount
+    if (processoForm.boas_vindas && valorManualFinal != null) {
+      const pct = Number(processoForm.boas_vindas_pct) || 50;
+      const desconto = valorManualFinal * (pct / 100);
+      notas += `Desconto de Boas-vindas aplicado: ${pct}% (-R$ ${desconto.toFixed(2)})`;
+      valorManualFinal = valorManualFinal - desconto;
+    }
+
+    // Mudança de UF
+    if (processoForm.mudanca_uf) {
+      notas += `${notas ? '\n' : ''}Mudança de UF (2 Processos)`;
+    }
 
     createProcesso.mutate(
       {
@@ -158,11 +176,18 @@ export default function ClienteDetalhe() {
         prioridade: processoForm.prioridade,
         responsavel: processoForm.responsavel || undefined,
         valor_manual: valorManualFinal,
+        notas: notas || undefined,
+        mudanca_uf: processoForm.mudanca_uf,
+        desconto_boas_vindas: processoForm.boas_vindas ? Number(processoForm.boas_vindas_pct) : undefined,
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          // Mark boas-vindas applied
+          if (processoForm.boas_vindas) {
+            await supabase.from('clientes').update({ desconto_boas_vindas_aplicado: true }).eq('id', cliente.id);
+          }
           setShowNovoProcesso(false);
-          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, negotiated_service_id: '' });
+          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, negotiated_service_id: '', mudanca_uf: false, boas_vindas: false, boas_vindas_pct: '50' });
           loadAll(cliente.id);
         },
       }
@@ -1185,6 +1210,47 @@ export default function ClienteDetalhe() {
               <div className="grid gap-1.5">
                 <Label>Valor Manual (R$)</Label>
                 <Input type="number" step="0.01" value={processoForm.valor_manual} onChange={e => setProcessoForm(f => ({ ...f, valor_manual: e.target.value }))} placeholder="0,00" />
+              </div>
+            )}
+            {/* Mudança de UF checkbox */}
+            {(processoForm.tipo === 'alteracao' || processoForm.tipo === 'transformacao') && (
+              <div className="flex items-center gap-3 rounded-lg border border-border/60 p-3">
+                <Checkbox
+                  id="mudanca_uf"
+                  checked={processoForm.mudanca_uf}
+                  onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, mudanca_uf: !!checked }))}
+                />
+                <div>
+                  <Label htmlFor="mudanca_uf" className="text-sm font-medium cursor-pointer">Mudança de UF</Label>
+                  <p className="text-[10px] text-muted-foreground">Consome 2 slots, cobra 2 processos</p>
+                </div>
+              </div>
+            )}
+            {/* Boas-vindas */}
+            {processos.length === 0 && !(cliente as any).desconto_boas_vindas_aplicado && (
+              <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-2">
+                <p className="text-sm font-medium flex items-center gap-2">🎉 Primeiro processo deste cliente!</p>
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="boas_vindas"
+                    checked={processoForm.boas_vindas}
+                    onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, boas_vindas: !!checked }))}
+                  />
+                  <Label htmlFor="boas_vindas" className="text-sm cursor-pointer">Aplicar desconto de boas-vindas</Label>
+                  {processoForm.boas_vindas && (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        className="w-16 h-7 text-xs"
+                        value={processoForm.boas_vindas_pct}
+                        onChange={e => setProcessoForm(f => ({ ...f, boas_vindas_pct: e.target.value }))}
+                        min={1}
+                        max={100}
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
