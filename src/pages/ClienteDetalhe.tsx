@@ -164,18 +164,13 @@ export default function ClienteDetalhe() {
 
     let notas = '';
 
-    // Boas-vindas discount
-    if (processoForm.boas_vindas && valorManualFinal != null) {
-      const pct = Number(processoForm.boas_vindas_pct) || 50;
-      const desconto = valorManualFinal * (pct / 100);
-      notas += `Desconto de Boas-vindas aplicado: ${pct}% (-R$ ${desconto.toFixed(2)})`;
-      valorManualFinal = valorManualFinal - desconto;
-    }
-
     // Mudança de UF
     if (processoForm.mudanca_uf) {
-      notas += `${notas ? '\n' : ''}Mudança de UF (2 Processos)`;
+      notas += 'Mudança de UF (2 Processos)';
     }
+
+    // Boas-vindas: pass percentage to useCreateProcesso which handles discount calculation
+    const boasVindasPct = processoForm.boas_vindas ? Number(processoForm.boas_vindas_pct) || 50 : undefined;
 
     createProcesso.mutate(
       {
@@ -187,7 +182,7 @@ export default function ClienteDetalhe() {
         valor_manual: valorManualFinal,
         notas: notas || undefined,
         mudanca_uf: processoForm.mudanca_uf,
-        desconto_boas_vindas: processoForm.boas_vindas ? Number(processoForm.boas_vindas_pct) : undefined,
+        desconto_boas_vindas: boasVindasPct,
       },
       {
         onSuccess: async () => {
