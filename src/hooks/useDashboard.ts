@@ -124,6 +124,7 @@ export function useAPagarMes(mes: number, ano: number) {
 export function useTicketMedio(mes: number, ano: number) {
   return useQuery({
     queryKey: ['dashboard_ticket', mes, ano],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const inicio = format(new Date(ano, mes - 1, 1), 'yyyy-MM-dd');
       const fim = format(endOfMonth(new Date(ano, mes - 1, 1)), 'yyyy-MM-dd');
