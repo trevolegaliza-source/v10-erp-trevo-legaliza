@@ -170,6 +170,7 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
         franquia_processos: isMensalista && form.franquia_processos ? Number(form.franquia_processos) : 0,
         // Pré-Pago fields
         saldo_prepago: isPrePago && form.saldo_prepago ? Number(form.saldo_prepago) : 0,
+        is_archived: false,
       } as any,
       {
         onSuccess: (data: any) => {
