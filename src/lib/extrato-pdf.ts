@@ -162,11 +162,11 @@ const GLOBAL_STYLES = `
   .total-value { font-size: 42px; font-weight: 800; color: #ffffff; letter-spacing: -1px; line-height: 1.1; }
   .total-ctx { font-size: 9px; color: #94a3b8; margin-top: 4px; }
   .kpi-row { display: flex; gap: 12px; margin-top: 14px; }
-  .kpi-card { flex: 1; background: #f8fafc; border: 2px solid #e2e8f0; border-top: 4px solid #4C9F38; border-radius: 0 0 5px 5px; padding: 12px; }
+  .kpi-card { flex: 1; background: #f8fafc; border: 2px solid #e2e8f0; border-top: 4px solid #4C9F38; border-radius: 0 0 5px 5px; padding: 12px; min-height: 70px; display: flex; flex-direction: column; justify-content: center; }
   .kpi-card.eco { background: #4C9F38; border-color: #4C9F38; }
-  .kpi-label { font-size: 8px; font-weight: 700; color: #4C9F38; text-transform: uppercase; }
+  .kpi-label { font-size: 6.5px; font-weight: 700; color: #4C9F38; text-transform: uppercase; }
   .kpi-card.eco .kpi-label { color: #ffffff; }
-  .kpi-value { font-size: 14px; font-weight: 800; color: #1a1a2e; margin-top: 2px; }
+  .kpi-value { font-size: 11px; font-weight: 800; color: #1a1a2e; margin-top: 2px; }
   .kpi-card.eco .kpi-value { color: #ffffff; }
   .vol-block { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; margin-top: 12px; border-radius: 4px; }
   .vol-text { font-size: 9px; color: #64748b; line-height: 1.5; }
@@ -193,10 +193,10 @@ const GLOBAL_STYLES = `
   /* Page 2 */
   .section-banner { background: #0f1f0f; padding: 12px 30px; }
   .section-banner-text { font-size: 9px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; }
-  .process-card { background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #4C9F38; margin-bottom: 14px; overflow: hidden; }
+  .process-card { background: #ffffff; border: 1px solid #e2e8f0; border-left: 3px solid #4C9F38; margin-bottom: 14px; overflow: hidden; border-radius: 4px; }
   .process-header { background: #0f1f0f; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
   .ph-left { display: flex; align-items: center; gap: 10px; flex: 1; }
-  .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: #ffffff; color: #4C9F38; border-radius: 6px; font-size: 9px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; }
+  .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: #ffffff; color: #4C9F38; border-radius: 6px; font-size: 10px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; padding: 0; margin: 0; }
   .ph-info { flex: 1; }
   .ph-title { font-size: 10px; font-weight: 700; color: #ffffff; text-transform: uppercase; }
   .ph-date { font-size: 8px; color: rgba(255,255,255,0.5); margin-top: 2px; }
@@ -205,7 +205,7 @@ const GLOBAL_STYLES = `
   .ph-values-inline { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; }
   .ph-value { font-size: 14px; font-weight: 800; color: #ffffff; }
   .ph-base { font-size: 8px; color: rgba(255,255,255,0.4); }
-  .ph-base-strike { font-size: 10px; color: rgba(255,255,255,0.4); text-decoration: line-through; opacity: 0.4; }
+  .ph-base-strike { font-size: 10px; color: rgba(255,255,255,0.55); text-decoration: line-through; }
   .cortesia-badge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 9999px; background: #dcfce7; color: #166534; font-size: 7px; font-weight: 700; letter-spacing: 0.3px; }
   .boas-vindas-badge { display: inline-block; vertical-align: middle; background: #22c55e; color: #ffffff; padding: 2px 8px; border-radius: 2px; font-size: 6.5px; font-weight: 700; text-transform: uppercase; margin-left: 6px; line-height: 1; }
   .boas-vindas-economia { font-size: 7px; color: #4ade80; margin-top: 2px; }
@@ -291,9 +291,9 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
       html += `
         <div class="prog-step active">
           <div class="ps-label">${s.index}º Processo</div>
-          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-decoration:line-through;">${fmt(base)}</div>
+          <div style="font-size:7.5px;color:rgba(255,255,255,0.6);text-decoration:line-through;">${fmt(base)}</div>
           <div class="ps-value">${fmt(s.valorFinal)}</div>
-          <div class="ps-desc" style="color:#4ade80;">(${s.label})</div>
+          <div style="font-size:6px;color:#4ade80;font-weight:700;">(${s.label})</div>
         </div>
       `;
     } else {
@@ -367,7 +367,9 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         <div class="total-card">
           <div class="total-tag">HONORÁRIOS DOS SERVIÇOS SOCIETÁRIOS</div>
           <div class="total-label">TOTAL</div>
+          ${economiaBoasVindas > 0 ? `<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;margin-bottom:2px;">${fmt(totalGeral + economiaBoasVindas)}</div>` : ''}
           <div class="total-value"><span class="total-prefix">R$ </span>${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+          ${economiaBoasVindas > 0 ? `<div style="font-size:8px;color:#4ade80;margin-top:4px;">Desconto de boas-vindas aplicado</div>` : ''}
           <div class="total-ctx">${selected.length} processo(s) cobrado(s) neste período</div>
         </div>
 
@@ -457,7 +459,7 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     }
     // Boas-vindas gets a green badge instead of orange manual badge
     if (isBoasVindasDiscount) {
-      manualBadge = `<span class="boas-vindas-badge">BOAS-VINDAS: ${bvPct || ''}% de desconto</span>`;
+      manualBadge = `<span class="boas-vindas-badge">BOAS-VINDAS: ${bvPct ? bvPct + '%' : ''}</span>`;
     }
 
     let baseRef = '';
