@@ -193,7 +193,7 @@ const GLOBAL_STYLES = `
   /* Page 2 */
   .section-banner { background: #0f1f0f; padding: 12px 30px; }
   .section-banner-text { font-size: 9px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; }
-  .process-card { background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #4C9F38; margin-bottom: 14px; overflow: hidden; }
+  .process-card { background: #ffffff; border: 1px solid #e2e8f0; border-left: 3px solid #4C9F38; margin-bottom: 14px; overflow: hidden; border-radius: 4px; }
   .process-header { background: #0f1f0f; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
   .ph-left { display: flex; align-items: center; gap: 10px; flex: 1; }
   .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: #ffffff; color: #4C9F38; border-radius: 6px; font-size: 10px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; padding: 0; margin: 0; }
