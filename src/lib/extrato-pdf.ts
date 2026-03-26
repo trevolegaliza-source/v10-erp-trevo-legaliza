@@ -264,12 +264,12 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
   const base = data.cliente.valor_base ?? 580;
   const limite = data.cliente.valor_limite_desconto ?? 0;
 
-  // Show active steps + 1 "next" step (max 5 total)
-  const activeSteps = steps.filter(s => !s.isManual);
-  const displaySteps = activeSteps.slice(-4); // last 4 active
+  // Show all steps + 1 "next" step (max 5 total)
+  const displaySteps = steps.slice(-4); // last 4
 
-  // Calculate next step value
-  const lastSlot = steps.length;
+  // Calculate next step value based on non-manual slot count
+  const nonManualCount = steps.filter(s => !s.isManual).length;
+  const lastSlot = Math.max(nonManualCount, 1);
   let nextVal = base;
   for (let i = 1; i <= lastSlot; i++) {
     nextVal = nextVal * (1 - descPct / 100);
@@ -284,29 +284,52 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
   displaySteps.forEach((s, i) => {
     if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
     const isLim = limite > 0 && s.valorFinal <= limite;
-    html += `
-      <div class="prog-step active">
-        <div class="ps-label">${s.index}º Processo</div>
-        <div class="ps-value">${fmt(s.valorFinal)}</div>
-        <div class="ps-desc">${s.desconto > 0 ? `-${descPct}%` : '(base)'}</div>
-        ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
-      </div>
-    `;
+    const isBoasVindas = s.label && s.label.includes('BOAS-VINDAS');
+
+    if (isBoasVindas) {
+      // Show boas-vindas step with original value strikethrough
+      html += `
+        <div class="prog-step active">
+          <div class="ps-label">${s.index}º Processo</div>
+          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-decoration:line-through;">${fmt(base)}</div>
+          <div class="ps-value">${fmt(s.valorFinal)}</div>
+          <div class="ps-desc" style="color:#4ade80;">(${s.label})</div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="prog-step active">
+          <div class="ps-label">${s.index}º Processo</div>
+          <div class="ps-value">${fmt(s.valorFinal)}</div>
+          <div class="ps-desc">${s.isManual ? s.label : (s.desconto > 0 ? `-${descPct}% sobre base` : '(base)')}</div>
+          ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
+        </div>
+      `;
+    }
   });
 
   if (!limitReached) {
     html += `<div class="prog-arrow">${arrowSvg('#86efac')}</div>`;
     html += `
       <div class="prog-step next">
-        <div class="ps-label">${lastSlot + 1}º Processo</div>
+        <div class="ps-label">${steps.length + 1}º Processo</div>
         <div class="ps-value">${fmt(Math.round(nextVal * 100) / 100)}</div>
-        <div class="ps-desc">-${descPct}%</div>
+        <div class="ps-desc">-${descPct}% sobre base</div>
         <div class="ps-next-label">SEU PRÓXIMO DESCONTO</div>
       </div>
     `;
   }
 
   html += '</div>';
+
+  // Add explanatory note when boas-vindas is present
+  const hasBoasVindas = steps.some(s => s.label && s.label.includes('BOAS-VINDAS'));
+  if (hasBoasVindas) {
+    html += `<div style="font-size:7px;color:#64748b;margin-top:4px;padding:4px 8px;background:#f8fafc;border-radius:3px;line-height:1.5;">
+      ℹ O desconto de boas-vindas aplica-se apenas ao primeiro processo. A partir do 2º processo, o desconto progressivo é calculado sobre o valor base de ${fmt(base)}.
+    </div>`;
+  }
+
   return html;
 }
 
