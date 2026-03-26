@@ -641,6 +641,25 @@ export default function ClienteDetalhe() {
                 ) : (
                   <>
                     <div className="grid gap-1.5">
+                      <Label className="text-xs text-muted-foreground">Dia de Faturamento</Label>
+                      {editing ? (
+                        <Input type="number" min={0} max={31} value={(editForm as any).dia_vencimento_mensal ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_vencimento_mensal: e.target.value ? Number(e.target.value) : null }))} placeholder="0 = D+X" />
+                      ) : (
+                        <p className="font-medium">{Number(cliente.dia_vencimento_mensal) === 0 || !cliente.dia_vencimento_mensal ? 'D+X' : `Dia ${cliente.dia_vencimento_mensal}`}</p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground">0 = D+X após solicitação; 1-31 = dia fixo mensal</p>
+                    </div>
+                    {(Number((editForm as any).dia_vencimento_mensal) === 0 || !(editForm as any).dia_vencimento_mensal) && (editForm as any).momento_faturamento !== 'no_deferimento' && (
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs text-muted-foreground">Dias p/ vencimento (D+X)</Label>
+                        {editing ? (
+                          <Input type="number" min={1} max={60} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="4" />
+                        ) : (
+                          <p className="font-medium">D+{(cliente as any).dia_cobranca ?? 0}</p>
+                        )}
+                      </div>
+                    )}
+                    <div className="grid gap-1.5">
                       <Label className="text-xs text-muted-foreground">Valor Base</Label>
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
@@ -664,16 +683,6 @@ export default function ClienteDetalhe() {
                         <p className="font-medium">{formatCurrencyOrZero((cliente as any).valor_limite_desconto)}</p>
                       )}
                     </div>
-                    {(editForm as any).momento_faturamento !== 'no_deferimento' && (
-                      <div className="grid gap-1.5">
-                        <Label className="text-xs text-muted-foreground">Dia de Cobrança (D+X)</Label>
-                        {editing ? (
-                          <Input type="number" min={1} max={30} value={(editForm as any).dia_cobranca ?? ''} onChange={e => setEditForm(f => ({ ...f, dia_cobranca: e.target.value ? Number(e.target.value) : null }))} placeholder="4" />
-                        ) : (
-                          <p className="font-medium">D+{(cliente as any).dia_cobranca ?? 0}</p>
-                        )}
-                      </div>
-                    )}
                   </>
                 )}
               </div>
