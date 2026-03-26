@@ -96,6 +96,7 @@ export default function ClienteDetalhe() {
   const [showBoasVindasAlert, setShowBoasVindasAlert] = useState(false);
   const [boasVindasPct, setBoasVindasPct] = useState('50');
   const [aplicarBoasVindas, setAplicarBoasVindas] = useState(false);
+  const [isFirstProcessNovo, setIsFirstProcessNovo] = useState(false);
 
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
@@ -136,19 +137,33 @@ export default function ClienteDetalhe() {
   const handleNovoProcesso = async () => {
     if (!cliente) return;
 
-    const { count } = await supabase
+    const { count, error } = await supabase
       .from('processos')
       .select('*', { count: 'exact', head: true })
       .eq('cliente_id', cliente.id);
 
-    if ((count ?? 0) === 0 && !(cliente as any).desconto_boas_vindas_aplicado) {
-      setBoasVindasPct('50');
-      setAplicarBoasVindas(false);
-      setShowBoasVindasAlert(true);
+    if (error) {
+      toast.error('Erro ao checar primeiro processo');
       return;
     }
 
+    const jaAplicou = (cliente as any).desconto_boas_vindas_aplicado === true;
+    const ehPrimeiro = (count ?? 0) === 0;
+
+    console.log('CHECK BOAS-VINDAS CLIENTE DETALHE:', {
+      clienteId: cliente.id,
+      count,
+      jaAplicou,
+      ehPrimeiro,
+    });
+
+    if (ehPrimeiro && jaAplicou) {
+      console.warn('Cliente com 0 processos e flag de boas-vindas já aplicada; habilitando switch para correção de legado.');
+    }
+
     setAplicarBoasVindas(false);
+    setBoasVindasPct('50');
+    setIsFirstProcessNovo(ehPrimeiro);
     setProcessoForm({ ...defaultProcessoForm });
     setShowNovoProcesso(true);
   };
@@ -301,6 +316,7 @@ export default function ClienteDetalhe() {
             await supabase.from('clientes').update({ desconto_boas_vindas_aplicado: true }).eq('id', cliente.id);
           }
           setShowNovoProcesso(false);
+          setIsFirstProcessNovo(false);
           setProcessoForm({ ...defaultProcessoForm });
           setAplicarBoasVindas(false);
           loadAll(cliente.id);
@@ -1507,7 +1523,16 @@ export default function ClienteDetalhe() {
       </AlertDialog>
 
       {/* Dialog Novo Processo — Reformulado */}
-      <Dialog open={showNovoProcesso} onOpenChange={setShowNovoProcesso}>
+      <Dialog
+        open={showNovoProcesso}
+        onOpenChange={(open) => {
+          setShowNovoProcesso(open);
+          if (!open) {
+            setAplicarBoasVindas(false);
+            setIsFirstProcessNovo(false);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Processo — {cliente.apelido || cliente.nome}</DialogTitle>
@@ -1649,6 +1674,47 @@ export default function ClienteDetalhe() {
                   )}
                   {aplicarBoasVindas && (
                     <p className="text-xs text-primary">🎉 Boas-vindas {boasVindasPct}% aplicado</p>
+                  )}
+                </div>
+              )}
+
+              {isFirstProcessNovo && (
+                <div className="rounded-lg border border-success/40 bg-success/10 p-3 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-success">🎉 Primeiro processo deste cliente</p>
+                      <p className="text-xs text-muted-foreground">Deseja aplicar desconto de boas-vindas neste cadastro?</p>
+                    </div>
+                    <Switch
+                      checked={aplicarBoasVindas}
+                      onCheckedChange={(checked) => {
+                        setAplicarBoasVindas(checked);
+                        setProcessoForm((f) => ({
+                          ...f,
+                          boas_vindas: checked,
+                          boas_vindas_pct: checked ? (boasVindasPct || '50') : '50',
+                        }));
+                      }}
+                    />
+                  </div>
+
+                  {aplicarBoasVindas && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs">Percentual</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        className="w-20 h-8"
+                        value={boasVindasPct}
+                        onChange={(e) => {
+                          const pct = e.target.value;
+                          setBoasVindasPct(pct);
+                          setProcessoForm((f) => ({ ...f, boas_vindas: true, boas_vindas_pct: pct || '50' }));
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
                   )}
                 </div>
               )}
