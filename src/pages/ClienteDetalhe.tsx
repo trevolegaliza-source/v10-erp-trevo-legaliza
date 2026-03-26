@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +21,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { useUpdateCliente, useCreateProcesso, useDeleteCliente, useArchiveCliente, useUnarchiveCliente } from '@/hooks/useFinanceiro';
+import { useUpdateCliente, useCreateProcesso, useDeleteCliente, useArchiveCliente, useUnarchiveCliente, calcularDescontoProgressivo } from '@/hooks/useFinanceiro';
 import { KANBAN_STAGES } from '@/types/process';
 import { STATUS_LABELS, STATUS_STYLES, TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ClienteDB, ProcessoDB, Lancamento, StatusFinanceiro, TipoProcesso, TipoCliente } from '@/types/financial';
@@ -34,6 +34,8 @@ import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
 import ProcessoEditModal from '@/components/financeiro/ProcessoEditModal';
+import { useColaboradores } from '@/hooks/useColaboradores';
+import { Textarea } from '@/components/ui/textarea';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import {
@@ -70,6 +72,7 @@ export default function ClienteDetalhe() {
   const updateCliente = useUpdateCliente();
   const createProcesso = useCreateProcesso();
   const { data: negotiations } = useServiceNegotiations(id);
+  const { data: colaboradores } = useColaboradores();
   const deleteCliente = useDeleteCliente();
   const archiveCliente = useArchiveCliente();
   const unarchiveCliente = useUnarchiveCliente();
@@ -92,6 +95,7 @@ export default function ClienteDetalhe() {
   // Boas-vindas (1º processo) — alert antes de abrir o formulário
   const [showBoasVindasAlert, setShowBoasVindasAlert] = useState(false);
   const [boasVindasPct, setBoasVindasPct] = useState('50');
+  const [aplicarBoasVindas, setAplicarBoasVindas] = useState(false);
 
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
@@ -105,24 +109,87 @@ export default function ClienteDetalhe() {
     mudanca_uf: false,
     boas_vindas: false,
     boas_vindas_pct: '50',
+    ja_pago: false,
+    observacoes: '',
+    motivo_manual: '',
   });
   const isManualPrice = processoForm.definir_manual;
   const isNegotiatedService = !!processoForm.negotiated_service_id;
   const isArchived = !!(cliente as any)?.is_archived;
 
+  const defaultProcessoForm = {
+    razao_social: '',
+    tipo: 'abertura' as string,
+    prioridade: 'normal',
+    responsavel: '',
+    valor_manual: '',
+    definir_manual: false,
+    negotiated_service_id: '' as string,
+    mudanca_uf: false,
+    boas_vindas: false,
+    boas_vindas_pct: '50',
+    ja_pago: false,
+    observacoes: '',
+    motivo_manual: '',
+  };
+
   const handleClickNovoProcesso = () => {
     if (!cliente) return;
-
-    // Verificar se é primeiro processo
     const isFirst = processos.length === 0 && !(cliente as any).desconto_boas_vindas_aplicado;
     if (isFirst) {
       setBoasVindasPct('50');
       setShowBoasVindasAlert(true);
       return;
     }
-
+    setAplicarBoasVindas(false);
+    setProcessoForm({ ...defaultProcessoForm });
     setShowNovoProcesso(true);
   };
+
+  // Desconto progressivo preview (real-time)
+  const descontoPreview = useMemo(() => {
+    if (!cliente || isManualPrice || isNegotiatedService) return null;
+    const c = cliente as any;
+    const valorBase = Number(c.valor_base ?? 0);
+    const descontoPercent = Number(c.desconto_progressivo ?? 0);
+    const valorLimite = c.valor_limite_desconto != null ? Number(c.valor_limite_desconto) : null;
+    const isMens = c.tipo === 'MENSALISTA';
+    const franquia = Number(c.franquia_processos ?? 0);
+
+    // count current month processes
+    const now = new Date();
+    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthCount = processos.filter(p => new Date(p.created_at) >= startMonth).length;
+    const slots = processoForm.mudanca_uf ? 2 : 1;
+
+    if (isMens && franquia > 0 && monthCount < franquia) {
+      return { slot: monthCount + 1, valor: 0, desconto: 0, label: `Dentro da franquia (${monthCount + 1}/${franquia})` };
+    }
+
+    const effectiveCount = isMens && franquia > 0 ? monthCount - franquia : monthCount;
+    if (effectiveCount < 0) return { slot: monthCount + 1, valor: 0, desconto: 0, label: 'Franquia' };
+
+    if (slots === 2 && descontoPercent > 0) {
+      const calc1 = calcularDescontoProgressivo(valorBase, descontoPercent, effectiveCount, valorLimite);
+      const calc2 = calcularDescontoProgressivo(valorBase, descontoPercent, effectiveCount + 1, valorLimite);
+      const total = calc1.valorFinal + calc2.valorFinal;
+      const isUrg = processoForm.prioridade === 'urgente';
+      return { slot: calc1.processoNumero, valor: isUrg ? total * 1.5 : total, desconto: calc1.descontoAcumulado + calc2.descontoAcumulado, label: `Mudança UF: Slots ${calc1.processoNumero} e ${calc2.processoNumero}` };
+    }
+
+    const calc = calcularDescontoProgressivo(valorBase, descontoPercent, effectiveCount, valorLimite);
+    const isUrg = processoForm.prioridade === 'urgente';
+    let val = calc.valorFinal;
+    if (isUrg) val = val * 1.5;
+
+    // Apply boas-vindas preview
+    if (aplicarBoasVindas) {
+      const pct = Number(boasVindasPct) || 50;
+      val = Math.round(val * (1 - pct / 100) * 100) / 100;
+    }
+
+    return { slot: calc.processoNumero, valor: val, desconto: calc.descontoAcumulado, label: `Slot nº ${calc.processoNumero}` };
+  }, [cliente, processos, processoForm.mudanca_uf, processoForm.prioridade, isManualPrice, isNegotiatedService, aplicarBoasVindas, boasVindasPct]);
 
   async function gerarExtratoClienteDetalhe(procsToGenerate: ProcessoDB[]) {
     if (!cliente) return;
@@ -174,21 +241,20 @@ export default function ClienteDetalhe() {
       toast.error('Preencha a Razão Social');
       return;
     }
-    // Determine valor: negotiated service uses fixed_price, otherwise normal flow
     const negotiatedService = negotiations?.find(n => n.id === processoForm.negotiated_service_id);
     let valorManualFinal = negotiatedService
       ? negotiatedService.fixed_price
       : (isManualPrice && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined);
 
-    let notas = '';
-
-    // Mudança de UF
+    let notas = processoForm.observacoes.trim();
     if (processoForm.mudanca_uf) {
-      notas += 'Mudança de UF (2 Processos)';
+      notas = notas ? `Mudança de UF (2 Processos)\n${notas}` : 'Mudança de UF (2 Processos)';
+    }
+    if (isManualPrice && processoForm.motivo_manual.trim()) {
+      notas = notas ? `${notas}\nMotivo valor manual: ${processoForm.motivo_manual.trim()}` : `Motivo valor manual: ${processoForm.motivo_manual.trim()}`;
     }
 
-    // Boas-vindas: pass percentage to useCreateProcesso which handles discount calculation
-    const boasVindasPctToSend = processoForm.boas_vindas
+    const boasVindasPctToSend = (aplicarBoasVindas || processoForm.boas_vindas)
       ? Number(boasVindasPct || processoForm.boas_vindas_pct) || 50
       : undefined;
 
@@ -203,15 +269,16 @@ export default function ClienteDetalhe() {
         notas: notas || undefined,
         mudanca_uf: processoForm.mudanca_uf,
         desconto_boas_vindas: boasVindasPctToSend,
+        ja_pago: processoForm.ja_pago,
       },
       {
         onSuccess: async () => {
-          // Mark boas-vindas applied
-          if (processoForm.boas_vindas) {
+          if (aplicarBoasVindas || processoForm.boas_vindas) {
             await supabase.from('clientes').update({ desconto_boas_vindas_aplicado: true }).eq('id', cliente.id);
           }
           setShowNovoProcesso(false);
-          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, negotiated_service_id: '', mudanca_uf: false, boas_vindas: false, boas_vindas_pct: '50' });
+          setProcessoForm({ ...defaultProcessoForm });
+          setAplicarBoasVindas(false);
           loadAll(cliente.id);
         },
       }
@@ -1336,15 +1403,17 @@ export default function ClienteDetalhe() {
       <AlertDialog open={showBoasVindasAlert} onOpenChange={setShowBoasVindasAlert}>
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>🎉 Primeiro processo deste cliente!</AlertDialogTitle>
-            <AlertDialogDescription>
-              Deseja aplicar desconto de boas-vindas antes de continuar?
+            <AlertDialogTitle className="flex items-center gap-2">🎉 Primeiro processo deste cliente!</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Este é o primeiro processo de <strong>{cliente.apelido || cliente.nome}</strong>. Deseja aplicar desconto de boas-vindas?</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           <div className="space-y-3">
             <div className="grid gap-1.5">
-              <Label className="text-sm">Percentual (%)</Label>
+              <Label className="text-sm">Percentual de desconto (%)</Label>
               <Input
                 type="number"
                 min={1}
@@ -1353,6 +1422,17 @@ export default function ClienteDetalhe() {
                 onChange={(e) => setBoasVindasPct(e.target.value)}
               />
             </div>
+            {(() => {
+              const valorBase = Number((cliente as any).valor_base ?? 0);
+              const pct = Number(boasVindasPct) || 0;
+              const valorComDesconto = Math.round(valorBase * (1 - pct / 100) * 100) / 100;
+              return valorBase > 0 ? (
+                <div className="rounded-lg bg-muted/50 p-3 text-sm">
+                  <p>Valor base: <strong>{valorBase.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></p>
+                  <p>Com desconto: <strong className="text-primary">{valorComDesconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></p>
+                </div>
+              ) : null;
+            })()}
           </div>
 
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
@@ -1360,47 +1440,44 @@ export default function ClienteDetalhe() {
               variant="outline"
               onClick={() => {
                 setShowBoasVindasAlert(false);
-                setProcessoForm((f) => ({
-                  ...f,
-                  boas_vindas: false,
-                  boas_vindas_pct: boasVindasPct || '50',
-                }));
+                setAplicarBoasVindas(false);
+                setProcessoForm({ ...defaultProcessoForm });
                 setShowNovoProcesso(true);
               }}
             >
-              Não cobrar normal
+              Não, cobrar normal
             </Button>
             <AlertDialogAction
               onClick={() => {
                 setShowBoasVindasAlert(false);
-                setProcessoForm((f) => ({
-                  ...f,
-                  boas_vindas: true,
-                  boas_vindas_pct: boasVindasPct || '50',
-                }));
+                setAplicarBoasVindas(true);
+                setProcessoForm({ ...defaultProcessoForm, boas_vindas: true, boas_vindas_pct: boasVindasPct || '50' });
                 setShowNovoProcesso(true);
               }}
             >
-              Sim aplicar
+              Sim, aplicar desconto
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog Novo Processo */}
+      {/* Dialog Novo Processo — Reformulado */}
       <Dialog open={showNovoProcesso} onOpenChange={setShowNovoProcesso}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Processo — {cliente.nome}</DialogTitle>
+            <DialogTitle>Novo Processo — {cliente.apelido || cliente.nome}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Razão Social */}
             <div className="grid gap-1.5">
               <Label>Razão Social *</Label>
               <Input value={processoForm.razao_social} onChange={e => setProcessoForm(f => ({ ...f, razao_social: e.target.value }))} placeholder="Nome da empresa" />
             </div>
+
+            {/* Tipo + Prioridade */}
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-1.5">
-                <Label>Tipo de Serviço</Label>
+                <Label>Tipo de Serviço *</Label>
                 <Select
                   value={processoForm.negotiated_service_id || processoForm.tipo}
                   onValueChange={v => {
@@ -1426,7 +1503,6 @@ export default function ClienteDetalhe() {
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem disabled value="__header_std" className="text-[10px] font-semibold text-muted-foreground">— Serviços Padrão —</SelectItem>
                     {Object.entries(TIPO_PROCESSO_LABELS).map(([k, v]) => (
                       <SelectItem key={k} value={k}>{v}</SelectItem>
                     ))}
@@ -1443,7 +1519,7 @@ export default function ClienteDetalhe() {
                   </SelectContent>
                 </Select>
                 {isNegotiatedService && (
-                  <p className="text-[10px] text-primary">Valor fixo negociado aplicado. Desconto progressivo bloqueado.</p>
+                  <p className="text-[10px] text-primary">Valor fixo negociado aplicado.</p>
                 )}
               </div>
               <div className="grid gap-1.5">
@@ -1457,69 +1533,117 @@ export default function ClienteDetalhe() {
                 </Select>
               </div>
             </div>
+
+            {/* Responsável */}
             <div className="grid gap-1.5">
               <Label>Responsável</Label>
-              <Input value={processoForm.responsavel} onChange={e => setProcessoForm(f => ({ ...f, responsavel: e.target.value }))} placeholder="Opcional" />
+              <Select value={processoForm.responsavel || '__none__'} onValueChange={v => setProcessoForm(f => ({ ...f, responsavel: v === '__none__' ? '' : v }))}>
+                <SelectTrigger><SelectValue placeholder="Selecionar (opcional)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum</SelectItem>
+                  {(colaboradores || []).filter(c => c.status === 'ativo').map(c => (
+                    <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
-              <div>
-                <Label className="text-sm font-medium">Definir Valor Manualmente</Label>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {processoForm.definir_manual ? 'Valor digitado abaixo será usado.' : 'Sistema calcula pela Metodologia de Cobrança.'}
-                </p>
-              </div>
-              <Switch
-                checked={processoForm.definir_manual}
-                onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, definir_manual: checked }))}
-              />
-            </div>
-            {isManualPrice && (
-              <div className="grid gap-1.5">
-                <Label>Valor Manual (R$)</Label>
-                <Input type="number" step="0.01" value={processoForm.valor_manual} onChange={e => setProcessoForm(f => ({ ...f, valor_manual: e.target.value }))} placeholder="0,00" />
-              </div>
-            )}
-            {/* Mudança de UF checkbox */}
-            {(processoForm.tipo === 'alteracao' || processoForm.tipo === 'transformacao') && (
-              <div className="flex items-center gap-3 rounded-lg border border-border/60 p-3">
+
+            {/* Mudança de UF */}
+            {(processoForm.tipo === 'alteracao' || processoForm.tipo === 'transformacao') && !isNegotiatedService && (
+              <div className="flex items-center gap-3 rounded-lg border border-warning/30 bg-warning/5 p-3">
                 <Checkbox
-                  id="mudanca_uf"
+                  id="np-mudanca_uf"
                   checked={processoForm.mudanca_uf}
                   onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, mudanca_uf: !!checked }))}
                 />
                 <div>
-                  <Label htmlFor="mudanca_uf" className="text-sm font-medium cursor-pointer">Mudança de UF</Label>
-                  <p className="text-[10px] text-muted-foreground">Consome 2 slots, cobra 2 processos</p>
+                  <Label htmlFor="np-mudanca_uf" className="text-sm font-medium cursor-pointer">Mudança de UF (2 slots)</Label>
+                  <p className="text-[10px] text-muted-foreground">Será tratado como 2 processos para faturamento</p>
                 </div>
               </div>
             )}
-            {/* Boas-vindas */}
-            {processos.length === 0 && !(cliente as any).desconto_boas_vindas_aplicado && (
-              <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-2">
-                <p className="text-sm font-medium flex items-center gap-2">🎉 Primeiro processo deste cliente!</p>
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    id="boas_vindas"
-                    checked={processoForm.boas_vindas}
-                    onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, boas_vindas: !!checked }))}
-                  />
-                  <Label htmlFor="boas_vindas" className="text-sm cursor-pointer">Aplicar desconto de boas-vindas</Label>
-                  {processoForm.boas_vindas && (
-                    <div className="flex items-center gap-1">
-                      <Input
-                        type="number"
-                        className="w-16 h-7 text-xs"
-                        value={processoForm.boas_vindas_pct}
-                        onChange={e => setProcessoForm(f => ({ ...f, boas_vindas_pct: e.target.value }))}
-                        min={1}
-                        max={100}
-                      />
-                      <span className="text-xs text-muted-foreground">%</span>
-                    </div>
+
+            {/* ── Precificação ── */}
+            <div className="space-y-3 rounded-lg border border-border/60 p-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Precificação</p>
+              <RadioGroup
+                value={isNegotiatedService ? 'manual' : (processoForm.definir_manual ? 'manual' : 'auto')}
+                onValueChange={v => setProcessoForm(f => ({ ...f, definir_manual: v === 'manual', negotiated_service_id: v === 'auto' ? '' : f.negotiated_service_id, valor_manual: v === 'auto' ? '' : f.valor_manual }))}
+                className="flex gap-6"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="auto" id="np-preco-auto" disabled={isNegotiatedService} />
+                  <Label htmlFor="np-preco-auto" className="text-sm cursor-pointer">Automático</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="manual" id="np-preco-manual" />
+                  <Label htmlFor="np-preco-manual" className="text-sm cursor-pointer">Valor Manual</Label>
+                </div>
+              </RadioGroup>
+
+              {/* Auto preview */}
+              {!isManualPrice && !isNegotiatedService && descontoPreview && (
+                <div className="rounded-md bg-muted/40 p-2.5 text-sm space-y-0.5">
+                  <p className="text-muted-foreground">{descontoPreview.label}</p>
+                  <p className="font-semibold">
+                    Valor: <span className="text-primary">{descontoPreview.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                    {descontoPreview.desconto > 0 && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        (Desc: {descontoPreview.desconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+                      </span>
+                    )}
+                  </p>
+                  {aplicarBoasVindas && (
+                    <p className="text-xs text-primary">🎉 Boas-vindas {boasVindasPct}% aplicado</p>
                   )}
                 </div>
+              )}
+
+              {/* Manual fields */}
+              {isManualPrice && (
+                <div className="space-y-3">
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Valor (R$)</Label>
+                    <Input type="number" step="0.01" value={processoForm.valor_manual} onChange={e => setProcessoForm(f => ({ ...f, valor_manual: e.target.value }))} placeholder="0,00" />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label className="text-xs">Motivo</Label>
+                    <Input value={processoForm.motivo_manual} onChange={e => setProcessoForm(f => ({ ...f, motivo_manual: e.target.value }))} placeholder="Ex: Cortesia, negociação especial..." />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Já Pago */}
+            <div className="flex items-center gap-3 rounded-lg border border-border/60 p-3">
+              <Switch
+                id="np-ja-pago"
+                checked={processoForm.ja_pago}
+                onCheckedChange={(checked) => setProcessoForm(f => ({ ...f, ja_pago: checked }))}
+              />
+              <div>
+                <Label htmlFor="np-ja-pago" className="text-sm font-medium cursor-pointer">Já Pago</Label>
+                <p className="text-[10px] text-muted-foreground">Cria o lançamento como pago e finaliza o processo</p>
+              </div>
+            </div>
+
+            {/* Boas-vindas badge (se ativo) */}
+            {aplicarBoasVindas && (
+              <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
+                <p className="text-sm font-medium flex items-center gap-2">🎉 Desconto de boas-vindas: {boasVindasPct}%</p>
               </div>
             )}
+
+            {/* Observações */}
+            <div className="grid gap-1.5">
+              <Label>Observações</Label>
+              <Textarea
+                value={processoForm.observacoes}
+                onChange={e => setProcessoForm(f => ({ ...f, observacoes: e.target.value }))}
+                placeholder="Notas adicionais sobre o processo..."
+                className="min-h-[60px]"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNovoProcesso(false)}>Cancelar</Button>
