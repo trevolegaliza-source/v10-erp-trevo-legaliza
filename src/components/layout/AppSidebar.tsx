@@ -52,7 +52,7 @@ export function AppSidebar() {
         </div>
         {!collapsed && (
           <div className="flex flex-col">
-            <span className="text-sm font-bold tracking-tight">TESTE 01</span>
+            <span className="text-sm font-bold tracking-tight">Trevo Legaliza 🍀</span>
             <span className="text-[10px] text-sidebar-foreground/60">Controladoria & Gestão</span>
           </div>
         )}

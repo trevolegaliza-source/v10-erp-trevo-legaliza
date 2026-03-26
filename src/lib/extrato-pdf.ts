@@ -10,8 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 // ═══ BRAND ═══
 const BRAND = {
-  nome: 'TESTE 01 LTDA',
-  fantasia: 'TESTE 01',
+  nome: 'TREVO LEGALIZA LTDA',
+  fantasia: 'Trevo Legaliza 🍀',
   cnpj: '39.969.412/0001-70',
   endereco: 'Rua Brasil, nº 1170, Rudge Ramos, SBC/SP',
   email: 'administrativo@trevolegaliza.com.br',
@@ -240,8 +240,8 @@ const GLOBAL_STYLES = `
 
 function buildHeaderHTML(logoDataUrl: string | null): string {
   const logoHtml = logoDataUrl
-    ? `<div class="header-logo"><img src="${logoDataUrl}" alt="TESTE 01" /></div>`
-    : `<div class="header-logo" style="font-size:12px;font-weight:800;color:#4C9F38;">TESTE 01</div>`;
+    ? `<div class="header-logo"><img src="${logoDataUrl}" alt="Trevo Legaliza" /></div>`
+    : `<div class="header-logo" style="font-size:12px;font-weight:800;color:#4C9F38;">Trevo Legaliza 🍀</div>`;
   return `
     <div class="stripe-top"></div>
     <div class="header">
