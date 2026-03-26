@@ -315,21 +315,21 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
       </AlertDialog>
 
       {/* Deferimento warning dialog */}
-      <AlertDialog open={showDeferimentoDialog} onOpenChange={setShowDeferimentoDialog}>
+      <AlertDialog open={showDeferimentoAlert} onOpenChange={setShowDeferimentoAlert}>
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+            <AlertDialogTitle className="flex items-center gap-2 text-warning">
               <AlertTriangle className="h-5 w-5" />
               Cliente com Faturamento no Deferimento
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>
-                  O cliente <strong>{deferimentoInfo?.clienteNome}</strong> está configurado para faturar apenas no deferimento.
+                  O cliente <strong>{deferimentoAlertData?.clienteNome}</strong> está configurado para faturar apenas no deferimento.
                 </p>
                 <p className="font-medium text-foreground">Os seguintes processos ainda não foram deferidos:</p>
                 <ul className="list-disc pl-5 space-y-1 text-sm">
-                  {deferimentoInfo?.naoDeferidos.map(p => (
+                  {deferimentoAlertData?.naoDeferidos.map(p => (
                     <li key={p.id}>
                       {TIPO_PROCESSO_LABELS[p.tipo] || p.tipo} — {p.razao_social}{' '}
                       <span className="text-muted-foreground">(Etapa: {p.etapa})</span>
@@ -342,11 +342,9 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            {deferimentoInfo && deferimentoInfo.deferidos.length > 0 && (
-              <Button variant="outline" onClick={handleDeferimentoApenasDeferidos}>
-                Gerar Apenas Deferidos ({deferimentoInfo.deferidos.length})
-              </Button>
-            )}
+            <Button variant="outline" onClick={handleDeferimentoApenasDeferidos}>
+              Gerar Apenas Deferidos
+            </Button>
             <AlertDialogAction onClick={handleDeferimentoTodos}>
               Gerar Todos Mesmo Assim
             </AlertDialogAction>
