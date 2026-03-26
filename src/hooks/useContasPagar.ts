@@ -22,6 +22,7 @@ export interface DespesaRecorrente {
 export function useLancamentosPagar(mes: number, ano: number) {
   return useQuery({
     queryKey: ['lancamentos_pagar', mes, ano],
+    staleTime: 3 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('lancamentos')
