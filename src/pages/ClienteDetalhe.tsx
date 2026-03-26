@@ -172,18 +172,35 @@ export default function ClienteDetalhe() {
     const effectiveCount = isMens && franquia > 0 ? monthCount - franquia : monthCount;
     if (effectiveCount < 0) return { slot: monthCount + 1, valor: 0, desconto: 0, label: 'Franquia' };
 
+    const isUrg = processoForm.prioridade === 'urgente';
+    const slotNumero = effectiveCount + 1;
+
+    if (isUrg) {
+      let val = valorBase * 1.5;
+      if (slots === 2) val *= 2;
+
+      if (aplicarBoasVindas) {
+        const pct = Number(boasVindasPct) || 50;
+        val = Math.round(val * (1 - pct / 100) * 100) / 100;
+      }
+
+      return {
+        slot: slotNumero,
+        valor: val,
+        desconto: 0,
+        label: slots === 2 ? `Slots ${slotNumero} e ${slotNumero + 1}` : `Slot nº ${slotNumero}`,
+      };
+    }
+
     if (slots === 2 && descontoPercent > 0) {
       const calc1 = calcularDescontoProgressivo(valorBase, descontoPercent, effectiveCount, valorLimite);
       const calc2 = calcularDescontoProgressivo(valorBase, descontoPercent, effectiveCount + 1, valorLimite);
       const total = calc1.valorFinal + calc2.valorFinal;
-      const isUrg = processoForm.prioridade === 'urgente';
-      return { slot: calc1.processoNumero, valor: isUrg ? total * 1.5 : total, desconto: calc1.descontoAcumulado + calc2.descontoAcumulado, label: `Mudança UF: Slots ${calc1.processoNumero} e ${calc2.processoNumero}` };
+      return { slot: calc1.processoNumero, valor: total, desconto: calc1.descontoAcumulado + calc2.descontoAcumulado, label: `Mudança UF: Slots ${calc1.processoNumero} e ${calc2.processoNumero}` };
     }
 
     const calc = calcularDescontoProgressivo(valorBase, descontoPercent, effectiveCount, valorLimite);
-    const isUrg = processoForm.prioridade === 'urgente';
     let val = calc.valorFinal;
-    if (isUrg) val = val * 1.5;
 
     // Apply boas-vindas preview
     if (aplicarBoasVindas) {
@@ -1587,15 +1604,24 @@ export default function ClienteDetalhe() {
               {/* Auto preview */}
               {!isManualPrice && !isNegotiatedService && descontoPreview && (
                 <div className="rounded-md bg-muted/40 p-2.5 text-sm space-y-0.5">
-                  <p className="text-muted-foreground">{descontoPreview.label}</p>
-                  <p className="font-semibold">
-                    Valor: <span className="text-primary">{descontoPreview.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                    {descontoPreview.desconto > 0 && (
-                      <span className="text-xs text-muted-foreground ml-2">
-                        (Desc: {descontoPreview.desconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
-                      </span>
-                    )}
-                  </p>
+                  {processoForm.prioridade === 'urgente' ? (
+                    <p className="font-semibold">
+                      Slot nº {descontoPreview.slot} • MÉTODO TREVO (+50%) • Valor:{' '}
+                      <span className="text-primary">{descontoPreview.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span> • Sem desconto progressivo
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-muted-foreground">{descontoPreview.label}</p>
+                      <p className="font-semibold">
+                        Valor: <span className="text-primary">{descontoPreview.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        {descontoPreview.desconto > 0 && (
+                          <span className="text-xs text-muted-foreground ml-2">
+                            (Desc: {descontoPreview.desconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+                          </span>
+                        )}
+                      </p>
+                    </>
+                  )}
                   {aplicarBoasVindas && (
                     <p className="text-xs text-primary">🎉 Boas-vindas {boasVindasPct}% aplicado</p>
                   )}
