@@ -71,6 +71,7 @@ export function useLucroMesAnterior(mes: number, ano: number) {
 export function useAReceberMes(mes: number, ano: number) {
   return useQuery({
     queryKey: ['dashboard_a_receber', mes, ano],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const inicio = format(new Date(ano, mes - 1, 1), 'yyyy-MM-dd');
       const fim = format(endOfMonth(new Date(ano, mes - 1, 1)), 'yyyy-MM-dd');
