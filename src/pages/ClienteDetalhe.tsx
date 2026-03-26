@@ -956,7 +956,36 @@ export default function ClienteDetalhe() {
                 <Label className="text-muted-foreground">Email</Label>
                 <Input value={editCadastroForm.email || ''} onChange={e => setEditCadastroForm(f => ({ ...f, email: e.target.value }))} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            </div>
+
+            {/* Endereço */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-muted-foreground">CEP</Label>
+                <div className="relative">
+                  <Input
+                    value={formatCEP(editCadastroForm.cep || '')}
+                    onChange={async (e) => {
+                      const masked = formatCEP(e.target.value);
+                      setEditCadastroForm(f => ({ ...f, cep: masked }));
+                      const digits = masked.replace(/\D/g, '');
+                      if (digits.length === 8) {
+                        setBuscandoCep(true);
+                        const result = await buscarCEP(digits);
+                        setBuscandoCep(false);
+                        if (result) {
+                          setEditCadastroForm(f => ({ ...f, logradouro: result.logradouro, bairro: result.bairro, cidade: result.cidade, estado: result.estado }));
+                        } else {
+                          toast.error('CEP não encontrado');
+                        }
+                      }
+                    }}
+                    placeholder="00000-000"
+                    maxLength={9}
+                  />
+                  {buscandoCep && <span className="absolute right-2 top-2.5 text-xs text-muted-foreground animate-pulse">...</span>}
+                </div>
+              </div>
               <div className="grid gap-2">
                 <Label className="text-muted-foreground">Estado (UF)</Label>
                 <Select value={editCadastroForm.estado || ''} onValueChange={(v) => setEditCadastroForm(f => ({ ...f, estado: v }))}>
@@ -973,6 +1002,25 @@ export default function ClienteDetalhe() {
                 <Input value={editCadastroForm.cidade || ''} onChange={e => setEditCadastroForm(f => ({ ...f, cidade: e.target.value }))} placeholder="Ex: São Paulo" />
               </div>
             </div>
+            <div className="grid gap-2">
+              <Label className="text-muted-foreground">Logradouro</Label>
+              <Input value={editCadastroForm.logradouro || ''} onChange={e => setEditCadastroForm(f => ({ ...f, logradouro: e.target.value }))} placeholder="Rua, Avenida..." />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label className="text-muted-foreground">Número</Label>
+                <Input value={editCadastroForm.numero || ''} onChange={e => setEditCadastroForm(f => ({ ...f, numero: e.target.value }))} placeholder="Nº" />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-muted-foreground">Complemento</Label>
+                <Input value={editCadastroForm.complemento || ''} onChange={e => setEditCadastroForm(f => ({ ...f, complemento: e.target.value }))} placeholder="Sala, Andar..." />
+              </div>
+              <div className="grid gap-2">
+                <Label className="text-muted-foreground">Bairro</Label>
+                <Input value={editCadastroForm.bairro || ''} onChange={e => setEditCadastroForm(f => ({ ...f, bairro: e.target.value }))} placeholder="Bairro" />
+              </div>
+            </div>
+
             <div className="grid gap-2">
                 <Label className="text-muted-foreground">Telefone</Label>
                 <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
