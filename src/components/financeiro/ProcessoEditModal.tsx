@@ -243,7 +243,7 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-foreground">Observações</label>
               <Textarea
-                defaultValue={currentNotes}
+                value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 onBlur={handleNotesBlur}
                 placeholder="Anotações sobre este processo..."
