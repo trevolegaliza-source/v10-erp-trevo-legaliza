@@ -82,6 +82,7 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
     const notasRaw = p.notas || '';
     const hasManualFlag = notasRaw.includes('Valor Manual') || notasRaw.includes('VALOR MANUAL')
       || notasRaw.includes('is_manual') || notasRaw.includes('IS_MANUAL');
+    const hasBoasVindas = notas.includes('boas-vindas') || notas.includes('boas vindas');
 
     const slotsCount = isMudancaUF ? 2 : 1;
 
@@ -98,6 +99,14 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
         valorFinal = lancVal != null ? Number(lancVal) : (pVal != null ? Number(pVal) : base);
         isManual = true;
         label = 'VALOR MANUAL';
+      } else if (hasBoasVindas && s === 0) {
+        const lancVal = (p as any).lancamento?.valor;
+        const pVal = p.valor;
+        valorFinal = lancVal != null ? Number(lancVal) : (pVal != null ? Number(pVal) : base);
+        isManual = true;
+        // Extract percentage from notes e.g. "Boas-vindas 50%"
+        const pctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
+        label = pctMatch ? `BOAS-VINDAS ${pctMatch[1]}%` : 'BOAS-VINDAS';
       } else if (isUrgencia && !hasManualFlag && s === 0) {
         valorFinal = base * 1.5;
         isManual = true;
