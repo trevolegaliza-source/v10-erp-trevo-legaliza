@@ -25,6 +25,14 @@ export interface Cliente {
   vencimento: number | null;
   qtd_processos: number | null;
   is_archived?: boolean;
+  // Endereço
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  latitude: number | null;
+  longitude: number | null;
   // Pré-Pago
   saldo_prepago: number;
   saldo_ultima_recarga: number;
