@@ -367,7 +367,9 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         <div class="total-card">
           <div class="total-tag">HONORÁRIOS DOS SERVIÇOS SOCIETÁRIOS</div>
           <div class="total-label">TOTAL</div>
+          ${economiaBoasVindas > 0 ? `<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;margin-bottom:2px;">${fmt(totalGeral + economiaBoasVindas)}</div>` : ''}
           <div class="total-value"><span class="total-prefix">R$ </span>${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+          ${economiaBoasVindas > 0 ? `<div style="font-size:8px;color:#4ade80;margin-top:4px;">Desconto de boas-vindas aplicado</div>` : ''}
           <div class="total-ctx">${selected.length} processo(s) cobrado(s) neste período</div>
         </div>
 
