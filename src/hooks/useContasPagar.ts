@@ -22,6 +22,7 @@ export interface DespesaRecorrente {
 export function useLancamentosPagar(mes: number, ano: number) {
   return useQuery({
     queryKey: ['lancamentos_pagar', mes, ano],
+    staleTime: 3 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('lancamentos')
@@ -45,6 +46,7 @@ export function useLancamentosPagarByDate(mes: number, ano: number) {
 
   return useQuery({
     queryKey: ['lancamentos_pagar_date', mes, ano],
+    staleTime: 3 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('lancamentos')
@@ -62,6 +64,7 @@ export function useLancamentosPagarByDate(mes: number, ano: number) {
 export function useDespesasRecorrentes() {
   return useQuery({
     queryKey: ['despesas_recorrentes'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('despesas_recorrentes')

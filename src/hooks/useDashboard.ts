@@ -35,6 +35,7 @@ export { getSaudacao, getNomeUsuario, abreviar, variacao };
 export function useLucroMensal(mes: number, ano: number) {
   return useQuery({
     queryKey: ['dashboard_lucro', mes, ano],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const inicio = format(new Date(ano, mes - 1, 1), 'yyyy-MM-dd');
       const fim = format(endOfMonth(new Date(ano, mes - 1, 1)), 'yyyy-MM-dd');
@@ -70,6 +71,7 @@ export function useLucroMesAnterior(mes: number, ano: number) {
 export function useAReceberMes(mes: number, ano: number) {
   return useQuery({
     queryKey: ['dashboard_a_receber', mes, ano],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const inicio = format(new Date(ano, mes - 1, 1), 'yyyy-MM-dd');
       const fim = format(endOfMonth(new Date(ano, mes - 1, 1)), 'yyyy-MM-dd');
@@ -96,6 +98,7 @@ export function useAReceberMes(mes: number, ano: number) {
 export function useAPagarMes(mes: number, ano: number) {
   return useQuery({
     queryKey: ['dashboard_a_pagar', mes, ano],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const inicio = format(new Date(ano, mes - 1, 1), 'yyyy-MM-dd');
       const fim = format(endOfMonth(new Date(ano, mes - 1, 1)), 'yyyy-MM-dd');
@@ -121,6 +124,7 @@ export function useAPagarMes(mes: number, ano: number) {
 export function useTicketMedio(mes: number, ano: number) {
   return useQuery({
     queryKey: ['dashboard_ticket', mes, ano],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const inicio = format(new Date(ano, mes - 1, 1), 'yyyy-MM-dd');
       const fim = format(endOfMonth(new Date(ano, mes - 1, 1)), 'yyyy-MM-dd');
@@ -142,6 +146,7 @@ export function useTicketMedio(mes: number, ano: number) {
 export function useAgendaSemana() {
   return useQuery({
     queryKey: ['dashboard_agenda'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const hoje = format(new Date(), 'yyyy-MM-dd');
       const em7dias = format(addDays(new Date(), 7), 'yyyy-MM-dd');
@@ -172,6 +177,7 @@ export function useAgendaSemana() {
 export function useInadimplenciaDashboard() {
   return useQuery({
     queryKey: ['dashboard_inadimplencia'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const hoje = format(new Date(), 'yyyy-MM-dd');
 
@@ -199,6 +205,7 @@ export function useInadimplenciaDashboard() {
 export function useProcessosParados() {
   return useQuery({
     queryKey: ['dashboard_processos_parados'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase
         .from('processos')
@@ -225,6 +232,7 @@ export function useProcessosParados() {
 export function useRankingFaturamento(mes: number, ano: number) {
   return useQuery({
     queryKey: ['dashboard_ranking_fat', mes, ano],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const inicio = format(new Date(ano, mes - 1, 1), 'yyyy-MM-dd');
       const fim = format(endOfMonth(new Date(ano, mes - 1, 1)), 'yyyy-MM-dd');
@@ -255,6 +263,7 @@ export function useRankingFaturamento(mes: number, ano: number) {
 export function useRankingVolume(mes: number, ano: number) {
   return useQuery({
     queryKey: ['dashboard_ranking_vol', mes, ano],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const inicio = startOfMonth(new Date(ano, mes - 1, 1)).toISOString();
       const fim = endOfMonth(new Date(ano, mes - 1, 1)).toISOString();
@@ -284,6 +293,7 @@ export function useRankingVolume(mes: number, ano: number) {
 export function useResultadoMes(mes: number, ano: number) {
   return useQuery({
     queryKey: ['dashboard_resultado', mes, ano],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const inicio = format(new Date(ano, mes - 1, 1), 'yyyy-MM-dd');
       const fim = format(endOfMonth(new Date(ano, mes - 1, 1)), 'yyyy-MM-dd');
@@ -325,6 +335,7 @@ export function useResultadoMes(mes: number, ano: number) {
 export function useProvisaoDashboard() {
   return useQuery({
     queryKey: ['dashboard_provisao'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase
         .from('despesas_recorrentes')
