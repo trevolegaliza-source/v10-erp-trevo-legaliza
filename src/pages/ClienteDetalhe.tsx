@@ -1500,11 +1500,11 @@ export default function ClienteDetalhe() {
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>
-                  O cliente <strong>{cliente?.apelido || cliente?.nome}</strong> está configurado para faturar apenas no deferimento.
+                  O cliente <strong>{deferimentoAlertData?.clienteNome}</strong> está configurado para faturar apenas no deferimento.
                 </p>
                 <p className="font-medium text-foreground">Processos ainda NÃO deferidos:</p>
                 <ul className="list-disc pl-5 space-y-1 text-sm">
-                  {deferimentoPendentes.map(p => (
+                  {deferimentoAlertData?.naoDeferidos.map(p => (
                     <li key={p.id}>
                       {TIPO_PROCESSO_LABELS[p.tipo] || p.tipo} — {p.razao_social}{' '}
                       <span className="text-muted-foreground">(Etapa: {p.etapa})</span>
@@ -1517,18 +1517,27 @@ export default function ClienteDetalhe() {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            {deferimentoDeferidos.length > 0 && (
-              <Button variant="outline" onClick={() => {
+            <Button
+              variant="outline"
+              onClick={() => {
+                const deferidos = deferimentoAlertData?.todosSelecionados.filter(p => ['registro', 'finalizados'].includes(p.etapa)) || [];
                 setShowDeferimentoAlert(false);
-                gerarExtratoClienteDetalhe(deferimentoDeferidos);
-              }}>
-                Gerar Apenas Deferidos ({deferimentoDeferidos.length})
-              </Button>
-            )}
-            <AlertDialogAction onClick={() => {
-              setShowDeferimentoAlert(false);
-              gerarExtratoClienteDetalhe(deferimentoTodos);
-            }}>
+                if (deferidos.length > 0) {
+                  gerarExtratoClienteDetalhe(deferidos);
+                } else {
+                  toast.warning('Nenhum processo deferido para gerar extrato.');
+                }
+              }}
+            >
+              Gerar Apenas Deferidos
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                if (!deferimentoAlertData) return;
+                setShowDeferimentoAlert(false);
+                gerarExtratoClienteDetalhe(deferimentoAlertData.todosSelecionados);
+              }}
+            >
               Gerar Todos Mesmo Assim
             </AlertDialogAction>
           </AlertDialogFooter>
