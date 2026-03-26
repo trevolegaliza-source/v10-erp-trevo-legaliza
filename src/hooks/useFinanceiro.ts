@@ -297,19 +297,28 @@ export function useCreateProcesso() {
           valorFinal = 0;
           discountInfo = `Dentro da franquia (${monthCount + 1}/${franquia})`;
         } else {
-          // Exceeded franchise — use valor_base with progressive discount
+          // Exceeded franchise
           const excedenteCount = franquia > 0 ? monthCount - franquia : monthCount;
-          if (descontoPercent > 0) {
+          if (isUrgente) {
+            // URGÊNCIA: valor fixo = base × 1.5, SEM desconto progressivo
+            // O slot é ocupado (monthCount já conta) mas o valor não muda
+            valorFinal = valorBaseCliente * 1.5;
+            discountInfo = `Método Trevo / Urgência | Base: R$ ${valorBaseCliente.toFixed(2)} × 1.5 = R$ ${valorFinal.toFixed(2)}`;
+          } else if (descontoPercent > 0) {
             const calc = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, excedenteCount, valorLimite);
             valorFinal = calc.valorFinal;
             discountInfo = `Excedente nº ${excedenteCount + 1} | Base: R$ ${valorBaseCliente.toFixed(2)} | Desc: R$ ${calc.descontoAcumulado.toFixed(2)}`;
           } else {
             valorFinal = valorBaseCliente;
           }
-          if (isUrgente) valorFinal *= 1.5;
         }
       } else if (cliente.tipo !== 'MENSALISTA') {
-        if (slots === 2 && descontoPercent > 0) {
+        if (isUrgente) {
+          // URGÊNCIA: valor fixo = base × 1.5, SEM desconto progressivo
+          // O slot é ocupado mas o valor é fixo
+          valorFinal = valorBaseCliente * 1.5;
+          discountInfo = `Método Trevo / Urgência | Base: R$ ${valorBaseCliente.toFixed(2)} × 1.5 = R$ ${valorFinal.toFixed(2)}`;
+        } else if (slots === 2 && descontoPercent > 0) {
           const calc1 = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount, valorLimite);
           const calc2 = calcularDescontoProgressivo(valorBaseCliente, descontoPercent, monthCount + 1, valorLimite);
           valorFinal = calc1.valorFinal + calc2.valorFinal;
@@ -325,9 +334,6 @@ export function useCreateProcesso() {
           }
         } else {
           valorFinal = valorBaseCliente;
-        }
-        if (isUrgente) {
-          valorFinal = valorFinal * 1.5;
         }
       } else {
         valorFinal = isUrgente ? valorBaseCliente * 1.5 : valorBaseCliente;
