@@ -76,13 +76,19 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
   let slot = 0;
 
   for (const p of sorted) {
-    const notas = (p.notas || '').toLowerCase();
+    const notasRaw = p.notas || '';
+    const notas = notasRaw.toLowerCase();
     const isMudancaUF = notas.includes('mudança de uf') || notas.includes('mudanca de uf');
     const isUrgencia = notas.includes('urgência') || notas.includes('urgencia');
-    const notasRaw = p.notas || '';
-    const hasManualFlag = notasRaw.includes('Valor Manual') || notasRaw.includes('VALOR MANUAL')
-      || notasRaw.includes('is_manual') || notasRaw.includes('IS_MANUAL');
+    const hasManualFlag = notas.includes('valor manual') || notas.includes('is_manual');
     const hasBoasVindas = notas.includes('boas-vindas') || notas.includes('boas vindas');
+
+    const valorProcesso = p.valor != null ? Number(p.valor) : Number.NaN;
+    const valorLancamentoRaw = (p as any).lancamento?.valor;
+    const valorLancamento = valorLancamentoRaw != null ? Number(valorLancamentoRaw) : Number.NaN;
+    const valorReal = Number.isFinite(valorProcesso)
+      ? valorProcesso
+      : (Number.isFinite(valorLancamento) ? valorLancamento : 0);
 
     const slotsCount = isMudancaUF ? 2 : 1;
 
@@ -93,24 +99,21 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
       let isManual = false;
       let label = '';
 
-      if (hasManualFlag && s === 0) {
-        const lancVal = (p as any).lancamento?.valor;
-        const pVal = p.valor;
-        valorFinal = lancVal != null ? Number(lancVal) : (pVal != null ? Number(pVal) : base);
+      if ((hasManualFlag || isUrgencia || hasBoasVindas) && s === 0) {
+        valorFinal = valorReal;
+        desconto = 0;
         isManual = true;
-        label = 'VALOR MANUAL';
-      } else if (hasBoasVindas && s === 0) {
-        const lancVal = (p as any).lancamento?.valor;
-        const pVal = p.valor;
-        valorFinal = lancVal != null ? Number(lancVal) : (pVal != null ? Number(pVal) : base);
-        isManual = true;
-        // Extract percentage from notes e.g. "Boas-vindas 50%"
-        const pctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
-        label = pctMatch ? `BOAS-VINDAS ${pctMatch[1]}%` : 'BOAS-VINDAS';
-      } else if (isUrgencia && !hasManualFlag && s === 0) {
-        valorFinal = base * 1.5;
-        isManual = true;
-        label = 'MÉTODO TREVO / URGÊNCIA';
+        if (hasManualFlag) {
+          label = 'VALOR MANUAL';
+        } else if (isUrgencia) {
+          label = 'MÉTODO TREVO / URGÊNCIA';
+        } else {
+          const pctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
+          label = pctMatch ? `BOAS-VINDAS ${pctMatch[1]}%` : 'BOAS-VINDAS';
+        }
+      } else if (valorReal > 0) {
+        valorFinal = valorReal;
+        desconto = base - valorFinal;
       } else {
         valorFinal = base;
         if (descPct > 0 && slot > 1) {
