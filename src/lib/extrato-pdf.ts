@@ -433,10 +433,18 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     const blockTotal = step.valorFinal + taxTotal;
 
     const notas = (p.notas || '').toLowerCase();
+    const notasRaw = p.notas || '';
     const hasCortesiaNasNotas = notas.includes('cortesia');
     const hasBoasVindas = notas.includes('boas-vindas') || notas.includes('boas vindas');
     const hasBoasVindas100 = hasBoasVindas && /100\s*%/.test(notas);
     const isCortesia = step.valorFinal === 0 || hasCortesiaNasNotas || hasBoasVindas100;
+    const isBoasVindasDiscount = hasBoasVindas && !isCortesia;
+
+    // Extract boas-vindas percentage
+    const bvPctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
+    const bvPct = bvPctMatch ? Number(bvPctMatch[1]) : 0;
+    const valorOriginal = data.cliente.valor_base ?? 580;
+    const economiaBoasVindas = isBoasVindasDiscount ? (valorOriginal - step.valorFinal) : 0;
 
     let discountLine = '';
     if (!step.isManual && step.desconto > 0) {
@@ -444,8 +452,12 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     }
 
     let manualBadge = '';
-    if (step.isManual && step.label) {
+    if (step.isManual && step.label && !isBoasVindasDiscount) {
       manualBadge = `<span class="manual-badge">${step.label}</span>`;
+    }
+    // Boas-vindas gets a green badge instead of orange manual badge
+    if (isBoasVindasDiscount) {
+      manualBadge = `<span class="boas-vindas-badge">BOAS-VINDAS: ${bvPct || ''}% de desconto</span>`;
     }
 
     let baseRef = '';
@@ -457,13 +469,20 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
       ? step.valorBase
       : ((data.cliente.valor_base ?? 0) > 0 ? Number(data.cliente.valor_base) : null);
 
-    const valorHeader = isCortesia
-      ? `<div class="ph-values-inline">${baseCortesia != null ? `<span class="ph-base-strike">${fmt(baseCortesia)}</span>` : ''}<span class="ph-value">${fmt(step.valorFinal)}</span></div>`
-      : `<div class="ph-value">${fmt(step.valorFinal)}</div>`;
+    let valorHeader = '';
+    let valorInfo = '';
 
-    const valorInfo = isCortesia
-      ? `<div class="cortesia-badge">CORTESIA</div>`
-      : baseRef;
+    if (isCortesia) {
+      valorHeader = `<div class="ph-values-inline">${baseCortesia != null ? `<span class="ph-base-strike">${fmt(baseCortesia)}</span>` : ''}<span class="ph-value">${fmt(step.valorFinal)}</span></div>`;
+      valorInfo = `<div class="cortesia-badge">CORTESIA</div>`;
+    } else if (isBoasVindasDiscount) {
+      // Show original strikethrough + final value + economia
+      valorHeader = `<div class="ph-values-inline"><span class="ph-base-strike">${fmt(valorOriginal)}</span><span class="ph-value">${fmt(step.valorFinal)}</span></div>`;
+      valorInfo = `<div class="boas-vindas-economia">Economia: ${fmt(economiaBoasVindas)}</div>`;
+    } else {
+      valorHeader = `<div class="ph-value">${fmt(step.valorFinal)}</div>`;
+      valorInfo = baseRef;
+    }
 
     let taxTableHTML = '';
     if (pTaxas.length > 0) {
