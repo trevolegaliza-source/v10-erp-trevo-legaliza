@@ -225,6 +225,21 @@ export default function ClienteDetalhe() {
         tipo: editCadastroForm.tipo,
         estado: editCadastroForm.estado || null,
         cidade: editCadastroForm.cidade || null,
+        cep: (editCadastroForm.cep || '').replace(/\D/g, '') || null,
+        logradouro: editCadastroForm.logradouro || null,
+        numero: editCadastroForm.numero || null,
+        complemento: editCadastroForm.complemento || null,
+        bairro: editCadastroForm.bairro || null,
+      };
+      // Fetch coordinates in background
+      if (editCadastroForm.cidade && editCadastroForm.estado) {
+        const { buscarCoordenadas } = await import('@/lib/cep');
+        const coords = await buscarCoordenadas(editCadastroForm.logradouro || '', editCadastroForm.cidade, editCadastroForm.estado);
+        if (coords) {
+          payload.latitude = coords.lat;
+          payload.longitude = coords.lng;
+        }
+      }
       };
       await new Promise<void>((resolve, reject) => {
         updateCliente.mutate(payload as any, {
