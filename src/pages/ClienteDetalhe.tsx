@@ -1022,9 +1022,8 @@ export default function ClienteDetalhe() {
             </div>
 
             <div className="grid gap-2">
-                <Label className="text-muted-foreground">Telefone</Label>
-                <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
-              </div>
+              <Label className="text-muted-foreground">Telefone</Label>
+              <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
             </div>
             <div className="grid gap-2">
               <Label className="text-muted-foreground">Tipo</Label>
