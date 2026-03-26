@@ -112,12 +112,12 @@ export default function ClienteDetalhe() {
     try {
       const { data: clienteData } = await supabase
         .from('clientes')
-        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador, dia_cobranca')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador, dia_cobranca, dia_vencimento_mensal')
         .eq('id', cliente.id)
         .single();
 
-      if (clienteData?.dia_cobranca) {
-        toast.info(`Atenção: o cliente ${clienteData.apelido || clienteData.nome} tem vencimento fixo no dia ${clienteData.dia_cobranca} de cada mês.`);
+      if (clienteData?.dia_vencimento_mensal && clienteData.dia_vencimento_mensal > 0 && !clienteData.dia_cobranca) {
+        toast.info(`Atenção: o cliente ${clienteData.apelido || clienteData.nome} tem vencimento fixo no dia ${clienteData.dia_vencimento_mensal} de cada mês.`);
       }
       const processosFin: ProcessoFinanceiro[] = procsToGenerate.map(p => ({
         ...p,
@@ -259,6 +259,17 @@ export default function ClienteDetalhe() {
       numero: (cliente as any).numero || '',
       complemento: (cliente as any).complemento || '',
       bairro: (cliente as any).bairro || '',
+      // Financial fields
+      momento_faturamento: (cliente as any).momento_faturamento || 'na_solicitacao',
+      forma_cobranca: Number((cliente as any).dia_vencimento_mensal) > 0 && !(cliente as any).dia_cobranca ? 'fatura_mensal' : 'por_processo',
+      dia_cobranca: String((cliente as any).dia_cobranca ?? '4'),
+      dia_vencimento_mensal: String((cliente as any).dia_vencimento_mensal ?? '15'),
+      valor_base: String((cliente as any).valor_base ?? ''),
+      desconto_progressivo: String((cliente as any).desconto_progressivo ?? ''),
+      valor_limite_desconto: String((cliente as any).valor_limite_desconto ?? ''),
+      mensalidade: String((cliente as any).mensalidade ?? ''),
+      franquia_processos: String((cliente as any).franquia_processos ?? ''),
+      saldo_prepago: String((cliente as any).saldo_prepago ?? ''),
     });
     // Load existing negotiations into inline rows
     setEditHonorariosRows(
@@ -294,6 +305,11 @@ export default function ClienteDetalhe() {
     }
     setSavingCadastro(true);
     try {
+      const isAvulso = editCadastroForm.tipo === 'AVULSO_4D';
+      const isMensalistaEdit = editCadastroForm.tipo === 'MENSALISTA';
+      const isPrePagoEdit = editCadastroForm.tipo === 'PRE_PAGO';
+      const isFormaProcesso = editCadastroForm.forma_cobranca === 'por_processo';
+
       const payload: Record<string, any> = {
         id: cliente.id,
         nome: editCadastroForm.nome,
@@ -311,6 +327,16 @@ export default function ClienteDetalhe() {
         numero: editCadastroForm.numero || null,
         complemento: editCadastroForm.complemento || null,
         bairro: editCadastroForm.bairro || null,
+        // Financial fields
+        momento_faturamento: isAvulso ? editCadastroForm.momento_faturamento : isMensalistaEdit ? 'na_solicitacao' : null,
+        dia_vencimento_mensal: isAvulso ? (isFormaProcesso ? null : (Number(editCadastroForm.dia_vencimento_mensal) || 15)) : isMensalistaEdit ? (Number(editCadastroForm.dia_vencimento_mensal) || 10) : null,
+        dia_cobranca: isAvulso && isFormaProcesso ? (Number(editCadastroForm.dia_cobranca) || 4) : null,
+        valor_base: (isAvulso || isMensalistaEdit || isPrePagoEdit) && editCadastroForm.valor_base ? Number(editCadastroForm.valor_base) : null,
+        desconto_progressivo: (isAvulso || isMensalistaEdit) && editCadastroForm.desconto_progressivo ? Number(editCadastroForm.desconto_progressivo) : null,
+        valor_limite_desconto: (isAvulso || isMensalistaEdit) && editCadastroForm.valor_limite_desconto ? Number(editCadastroForm.valor_limite_desconto) : null,
+        mensalidade: isMensalistaEdit && editCadastroForm.mensalidade ? Number(editCadastroForm.mensalidade) : null,
+        franquia_processos: isMensalistaEdit && editCadastroForm.franquia_processos ? Number(editCadastroForm.franquia_processos) : 0,
+        saldo_prepago: isPrePagoEdit && editCadastroForm.saldo_prepago ? Number(editCadastroForm.saldo_prepago) : undefined,
       };
       // Fetch coordinates in background
       if (editCadastroForm.cidade && editCadastroForm.estado) {
@@ -1126,7 +1152,7 @@ export default function ClienteDetalhe() {
               <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
             </div>
             <div className="grid gap-2">
-              <Label className="text-muted-foreground">Tipo</Label>
+              <Label className="text-muted-foreground">Modalidade do Cliente</Label>
               <Select value={editCadastroForm.tipo} onValueChange={(v) => setEditCadastroForm(f => ({ ...f, tipo: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -1136,6 +1162,128 @@ export default function ClienteDetalhe() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* ═══ Financial fields by modality ═══ */}
+            {editCadastroForm.tipo === 'AVULSO_4D' && (
+              <div className="space-y-3 rounded-lg border border-border/40 bg-muted/20 p-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Faturamento</Label>
+                    <Select value={editCadastroForm.momento_faturamento || 'na_solicitacao'} onValueChange={v => setEditCadastroForm(f => ({ ...f, momento_faturamento: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>
+                        <SelectItem value="no_deferimento">No Deferimento</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold">Forma de Cobrança</Label>
+                  <RadioGroup
+                    value={editCadastroForm.forma_cobranca || 'por_processo'}
+                    onValueChange={(v: string) => setEditCadastroForm(f => ({ ...f, forma_cobranca: v }))}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <RadioGroupItem value="por_processo" id="ec-fc-processo" />
+                      <Label htmlFor="ec-fc-processo" className="text-xs cursor-pointer">Por processo (D+X dias)</Label>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <RadioGroupItem value="fatura_mensal" id="ec-fc-mensal" />
+                      <Label htmlFor="ec-fc-mensal" className="text-xs cursor-pointer">Fatura mensal (dia fixo)</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                {editCadastroForm.forma_cobranca === 'por_processo' ? (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Vencimento após solicitação</Label>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground">D+</span>
+                        <Input type="number" min={1} max={60} value={editCadastroForm.dia_cobranca || ''} onChange={e => setEditCadastroForm(f => ({ ...f, dia_cobranca: e.target.value }))} placeholder="4" className="w-20" />
+                        <span className="text-xs text-muted-foreground">dias</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Dia de vencimento da fatura</Label>
+                      <Input type="number" min={1} max={31} value={editCadastroForm.dia_vencimento_mensal || ''} onChange={e => setEditCadastroForm(f => ({ ...f, dia_vencimento_mensal: e.target.value }))} placeholder="15" />
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Valor Base (R$)</Label>
+                    <Input type="number" step="0.01" value={editCadastroForm.valor_base || ''} onChange={e => setEditCadastroForm(f => ({ ...f, valor_base: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Desc. Progr. (%)</Label>
+                    <Input type="number" step="0.1" value={editCadastroForm.desconto_progressivo || ''} onChange={e => setEditCadastroForm(f => ({ ...f, desconto_progressivo: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Limite/Piso (R$)</Label>
+                    <Input type="number" step="0.01" value={editCadastroForm.valor_limite_desconto || ''} onChange={e => setEditCadastroForm(f => ({ ...f, valor_limite_desconto: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {editCadastroForm.tipo === 'MENSALISTA' && (
+              <div className="space-y-3 rounded-lg border border-border/40 bg-muted/20 p-3">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Mensalidade (R$) *</Label>
+                    <Input type="number" step="0.01" value={editCadastroForm.mensalidade || ''} onChange={e => setEditCadastroForm(f => ({ ...f, mensalidade: e.target.value }))} placeholder="0,00" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Franquia Processos *</Label>
+                    <Input type="number" min={0} value={editCadastroForm.franquia_processos || ''} onChange={e => setEditCadastroForm(f => ({ ...f, franquia_processos: e.target.value }))} placeholder="Qtd inclusos" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Dia Vencimento</Label>
+                    <Input type="number" min={1} max={31} value={editCadastroForm.dia_vencimento_mensal || ''} onChange={e => setEditCadastroForm(f => ({ ...f, dia_vencimento_mensal: e.target.value }))} placeholder="10" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="flex-1 border-t border-border/40" />
+                  <span>Processos Excedentes</span>
+                  <span className="flex-1 border-t border-border/40" />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Valor Base Excedente (R$)</Label>
+                    <Input type="number" step="0.01" value={editCadastroForm.valor_base || ''} onChange={e => setEditCadastroForm(f => ({ ...f, valor_base: e.target.value }))} placeholder="0,00" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Desc. Progr. Exc. (%)</Label>
+                    <Input type="number" step="0.1" value={editCadastroForm.desconto_progressivo || ''} onChange={e => setEditCadastroForm(f => ({ ...f, desconto_progressivo: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Limite/Piso Exc. (R$)</Label>
+                    <Input type="number" step="0.01" value={editCadastroForm.valor_limite_desconto || ''} onChange={e => setEditCadastroForm(f => ({ ...f, valor_limite_desconto: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {editCadastroForm.tipo === 'PRE_PAGO' && (
+              <div className="space-y-3 rounded-lg border border-border/40 bg-muted/20 p-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Saldo Atual (R$)</Label>
+                    <Input type="number" step="0.01" value={editCadastroForm.saldo_prepago || ''} onChange={e => setEditCadastroForm(f => ({ ...f, saldo_prepago: e.target.value }))} placeholder="Valor depositado" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Valor por Processo (R$)</Label>
+                    <Input type="number" step="0.01" value={editCadastroForm.valor_base || ''} onChange={e => setEditCadastroForm(f => ({ ...f, valor_base: e.target.value }))} placeholder="Cobrado do saldo" />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Honorários Específicos inline */}
             <div className="pt-3 border-t border-border/40">
               <HonorariosInlineRepeater rows={editHonorariosRows} onChange={setEditHonorariosRows} />
