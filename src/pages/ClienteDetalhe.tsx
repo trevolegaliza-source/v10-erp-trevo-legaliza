@@ -117,19 +117,79 @@ export default function ClienteDetalhe() {
   const isNegotiatedService = !!processoForm.negotiated_service_id;
   const isArchived = !!(cliente as any)?.is_archived;
 
+  const defaultProcessoForm = {
+    razao_social: '',
+    tipo: 'abertura' as string,
+    prioridade: 'normal',
+    responsavel: '',
+    valor_manual: '',
+    definir_manual: false,
+    negotiated_service_id: '' as string,
+    mudanca_uf: false,
+    boas_vindas: false,
+    boas_vindas_pct: '50',
+    ja_pago: false,
+    observacoes: '',
+    motivo_manual: '',
+  };
+
   const handleClickNovoProcesso = () => {
     if (!cliente) return;
-
-    // Verificar se é primeiro processo
     const isFirst = processos.length === 0 && !(cliente as any).desconto_boas_vindas_aplicado;
     if (isFirst) {
       setBoasVindasPct('50');
       setShowBoasVindasAlert(true);
       return;
     }
-
+    setAplicarBoasVindas(false);
+    setProcessoForm({ ...defaultProcessoForm });
     setShowNovoProcesso(true);
   };
+
+  // Desconto progressivo preview (real-time)
+  const descontoPreview = useMemo(() => {
+    if (!cliente || isManualPrice || isNegotiatedService) return null;
+    const c = cliente as any;
+    const valorBase = Number(c.valor_base ?? 0);
+    const descontoPercent = Number(c.desconto_progressivo ?? 0);
+    const valorLimite = c.valor_limite_desconto != null ? Number(c.valor_limite_desconto) : null;
+    const isMens = c.tipo === 'MENSALISTA';
+    const franquia = Number(c.franquia_processos ?? 0);
+
+    // count current month processes
+    const now = new Date();
+    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthCount = processos.filter(p => new Date(p.created_at) >= startMonth).length;
+    const slots = processoForm.mudanca_uf ? 2 : 1;
+
+    if (isMens && franquia > 0 && monthCount < franquia) {
+      return { slot: monthCount + 1, valor: 0, desconto: 0, label: `Dentro da franquia (${monthCount + 1}/${franquia})` };
+    }
+
+    const effectiveCount = isMens && franquia > 0 ? monthCount - franquia : monthCount;
+    if (effectiveCount < 0) return { slot: monthCount + 1, valor: 0, desconto: 0, label: 'Franquia' };
+
+    if (slots === 2 && descontoPercent > 0) {
+      const calc1 = calcularDescontoProgressivo(valorBase, descontoPercent, effectiveCount, valorLimite);
+      const calc2 = calcularDescontoProgressivo(valorBase, descontoPercent, effectiveCount + 1, valorLimite);
+      const total = calc1.valorFinal + calc2.valorFinal;
+      const isUrg = processoForm.prioridade === 'urgente';
+      return { slot: calc1.processoNumero, valor: isUrg ? total * 1.5 : total, desconto: calc1.descontoAcumulado + calc2.descontoAcumulado, label: `Mudança UF: Slots ${calc1.processoNumero} e ${calc2.processoNumero}` };
+    }
+
+    const calc = calcularDescontoProgressivo(valorBase, descontoPercent, effectiveCount, valorLimite);
+    const isUrg = processoForm.prioridade === 'urgente';
+    let val = calc.valorFinal;
+    if (isUrg) val = val * 1.5;
+
+    // Apply boas-vindas preview
+    if (aplicarBoasVindas) {
+      const pct = Number(boasVindasPct) || 50;
+      val = Math.round(val * (1 - pct / 100) * 100) / 100;
+    }
+
+    return { slot: calc.processoNumero, valor: val, desconto: calc.descontoAcumulado, label: `Slot nº ${calc.processoNumero}` };
+  }, [cliente, processos, processoForm.mudanca_uf, processoForm.prioridade, isManualPrice, isNegotiatedService, aplicarBoasVindas, boasVindasPct]);
 
   async function gerarExtratoClienteDetalhe(procsToGenerate: ProcessoDB[]) {
     if (!cliente) return;
