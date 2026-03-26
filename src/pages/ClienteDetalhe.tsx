@@ -305,6 +305,11 @@ export default function ClienteDetalhe() {
     }
     setSavingCadastro(true);
     try {
+      const isAvulso = editCadastroForm.tipo === 'AVULSO_4D';
+      const isMensalistaEdit = editCadastroForm.tipo === 'MENSALISTA';
+      const isPrePagoEdit = editCadastroForm.tipo === 'PRE_PAGO';
+      const isFormaProcesso = editCadastroForm.forma_cobranca === 'por_processo';
+
       const payload: Record<string, any> = {
         id: cliente.id,
         nome: editCadastroForm.nome,
@@ -322,6 +327,16 @@ export default function ClienteDetalhe() {
         numero: editCadastroForm.numero || null,
         complemento: editCadastroForm.complemento || null,
         bairro: editCadastroForm.bairro || null,
+        // Financial fields
+        momento_faturamento: isAvulso ? editCadastroForm.momento_faturamento : isMensalistaEdit ? 'na_solicitacao' : null,
+        dia_vencimento_mensal: isAvulso ? (isFormaProcesso ? null : (Number(editCadastroForm.dia_vencimento_mensal) || 15)) : isMensalistaEdit ? (Number(editCadastroForm.dia_vencimento_mensal) || 10) : null,
+        dia_cobranca: isAvulso && isFormaProcesso ? (Number(editCadastroForm.dia_cobranca) || 4) : null,
+        valor_base: (isAvulso || isMensalistaEdit || isPrePagoEdit) && editCadastroForm.valor_base ? Number(editCadastroForm.valor_base) : null,
+        desconto_progressivo: (isAvulso || isMensalistaEdit) && editCadastroForm.desconto_progressivo ? Number(editCadastroForm.desconto_progressivo) : null,
+        valor_limite_desconto: (isAvulso || isMensalistaEdit) && editCadastroForm.valor_limite_desconto ? Number(editCadastroForm.valor_limite_desconto) : null,
+        mensalidade: isMensalistaEdit && editCadastroForm.mensalidade ? Number(editCadastroForm.mensalidade) : null,
+        franquia_processos: isMensalistaEdit && editCadastroForm.franquia_processos ? Number(editCadastroForm.franquia_processos) : 0,
+        saldo_prepago: isPrePagoEdit && editCadastroForm.saldo_prepago ? Number(editCadastroForm.saldo_prepago) : undefined,
       };
       // Fetch coordinates in background
       if (editCadastroForm.cidade && editCadastroForm.estado) {
