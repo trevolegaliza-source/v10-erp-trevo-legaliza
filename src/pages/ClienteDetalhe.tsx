@@ -112,12 +112,12 @@ export default function ClienteDetalhe() {
     try {
       const { data: clienteData } = await supabase
         .from('clientes')
-        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador, dia_cobranca')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador, dia_cobranca, dia_vencimento_mensal')
         .eq('id', cliente.id)
         .single();
 
-      if (clienteData?.dia_cobranca) {
-        toast.info(`Atenção: o cliente ${clienteData.apelido || clienteData.nome} tem vencimento fixo no dia ${clienteData.dia_cobranca} de cada mês.`);
+      if (clienteData?.dia_vencimento_mensal && clienteData.dia_vencimento_mensal > 0 && !clienteData.dia_cobranca) {
+        toast.info(`Atenção: o cliente ${clienteData.apelido || clienteData.nome} tem vencimento fixo no dia ${clienteData.dia_vencimento_mensal} de cada mês.`);
       }
       const processosFin: ProcessoFinanceiro[] = procsToGenerate.map(p => ({
         ...p,
