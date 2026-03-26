@@ -95,6 +95,7 @@ export default function ClienteDetalhe() {
   // Boas-vindas (1º processo) — alert antes de abrir o formulário
   const [showBoasVindasAlert, setShowBoasVindasAlert] = useState(false);
   const [boasVindasPct, setBoasVindasPct] = useState('50');
+  const [aplicarBoasVindas, setAplicarBoasVindas] = useState(false);
 
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
@@ -108,6 +109,9 @@ export default function ClienteDetalhe() {
     mudanca_uf: false,
     boas_vindas: false,
     boas_vindas_pct: '50',
+    ja_pago: false,
+    observacoes: '',
+    motivo_manual: '',
   });
   const isManualPrice = processoForm.definir_manual;
   const isNegotiatedService = !!processoForm.negotiated_service_id;
