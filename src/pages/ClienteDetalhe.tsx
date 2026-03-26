@@ -96,6 +96,7 @@ export default function ClienteDetalhe() {
   const [showBoasVindasAlert, setShowBoasVindasAlert] = useState(false);
   const [boasVindasPct, setBoasVindasPct] = useState('50');
   const [aplicarBoasVindas, setAplicarBoasVindas] = useState(false);
+  const [isFirstProcessNovo, setIsFirstProcessNovo] = useState(false);
 
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
@@ -136,19 +137,33 @@ export default function ClienteDetalhe() {
   const handleNovoProcesso = async () => {
     if (!cliente) return;
 
-    const { count } = await supabase
+    const { count, error } = await supabase
       .from('processos')
       .select('*', { count: 'exact', head: true })
       .eq('cliente_id', cliente.id);
 
-    if ((count ?? 0) === 0 && !(cliente as any).desconto_boas_vindas_aplicado) {
-      setBoasVindasPct('50');
-      setAplicarBoasVindas(false);
-      setShowBoasVindasAlert(true);
+    if (error) {
+      toast.error('Erro ao checar primeiro processo');
       return;
     }
 
+    const jaAplicou = (cliente as any).desconto_boas_vindas_aplicado === true;
+    const ehPrimeiro = (count ?? 0) === 0;
+
+    console.log('CHECK BOAS-VINDAS CLIENTE DETALHE:', {
+      clienteId: cliente.id,
+      count,
+      jaAplicou,
+      ehPrimeiro,
+    });
+
+    if (ehPrimeiro && jaAplicou) {
+      console.warn('Cliente com 0 processos e flag de boas-vindas já aplicada; habilitando switch para correção de legado.');
+    }
+
     setAplicarBoasVindas(false);
+    setBoasVindasPct('50');
+    setIsFirstProcessNovo(ehPrimeiro);
     setProcessoForm({ ...defaultProcessoForm });
     setShowNovoProcesso(true);
   };
