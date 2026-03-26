@@ -160,8 +160,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
         longitude,
         // Avulso fields
         momento_faturamento: isAvulso ? form.momento_faturamento : isMensalista ? 'na_solicitacao' : null,
-        dia_vencimento_mensal: isAvulso ? (diaVencNum || null) : isMensalista ? (Number(form.dia_vencimento_mensal) || 10) : null,
-        dia_cobranca: isAvulso && showDiaCobranca && form.dia_cobranca ? Number(form.dia_cobranca) : null,
+        dia_vencimento_mensal: isAvulso ? (isFormaProcesso ? null : (Number(form.dia_vencimento_mensal) || 15)) : isMensalista ? (Number(form.dia_vencimento_mensal) || 10) : null,
+        dia_cobranca: isAvulso && isFormaProcesso && form.dia_cobranca ? Number(form.dia_cobranca) : null,
         valor_base: (isAvulso || isMensalista) && form.valor_base ? Number(form.valor_base) : isPrePago && form.valor_base ? Number(form.valor_base) : null,
         desconto_progressivo: (isAvulso || isMensalista) && form.desconto_progressivo ? Number(form.desconto_progressivo) : null,
         valor_limite_desconto: (isAvulso || isMensalista) && form.valor_limite_desconto ? Number(form.valor_limite_desconto) : null,
