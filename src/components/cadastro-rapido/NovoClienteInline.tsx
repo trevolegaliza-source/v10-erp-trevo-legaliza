@@ -72,7 +72,7 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
           estado: result.estado,
         }));
       } else {
-        toast.error('CEP não encontrado');
+        toast.info('CEP não encontrado na base. Preencha os campos manualmente.');
       }
     }
   };
