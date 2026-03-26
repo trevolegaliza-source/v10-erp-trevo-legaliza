@@ -111,9 +111,13 @@ export default function ClienteDetalhe() {
     try {
       const { data: clienteData } = await supabase
         .from('clientes')
-        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador, dia_cobranca')
         .eq('id', cliente.id)
         .single();
+
+      if (clienteData?.dia_cobranca) {
+        toast.info(`Atenção: o cliente ${clienteData.apelido || clienteData.nome} tem vencimento fixo no dia ${clienteData.dia_cobranca} de cada mês.`);
+      }
       const processosFin: ProcessoFinanceiro[] = procsToGenerate.map(p => ({
         ...p,
         etapa_financeiro: 'gerar_cobranca' as const,
