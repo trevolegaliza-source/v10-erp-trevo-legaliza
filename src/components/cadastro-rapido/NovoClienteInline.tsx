@@ -121,6 +121,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
         cep: cepDigits || null,
         latitude,
         longitude,
+        momento_faturamento: form.momento_faturamento,
+        dia_cobranca: form.dia_cobranca ? Number(form.dia_cobranca) : null,
       } as any,
       {
         onSuccess: (data: any) => {
