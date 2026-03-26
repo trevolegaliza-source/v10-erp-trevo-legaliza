@@ -291,9 +291,9 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
       html += `
         <div class="prog-step active">
           <div class="ps-label">${s.index}º Processo</div>
-          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-decoration:line-through;">${fmt(base)}</div>
+          <div style="font-size:7.5px;color:rgba(255,255,255,0.6);text-decoration:line-through;">${fmt(base)}</div>
           <div class="ps-value">${fmt(s.valorFinal)}</div>
-          <div class="ps-desc" style="color:#4ade80;">(${s.label})</div>
+          <div style="font-size:6px;color:#4ade80;font-weight:700;">(${s.label})</div>
         </div>
       `;
     } else {
