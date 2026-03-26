@@ -196,17 +196,19 @@ const GLOBAL_STYLES = `
   .process-card { background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #4C9F38; margin-bottom: 14px; overflow: hidden; }
   .process-header { background: #0f1f0f; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
   .ph-left { display: flex; align-items: center; gap: 10px; flex: 1; }
-  .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; background: #ffffff; color: #4C9F38; border-radius: 6px; font-size: 11px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; }
+  .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: #ffffff; color: #4C9F38; border-radius: 6px; font-size: 9px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; }
   .ph-info { flex: 1; }
   .ph-title { font-size: 10px; font-weight: 700; color: #ffffff; text-transform: uppercase; }
   .ph-date { font-size: 8px; color: rgba(255,255,255,0.5); margin-top: 2px; }
   .ph-discount { font-size: 8px; color: #4ade80; margin-top: 1px; }
   .ph-right { text-align: right; }
   .ph-values-inline { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; }
-  .ph-value { font-size: 18px; font-weight: 800; color: #ffffff; }
+  .ph-value { font-size: 14px; font-weight: 800; color: #ffffff; }
   .ph-base { font-size: 8px; color: rgba(255,255,255,0.4); }
-  .ph-base-strike { font-size: 12px; color: rgba(255,255,255,0.4); text-decoration: line-through; opacity: 0.4; }
+  .ph-base-strike { font-size: 10px; color: rgba(255,255,255,0.4); text-decoration: line-through; opacity: 0.4; }
   .cortesia-badge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 9999px; background: #dcfce7; color: #166534; font-size: 7px; font-weight: 700; letter-spacing: 0.3px; }
+  .boas-vindas-badge { display: inline-block; vertical-align: middle; background: #22c55e; color: #ffffff; padding: 2px 8px; border-radius: 2px; font-size: 6.5px; font-weight: 700; text-transform: uppercase; margin-left: 6px; line-height: 1; }
+  .boas-vindas-economia { font-size: 7px; color: #4ade80; margin-top: 2px; }
   .manual-badge { display: inline-block; background: #f59e0b; color: #ffffff; font-size: 7px; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; margin-left: 6px; }
   .tax-table { width: 100%; border-collapse: collapse; }
   .tax-table th { background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase; padding: 5px 8px; text-align: left; }
@@ -262,12 +264,12 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
   const base = data.cliente.valor_base ?? 580;
   const limite = data.cliente.valor_limite_desconto ?? 0;
 
-  // Show active steps + 1 "next" step (max 5 total)
-  const activeSteps = steps.filter(s => !s.isManual);
-  const displaySteps = activeSteps.slice(-4); // last 4 active
+  // Show all steps + 1 "next" step (max 5 total)
+  const displaySteps = steps.slice(-4); // last 4
 
-  // Calculate next step value
-  const lastSlot = steps.length;
+  // Calculate next step value based on non-manual slot count
+  const nonManualCount = steps.filter(s => !s.isManual).length;
+  const lastSlot = Math.max(nonManualCount, 1);
   let nextVal = base;
   for (let i = 1; i <= lastSlot; i++) {
     nextVal = nextVal * (1 - descPct / 100);
@@ -282,29 +284,52 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
   displaySteps.forEach((s, i) => {
     if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
     const isLim = limite > 0 && s.valorFinal <= limite;
-    html += `
-      <div class="prog-step active">
-        <div class="ps-label">${s.index}º Processo</div>
-        <div class="ps-value">${fmt(s.valorFinal)}</div>
-        <div class="ps-desc">${s.desconto > 0 ? `-${descPct}%` : '(base)'}</div>
-        ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
-      </div>
-    `;
+    const isBoasVindas = s.label && s.label.includes('BOAS-VINDAS');
+
+    if (isBoasVindas) {
+      // Show boas-vindas step with original value strikethrough
+      html += `
+        <div class="prog-step active">
+          <div class="ps-label">${s.index}º Processo</div>
+          <div style="font-size:8px;color:rgba(255,255,255,0.4);text-decoration:line-through;">${fmt(base)}</div>
+          <div class="ps-value">${fmt(s.valorFinal)}</div>
+          <div class="ps-desc" style="color:#4ade80;">(${s.label})</div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div class="prog-step active">
+          <div class="ps-label">${s.index}º Processo</div>
+          <div class="ps-value">${fmt(s.valorFinal)}</div>
+          <div class="ps-desc">${s.isManual ? s.label : (s.desconto > 0 ? `-${descPct}% sobre base` : '(base)')}</div>
+          ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
+        </div>
+      `;
+    }
   });
 
   if (!limitReached) {
     html += `<div class="prog-arrow">${arrowSvg('#86efac')}</div>`;
     html += `
       <div class="prog-step next">
-        <div class="ps-label">${lastSlot + 1}º Processo</div>
+        <div class="ps-label">${steps.length + 1}º Processo</div>
         <div class="ps-value">${fmt(Math.round(nextVal * 100) / 100)}</div>
-        <div class="ps-desc">-${descPct}%</div>
+        <div class="ps-desc">-${descPct}% sobre base</div>
         <div class="ps-next-label">SEU PRÓXIMO DESCONTO</div>
       </div>
     `;
   }
 
   html += '</div>';
+
+  // Add explanatory note when boas-vindas is present
+  const hasBoasVindas = steps.some(s => s.label && s.label.includes('BOAS-VINDAS'));
+  if (hasBoasVindas) {
+    html += `<div style="font-size:7px;color:#64748b;margin-top:4px;padding:4px 8px;background:#f8fafc;border-radius:3px;line-height:1.5;">
+      ℹ O desconto de boas-vindas aplica-se apenas ao primeiro processo. A partir do 2º processo, o desconto progressivo é calculado sobre o valor base de ${fmt(base)}.
+    </div>`;
+  }
+
   return html;
 }
 
@@ -317,7 +342,11 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
   const totalHon = selected.reduce((s, st) => s + st.valorFinal, 0);
   const totalTaxas = Object.values(data.valoresAdicionais).flat().reduce((s, va) => s + Number(va.valor), 0);
   const totalGeral = totalHon + totalTaxas;
-  const economia = steps.filter(s => !s.isManual).reduce((s, st) => s + st.desconto, 0);
+  const economiaProgressivo = steps.filter(s => !s.isManual).reduce((s, st) => s + st.desconto, 0);
+  // Include boas-vindas savings in economia
+  const base = data.cliente.valor_base ?? 580;
+  const economiaBoasVindas = steps.filter(s => s.label && s.label.includes('BOAS-VINDAS')).reduce((s, st) => s + (base - st.valorFinal), 0);
+  const economia = economiaProgressivo + economiaBoasVindas;
   const descPct = data.cliente.desconto_progressivo ?? 0;
 
   return `
@@ -404,10 +433,18 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     const blockTotal = step.valorFinal + taxTotal;
 
     const notas = (p.notas || '').toLowerCase();
+    const notasRaw = p.notas || '';
     const hasCortesiaNasNotas = notas.includes('cortesia');
     const hasBoasVindas = notas.includes('boas-vindas') || notas.includes('boas vindas');
     const hasBoasVindas100 = hasBoasVindas && /100\s*%/.test(notas);
     const isCortesia = step.valorFinal === 0 || hasCortesiaNasNotas || hasBoasVindas100;
+    const isBoasVindasDiscount = hasBoasVindas && !isCortesia;
+
+    // Extract boas-vindas percentage
+    const bvPctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
+    const bvPct = bvPctMatch ? Number(bvPctMatch[1]) : 0;
+    const valorOriginal = data.cliente.valor_base ?? 580;
+    const economiaBoasVindas = isBoasVindasDiscount ? (valorOriginal - step.valorFinal) : 0;
 
     let discountLine = '';
     if (!step.isManual && step.desconto > 0) {
@@ -415,8 +452,12 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     }
 
     let manualBadge = '';
-    if (step.isManual && step.label) {
+    if (step.isManual && step.label && !isBoasVindasDiscount) {
       manualBadge = `<span class="manual-badge">${step.label}</span>`;
+    }
+    // Boas-vindas gets a green badge instead of orange manual badge
+    if (isBoasVindasDiscount) {
+      manualBadge = `<span class="boas-vindas-badge">BOAS-VINDAS: ${bvPct || ''}% de desconto</span>`;
     }
 
     let baseRef = '';
@@ -428,13 +469,20 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
       ? step.valorBase
       : ((data.cliente.valor_base ?? 0) > 0 ? Number(data.cliente.valor_base) : null);
 
-    const valorHeader = isCortesia
-      ? `<div class="ph-values-inline">${baseCortesia != null ? `<span class="ph-base-strike">${fmt(baseCortesia)}</span>` : ''}<span class="ph-value">${fmt(step.valorFinal)}</span></div>`
-      : `<div class="ph-value">${fmt(step.valorFinal)}</div>`;
+    let valorHeader = '';
+    let valorInfo = '';
 
-    const valorInfo = isCortesia
-      ? `<div class="cortesia-badge">CORTESIA</div>`
-      : baseRef;
+    if (isCortesia) {
+      valorHeader = `<div class="ph-values-inline">${baseCortesia != null ? `<span class="ph-base-strike">${fmt(baseCortesia)}</span>` : ''}<span class="ph-value">${fmt(step.valorFinal)}</span></div>`;
+      valorInfo = `<div class="cortesia-badge">CORTESIA</div>`;
+    } else if (isBoasVindasDiscount) {
+      // Show original strikethrough + final value + economia
+      valorHeader = `<div class="ph-values-inline"><span class="ph-base-strike">${fmt(valorOriginal)}</span><span class="ph-value">${fmt(step.valorFinal)}</span></div>`;
+      valorInfo = `<div class="boas-vindas-economia">Economia: ${fmt(economiaBoasVindas)}</div>`;
+    } else {
+      valorHeader = `<div class="ph-value">${fmt(step.valorFinal)}</div>`;
+      valorInfo = baseRef;
+    }
 
     let taxTableHTML = '';
     if (pTaxas.length > 0) {
