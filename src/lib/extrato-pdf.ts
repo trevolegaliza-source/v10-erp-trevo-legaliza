@@ -43,6 +43,7 @@ export interface ExtratoData {
     telefone: string | null;
     email: string | null;
     nome_contador: string | null;
+    dia_cobranca: number | null;
   };
 }
 
