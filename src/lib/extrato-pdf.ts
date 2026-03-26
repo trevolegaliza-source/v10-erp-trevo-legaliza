@@ -40,6 +40,9 @@ export interface ExtratoData {
     valor_base: number | null;
     desconto_progressivo: number | null;
     valor_limite_desconto: number | null;
+    telefone: string | null;
+    email: string | null;
+    nome_contador: string | null;
   };
 }
 
@@ -137,7 +140,8 @@ const GLOBAL_STYLES = `
   .client-block { background: #0f1f0f; padding: 20px 30px; }
   .client-tag { font-size: 9px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
   .client-name { font-size: 26px; font-weight: 800; color: #ffffff; line-height: 1.2; }
-  .client-cnpj { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 4px; }
+  .client-cnpj { font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+  .client-contact { font-size: 8px; color: rgba(255,255,255,0.65); margin-top: 2px; }
   .client-meta { font-size: 10px; color: #94a3b8; margin-top: 4px; }
   .fin-section { padding: 22px 30px 0 30px; }
   .total-card { background: linear-gradient(135deg, #0f1f0f, #1a3a1a); border-radius: 8px; padding: 20px; text-align: center; }
@@ -187,8 +191,11 @@ const GLOBAL_STYLES = `
   .ph-date { font-size: 8px; color: rgba(255,255,255,0.5); margin-top: 2px; }
   .ph-discount { font-size: 8px; color: #4ade80; margin-top: 1px; }
   .ph-right { text-align: right; }
+  .ph-values-inline { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; }
   .ph-value { font-size: 18px; font-weight: 800; color: #ffffff; }
   .ph-base { font-size: 8px; color: rgba(255,255,255,0.4); }
+  .ph-base-strike { font-size: 12px; color: rgba(255,255,255,0.4); text-decoration: line-through; opacity: 0.4; }
+  .cortesia-badge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 9999px; background: #dcfce7; color: #166534; font-size: 7px; font-weight: 700; letter-spacing: 0.3px; }
   .manual-badge { display: inline-block; background: #f59e0b; color: #ffffff; font-size: 7px; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; margin-left: 6px; }
   .tax-table { width: 100%; border-collapse: collapse; }
   .tax-table th { background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase; padding: 5px 8px; text-align: left; }
@@ -309,6 +316,9 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         <div class="client-tag">EXTRATO DE FATURAMENTO</div>
         <div class="client-name">${data.cliente.nome}</div>
         ${data.cliente.cnpj ? `<div class="client-cnpj">${data.cliente.cnpj}</div>` : ''}
+        ${data.cliente.nome_contador ? `<div class="client-contact">👤 ${data.cliente.nome_contador} (contador)</div>` : ''}
+        ${data.cliente.telefone ? `<div class="client-contact">📱 ${data.cliente.telefone}</div>` : ''}
+        ${data.cliente.email ? `<div class="client-contact">✉ ${data.cliente.email}</div>` : ''}
         <div class="client-meta">Relatório de Performance: 01/${mesNum}/${now.getFullYear()} até ${emissao}</div>
         <div class="client-meta">Emissão: ${emissao} • ${data.processos.length} processo(s) cobrado(s)</div>
       </div>
@@ -381,6 +391,12 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     const taxTotal = pTaxas.reduce((s, va) => s + Number(va.valor), 0);
     const blockTotal = step.valorFinal + taxTotal;
 
+    const notas = (p.notas || '').toLowerCase();
+    const hasCortesiaNasNotas = notas.includes('cortesia');
+    const hasBoasVindas = notas.includes('boas-vindas') || notas.includes('boas vindas');
+    const hasBoasVindas100 = hasBoasVindas && /100\s*%/.test(notas);
+    const isCortesia = step.valorFinal === 0 || hasCortesiaNasNotas || hasBoasVindas100;
+
     let discountLine = '';
     if (!step.isManual && step.desconto > 0) {
       discountLine = `<div class="ph-discount">Desc. progressivo: -${fmt(step.desconto)}</div>`;
@@ -395,6 +411,18 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     if (!step.isManual && step.desconto > 0) {
       baseRef = `<div class="ph-base">Base: ${fmt(step.valorBase)}</div>`;
     }
+
+    const baseCortesia = step.valorBase > 0
+      ? step.valorBase
+      : ((data.cliente.valor_base ?? 0) > 0 ? Number(data.cliente.valor_base) : null);
+
+    const valorHeader = isCortesia
+      ? `<div class="ph-values-inline">${baseCortesia != null ? `<span class="ph-base-strike">${fmt(baseCortesia)}</span>` : ''}<span class="ph-value">${fmt(step.valorFinal)}</span></div>`
+      : `<div class="ph-value">${fmt(step.valorFinal)}</div>`;
+
+    const valorInfo = isCortesia
+      ? `<div class="cortesia-badge">CORTESIA</div>`
+      : baseRef;
 
     let taxTableHTML = '';
     if (pTaxas.length > 0) {
@@ -432,8 +460,8 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
             </div>
           </div>
           <div class="ph-right">
-            <div class="ph-value">${fmt(step.valorFinal)}</div>
-            ${baseRef}
+            ${valorHeader}
+            ${valorInfo}
           </div>
         </div>
         ${taxTableHTML}

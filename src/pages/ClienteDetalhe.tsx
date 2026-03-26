@@ -40,6 +40,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+interface DeferimentoAlertData {
+  clienteNome: string;
+  naoDeferidos: ProcessoDB[];
+  todosSelecionados: ProcessoDB[];
+}
+
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -80,9 +86,7 @@ export default function ClienteDetalhe() {
   const [generatingExtrato, setGeneratingExtrato] = useState(false);
   const [showMarkFaturadoDialog, setShowMarkFaturadoDialog] = useState(false);
   const [showDeferimentoAlert, setShowDeferimentoAlert] = useState(false);
-  const [deferimentoPendentes, setDeferimentoPendentes] = useState<ProcessoDB[]>([]);
-  const [deferimentoDeferidos, setDeferimentoDeferidos] = useState<ProcessoDB[]>([]);
-  const [deferimentoTodos, setDeferimentoTodos] = useState<ProcessoDB[]>([]);
+  const [deferimentoAlertData, setDeferimentoAlertData] = useState<DeferimentoAlertData | null>(null);
 
   const [showNovoProcesso, setShowNovoProcesso] = useState(false);
   const [processoForm, setProcessoForm] = useState({
@@ -107,7 +111,7 @@ export default function ClienteDetalhe() {
     try {
       const { data: clienteData } = await supabase
         .from('clientes')
-        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador')
         .eq('id', cliente.id)
         .single();
       const processosFin: ProcessoFinanceiro[] = procsToGenerate.map(p => ({
@@ -709,22 +713,28 @@ export default function ClienteDetalhe() {
                     variant="outline"
                     className="gap-1.5 text-xs"
                     disabled={generatingExtrato}
-                    onClick={() => {
+                    onClick={async () => {
                       if (!cliente) return;
                       const selectedProcs = processos.filter(p => selectedProcessosTab.has(p.id));
                       if (selectedProcs.length === 0) return;
 
-                      const DEFER_STAGES = ['registro', 'finalizados'];
-                      const momentoFat = (cliente as any).momento_faturamento || 'na_solicitacao';
+                      const clienteId = selectedProcs[0].cliente_id;
+                      const { data: clienteCheck } = await supabase
+                        .from('clientes')
+                        .select('momento_faturamento, nome')
+                        .eq('id', clienteId)
+                        .single();
 
-                      if (momentoFat === 'no_deferimento') {
-                        const deferidos = selectedProcs.filter(p => DEFER_STAGES.includes(p.etapa));
-                        const pendentes = selectedProcs.filter(p => !DEFER_STAGES.includes(p.etapa));
+                      if (clienteCheck?.momento_faturamento === 'no_deferimento') {
+                        const DEFER_STAGES = ['registro', 'finalizados'];
+                        const naoDeferidos = selectedProcs.filter(p => !DEFER_STAGES.includes(p.etapa));
 
-                        if (pendentes.length > 0) {
-                          setDeferimentoPendentes(pendentes);
-                          setDeferimentoDeferidos(deferidos);
-                          setDeferimentoTodos(selectedProcs);
+                        if (naoDeferidos.length > 0) {
+                          setDeferimentoAlertData({
+                            clienteNome: clienteCheck.nome || cliente.nome,
+                            naoDeferidos,
+                            todosSelecionados: selectedProcs,
+                          });
                           setShowDeferimentoAlert(true);
                           return;
                         }
@@ -1490,11 +1500,11 @@ export default function ClienteDetalhe() {
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>
-                  O cliente <strong>{cliente?.apelido || cliente?.nome}</strong> está configurado para faturar apenas no deferimento.
+                  O cliente <strong>{deferimentoAlertData?.clienteNome}</strong> está configurado para faturar apenas no deferimento.
                 </p>
                 <p className="font-medium text-foreground">Processos ainda NÃO deferidos:</p>
                 <ul className="list-disc pl-5 space-y-1 text-sm">
-                  {deferimentoPendentes.map(p => (
+                  {deferimentoAlertData?.naoDeferidos.map(p => (
                     <li key={p.id}>
                       {TIPO_PROCESSO_LABELS[p.tipo] || p.tipo} — {p.razao_social}{' '}
                       <span className="text-muted-foreground">(Etapa: {p.etapa})</span>
@@ -1507,18 +1517,27 @@ export default function ClienteDetalhe() {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            {deferimentoDeferidos.length > 0 && (
-              <Button variant="outline" onClick={() => {
+            <Button
+              variant="outline"
+              onClick={() => {
+                const deferidos = deferimentoAlertData?.todosSelecionados.filter(p => ['registro', 'finalizados'].includes(p.etapa)) || [];
                 setShowDeferimentoAlert(false);
-                gerarExtratoClienteDetalhe(deferimentoDeferidos);
-              }}>
-                Gerar Apenas Deferidos ({deferimentoDeferidos.length})
-              </Button>
-            )}
-            <AlertDialogAction onClick={() => {
-              setShowDeferimentoAlert(false);
-              gerarExtratoClienteDetalhe(deferimentoTodos);
-            }}>
+                if (deferidos.length > 0) {
+                  gerarExtratoClienteDetalhe(deferidos);
+                } else {
+                  toast.warning('Nenhum processo deferido para gerar extrato.');
+                }
+              }}
+            >
+              Gerar Apenas Deferidos
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                if (!deferimentoAlertData) return;
+                setShowDeferimentoAlert(false);
+                gerarExtratoClienteDetalhe(deferimentoAlertData.todosSelecionados);
+              }}
+            >
               Gerar Todos Mesmo Assim
             </AlertDialogAction>
           </AlertDialogFooter>
