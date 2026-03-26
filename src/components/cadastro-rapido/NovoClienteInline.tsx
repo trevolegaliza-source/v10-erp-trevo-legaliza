@@ -5,9 +5,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { useCreateCliente } from '@/hooks/useFinanceiro';
 import { maskCNPJ, isValidCNPJ } from '@/lib/cnpj';
+import { formatCEP, buscarCEP, buscarCoordenadas } from '@/lib/cep';
 import { toast } from 'sonner';
 import type { TipoCliente } from '@/types/financial';
 import { UFS_BRASIL } from '@/constants/estados-brasil';
@@ -33,8 +34,10 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     observacoes: '',
     estado: '',
     cidade: '',
+    cep: '',
   });
   const [codigoManual, setCodigoManual] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
   const createCliente = useCreateCliente();
 
   const handleCnpjChange = (value: string) => {
@@ -51,7 +54,28 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     setForm(f => ({ ...f, codigo_identificador: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleCepChange = async (value: string) => {
+    const masked = formatCEP(value);
+    setForm(f => ({ ...f, cep: masked }));
+
+    const digits = masked.replace(/\D/g, '');
+    if (digits.length === 8) {
+      setBuscandoCep(true);
+      const result = await buscarCEP(digits);
+      setBuscandoCep(false);
+      if (result) {
+        setForm(f => ({
+          ...f,
+          cidade: result.cidade,
+          estado: result.estado,
+        }));
+      } else {
+        toast.error('CEP não encontrado');
+      }
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cnpjDigits = form.cnpj.replace(/\D/g, '');
     if (cnpjDigits.length > 0 && !isValidCNPJ(form.cnpj)) {
@@ -61,6 +85,19 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     if (!form.codigo_identificador.trim()) {
       toast.error('Preencha o Código do Cliente (ou digite o CNPJ)');
       return;
+    }
+
+    const cepDigits = form.cep.replace(/\D/g, '');
+
+    // Try to get coordinates in background
+    let latitude: number | null = null;
+    let longitude: number | null = null;
+    if (form.cidade && form.estado) {
+      const coords = await buscarCoordenadas('', form.cidade, form.estado);
+      if (coords) {
+        latitude = coords.lat;
+        longitude = coords.lng;
+      }
     }
 
     createCliente.mutate(
@@ -79,6 +116,9 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
         observacoes: form.observacoes || null,
         estado: form.estado || null,
         cidade: form.cidade || null,
+        cep: cepDigits || null,
+        latitude,
+        longitude,
       } as any,
       {
         onSuccess: (data: any) => {
@@ -141,12 +181,23 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
             </div>
           </div>
 
-          {/* Estado + Cidade */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* CEP + Cidade + Estado */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">CEP</Label>
+              <div className="relative">
+                <Input value={form.cep} onChange={e => handleCepChange(e.target.value)} placeholder="00000-000" maxLength={9} />
+                {buscandoCep && <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Cidade</Label>
+              <Input value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} placeholder="Auto via CEP" />
+            </div>
             <div className="space-y-1">
               <Label className="text-xs">Estado (UF)</Label>
               <Select value={form.estado} onValueChange={v => setForm(f => ({ ...f, estado: v }))}>
-                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
                 <SelectContent>
                   {UFS_BRASIL.map(uf => (
                     <SelectItem key={uf} value={uf}>{uf}</SelectItem>
@@ -154,11 +205,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Cidade</Label>
-              <Input value={form.cidade} onChange={e => setForm(f => ({ ...f, cidade: e.target.value }))} placeholder="Ex: São Paulo" />
-            </div>
           </div>
+
           <div className="grid grid-cols-4 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Tipo</Label>
