@@ -93,6 +93,9 @@ export default function ClienteDetalhe() {
     valor_manual: '',
     definir_manual: false,
     negotiated_service_id: '' as string,
+    mudanca_uf: false,
+    boas_vindas: false,
+    boas_vindas_pct: '50',
   });
   const isManualPrice = processoForm.definir_manual;
   const isNegotiatedService = !!processoForm.negotiated_service_id;
