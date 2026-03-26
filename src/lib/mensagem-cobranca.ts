@@ -18,6 +18,6 @@ Banco: C6 Bank
 Caso já tenha realizado o pagamento, por favor desconsidere esta mensagem e nos envie o comprovante.
 
 Atenciosamente,
-TESTE 01
+Trevo Legaliza 🍀
 (11) 93492-7001`;
 }

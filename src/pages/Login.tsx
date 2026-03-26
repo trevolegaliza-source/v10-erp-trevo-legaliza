@@ -34,7 +34,7 @@ export default function Login() {
           <div className="mx-auto h-12 w-12 rounded-xl bg-primary/15 flex items-center justify-center">
             <span className="text-xl font-bold text-primary">T1</span>
           </div>
-          <CardTitle className="text-xl">TESTE 01</CardTitle>
+          <CardTitle className="text-xl">Trevo Legaliza 🍀</CardTitle>
           <p className="text-sm text-muted-foreground">{isSignUp ? 'Crie sua conta' : 'Acesse o sistema ERP'}</p>
         </CardHeader>
         <CardContent>
