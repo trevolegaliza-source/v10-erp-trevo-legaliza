@@ -1,6 +1,6 @@
 import type { Cliente as SupabaseCliente } from '@/types/supabase';
 
-export type TipoCliente = 'MENSALISTA' | 'AVULSO_4D';
+export type TipoCliente = 'MENSALISTA' | 'AVULSO_4D' | 'PRE_PAGO';
 export type TipoProcesso = 'abertura' | 'alteracao' | 'transformacao' | 'baixa' | 'avulso' | 'orcamento';
 export type StatusFinanceiro = 'pendente' | 'pago' | 'atrasado' | 'cancelado';
 export type TipoLancamento = 'receber' | 'pagar';
