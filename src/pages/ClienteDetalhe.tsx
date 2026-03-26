@@ -40,6 +40,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+interface DeferimentoAlertData {
+  clienteNome: string;
+  naoDeferidos: ProcessoDB[];
+  todosSelecionados: ProcessoDB[];
+}
+
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
