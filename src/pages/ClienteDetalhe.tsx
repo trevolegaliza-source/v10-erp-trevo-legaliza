@@ -316,6 +316,7 @@ export default function ClienteDetalhe() {
             await supabase.from('clientes').update({ desconto_boas_vindas_aplicado: true }).eq('id', cliente.id);
           }
           setShowNovoProcesso(false);
+          setIsFirstProcessNovo(false);
           setProcessoForm({ ...defaultProcessoForm });
           setAplicarBoasVindas(false);
           loadAll(cliente.id);
