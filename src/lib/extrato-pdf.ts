@@ -40,6 +40,9 @@ export interface ExtratoData {
     valor_base: number | null;
     desconto_progressivo: number | null;
     valor_limite_desconto: number | null;
+    telefone: string | null;
+    email: string | null;
+    nome_contador: string | null;
   };
 }
 
