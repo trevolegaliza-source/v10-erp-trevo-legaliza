@@ -133,17 +133,20 @@ export default function ClienteDetalhe() {
     motivo_manual: '',
   };
 
-  const handleNovoProcesso = () => {
+  const handleNovoProcesso = async () => {
     if (!cliente) return;
-    console.log('processos.length:', processos.length);
-    console.log('desconto_boas_vindas_aplicado:', (cliente as any).desconto_boas_vindas_aplicado);
-    const isFirst = processos.length === 0 && !(cliente as any).desconto_boas_vindas_aplicado;
-    console.log('isFirst:', isFirst);
-    if (isFirst) {
+
+    const { count } = await supabase
+      .from('processos')
+      .select('id', { count: 'exact', head: true })
+      .eq('cliente_id', cliente.id);
+
+    if ((count ?? 0) === 0 && !(cliente as any).desconto_boas_vindas_aplicado) {
       setBoasVindasPct('50');
       setShowBoasVindasAlert(true);
       return;
     }
+
     setAplicarBoasVindas(false);
     setProcessoForm({ ...defaultProcessoForm });
     setShowNovoProcesso(true);
@@ -1456,26 +1459,25 @@ export default function ClienteDetalhe() {
           </div>
 
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
+            <AlertDialogCancel
               onClick={() => {
-                setShowBoasVindasAlert(false);
                 setAplicarBoasVindas(false);
+                setShowBoasVindasAlert(false);
                 setProcessoForm({ ...defaultProcessoForm });
                 setShowNovoProcesso(true);
               }}
             >
               Não, cobrar normal
-            </Button>
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                setShowBoasVindasAlert(false);
                 setAplicarBoasVindas(true);
+                setShowBoasVindasAlert(false);
                 setProcessoForm({ ...defaultProcessoForm, boas_vindas: true, boas_vindas_pct: boasVindasPct || '50' });
                 setShowNovoProcesso(true);
               }}
             >
-              Sim, aplicar desconto
+              Sim, aplicar {boasVindasPct}%
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

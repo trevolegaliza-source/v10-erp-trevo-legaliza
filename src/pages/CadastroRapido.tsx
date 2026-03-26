@@ -16,6 +16,18 @@ import PreviewFinanceiro, { calcPreview } from '@/components/cadastro-rapido/Pre
 import UltimosProcessos from '@/components/cadastro-rapido/UltimosProcessos';
 import FilaBatch, { type ProcessoNaFila } from '@/components/cadastro-rapido/FilaBatch';
 import FeedbackSucesso, { type ProcessoSalvo } from '@/components/cadastro-rapido/FeedbackSucesso';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 const INITIAL_PROCESSO: ProcessoFormData = {
   razaoSocial: '',
@@ -52,6 +64,9 @@ export default function CadastroRapido() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [savedProcessos, setSavedProcessos] = useState<ProcessoSalvo[]>([]);
   const [totalEconomia, setTotalEconomia] = useState(0);
+  const [showBoasVindasAlert, setShowBoasVindasAlert] = useState(false);
+  const [boasVindasPct, setBoasVindasPct] = useState('50');
+  const [aplicarBoasVindas, setAplicarBoasVindas] = useState(false);
 
   const selectedCliente = (clientes || []).find(c => c.id === clienteId) || null;
   const { data: negotiations } = useServiceNegotiations(clienteId || undefined);
@@ -126,9 +141,27 @@ export default function CadastroRapido() {
     setClienteId(id);
   };
 
-  const handleNextStep1 = () => {
+  const proceedToStep2 = () => {
     setCompletedSteps(prev => prev.includes(1) ? prev : [...prev, 1]);
     setStep(2);
+  };
+
+  const handleNextStep1 = async () => {
+    if (!selectedCliente) return;
+    const { count } = await supabase
+      .from('processos')
+      .select('id', { count: 'exact', head: true })
+      .eq('cliente_id', selectedCliente.id);
+
+    if ((count ?? 0) === 0 && !(selectedCliente as any).desconto_boas_vindas_aplicado) {
+      setBoasVindasPct('50');
+      setShowBoasVindasAlert(true);
+      return;
+    }
+
+    setAplicarBoasVindas(false);
+    setValorForm(prev => ({ ...prev, boasVindas: false, boasVindasPct: '50' }));
+    proceedToStep2();
   };
 
   const handleNextStep2 = () => {
@@ -403,6 +436,32 @@ export default function CadastroRapido() {
         processos={savedProcessos}
         totalEconomia={totalEconomia}
       />
+
+      <AlertDialog open={showBoasVindasAlert} onOpenChange={setShowBoasVindasAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>🎉 Primeiro processo deste cliente!</AlertDialogTitle>
+            <AlertDialogDescription>
+              Deseja aplicar desconto de boas-vindas?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4">
+            <Label>Percentual de desconto (%)</Label>
+            <Input type="number" value={boasVindasPct} onChange={e => setBoasVindasPct(e.target.value)} />
+            <p className="text-sm text-muted-foreground mt-2">
+              Valor base: R$ {Number((selectedCliente as any)?.valor_base || 0).toFixed(2)} → Com desconto: R$ {((Number((selectedCliente as any)?.valor_base || 0)) * (1 - Number(boasVindasPct) / 100)).toFixed(2)}
+            </p>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setAplicarBoasVindas(false); setShowBoasVindasAlert(false); setValorForm(prev => ({ ...prev, boasVindas: false, boasVindasPct: '50' })); proceedToStep2(); }}>
+              Não, cobrar normal
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setAplicarBoasVindas(true); setShowBoasVindasAlert(false); setValorForm(prev => ({ ...prev, boasVindas: true, boasVindasPct: boasVindasPct || '50' })); proceedToStep2(); }}>
+              Sim, aplicar {boasVindasPct}%
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
