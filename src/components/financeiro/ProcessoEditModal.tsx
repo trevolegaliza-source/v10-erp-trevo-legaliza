@@ -74,7 +74,7 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   const createdAt = processo.created_at ? new Date(processo.created_at).toLocaleDateString('pt-BR') : null;
 
   const handleNotesBlur = () => {
-    if (notes !== currentNotes) {
+    if (notes !== savedNotes) {
       mutateField({ observacoes_financeiro: notes });
     }
   };
