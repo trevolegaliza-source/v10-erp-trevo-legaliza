@@ -27,11 +27,10 @@ import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 
 const ETAPAS_DEFERIDAS = ['registro', 'finalizados'];
 
-interface DeferimentoInfo {
+interface DeferimentoAlertData {
   clienteNome: string;
   naoDeferidos: ProcessoFinanceiro[];
-  deferidos: ProcessoFinanceiro[];
-  allSelected: ProcessoFinanceiro[];
+  todosSelecionados: ProcessoFinanceiro[];
 }
 
 interface FinanceiroListProps {
@@ -45,8 +44,8 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
   const [lastPdfBlob, setLastPdfBlob] = useState<Blob | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
-  const [showDeferimentoDialog, setShowDeferimentoDialog] = useState(false);
-  const [deferimentoInfo, setDeferimentoInfo] = useState<DeferimentoInfo | null>(null);
+  const [showDeferimentoAlert, setShowDeferimentoAlert] = useState(false);
+  const [deferimentoAlertData, setDeferimentoAlertData] = useState<DeferimentoAlertData | null>(null);
   const qc = useQueryClient();
 
   const allChecked = processos.length > 0 && selected.size === processos.length;
@@ -72,7 +71,7 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
       const clienteId = processosParaGerar[0].cliente_id;
       const { data: clienteData } = await supabase
         .from('clientes')
-        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador')
         .eq('id', clienteId)
         .single();
 
@@ -122,47 +121,45 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
     }
 
     const clienteId = selectedProcessos[0].cliente_id;
-
-    // Check deferimento
     const { data: clienteCheck } = await supabase
       .from('clientes')
-      .select('momento_faturamento, nome, apelido')
+      .select('momento_faturamento, nome')
       .eq('id', clienteId)
       .single();
 
     if (clienteCheck?.momento_faturamento === 'no_deferimento') {
-      const deferidos = selectedProcessos.filter(p => ETAPAS_DEFERIDAS.includes(p.etapa));
       const naoDeferidos = selectedProcessos.filter(p => !ETAPAS_DEFERIDAS.includes(p.etapa));
 
       if (naoDeferidos.length > 0) {
-        setDeferimentoInfo({
-          clienteNome: clienteCheck.apelido || clienteCheck.nome || 'Cliente',
+        setDeferimentoAlertData({
+          clienteNome: clienteCheck.nome || 'Cliente',
           naoDeferidos,
-          deferidos,
-          allSelected: selectedProcessos,
+          todosSelecionados: selectedProcessos,
         });
-        setShowDeferimentoDialog(true);
+        setShowDeferimentoAlert(true);
         return;
       }
     }
 
-    // All good, generate normally
     await gerarExtratoParaProcessos(selectedProcessos);
   }
 
   async function handleDeferimentoApenasDeferidos() {
-    setShowDeferimentoDialog(false);
-    if (!deferimentoInfo || deferimentoInfo.deferidos.length === 0) {
+    setShowDeferimentoAlert(false);
+
+    const deferidos = deferimentoAlertData?.todosSelecionados?.filter(p => ETAPAS_DEFERIDAS.includes(p.etapa)) || [];
+    if (deferidos.length === 0) {
       toast.warning('Nenhum processo deferido para gerar extrato.');
       return;
     }
-    await gerarExtratoParaProcessos(deferimentoInfo.deferidos);
+
+    await gerarExtratoParaProcessos(deferidos);
   }
 
   async function handleDeferimentoTodos() {
-    setShowDeferimentoDialog(false);
-    if (!deferimentoInfo) return;
-    await gerarExtratoParaProcessos(deferimentoInfo.allSelected);
+    setShowDeferimentoAlert(false);
+    if (!deferimentoAlertData) return;
+    await gerarExtratoParaProcessos(deferimentoAlertData.todosSelecionados);
   }
 
   async function handleMarcarFaturado() {
