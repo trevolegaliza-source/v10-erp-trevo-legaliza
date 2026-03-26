@@ -525,9 +525,9 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         </div>
       </div>
 
-      <div style="padding: 0 30px;">
+      ${totalTaxas > 0 ? `<div style="padding: 0 30px;">
         <div class="transparency-note"><p>Nota: Os comprovantes de pagamento originais de todas as taxas reembolsáveis estão disponíveis para conferência em nossa plataforma de gestão (Trello), dentro do card correspondente a cada processo.</p></div>
-      </div>
+      </div>` : ''}
       <div class="gradient-bottom"></div>
       <div class="page-footer">
         <span>${BRAND.fantasia} • ${BRAND.cnpj} • ${BRAND.endereco}</span>
