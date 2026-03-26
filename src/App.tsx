@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
@@ -7,22 +8,36 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
-import Dashboard from "./pages/Dashboard";
-import Processos from "./pages/Processos";
-import ProcessosAtivosDetalhe from "./pages/ProcessosAtivosDetalhe";
-import FaturamentoDetalhe from "./pages/FaturamentoDetalhe";
-import Clientes from "./pages/Clientes";
-import ClienteDetalhe from "./pages/ClienteDetalhe";
-import Financeiro from "./pages/Financeiro";
-import ContasReceber from "./pages/ContasReceber";
-import ContasPagar from "./pages/ContasPagar";
-import Colaboradores from "./pages/Colaboradores";
-import CadastroRapido from "./pages/CadastroRapido";
-import Documentos from "./pages/Documentos";
-import Configuracoes from "./pages/Configuracoes";
-import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Processos = lazy(() => import("./pages/Processos"));
+const ProcessosAtivosDetalhe = lazy(() => import("./pages/ProcessosAtivosDetalhe"));
+const FaturamentoDetalhe = lazy(() => import("./pages/FaturamentoDetalhe"));
+const Clientes = lazy(() => import("./pages/Clientes"));
+const ClienteDetalhe = lazy(() => import("./pages/ClienteDetalhe"));
+const Financeiro = lazy(() => import("./pages/Financeiro"));
+const ContasReceber = lazy(() => import("./pages/ContasReceber"));
+const ContasPagar = lazy(() => import("./pages/ContasPagar"));
+const Colaboradores = lazy(() => import("./pages/Colaboradores"));
+const CadastroRapido = lazy(() => import("./pages/CadastroRapido"));
+const Documentos = lazy(() => import("./pages/Documentos"));
+const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+const PageFallback = () => (
+  <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+    Carregando...
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -32,30 +47,32 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              <Route
-                element={
-                  <ProtectedRoute>
-                    <AppLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/processos" element={<Processos />} />
-                <Route path="/processos-ativos" element={<ProcessosAtivosDetalhe />} />
-                <Route path="/faturamento" element={<FaturamentoDetalhe />} />
-                <Route path="/clientes" element={<Clientes />} />
-                <Route path="/clientes/:id" element={<ClienteDetalhe />} />
-                <Route path="/cadastro-rapido" element={<CadastroRapido />} />
-                <Route path="/financeiro" element={<Financeiro />} />
-                <Route path="/contas-receber" element={<ContasReceber />} />
-                <Route path="/contas-pagar" element={<ContasPagar />} />
-                <Route path="/colaboradores" element={<Colaboradores />} />
-                <Route path="/documentos" element={<Documentos />} />
-                <Route path="/configuracoes" element={<Configuracoes />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/processos" element={<Processos />} />
+                  <Route path="/processos-ativos" element={<ProcessosAtivosDetalhe />} />
+                  <Route path="/faturamento" element={<FaturamentoDetalhe />} />
+                  <Route path="/clientes" element={<Clientes />} />
+                  <Route path="/clientes/:id" element={<ClienteDetalhe />} />
+                  <Route path="/cadastro-rapido" element={<CadastroRapido />} />
+                  <Route path="/financeiro" element={<Financeiro />} />
+                  <Route path="/contas-receber" element={<ContasReceber />} />
+                  <Route path="/contas-pagar" element={<ContasPagar />} />
+                  <Route path="/colaboradores" element={<Colaboradores />} />
+                  <Route path="/documentos" element={<Documentos />} />
+                  <Route path="/configuracoes" element={<Configuracoes />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

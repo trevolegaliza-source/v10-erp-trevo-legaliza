@@ -55,6 +55,7 @@ export function diasAtraso(dataVencimento: string, status: string): number {
 export function useLancamentosReceber(dataInicio: string, dataFim: string) {
   return useQuery({
     queryKey: ['lancamentos_receber', dataInicio, dataFim],
+    staleTime: 3 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('lancamentos')

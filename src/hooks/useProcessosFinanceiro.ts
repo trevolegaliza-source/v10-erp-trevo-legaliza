@@ -37,6 +37,7 @@ export function useProcessosFinanceiro() {
 
   return useQuery({
     queryKey: ['processos_financeiro'],
+    staleTime: 3 * 60 * 1000,
     queryFn: async () => {
       const { data: processos, error: pErr } = await supabase
         .from('processos')

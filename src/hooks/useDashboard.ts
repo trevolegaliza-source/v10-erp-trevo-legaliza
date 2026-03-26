@@ -335,6 +335,7 @@ export function useResultadoMes(mes: number, ano: number) {
 export function useProvisaoDashboard() {
   return useQuery({
     queryKey: ['dashboard_provisao'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase
         .from('despesas_recorrentes')
