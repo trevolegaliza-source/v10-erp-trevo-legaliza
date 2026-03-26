@@ -205,6 +205,7 @@ export function useInadimplenciaDashboard() {
 export function useProcessosParados() {
   return useQuery({
     queryKey: ['dashboard_processos_parados'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase
         .from('processos')
