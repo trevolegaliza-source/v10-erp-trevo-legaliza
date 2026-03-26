@@ -68,7 +68,7 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   const lanc = processo.lancamento;
   const cliente = processo.cliente as any;
   const clienteApelido = cliente?.apelido || cliente?.nome || '-';
-  const currentNotes = lanc?.observacoes_financeiro || '';
+  const savedNotes = lanc?.observacoes_financeiro || '';
   const isNegociado = !!matchedNeg;
   const serviceName = matchedNeg?.service_name || lanc?.descricao || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
   const createdAt = processo.created_at ? new Date(processo.created_at).toLocaleDateString('pt-BR') : null;
