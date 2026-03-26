@@ -177,6 +177,7 @@ export function useAgendaSemana() {
 export function useInadimplenciaDashboard() {
   return useQuery({
     queryKey: ['dashboard_inadimplencia'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const hoje = format(new Date(), 'yyyy-MM-dd');
 
