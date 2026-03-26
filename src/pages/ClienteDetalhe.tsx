@@ -72,6 +72,7 @@ export default function ClienteDetalhe() {
   const updateCliente = useUpdateCliente();
   const createProcesso = useCreateProcesso();
   const { data: negotiations } = useServiceNegotiations(id);
+  const { data: colaboradores } = useColaboradores();
   const deleteCliente = useDeleteCliente();
   const archiveCliente = useArchiveCliente();
   const unarchiveCliente = useUnarchiveCliente();
