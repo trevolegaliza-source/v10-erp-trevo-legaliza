@@ -44,6 +44,7 @@ export interface ExtratoData {
     email: string | null;
     nome_contador: string | null;
     dia_cobranca: number | null;
+    dia_vencimento_mensal: number | null;
   };
 }
 
