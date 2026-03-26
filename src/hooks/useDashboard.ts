@@ -146,6 +146,7 @@ export function useTicketMedio(mes: number, ano: number) {
 export function useAgendaSemana() {
   return useQuery({
     queryKey: ['dashboard_agenda'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const hoje = format(new Date(), 'yyyy-MM-dd');
       const em7dias = format(addDays(new Date(), 7), 'yyyy-MM-dd');
