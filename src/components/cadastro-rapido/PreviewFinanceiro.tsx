@@ -22,6 +22,7 @@ export interface PreviewResult {
   valorFinal: number;
   slotNumero: number;
   descontoAplicado: number;
+  valorAntesBoasVindas: number;
 }
 
 export function calcPreview(props: Props): PreviewResult {
@@ -32,10 +33,12 @@ export function calcPreview(props: Props): PreviewResult {
 
   // PRE_PAGO or manual
   if (isPrePago || isAvulso || metodoPreco === 'manual' || metodoPreco === 'servico_preacordado') {
+    const valorBaseManual = Number(valorManual) || 0;
     return {
-      valorFinal: Number(valorManual) || 0,
+      valorFinal: valorBaseManual,
       slotNumero: processosNoMes + filaLength + 1,
       descontoAplicado: 0,
+      valorAntesBoasVindas: valorBaseManual,
     };
   }
 
@@ -45,6 +48,7 @@ export function calcPreview(props: Props): PreviewResult {
       valorFinal: 0,
       slotNumero: processosNoMes + filaLength + 1,
       descontoAplicado: 0,
+      valorAntesBoasVindas: 0,
     };
   }
 
@@ -62,32 +66,42 @@ export function calcPreview(props: Props): PreviewResult {
 
   // URGÊNCIA: valor fixo = base × 1.5, SEM desconto progressivo
   if (prioridade === 'urgente') {
-    let urgFinal = valorBase * 1.5;
-    if (mudancaUF) urgFinal *= 2;
+    let urgBase = valorBase * 1.5;
+    if (mudancaUF) urgBase *= 2;
+    let urgFinal = urgBase;
     if (boasVindas) urgFinal *= (1 - Number(boasVindasPct) / 100);
     return {
       valorFinal: Math.round(urgFinal * 100) / 100,
       slotNumero: slotOffset + 1,
       descontoAplicado: 0,
+      valorAntesBoasVindas: Math.round(urgBase * 100) / 100,
     };
   }
 
   if (mudancaUF && descontoPercent > 0) {
     const calc1 = calcularDescontoProgressivo(valorBase, descontoPercent, slotOffset, valorLimite);
     const calc2 = calcularDescontoProgressivo(valorBase, descontoPercent, slotOffset + 1, valorLimite);
-    let total = calc1.valorFinal + calc2.valorFinal;
+    const totalBase = calc1.valorFinal + calc2.valorFinal;
+    let total = totalBase;
     if (boasVindas) total *= (1 - Number(boasVindasPct) / 100);
-    return { valorFinal: Math.round(total * 100) / 100, slotNumero: calc1.processoNumero, descontoAplicado: calc1.descontoAcumulado + calc2.descontoAcumulado };
+    return {
+      valorFinal: Math.round(total * 100) / 100,
+      slotNumero: calc1.processoNumero,
+      descontoAplicado: calc1.descontoAcumulado + calc2.descontoAcumulado,
+      valorAntesBoasVindas: Math.round(totalBase * 100) / 100,
+    };
   }
 
   const calc = calcularDescontoProgressivo(valorBase, descontoPercent, slotOffset, valorLimite);
-  let final = mudancaUF ? calc.valorFinal * 2 : calc.valorFinal;
+  const finalBase = mudancaUF ? calc.valorFinal * 2 : calc.valorFinal;
+  let final = finalBase;
   if (boasVindas) final *= (1 - Number(boasVindasPct) / 100);
 
   return {
     valorFinal: Math.round(final * 100) / 100,
     slotNumero: calc.processoNumero,
     descontoAplicado: calc.descontoAcumulado,
+    valorAntesBoasVindas: Math.round(finalBase * 100) / 100,
   };
 }
 
@@ -101,6 +115,7 @@ export default function PreviewFinanceiro(props: Props) {
   const franquia = Number((cliente as any).franquia_processos ?? 0);
   const saldo = Number((cliente as any).saldo_prepago ?? 0);
   const dentroFranquia = isMensalista && franquia > 0 && (processosNoMes + filaLength) < franquia;
+  const boasVindasDesconto = boasVindas ? Math.max(0, preview.valorAntesBoasVindas - preview.valorFinal) : 0;
 
   // Build progression line
   const descontoPercent = Number(cliente.desconto_progressivo ?? 0);
@@ -210,7 +225,7 @@ export default function PreviewFinanceiro(props: Props) {
             {boasVindas && (
               <div className="flex justify-between text-success">
                 <span>Boas-vindas (-{boasVindasPct}%)</span>
-                <span>incluído</span>
+                <span>{boasVindasDesconto > 0 ? `-${fmt(boasVindasDesconto)}` : 'incluído'}</span>
               </div>
             )}
 
