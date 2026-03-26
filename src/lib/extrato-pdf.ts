@@ -196,7 +196,7 @@ const GLOBAL_STYLES = `
   .process-card { background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #4C9F38; margin-bottom: 14px; overflow: hidden; }
   .process-header { background: #0f1f0f; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
   .ph-left { display: flex; align-items: center; gap: 10px; flex: 1; }
-  .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: #ffffff; color: #4C9F38; border-radius: 6px; font-size: 9px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; }
+  .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: #ffffff; color: #4C9F38; border-radius: 6px; font-size: 10px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; padding: 0; margin: 0; }
   .ph-info { flex: 1; }
   .ph-title { font-size: 10px; font-weight: 700; color: #ffffff; text-transform: uppercase; }
   .ph-date { font-size: 8px; color: rgba(255,255,255,0.5); margin-top: 2px; }
