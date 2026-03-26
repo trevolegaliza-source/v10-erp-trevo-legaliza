@@ -241,21 +241,20 @@ export default function ClienteDetalhe() {
       toast.error('Preencha a Razão Social');
       return;
     }
-    // Determine valor: negotiated service uses fixed_price, otherwise normal flow
     const negotiatedService = negotiations?.find(n => n.id === processoForm.negotiated_service_id);
     let valorManualFinal = negotiatedService
       ? negotiatedService.fixed_price
       : (isManualPrice && processoForm.valor_manual ? Number(processoForm.valor_manual) : undefined);
 
-    let notas = '';
-
-    // Mudança de UF
+    let notas = processoForm.observacoes.trim();
     if (processoForm.mudanca_uf) {
-      notas += 'Mudança de UF (2 Processos)';
+      notas = notas ? `Mudança de UF (2 Processos)\n${notas}` : 'Mudança de UF (2 Processos)';
+    }
+    if (isManualPrice && processoForm.motivo_manual.trim()) {
+      notas = notas ? `${notas}\nMotivo valor manual: ${processoForm.motivo_manual.trim()}` : `Motivo valor manual: ${processoForm.motivo_manual.trim()}`;
     }
 
-    // Boas-vindas: pass percentage to useCreateProcesso which handles discount calculation
-    const boasVindasPctToSend = processoForm.boas_vindas
+    const boasVindasPctToSend = (aplicarBoasVindas || processoForm.boas_vindas)
       ? Number(boasVindasPct || processoForm.boas_vindas_pct) || 50
       : undefined;
 
@@ -270,15 +269,16 @@ export default function ClienteDetalhe() {
         notas: notas || undefined,
         mudanca_uf: processoForm.mudanca_uf,
         desconto_boas_vindas: boasVindasPctToSend,
+        ja_pago: processoForm.ja_pago,
       },
       {
         onSuccess: async () => {
-          // Mark boas-vindas applied
-          if (processoForm.boas_vindas) {
+          if (aplicarBoasVindas || processoForm.boas_vindas) {
             await supabase.from('clientes').update({ desconto_boas_vindas_aplicado: true }).eq('id', cliente.id);
           }
           setShowNovoProcesso(false);
-          setProcessoForm({ razao_social: '', tipo: 'abertura', prioridade: 'normal', responsavel: '', valor_manual: '', definir_manual: false, negotiated_service_id: '', mudanca_uf: false, boas_vindas: false, boas_vindas_pct: '50' });
+          setProcessoForm({ ...defaultProcessoForm });
+          setAplicarBoasVindas(false);
           loadAll(cliente.id);
         },
       }
