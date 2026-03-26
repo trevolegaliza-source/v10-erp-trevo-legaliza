@@ -35,6 +35,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
     estado: '',
     cidade: '',
     cep: '',
+    momento_faturamento: 'na_solicitacao',
+    dia_cobranca: '',
   });
   const [codigoManual, setCodigoManual] = useState(false);
   const [buscandoCep, setBuscandoCep] = useState(false);
@@ -119,6 +121,8 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
         cep: cepDigits || null,
         latitude,
         longitude,
+        momento_faturamento: form.momento_faturamento,
+        dia_cobranca: form.dia_cobranca ? Number(form.dia_cobranca) : null,
       } as any,
       {
         onSuccess: (data: any) => {
@@ -207,7 +211,7 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Tipo</Label>
               <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v as TipoCliente }))}>
@@ -216,6 +220,16 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
                   <SelectItem value="AVULSO_4D">Avulso</SelectItem>
                   <SelectItem value="MENSALISTA">Mensalista</SelectItem>
                   <SelectItem value="PRE_PAGO">Pré-Pago</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Faturamento</Label>
+              <Select value={form.momento_faturamento} onValueChange={v => setForm(f => ({ ...f, momento_faturamento: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="na_solicitacao">Na Solicitação</SelectItem>
+                  <SelectItem value="no_deferimento">No Deferimento</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -232,6 +246,16 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
               <Input type="number" step="0.01" value={form.valor_limite_desconto} onChange={e => setForm(f => ({ ...f, valor_limite_desconto: e.target.value }))} />
             </div>
           </div>
+
+          {/* Dia de Vencimento — only when na_solicitacao */}
+          {form.momento_faturamento === 'na_solicitacao' && (
+            <div className="grid grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Dias p/ vencimento (D+X)</Label>
+                <Input type="number" min={1} max={31} value={form.dia_cobranca} onChange={e => setForm(f => ({ ...f, dia_cobranca: e.target.value }))} placeholder="Ex: 4" />
+              </div>
+            </div>
+          )}
 
           {/* Observações */}
           <div className="space-y-1">

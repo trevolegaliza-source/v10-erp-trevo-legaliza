@@ -88,7 +88,9 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
       let label = '';
 
       if (hasManualFlag && s === 0) {
-        valorFinal = Number(p.valor) || base;
+        const lancVal = (p as any).lancamento?.valor;
+        const pVal = p.valor;
+        valorFinal = lancVal != null ? Number(lancVal) : (pVal != null ? Number(pVal) : base);
         isManual = true;
         label = 'VALOR MANUAL';
       } else if (isUrgencia && !hasManualFlag && s === 0) {
