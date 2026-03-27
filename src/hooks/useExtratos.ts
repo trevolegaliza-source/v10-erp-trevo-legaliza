@@ -123,16 +123,15 @@ export function useExtratos(clienteId?: string) {
       const ext = extrato as unknown as Extrato;
 
       // Desvincular lançamentos
-      for (const pid of ext.processo_ids) {
+      for (const pid of (ext.processo_ids || [])) {
         await supabase
           .from('lancamentos')
           .update({
             extrato_id: null,
             etapa_financeiro: 'solicitacao_criada',
           } as any)
-          .eq('processo_id', pid)
-          .eq('tipo', 'receber')
-          .eq('extrato_id' as any, extratoId);
+          .eq('processo_id', pid as string)
+          .eq('tipo', 'receber');
       }
 
       // Soft delete
