@@ -592,15 +592,17 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     const progRows = steps.map(s => {
       let desc = '—';
       const isLimite = !s.isManual && !s.isUrgencia && data.cliente.valor_limite_desconto && s.valorFinal <= (data.cliente.valor_limite_desconto ?? 0);
-      const status = s.valorFinal === 0 && s.isManual
+      const status = s.isCortesia
         ? 'CORTESIA'
-        : s.isUrgencia
-          ? 'URGÊNCIA'
-          : s.isManual
-            ? 'VALOR MANUAL'
-            : s.desconto > 0
-              ? (isLimite ? 'Limite atingido' : 'DESC. PROGRESSIVO')
-              : '—';
+        : s.isMudancaUF
+          ? 'MUDANÇA DE UF (2 slots)'
+          : s.isUrgencia
+            ? 'URGÊNCIA'
+            : s.isManual
+              ? 'VALOR MANUAL'
+              : s.desconto > 0
+                ? (isLimite ? 'Limite atingido' : 'DESC. PROGRESSIVO')
+                : '—';
       if (!s.isManual && s.desconto > 0) {
         desc = `-${descPct}%`;
       }
@@ -608,8 +610,9 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         ? '<span style="color:#22c55e;font-weight:600;">✓ COBRADO</span>'
         : '<span style="color:#9ca3af;">—</span>';
       const rowStyle = s.isSelected ? 'background:#f0fdf4;' : 'opacity:0.6;';
+      const procLabel = s.isMudancaUF ? `${s.index}º-${s.index + 1}º` : `${s.index}º`;
       return `<tr class="${isLimite ? 'limite' : ''}" style="${rowStyle}">
-        <td>${s.index}º</td>
+        <td>${procLabel}</td>
         <td class="val">${fmt(s.valorFinal)}</td>
         <td class="desc">${desc}</td>
         <td class="status">${status}</td>
