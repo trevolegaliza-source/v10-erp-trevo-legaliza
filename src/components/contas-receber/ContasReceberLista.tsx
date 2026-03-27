@@ -14,8 +14,8 @@ import { toast } from 'sonner';
 interface Props {
   lancamentos: LancamentoReceber[];
   taxasPorProcesso: Record<string, ValorAdicionalSimple[]>;
-  onMarcarPago: (l: LancamentoReceber) => void;
-  onCobrar: (l: LancamentoReceber) => void;
+  onMarcarPago?: (l: LancamentoReceber) => void;
+  onCobrar?: (l: LancamentoReceber) => void;
 }
 
 type Ordenacao = 'venc_asc' | 'venc_desc' | 'valor_asc' | 'valor_desc' | 'cliente_az' | 'atraso_desc';
