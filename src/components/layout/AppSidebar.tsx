@@ -10,7 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   PlusCircle,
-  ArrowDownCircle,
+  ArrowUpCircle,
   ArrowUpCircle,
   LogOut,
   UsersRound,
