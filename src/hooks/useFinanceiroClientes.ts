@@ -1,0 +1,261 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export interface ClienteFinanceiro {
+  cliente_id: string;
+  cliente_nome: string;
+  cliente_apelido: string | null;
+  cliente_cnpj: string | null;
+  cliente_tipo: string;
+  cliente_momento_faturamento: string;
+  cliente_dia_cobranca: number | null;
+  cliente_dia_vencimento_mensal: number | null;
+  cliente_telefone: string | null;
+  cliente_email: string | null;
+  cliente_nome_contador: string | null;
+  cliente_valor_base: number | null;
+  cliente_desconto_progressivo: number | null;
+  cliente_valor_limite_desconto: number | null;
+  lancamentos: LancamentoFinanceiro[];
+  total_faturado: number;
+  total_pendente: number;
+  qtd_processos: number;
+  qtd_sem_extrato: number;
+  qtd_aguardando_deferimento: number;
+  etapa_predominante: string;
+  extrato_mais_recente: { id: string; pdf_url: string; filename: string; created_at: string } | null;
+}
+
+export interface LancamentoFinanceiro {
+  id: string;
+  processo_id: string;
+  processo_razao_social: string;
+  processo_tipo: string;
+  processo_etapa: string;
+  processo_notas: string | null;
+  processo_valor: number;
+  processo_created_at: string;
+  valor: number;
+  data_vencimento: string;
+  status: string;
+  etapa_financeiro: string;
+  extrato_id: string | null;
+  descricao: string;
+}
+
+const ETAPAS_PRE_DEFERIMENTO = [
+  'recebidos', 'analise_documental', 'contrato', 'viabilidade',
+  'dbe', 'vre', 'aguardando_pagamento', 'taxa_paga',
+  'assinaturas', 'assinado', 'em_analise',
+];
+
+const ETAPA_ORDER: Record<string, number> = {
+  solicitacao_criada: 0,
+  cobranca_gerada: 1,
+  cobranca_enviada: 2,
+  honorario_vencido: 3,
+  honorario_pago: 4,
+};
+
+export function useFinanceiroClientes() {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ['financeiro_clientes'],
+    queryFn: async () => {
+      // 1. Fetch lancamentos a receber (pendente/atrasado)
+      const { data: lancamentos, error: lErr } = await supabase
+        .from('lancamentos')
+        .select('id, valor, data_vencimento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id')
+        .eq('tipo', 'receber')
+        .in('status', ['pendente', 'atrasado'])
+        .order('created_at', { ascending: false });
+      if (lErr) throw lErr;
+      if (!lancamentos?.length) return [];
+
+      // 2. Collect unique IDs
+      const processoIds = [...new Set((lancamentos || []).map(l => l.processo_id).filter(Boolean))] as string[];
+      const clienteIds = [...new Set((lancamentos || []).map(l => l.cliente_id).filter(Boolean))] as string[];
+
+      // 3. Fetch processos and clientes in parallel
+      const [processosRes, clientesRes] = await Promise.all([
+        processoIds.length > 0
+          ? supabase.from('processos').select('id, razao_social, tipo, etapa, notas, valor, created_at').in('id', processoIds)
+          : { data: [], error: null },
+        clienteIds.length > 0
+          ? supabase.from('clientes').select('id, nome, apelido, cnpj, tipo, momento_faturamento, dia_cobranca, dia_vencimento_mensal, telefone, email, nome_contador, valor_base, desconto_progressivo, valor_limite_desconto').in('id', clienteIds)
+          : { data: [], error: null },
+      ]);
+
+      const processoMap = new Map((processosRes.data || []).map((p: any) => [p.id, p]));
+      const clienteMap = new Map((clientesRes.data || []).map((c: any) => [c.id, c]));
+
+      // 4. Group by client
+      const result = new Map<string, ClienteFinanceiro>();
+
+      for (const l of lancamentos) {
+        const clienteId = l.cliente_id;
+        if (!clienteId) continue;
+        const cliente = clienteMap.get(clienteId);
+        if (!cliente) continue;
+        const processo = l.processo_id ? processoMap.get(l.processo_id) : null;
+
+        if (!result.has(clienteId)) {
+          result.set(clienteId, {
+            cliente_id: clienteId,
+            cliente_nome: cliente.nome,
+            cliente_apelido: cliente.apelido,
+            cliente_cnpj: cliente.cnpj,
+            cliente_tipo: cliente.tipo,
+            cliente_momento_faturamento: cliente.momento_faturamento || 'na_solicitacao',
+            cliente_dia_cobranca: cliente.dia_cobranca,
+            cliente_dia_vencimento_mensal: cliente.dia_vencimento_mensal,
+            cliente_telefone: cliente.telefone,
+            cliente_email: cliente.email,
+            cliente_nome_contador: cliente.nome_contador,
+            cliente_valor_base: cliente.valor_base,
+            cliente_desconto_progressivo: cliente.desconto_progressivo,
+            cliente_valor_limite_desconto: cliente.valor_limite_desconto,
+            lancamentos: [],
+            total_faturado: 0,
+            total_pendente: 0,
+            qtd_processos: 0,
+            qtd_sem_extrato: 0,
+            qtd_aguardando_deferimento: 0,
+            etapa_predominante: 'solicitacao_criada',
+            extrato_mais_recente: null,
+          });
+        }
+
+        const c = result.get(clienteId)!;
+
+        c.lancamentos.push({
+          id: l.id,
+          processo_id: l.processo_id || '',
+          processo_razao_social: processo?.razao_social || '',
+          processo_tipo: processo?.tipo || '',
+          processo_etapa: processo?.etapa || '',
+          processo_notas: processo?.notas || null,
+          processo_valor: processo?.valor || 0,
+          processo_created_at: processo?.created_at || '',
+          valor: l.valor,
+          data_vencimento: l.data_vencimento,
+          status: l.status,
+          etapa_financeiro: l.etapa_financeiro,
+          extrato_id: l.extrato_id,
+          descricao: l.descricao,
+        });
+
+        c.total_faturado += l.valor;
+        c.total_pendente += l.status === 'pendente' ? l.valor : 0;
+        c.qtd_processos++;
+        if (!l.extrato_id && l.etapa_financeiro === 'solicitacao_criada') c.qtd_sem_extrato++;
+
+        if (cliente.momento_faturamento === 'no_deferimento' && processo) {
+          if (ETAPAS_PRE_DEFERIMENTO.includes(processo.etapa || '')) {
+            c.qtd_aguardando_deferimento++;
+          }
+        }
+      }
+
+      // 5. Determine predominant stage per client
+      for (const c of result.values()) {
+        let minOrder = 99;
+        for (const l of c.lancamentos) {
+          const order = ETAPA_ORDER[l.etapa_financeiro] ?? 99;
+          if (order < minOrder) minOrder = order;
+        }
+        const entry = Object.entries(ETAPA_ORDER).find(([, v]) => v === minOrder);
+        c.etapa_predominante = entry ? entry[0] : 'solicitacao_criada';
+      }
+
+      // 6. Fetch most recent extrato per client
+      const allClienteIds = Array.from(result.keys());
+      if (allClienteIds.length > 0) {
+        const { data: extratos } = await supabase
+          .from('extratos')
+          .select('id, cliente_id, pdf_url, filename, created_at')
+          .in('cliente_id', allClienteIds)
+          .eq('status', 'ativo')
+          .order('created_at', { ascending: false });
+
+        if (extratos) {
+          for (const ext of extratos) {
+            const c = result.get(ext.cliente_id);
+            if (c && !c.extrato_mais_recente) {
+              c.extrato_mais_recente = {
+                id: ext.id,
+                pdf_url: ext.pdf_url,
+                filename: ext.filename,
+                created_at: ext.created_at || '',
+              };
+            }
+          }
+        }
+      }
+
+      return Array.from(result.values());
+    },
+    staleTime: 60_000,
+  });
+
+  const marcarEnviado = useMutation({
+    mutationFn: async ({ lancamentoIds }: { lancamentoIds: string[] }) => {
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({
+          etapa_financeiro: 'cobranca_enviada',
+          observacoes_financeiro: `Cobrança enviada em ${new Date().toLocaleDateString('pt-BR')}`,
+        } as any)
+        .in('id', lancamentoIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      toast.success('Cobrança marcada como enviada!');
+    },
+  });
+
+  const marcarPago = useMutation({
+    mutationFn: async ({ lancamentoIds, dataPagamento }: { lancamentoIds: string[]; dataPagamento?: string }) => {
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({
+          etapa_financeiro: 'honorario_pago',
+          status: 'pago' as const,
+          data_pagamento: dataPagamento || new Date().toISOString().split('T')[0],
+          confirmado_recebimento: true,
+        })
+        .in('id', lancamentoIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['contas_receber'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+      toast.success('Pagamento confirmado!');
+    },
+  });
+
+  const clientes = query.data || [];
+  const metricas = {
+    aguardandoExtrato: clientes.filter(c => c.qtd_sem_extrato > 0).length,
+    valorAguardandoExtrato: clientes.filter(c => c.qtd_sem_extrato > 0).reduce((s, c) => s + c.total_pendente, 0),
+    aguardandoEnvio: clientes.filter(c => c.etapa_predominante === 'cobranca_gerada').length,
+    valorAguardandoEnvio: clientes.filter(c => c.etapa_predominante === 'cobranca_gerada').reduce((s, c) => s + c.total_pendente, 0),
+    aguardandoPagamento: clientes.filter(c => c.etapa_predominante === 'cobranca_enviada').length,
+    valorAguardandoPagamento: clientes.filter(c => c.etapa_predominante === 'cobranca_enviada').reduce((s, c) => s + c.total_pendente, 0),
+    vencidos: clientes.filter(c => c.lancamentos.some(l => l.status === 'atrasado')).length,
+    valorVencido: clientes.filter(c => c.lancamentos.some(l => l.status === 'atrasado')).reduce((s, c) => s + c.lancamentos.filter(l => l.status === 'atrasado').reduce((ss, l) => ss + l.valor, 0), 0),
+  };
+
+  return {
+    clientes,
+    metricas,
+    isLoading: query.isLoading,
+    marcarEnviado,
+    marcarPago,
+    refetch: query.refetch,
+  };
+}
