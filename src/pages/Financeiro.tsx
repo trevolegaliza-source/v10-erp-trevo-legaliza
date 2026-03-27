@@ -189,13 +189,13 @@ export default function Financeiro() {
             <CheckCircle className="h-3.5 w-3.5" />
             Recebidos
           </TabsTrigger>
-          {metricas.vencidos > 0 && (
-            <TabsTrigger value="vencidos" className="gap-1.5 text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Vencidos
-              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{metricas.vencidos}</Badge>
-            </TabsTrigger>
-          )}
+          <TabsTrigger value="vencidos" className="gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Vencidos
+            {clientesVencidos.length > 0 && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesVencidos.length}</Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="faturar" className="mt-4">
