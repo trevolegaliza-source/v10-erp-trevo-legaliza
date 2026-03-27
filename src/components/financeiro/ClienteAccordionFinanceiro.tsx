@@ -57,10 +57,25 @@ const BADGE_COLORS: Record<string, string> = {
   'Cortesia': 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
 };
 
-function tipoLabel(c: ClienteFinanceiro) {
+function tipoLabel(c: ClienteFinanceiro): string {
   if (c.cliente_momento_faturamento === 'no_deferimento') return 'No deferimento';
-  if (c.cliente_tipo === 'MENSALISTA') return `Mensal dia ${c.cliente_dia_vencimento_mensal || 15}`;
-  return `Avulso D+${c.cliente_dia_cobranca || 4}`;
+
+  if (c.cliente_tipo === 'MENSALISTA') {
+    return `Mensalista${c.cliente_dia_vencimento_mensal ? ` — dia ${c.cliente_dia_vencimento_mensal}` : ''}`;
+  }
+
+  if (c.cliente_tipo === 'PRE_PAGO') return 'Pré-Pago';
+
+  // AVULSO_4D: verificar forma de cobrança
+  if (c.cliente_dia_vencimento_mensal && c.cliente_dia_vencimento_mensal > 0 && !c.cliente_dia_cobranca) {
+    return `Fatura mensal — dia ${c.cliente_dia_vencimento_mensal}`;
+  }
+
+  if (c.cliente_dia_cobranca && c.cliente_dia_cobranca > 0) {
+    return `Avulso D+${c.cliente_dia_cobranca}`;
+  }
+
+  return 'Avulso';
 }
 
 // ══════════ TAB: FATURAR ══════════
