@@ -436,7 +436,11 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
 
 function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo[], logoDataUrl: string | null, totalPages: number): string {
   const totalHon = selected.reduce((s, st) => s + st.valorFinal, 0);
-  const totalTaxas = Object.values(data.valoresAdicionais).flat().reduce((s, va) => s + Number(va.valor), 0);
+  const selectedIds = new Set(selected.map(s => s.processo.id));
+  const totalTaxas = Object.entries(data.valoresAdicionais)
+    .filter(([pid]) => selectedIds.has(pid))
+    .flatMap(([, vas]) => vas)
+    .reduce((s, va) => s + Number(va.valor), 0);
   const totalGeral = totalHon + totalTaxas;
   const descPct = data.cliente.desconto_progressivo ?? 0;
 
