@@ -385,7 +385,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
         competenciaAno: now.getFullYear(),
       });
 
-      qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      invalidateFinanceiro(qc);
       toast.success('Extrato gerado e salvo no sistema!');
     } catch (err: any) {
       toast.error('Erro ao gerar extrato: ' + err.message);
