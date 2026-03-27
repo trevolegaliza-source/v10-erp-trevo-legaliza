@@ -100,11 +100,11 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
       let label = '';
 
       if ((hasManualFlag || isUrgencia || hasBoasVindas) && s === 0) {
-        valorFinal = valorReal;
+        valorFinal = hasManualFlag ? (valorReal || 0) : valorReal;
         desconto = 0;
         isManual = true;
         if (hasManualFlag) {
-          label = 'VALOR MANUAL';
+          label = valorFinal === 0 ? 'CORTESIA' : 'VALOR MANUAL';
         } else if (isUrgencia) {
           label = 'MÉTODO TREVO / URGÊNCIA';
         } else {
