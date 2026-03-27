@@ -174,11 +174,30 @@ function ClienteAccordionItem({
   };
 
   const handleVisualizarExtrato = async (extratoId: string) => {
-    const extrato = await buscarExtratoPorId(extratoId);
-    if (extrato?.pdf_url) {
-      window.open(extrato.pdf_url, '_blank');
-    } else {
-      toast.error('Extrato não encontrado');
+    try {
+      const extrato = await buscarExtratoPorId(extratoId);
+      if (!extrato) {
+        toast.error('Extrato não encontrado');
+        return;
+      }
+
+      const storagePath = `extratos/${extrato.cliente_id}/${extrato.filename}`;
+      const { data: fileData, error } = await supabase.storage
+        .from('documentos')
+        .download(storagePath);
+
+      if (error || !fileData) {
+        console.error('Erro ao baixar extrato:', error);
+        toast.error('Erro ao carregar o extrato. Tente novamente.');
+        return;
+      }
+
+      const blobUrl = URL.createObjectURL(fileData);
+      setPreviewUrl(blobUrl);
+      setPreviewFilename(extrato.filename);
+    } catch (err) {
+      console.error('Erro ao visualizar extrato:', err);
+      toast.error('Erro ao abrir o extrato.');
     }
   };
 
