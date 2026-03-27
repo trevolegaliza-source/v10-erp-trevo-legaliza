@@ -22,28 +22,33 @@ export interface ProcessoDB {
   cliente?: ClienteDB;
 }
 
-export type EtapaFinanceiro = 'solicitacao_criada' | 'gerar_cobranca' | 'cobranca_gerada' | 'honorario_pago' | 'honorario_vencido';
+export type EtapaFinanceiro =
+  | 'solicitacao_criada'    // 1. Faturar — precisa gerar extrato
+  | 'cobranca_gerada'       // 2. Enviar — extrato gerado, enviar ao cliente
+  | 'cobranca_enviada'      // 3. Aguardando — cobrança enviada, aguardar pagamento
+  | 'honorario_pago'        // 4. Pago — concluído
+  | 'honorario_vencido';    // Vencido — recobrança
 
 export const ETAPA_FINANCEIRO_LABELS: Record<EtapaFinanceiro, string> = {
-  solicitacao_criada: 'Solicitação Criada',
-  gerar_cobranca: 'Gerar Cobrança',
-  cobranca_gerada: 'Cobrança Gerada',
-  honorario_pago: 'Honorário Pago',
-  honorario_vencido: 'Honorário Vencido',
+  solicitacao_criada: 'Faturar',
+  cobranca_gerada: 'Enviar',
+  cobranca_enviada: 'Aguardando',
+  honorario_pago: 'Pago',
+  honorario_vencido: 'Vencido',
 };
 
 export const ETAPA_FINANCEIRO_COLORS: Record<EtapaFinanceiro, string> = {
-  solicitacao_criada: 'border-muted-foreground/40',
-  gerar_cobranca: 'border-warning',
+  solicitacao_criada: 'border-warning',
   cobranca_gerada: 'border-info',
+  cobranca_enviada: 'border-muted-foreground/40',
   honorario_pago: 'border-success',
   honorario_vencido: 'border-destructive',
 };
 
 export const ETAPA_FINANCEIRO_ORDER: EtapaFinanceiro[] = [
   'solicitacao_criada',
-  'gerar_cobranca',
   'cobranca_gerada',
+  'cobranca_enviada',
   'honorario_pago',
   'honorario_vencido',
 ];

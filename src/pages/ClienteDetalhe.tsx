@@ -245,7 +245,7 @@ export default function ClienteDetalhe() {
       }
       const processosFin: ProcessoFinanceiro[] = procsToGenerate.map(p => ({
         ...p,
-        etapa_financeiro: 'gerar_cobranca' as const,
+        etapa_financeiro: 'solicitacao_criada' as const,
         lancamento: lancamentos.find(l => l.processo_id === p.id && l.tipo === 'receber') || null,
       }));
       const [valoresAdicionais, allCompetencia] = await Promise.all([
