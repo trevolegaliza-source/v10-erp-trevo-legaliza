@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import {
-  FileText, Upload, CheckCircle2, Trash2, PlusCircle, Download, Eye, Loader2, Pencil,
+  FileText, Upload, CheckCircle2, Trash2, PlusCircle, Download, Eye, Loader2, Save,
 } from 'lucide-react';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useUpdateLancamentoFinanceiro } from '@/hooks/useProcessosFinanceiro';
@@ -22,6 +22,8 @@ import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { useDeleteProcesso } from '@/hooks/useProcessos';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import DocRow from './DocRow';
 
 interface ProcessoEditModalProps {
   open: boolean;
@@ -30,23 +32,31 @@ interface ProcessoEditModalProps {
 }
 
 export default function ProcessoEditModal({ open, onOpenChange, processo }: ProcessoEditModalProps) {
+  const queryClient = useQueryClient();
   const updateLanc = useUpdateLancamentoFinanceiro();
   const deleteProcesso = useDeleteProcesso();
   const { data: allNegotiations = [] } = useAllServiceNegotiations();
 
-  const [notes, setNotes] = useState(processo?.lancamento?.observacoes_financeiro || '');
+  // Editable form states
+  const [editValor, setEditValor] = useState(0);
+  const [editObservacoes, setEditObservacoes] = useState('');
+  const [hasChanges, setHasChanges] = useState(false);
+  const [showSavePassword, setShowSavePassword] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   const [valoresOpen, setValoresOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
-  const [editValuePasswordOpen, setEditValuePasswordOpen] = useState(false);
-  const [editingValue, setEditingValue] = useState(false);
-  const [newValue, setNewValue] = useState('');
 
-  // Sync notes when processo changes
+  // Sync form when processo changes
   useEffect(() => {
-    setNotes(processo?.lancamento?.observacoes_financeiro || '');
-    setEditingValue(false);
-  }, [processo?.id, processo?.lancamento?.observacoes_financeiro]);
+    if (processo) {
+      const lanc = processo.lancamento;
+      setEditValor(Number(lanc?.valor ?? processo.valor ?? 0));
+      setEditObservacoes(lanc?.observacoes_financeiro || '');
+      setHasChanges(false);
+    }
+  }, [processo?.id, processo?.lancamento?.observacoes_financeiro, processo?.lancamento?.valor, processo?.valor]);
 
   const boletoRef = useRef<HTMLInputElement>(null);
   const comprovanteRef = useRef<HTMLInputElement>(null);
@@ -73,16 +83,9 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   const lanc = processo.lancamento;
   const cliente = processo.cliente as any;
   const clienteApelido = cliente?.apelido || cliente?.nome || '-';
-  const savedNotes = lanc?.observacoes_financeiro || '';
   const isNegociado = !!matchedNeg;
   const serviceName = matchedNeg?.service_name || lanc?.descricao || TIPO_PROCESSO_LABELS[processo.tipo] || processo.tipo;
   const createdAt = processo.created_at ? new Date(processo.created_at).toLocaleDateString('pt-BR') : null;
-
-  const handleNotesBlur = () => {
-    if (notes !== savedNotes) {
-      mutateField({ observacoes_financeiro: notes });
-    }
-  };
 
   const mutateField = (updates: Record<string, any>) => {
     updateLanc.mutate({
@@ -122,109 +125,80 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
     });
   };
 
-  const handleEditValueUnlocked = () => {
-    const current = Number(lanc?.valor ?? processo.valor ?? 0);
-    setNewValue(String(current));
-    setEditingValue(true);
-  };
-
-  const handleSaveNewValue = async () => {
-    const novoValor = Number(newValue);
-    const valorAnterior = Number(lanc?.valor ?? processo.valor ?? 0);
-    if (isNaN(novoValor) || novoValor < 0) {
-      toast.error('Valor inválido');
-      return;
-    }
+  // Save all changes after password validation
+  const handleSalvarComSenha = async () => {
+    setIsSaving(true);
     try {
-      const dateStr = new Date().toLocaleDateString('pt-BR');
-      const notaValor = `Valor alterado manualmente de R$ ${valorAnterior.toFixed(2)} para R$ ${novoValor.toFixed(2)} em ${dateStr}`;
-      const currentNotas = processo.notas || '';
-      const notasAtualizadas = currentNotas ? `${currentNotas}\n${notaValor}` : notaValor;
+      const valorAnterior = Number(lanc?.valor ?? processo.valor ?? 0);
+      const valorMudou = editValor !== valorAnterior;
 
-      // 1. Update processo valor + notas in a single call
+      // Build notas for processo
+      let notasProcesso = processo.notas || '';
+      if (valorMudou) {
+        const dateStr = new Date().toLocaleDateString('pt-BR');
+        const registro = `Valor alterado manualmente de R$ ${valorAnterior.toFixed(2)} para R$ ${editValor.toFixed(2)} em ${dateStr}`;
+        if (!notasProcesso.includes('Valor Manual')) {
+          notasProcesso = `Valor Manual | ${notasProcesso}\n${registro}`.trim();
+        } else {
+          notasProcesso = `${notasProcesso}\n${registro}`.trim();
+        }
+      }
+
+      // 1. Update processo
+      const procUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
+      if (valorMudou) {
+        procUpdates.valor = editValor;
+        procUpdates.notas = notasProcesso;
+      }
       const { error: errProc } = await supabase
         .from('processos')
-        .update({ valor: novoValor, notas: notasAtualizadas, updated_at: new Date().toISOString() })
+        .update(procUpdates)
         .eq('id', processo.id);
       if (errProc) throw errProc;
 
-      // 2. Update lancamento if exists
+      // 2. Update lancamento
       if (lanc?.id) {
+        const lancUpdates: Record<string, any> = {
+          observacoes_financeiro: editObservacoes,
+          updated_at: new Date().toISOString(),
+        };
+        if (valorMudou) {
+          lancUpdates.valor = editValor;
+        }
         const { error: errLanc } = await supabase
           .from('lancamentos')
-          .update({ valor: novoValor, updated_at: new Date().toISOString() })
+          .update(lancUpdates)
           .eq('id', lanc.id);
         if (errLanc) console.warn('Erro ao atualizar lançamento:', errLanc);
       }
 
-      toast.success(`Valor atualizado para R$ ${novoValor.toFixed(2)}`);
-      setEditingValue(false);
+      // 3. Invalidate all relevant queries
+      queryClient.invalidateQueries({ queryKey: ['processos_financeiro'] });
+      queryClient.invalidateQueries({ queryKey: ['processos'] });
+      queryClient.invalidateQueries({ queryKey: ['processos_db'] });
+      queryClient.invalidateQueries({ queryKey: ['lancamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['contas_receber'] });
 
-      // 3. Force cache refresh via mutation
-      updateLanc.mutate({
-        processoId: processo.id,
-        lancamentoId: lanc?.id,
-        clienteId: processo.cliente_id,
-        valor: novoValor,
-        updates: {},
-      });
+      toast.success('Alterações salvas com sucesso!');
+      setHasChanges(false);
     } catch (err: any) {
-      console.error('Erro ao salvar valor:', err);
-      toast.error('Erro ao salvar o novo valor: ' + (err.message || 'Tente novamente'));
+      console.error('Erro ao salvar alterações:', err);
+      toast.error('Erro ao salvar: ' + (err.message || 'Tente novamente'));
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const DocRow = ({
-    label, storagePath, field, inputRef, folder,
-  }: {
-    label: string;
-    storagePath: string | null | undefined;
-    field: string;
-    inputRef: React.RefObject<HTMLInputElement | null>;
-    folder: string;
-  }) => (
-    <div className="flex items-center justify-between py-2">
-      <div className="flex items-center gap-2">
-        <FileText className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm text-foreground">{label}</span>
-        {storagePath && <CheckCircle2 className="h-3.5 w-3.5 text-success" />}
-      </div>
-      <div className="flex items-center gap-1.5">
-        {storagePath && (
-          <>
-            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => viewFile(storagePath)}>
-              <Eye className="h-3 w-3 mr-1" /> Ver
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground" onClick={() => handleDownload(storagePath)}>
-              <Download className="h-3 w-3 mr-1" /> Baixar
-            </Button>
-          </>
-        )}
-        <Button variant="outline" size="sm" className="h-7 text-xs border-border" disabled={uploading === field} onClick={() => inputRef.current?.click()}>
-          {uploading === field ? (
-            <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Enviando...</>
-          ) : (
-            <><Upload className="h-3 w-3 mr-1" /> {storagePath ? 'Substituir' : 'Enviar'}</>
-          )}
-        </Button>
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) handleUpload(field, f, folder);
-            e.target.value = '';
-          }}
-        />
-      </div>
-    </div>
-  );
-
   const somaAdicionais = valoresAdicionais.reduce((s, i) => s + Number(i.valor), 0);
-  const baseValue = Number(lanc?.valor ?? processo.valor ?? 0);
-  const totalValue = baseValue + somaAdicionais;
+  const totalValue = editValor + somaAdicionais;
+
+  // Discount info from notas
+  const discountMatch = processo.notas?.match(/Base: R\$ ([\d.,]+) \| Desconto: R\$ ([\d.,]+)/);
+  const valorBaseOriginal = discountMatch ? parseFloat(discountMatch[1].replace(',', '.')) : null;
+  const descontoAcum = discountMatch ? parseFloat(discountMatch[2].replace(',', '.')) : 0;
+  const processNumMatch = processo.notas?.match(/Processo nº (\d+) do mês/);
+  const processNum = processNumMatch ? processNumMatch[1] : null;
 
   return (
     <>
@@ -250,89 +224,64 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-            {/* Value summary */}
-            <div className="rounded-lg border border-border bg-muted/30 p-3">
-              {(() => {
-                const discountMatch = processo.notas?.match(/Base: R\$ ([\d.,]+) \| Desconto: R\$ ([\d.,]+)/);
-                const valorBase = discountMatch ? parseFloat(discountMatch[1].replace(',', '.')) : baseValue;
-                const descontoAcum = discountMatch ? parseFloat(discountMatch[2].replace(',', '.')) : 0;
-                const processNumMatch = processo.notas?.match(/Processo nº (\d+) do mês/);
-                const processNum = processNumMatch ? processNumMatch[1] : null;
-                return (
-                  <>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Valor Base</span>
-                      <div className="flex items-center gap-2">
-                        {editingValue ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-muted-foreground">R$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              className="w-24 h-7 text-xs"
-                              value={newValue}
-                              onChange={e => setNewValue(e.target.value)}
-                              autoFocus
-                            />
-                            <Button size="sm" variant="default" className="h-7 text-xs px-2" onClick={handleSaveNewValue}>Salvar</Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditingValue(false)}>X</Button>
-                          </div>
-                        ) : (
-                          <>
-                            <span className="text-foreground">{formatBRL(valorBase)}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                              onClick={() => setEditValuePasswordOpen(true)}
-                              title="Editar valor (requer senha master)"
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    {descontoAcum > 0 && (
-                      <div className="flex justify-between text-sm mt-1">
-                        <span className="text-info">Desconto Acumulado {processNum && `(nº ${processNum} do mês)`}</span>
-                        <span className="text-info">-{formatBRL(descontoAcum)}</span>
-                      </div>
-                    )}
-                    {descontoAcum > 0 && (
-                      <div className="flex justify-between text-sm mt-1">
-                        <span className="text-muted-foreground">Valor com Desconto</span>
-                        <span className="text-foreground">{formatBRL(baseValue)}</span>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
+            {/* Value — editable */}
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Valor do Processo</label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">R$</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={editValor}
+                  onChange={(e) => {
+                    setEditValor(Number(e.target.value));
+                    setHasChanges(true);
+                  }}
+                  className="w-32 text-lg font-bold bg-background border-border"
+                />
+              </div>
+
+              {valorBaseOriginal && descontoAcum > 0 && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Valor Original</span>
+                    <span className="text-foreground">{formatBRL(valorBaseOriginal)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-info">Desconto Acumulado {processNum && `(nº ${processNum} do mês)`}</span>
+                    <span className="text-info">-{formatBRL(descontoAcum)}</span>
+                  </div>
+                </>
+              )}
+
               {somaAdicionais > 0 && (
-                <div className="flex justify-between text-sm mt-1">
+                <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Valores Adicionais ({valoresAdicionais.length})</span>
                   <span className="text-primary">{formatBRL(somaAdicionais)}</span>
                 </div>
               )}
-              <Separator className="my-2" />
+              <Separator className="my-1" />
               <div className="flex justify-between font-bold">
                 <span className="text-foreground">Total</span>
                 <span className="text-primary">{formatBRL(totalValue)}</span>
               </div>
               {isNegociado && (
-                <p className="text-[11px] text-emerald-400 mt-2 flex items-center gap-1">
+                <p className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1">
                   ⚠️ Valor definido conforme Tabela de Honorários Específicos
                 </p>
               )}
             </div>
 
-            {/* Observações */}
+            {/* Observações — editable */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-foreground">Observações</label>
               <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                onBlur={handleNotesBlur}
+                value={editObservacoes}
+                onChange={(e) => {
+                  setEditObservacoes(e.target.value);
+                  setHasChanges(true);
+                }}
                 placeholder="Anotações sobre este processo..."
                 className="text-sm min-h-[60px] bg-background border-border text-foreground"
                 rows={3}
@@ -363,12 +312,28 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
             {/* Documents */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-foreground">Documentos Anexados</label>
-              <DocRow label="Boleto" storagePath={lanc?.boleto_url} field="boleto_url" inputRef={boletoRef} folder="boletos" />
-              <DocRow label="Comprovante de Pagamento" storagePath={(lanc as any)?.url_comprovante} field="url_comprovante" inputRef={comprovanteRef} folder="comprovantes" />
-              <DocRow label="Guia / Recibo de Taxa" storagePath={(lanc as any)?.url_recibo_taxa} field="url_recibo_taxa" inputRef={reciboRef} folder="recibos" />
+              <DocRow label="Boleto" storagePath={lanc?.boleto_url} field="boleto_url" inputRef={boletoRef} folder="boletos" uploading={uploading} onUpload={handleUpload} onView={viewFile} onDownload={handleDownload} />
+              <DocRow label="Comprovante de Pagamento" storagePath={(lanc as any)?.url_comprovante} field="url_comprovante" inputRef={comprovanteRef} folder="comprovantes" uploading={uploading} onUpload={handleUpload} onView={viewFile} onDownload={handleDownload} />
+              <DocRow label="Guia / Recibo de Taxa" storagePath={(lanc as any)?.url_recibo_taxa} field="url_recibo_taxa" inputRef={reciboRef} folder="recibos" uploading={uploading} onUpload={handleUpload} onView={viewFile} onDownload={handleDownload} />
             </div>
 
             <Separator className="bg-border" />
+
+            {/* Save button — visible only when there are changes */}
+            {hasChanges && (
+              <Button
+                size="sm"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={() => setShowSavePassword(true)}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Salvando...</>
+                ) : (
+                  <><Save className="h-3.5 w-3.5 mr-1.5" /> Salvar Alterações</>
+                )}
+              </Button>
+            )}
 
             {/* Delete */}
             <Button variant="destructive" size="sm" className="w-full" onClick={() => setDeleteOpen(true)}>
@@ -389,11 +354,11 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
       />
 
       <PasswordConfirmDialog
-        open={editValuePasswordOpen}
-        onOpenChange={setEditValuePasswordOpen}
-        onConfirm={handleEditValueUnlocked}
-        title="Editar Valor do Processo"
-        description="Digite a senha de administração para liberar a edição do valor."
+        open={showSavePassword}
+        onOpenChange={setShowSavePassword}
+        onConfirm={handleSalvarComSenha}
+        title="Confirmar Alterações"
+        description="Digite a senha de administração para salvar as alterações."
       />
     </>
   );
