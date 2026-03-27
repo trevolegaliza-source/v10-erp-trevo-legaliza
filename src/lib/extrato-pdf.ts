@@ -722,12 +722,35 @@ function countAttachments(data: ExtratoData): number {
     if (l?.url_recibo_taxa) count++;
     if (l?.comprovante_url) count++;
   }
-  const allVAs = Object.values(data.valoresAdicionais).flat();
-  for (const va of allVAs) {
-    if (va.comprovante_url) count++;
-    if (va.anexo_url) count++;
+  // Only count VAs for selected processes
+  for (const p of data.processos) {
+    const vas = data.valoresAdicionais[p.id] || [];
+    for (const va of vas) {
+      if (va.comprovante_url) count++;
+      if (va.anexo_url) count++;
+    }
   }
   return count;
+}
+
+/**
+ * Resolves a storage path or URL to a fetchable URL.
+ * If the value looks like a full URL (http/https), returns as-is.
+ * Otherwise treats it as a Supabase storage path and generates a signed URL.
+ */
+async function resolveStorageUrl(pathOrUrl: string): Promise<string> {
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+    return pathOrUrl;
+  }
+  // It's a storage path — generate signed URL from the 'contratos' bucket
+  const { data, error } = await supabase.storage
+    .from('contratos')
+    .createSignedUrl(pathOrUrl, 3600);
+  if (error || !data?.signedUrl) {
+    console.error(`Erro ao gerar signed URL para ${pathOrUrl}:`, error);
+    throw new Error('Failed to generate signed URL');
+  }
+  return data.signedUrl;
 }
 
 async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: number) {
@@ -740,18 +763,27 @@ async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: numb
     if (l?.boleto_url) atts.push({ label: `Boleto — ${p.razao_social}`, url: l.boleto_url });
     if (l?.url_recibo_taxa) atts.push({ label: `Guia/Recibo Taxa — ${p.razao_social}`, url: l.url_recibo_taxa });
     if (l?.comprovante_url) atts.push({ label: `Comprovante — ${p.razao_social}`, url: l.comprovante_url });
+
+    // Valores adicionais for this selected process
+    const vas = data.valoresAdicionais[p.id] || [];
+    for (const va of vas) {
+      if (va.comprovante_url) atts.push({ label: `Comprovante — ${va.descricao}`, url: va.comprovante_url });
+      if (va.anexo_url) atts.push({ label: `Anexo — ${va.descricao}`, url: va.anexo_url });
+    }
   }
-  const allVAs = Object.values(data.valoresAdicionais).flat();
-  for (const va of allVAs) {
-    if (va.comprovante_url) atts.push({ label: `Comprovante — ${va.descricao}`, url: va.comprovante_url });
-    if (va.anexo_url) atts.push({ label: `Anexo — ${va.descricao}`, url: va.anexo_url });
-  }
+
+  console.log('ANEXOS ENCONTRADOS:', atts.length, atts.map(a => a.label));
 
   let pageNum = 3;
   for (const att of atts) {
     try {
-      const imgData = await loadImageBase64(att.url);
-      if (!imgData) continue;
+      // Resolve storage paths to signed URLs
+      const resolvedUrl = await resolveStorageUrl(att.url);
+      const imgData = await loadImageBase64(resolvedUrl);
+      if (!imgData) {
+        console.warn(`Pulando anexo sem imagem: ${att.label} (${att.url})`);
+        continue;
+      }
 
       const attHtml = `
         <div class="page">
@@ -779,7 +811,8 @@ async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: numb
       doc.addPage();
       doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfW, pdfH);
       pageNum++;
-    } catch {
+    } catch (err) {
+      console.warn(`Erro ao renderizar anexo ${att.label}:`, err);
       // Skip failed attachments
     }
   }
@@ -787,12 +820,30 @@ async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: numb
 
 async function loadImageBase64(url: string): Promise<string | null> {
   try {
-    const r = await fetch(url);
-    if (!r.ok) return null;
+    const r = await fetch(url, { mode: 'cors' });
+    if (!r.ok) {
+      console.error(`Fetch falhou para ${url}: ${r.status}`);
+      return null;
+    }
     const blob = await r.blob();
+    if (!blob.type.startsWith('image/') && !blob.type.startsWith('application/pdf')) {
+      console.error(`URL não retornou imagem válida: ${url}, tipo: ${blob.type}`);
+      return null;
+    }
     return new Promise(res => {
       const fr = new FileReader();
       fr.onloadend = () => res(fr.result as string);
+      fr.onerror = () => {
+        console.error(`FileReader falhou para ${url}`);
+        res(null);
+      };
+      fr.readAsDataURL(blob);
+    });
+  } catch (err) {
+    console.error(`Erro ao carregar imagem ${url}:`, err);
+    return null;
+  }
+}
       fr.onerror = () => res(null);
       fr.readAsDataURL(blob);
     });
