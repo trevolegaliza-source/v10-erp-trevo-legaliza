@@ -452,7 +452,16 @@ export function ClientesRecebidos({ clientes }: { clientes: ClienteFinanceiro[] 
 
 // ══════════ TAB: VENCIDOS ══════════
 export function ClientesVencidos({ clientes }: { clientes: ClienteFinanceiro[] }) {
-  if (clientes.length === 0) return <EmptyState text="Nenhum cliente com cobrança vencida." />;
+  if (clientes.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+          <CheckCircle className="h-10 w-10 text-emerald-500/40 mb-3" />
+          <p className="text-sm text-muted-foreground">Nenhuma cobrança vencida. Tudo em dia! ✓</p>
+        </CardContent>
+      </Card>
+    );
+  }
   return (
     <Accordion type="multiple" className="space-y-2">
       {clientes.map(c => <VencidoItem key={c.cliente_id} cliente={c} />)}
