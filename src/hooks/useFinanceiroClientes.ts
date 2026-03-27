@@ -38,10 +38,12 @@ export interface LancamentoFinanceiro {
   processo_created_at: string;
   valor: number;
   data_vencimento: string;
+  data_pagamento: string | null;
   status: string;
   etapa_financeiro: string;
   extrato_id: string | null;
   descricao: string;
+  confirmado_recebimento: boolean;
 }
 
 const ETAPAS_PRE_DEFERIMENTO = [
@@ -58,27 +60,37 @@ const ETAPA_ORDER: Record<string, number> = {
   honorario_pago: 4,
 };
 
-export function useFinanceiroClientes() {
+/** Invalidate all financial queries across screens */
+export function invalidateFinanceiro(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+  qc.invalidateQueries({ queryKey: ['lancamentos_receber'] });
+  qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+  qc.invalidateQueries({ queryKey: ['lancamentos'] });
+}
+
+export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['financeiro_clientes'],
+    queryKey: ['financeiro_clientes', dataInicio, dataFim],
     queryFn: async () => {
-      // 1. Fetch lancamentos a receber (pendente/atrasado)
-      const { data: lancamentos, error: lErr } = await supabase
+      // Fetch ALL lancamentos a receber (including pago) within period
+      let q = supabase
         .from('lancamentos')
-        .select('id, valor, data_vencimento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id')
+        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento')
         .eq('tipo', 'receber')
-        .in('status', ['pendente', 'atrasado'])
         .order('created_at', { ascending: false });
+
+      if (dataInicio) q = q.gte('data_vencimento', dataInicio);
+      if (dataFim) q = q.lte('data_vencimento', dataFim);
+
+      const { data: lancamentos, error: lErr } = await q;
       if (lErr) throw lErr;
       if (!lancamentos?.length) return [];
 
-      // 2. Collect unique IDs
-      const processoIds = [...new Set((lancamentos || []).map(l => l.processo_id).filter(Boolean))] as string[];
-      const clienteIds = [...new Set((lancamentos || []).map(l => l.cliente_id).filter(Boolean))] as string[];
+      const processoIds = [...new Set(lancamentos.map(l => l.processo_id).filter(Boolean))] as string[];
+      const clienteIds = [...new Set(lancamentos.map(l => l.cliente_id).filter(Boolean))] as string[];
 
-      // 3. Fetch processos and clientes in parallel
       const [processosRes, clientesRes] = await Promise.all([
         processoIds.length > 0
           ? supabase.from('processos').select('id, razao_social, tipo, etapa, notas, valor, created_at').in('id', processoIds)
@@ -91,7 +103,6 @@ export function useFinanceiroClientes() {
       const processoMap = new Map((processosRes.data || []).map((p: any) => [p.id, p]));
       const clienteMap = new Map((clientesRes.data || []).map((c: any) => [c.id, c]));
 
-      // 4. Group by client
       const result = new Map<string, ClienteFinanceiro>();
 
       for (const l of lancamentos) {
@@ -141,14 +152,16 @@ export function useFinanceiroClientes() {
           processo_created_at: processo?.created_at || '',
           valor: l.valor,
           data_vencimento: l.data_vencimento,
+          data_pagamento: l.data_pagamento,
           status: l.status,
           etapa_financeiro: l.etapa_financeiro,
           extrato_id: l.extrato_id,
           descricao: l.descricao,
+          confirmado_recebimento: l.confirmado_recebimento ?? false,
         });
 
         c.total_faturado += l.valor;
-        c.total_pendente += l.status === 'pendente' ? l.valor : 0;
+        c.total_pendente += l.status !== 'pago' ? l.valor : 0;
         c.qtd_processos++;
         if (!l.extrato_id && l.etapa_financeiro === 'solicitacao_criada') c.qtd_sem_extrato++;
 
@@ -159,10 +172,15 @@ export function useFinanceiroClientes() {
         }
       }
 
-      // 5. Determine predominant stage per client
+      // Determine predominant stage per client (only non-pago lancamentos)
       for (const c of result.values()) {
+        const nonPago = c.lancamentos.filter(l => l.status !== 'pago');
+        if (nonPago.length === 0) {
+          c.etapa_predominante = 'honorario_pago';
+          continue;
+        }
         let minOrder = 99;
-        for (const l of c.lancamentos) {
+        for (const l of nonPago) {
           const order = ETAPA_ORDER[l.etapa_financeiro] ?? 99;
           if (order < minOrder) minOrder = order;
         }
@@ -170,7 +188,7 @@ export function useFinanceiroClientes() {
         c.etapa_predominante = entry ? entry[0] : 'solicitacao_criada';
       }
 
-      // 6. Fetch most recent extrato per client
+      // Fetch most recent extrato per client
       const allClienteIds = Array.from(result.keys());
       if (allClienteIds.length > 0) {
         const { data: extratos } = await supabase
@@ -212,7 +230,7 @@ export function useFinanceiroClientes() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      invalidateFinanceiro(queryClient);
       toast.success('Cobrança marcada como enviada!');
     },
   });
@@ -231,9 +249,7 @@ export function useFinanceiroClientes() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['financeiro_clientes'] });
-      queryClient.invalidateQueries({ queryKey: ['contas_receber'] });
-      queryClient.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+      invalidateFinanceiro(queryClient);
       toast.success('Pagamento confirmado!');
     },
   });
@@ -244,12 +260,28 @@ export function useFinanceiroClientes() {
   hoje.setHours(0, 0, 0, 0);
   const isVencido = (l: LancamentoFinanceiro) => {
     if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
-    if (l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido') return true;
     const venc = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
     return venc ? venc < hoje : false;
   };
 
+  // Correct KPI calculations
+  const allLanc = clientes.flatMap(c => c.lancamentos);
+  const totalFaturado = allLanc.reduce((s, l) => s + l.valor, 0);
+  const totalRecebido = allLanc
+    .filter(l => l.status === 'pago' && l.confirmado_recebimento === true && l.data_pagamento != null)
+    .reduce((s, l) => s + l.valor, 0);
+  const totalCobrado = allLanc
+    .filter(l => l.extrato_id != null || ['cobranca_gerada', 'cobranca_enviada', 'honorario_pago'].includes(l.etapa_financeiro))
+    .reduce((s, l) => s + l.valor, 0);
+  const totalPendente = totalFaturado - totalRecebido;
+  const taxaRecebimento = totalFaturado > 0 ? Math.round(totalRecebido / totalFaturado * 100) : 0;
+
   const metricas = {
+    totalFaturado,
+    totalCobrado,
+    totalPendente,
+    totalRecebido,
+    taxaRecebimento,
     aguardandoExtrato: clientes.filter(c => c.qtd_sem_extrato > 0).length,
     valorAguardandoExtrato: clientes.filter(c => c.qtd_sem_extrato > 0).reduce((s, c) => s + c.total_pendente, 0),
     aguardandoEnvio: clientes.filter(c => c.etapa_predominante === 'cobranca_gerada').length,
@@ -258,12 +290,16 @@ export function useFinanceiroClientes() {
     valorAguardandoPagamento: clientes.filter(c => c.etapa_predominante === 'cobranca_enviada').reduce((s, c) => s + c.total_pendente, 0),
     vencidos: clientes.filter(c => c.lancamentos.some(l => isVencido(l))).length,
     valorVencido: clientes.filter(c => c.lancamentos.some(l => isVencido(l))).reduce((s, c) => s + c.lancamentos.filter(l => isVencido(l)).reduce((ss, l) => ss + l.valor, 0), 0),
+    totalProcessos: allLanc.length,
+    clientesCobrados: clientes.filter(c => c.lancamentos.some(l => l.extrato_id != null || ['cobranca_gerada', 'cobranca_enviada', 'honorario_pago'].includes(l.etapa_financeiro))).length,
+    clientesPendentes: clientes.filter(c => c.lancamentos.some(l => l.status !== 'pago')).length,
   };
 
   return {
     clientes,
     metricas,
     isLoading: query.isLoading,
+    isVencido,
     marcarEnviado,
     marcarPago,
     refetch: query.refetch,

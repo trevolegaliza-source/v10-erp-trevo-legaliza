@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useFinanceiroClientes } from '@/hooks/useFinanceiroClientes';
-import { useFinanceiroDashboard } from '@/hooks/useFinanceiro';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search } from 'lucide-react';
+import { useFinanceiroClientes, type LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import {
   ClientesFaturar,
   ClientesEnviar,
@@ -20,200 +21,332 @@ import { ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function Financeiro() {
-  const { clientes, metricas, isLoading } = useFinanceiroClientes();
-  const { data: stats } = useFinanceiroDashboard();
-  const [activeTab, setActiveTab] = useState('faturar');
+function toISO(d: Date) { return d.toISOString().split('T')[0]; }
 
-  // Filter clients per tab
+type PeriodoPreset = 'este_mes' | 'mes_anterior' | 'ultimos_3' | 'custom';
+
+function getPeriodoDates(preset: PeriodoPreset): { inicio: string; fim: string } {
+  const now = new Date();
+  switch (preset) {
+    case 'este_mes':
+      return { inicio: toISO(startOfMonth(now)), fim: toISO(endOfMonth(now)) };
+    case 'mes_anterior': {
+      const prev = subMonths(now, 1);
+      return { inicio: toISO(startOfMonth(prev)), fim: toISO(endOfMonth(prev)) };
+    }
+    case 'ultimos_3': {
+      const m3 = subMonths(now, 2);
+      return { inicio: toISO(startOfMonth(m3)), fim: toISO(endOfMonth(now)) };
+    }
+    default:
+      return { inicio: toISO(startOfMonth(now)), fim: toISO(endOfMonth(now)) };
+  }
+}
+
+function isLancamentoVencido(l: LancamentoFinanceiro): boolean {
+  if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
+  if (!l.data_vencimento) return false;
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
+  const venc = new Date(l.data_vencimento + 'T00:00:00');
+  return venc < hoje;
+}
 
-  const isLancamentoVencido = (l: { data_vencimento: string; status: string; etapa_financeiro: string }) => {
-    if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
-    if (l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido') return true;
-    const venc = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
-    return venc ? venc < hoje : false;
-  };
+export default function Financeiro() {
+  const [periodo, setPeriodo] = useState<PeriodoPreset>('este_mes');
+  const [customInicio, setCustomInicio] = useState('');
+  const [customFim, setCustomFim] = useState('');
+  const [activeTab, setActiveTab] = useState('cobrar');
+  const [searchTodos, setSearchTodos] = useState('');
 
-  const clientesFaturar = clientes.filter(c => c.qtd_sem_extrato > 0);
-  const clientesEnviar = clientes.filter(c =>
+  const dates = periodo === 'custom'
+    ? { inicio: customInicio, fim: customFim }
+    : getPeriodoDates(periodo);
+
+  const { clientes, metricas, isLoading } = useFinanceiroClientes(dates.inicio, dates.fim);
+
+  // Filter clients per tab
+  const clientesCobrar = useMemo(() => clientes.filter(c => c.qtd_sem_extrato > 0), [clientes]);
+  const clientesEnviados = useMemo(() => clientes.filter(c =>
     c.etapa_predominante === 'cobranca_gerada' && c.qtd_sem_extrato === 0
-  );
-  const clientesAguardando = clientes.filter(c =>
+  ), [clientes]);
+  const clientesAguardando = useMemo(() => clientes.filter(c =>
     c.etapa_predominante === 'cobranca_enviada'
-  );
-  const clientesRecebidos = clientes.filter(c =>
+  ), [clientes]);
+  const clientesPagos = useMemo(() => clientes.filter(c =>
     c.etapa_predominante === 'honorario_pago'
-  );
-  const clientesVencidos = clientes.filter(c =>
+  ), [clientes]);
+  const clientesVencidos = useMemo(() => clientes.filter(c =>
     c.lancamentos.some(l => isLancamentoVencido(l))
-  );
-
-  const totalRecebido = stats?.receitaPrevistaMes || 0;
-  const totalFaturado = clientes.reduce((s, c) => s + c.total_faturado, 0) + totalRecebido;
-  const taxaRecebimento = totalFaturado > 0 ? Math.round((totalRecebido / totalFaturado) * 100) : 0;
+  ), [clientes]);
 
   const kpis = [
     {
-      label: 'Gerar Extrato',
-      value: `${metricas.aguardandoExtrato} clientes`,
-      subValue: formatBRL(metricas.valorAguardandoExtrato),
-      icon: FileText,
-      color: 'text-warning',
-      bgColor: 'bg-warning/10',
-      tab: 'faturar',
+      label: 'Faturado',
+      value: formatBRL(metricas.totalFaturado),
+      subValue: `${metricas.totalProcessos} processos`,
+      icon: DollarSign,
+      color: 'text-foreground',
+      bgColor: 'bg-muted',
     },
     {
-      label: 'Enviar Cobrança',
-      value: `${metricas.aguardandoEnvio} clientes`,
-      subValue: formatBRL(metricas.valorAguardandoEnvio),
+      label: 'Cobrado',
+      value: formatBRL(metricas.totalCobrado),
+      subValue: `${metricas.clientesCobrados} clientes`,
       icon: Send,
       color: 'text-blue-500',
       bgColor: 'bg-blue-500/10',
-      tab: 'enviar',
     },
     {
-      label: 'Aguardando Pagamento',
-      value: `${metricas.aguardandoPagamento} clientes`,
-      subValue: formatBRL(metricas.valorAguardandoPagamento),
+      label: 'Pendente',
+      value: formatBRL(metricas.totalPendente),
+      subValue: `${metricas.clientesPendentes} clientes`,
       icon: Clock,
-      color: 'text-muted-foreground',
-      bgColor: 'bg-muted',
-      tab: 'aguardando',
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-500/10',
     },
     {
-      label: 'Recebido no mês',
-      value: formatBRL(totalRecebido),
-      subValue: `${taxaRecebimento}% do faturado`,
+      label: 'Recebido',
+      value: formatBRL(metricas.totalRecebido),
+      subValue: `${metricas.taxaRecebimento}% do faturado`,
       icon: CheckCircle,
       color: 'text-emerald-500',
       bgColor: 'bg-emerald-500/10',
-      tab: 'recebidos',
     },
   ];
 
+  // Tab "Todos" - flat list
+  const todosLancamentos = useMemo(() => {
+    const all: Array<LancamentoFinanceiro & { cliente_nome: string; cliente_apelido: string | null }> = [];
+    for (const c of clientes) {
+      for (const l of c.lancamentos) {
+        all.push({ ...l, cliente_nome: c.cliente_nome, cliente_apelido: c.cliente_apelido });
+      }
+    }
+    if (searchTodos) {
+      const q = searchTodos.toLowerCase();
+      return all.filter(l =>
+        (l.cliente_apelido || l.cliente_nome).toLowerCase().includes(q) ||
+        l.processo_razao_social.toLowerCase().includes(q) ||
+        l.descricao.toLowerCase().includes(q)
+      );
+    }
+    return all;
+  }, [clientes, searchTodos]);
+
   const handleExportCSV = () => {
-    if (clientes.length === 0) { toast.info('Sem dados para exportar'); return; }
-    const rows = clientes.flatMap(c =>
-      c.lancamentos.map(l => ({
-        Cliente: c.cliente_apelido || c.cliente_nome,
-        'Razão Social': l.processo_razao_social,
-        Tipo: l.processo_tipo,
-        Valor: formatBRLPlain(l.valor),
-        Vencimento: formatDateBR(l.data_vencimento),
-        Etapa: ETAPA_FINANCEIRO_LABELS[l.etapa_financeiro as keyof typeof ETAPA_FINANCEIRO_LABELS] || l.etapa_financeiro,
-        Status: l.status,
-      }))
-    );
+    if (todosLancamentos.length === 0) { toast.info('Sem dados para exportar'); return; }
+    const rows = todosLancamentos.map(l => ({
+      Cliente: l.cliente_apelido || l.cliente_nome,
+      'Razão Social': l.processo_razao_social,
+      Tipo: l.processo_tipo,
+      Valor: formatBRLPlain(l.valor),
+      Vencimento: formatDateBR(l.data_vencimento),
+      Etapa: ETAPA_FINANCEIRO_LABELS[l.etapa_financeiro as keyof typeof ETAPA_FINANCEIRO_LABELS] || l.etapa_financeiro,
+      Status: l.status,
+      Pagamento: formatDateBR(l.data_pagamento),
+    }));
     downloadCSV(rows, `financeiro_${new Date().toISOString().split('T')[0]}.csv`);
     toast.success('Relatório exportado!');
   };
 
+  const periodoLabel = periodo === 'este_mes' ? 'Este Mês'
+    : periodo === 'mes_anterior' ? 'Mês Anterior'
+    : periodo === 'ultimos_3' ? 'Últimos 3 Meses'
+    : 'Personalizado';
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Financeiro</h1>
-          <p className="text-sm text-muted-foreground">Gestão visual de cobranças e honorários</p>
+          <p className="text-sm text-muted-foreground">Centro de cobranças e recebimentos</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoPreset)}>
+            <SelectTrigger className="w-40">
+              <SelectValue>{periodoLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="este_mes">Este Mês</SelectItem>
+              <SelectItem value="mes_anterior">Mês Anterior</SelectItem>
+              <SelectItem value="ultimos_3">Últimos 3 Meses</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+          {periodo === 'custom' && (
+            <div className="flex items-center gap-1">
+              <Input type="date" value={customInicio} onChange={e => setCustomInicio(e.target.value)} className="w-36 h-9" />
+              <span className="text-xs text-muted-foreground">a</span>
+              <Input type="date" value={customFim} onChange={e => setCustomFim(e.target.value)} className="w-36 h-9" />
+            </div>
+          )}
           <Button variant="outline" size="sm" className="text-muted-foreground hover:text-foreground" onClick={handleExportCSV}>
             <Download className="h-3.5 w-3.5 mr-1" /> Exportar CSV
-          </Button>
-          <Button variant="outline" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-            <Link to="/contas-receber">Contas a Receber</Link>
-          </Button>
-          <Button variant="outline" size="sm" className="text-muted-foreground hover:text-foreground" asChild>
-            <Link to="/contas-pagar">Contas a Pagar</Link>
           </Button>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpis.map(kpi => (
-          <Card
-            key={kpi.label}
-            className="border-border/60 cursor-pointer hover:border-border transition-colors"
-            onClick={() => setActiveTab(kpi.tab)}
-          >
-            <CardContent className="p-5">
-              {isLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-7 w-28" />
-                  <Skeleton className="h-3 w-16" />
-                </div>
-              ) : (
-                <>
+      {isLoading ? (
+        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">Carregando...</div>
+      ) : (
+        <>
+          {/* KPIs */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {kpis.map(kpi => (
+              <Card key={kpi.label} className="border-border/60">
+                <CardContent className="p-5">
                   <div className={`rounded-lg ${kpi.bgColor} p-2 w-fit`}>
                     <kpi.icon className={`h-4.5 w-4.5 ${kpi.color}`} />
                   </div>
                   <p className={`text-2xl font-bold mt-3 ${kpi.color}`}>{kpi.value}</p>
                   <p className="text-xs text-muted-foreground">{kpi.subValue}</p>
                   <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">{kpi.label}</p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="flex-wrap h-auto gap-1">
+              <TabsTrigger value="cobrar" className="gap-1.5">
+                <FileText className="h-3.5 w-3.5" />
+                Cobrar
+                {clientesCobrar.length > 0 && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesCobrar.length}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="enviados" className="gap-1.5">
+                <Send className="h-3.5 w-3.5" />
+                Enviados
+                {clientesEnviados.length > 0 && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesEnviados.length}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="aguardando" className="gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                Ag. Pagamento
+                {clientesAguardando.length > 0 && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesAguardando.length}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="pagos" className="gap-1.5">
+                <CheckCircle className="h-3.5 w-3.5" />
+                Pagos
+              </TabsTrigger>
+              <TabsTrigger value="vencidos" className="gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Vencidos
+                {clientesVencidos.length > 0 && (
+                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesVencidos.length}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="todos" className="gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5" />
+                Todos
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="cobrar" className="mt-4">
+              <ClientesFaturar clientes={clientesCobrar} />
+            </TabsContent>
+            <TabsContent value="enviados" className="mt-4">
+              <ClientesEnviar clientes={clientesEnviados} />
+            </TabsContent>
+            <TabsContent value="aguardando" className="mt-4">
+              <ClientesAguardando clientes={clientesAguardando} />
+            </TabsContent>
+            <TabsContent value="pagos" className="mt-4">
+              <ClientesPagos clientes={clientesPagos} />
+            </TabsContent>
+            <TabsContent value="vencidos" className="mt-4">
+              <ClientesVencidos clientes={clientesVencidos} />
+            </TabsContent>
+            <TabsContent value="todos" className="mt-4">
+              <TabTodos
+                lancamentos={todosLancamentos}
+                search={searchTodos}
+                onSearchChange={setSearchTodos}
+              />
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Tab Pagos uses the existing component but we re-export for clarity
+function ClientesPagos({ clientes }: { clientes: import('@/hooks/useFinanceiroClientes').ClienteFinanceiro[] }) {
+  return <ClientesRecebidos clientes={clientes} />;
+}
+
+// ── Tab Todos: flat table
+function TabTodos({ lancamentos, search, onSearchChange }: {
+  lancamentos: Array<LancamentoFinanceiro & { cliente_nome: string; cliente_apelido: string | null }>;
+  search: string;
+  onSearchChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar cliente ou processo..."
+            value={search}
+            onChange={e => onSearchChange(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
+        <span className="text-xs text-muted-foreground">{lancamentos.length} lançamentos</span>
       </div>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="faturar" className="gap-1.5">
-            <FileText className="h-3.5 w-3.5" />
-            Gerar Extrato
-            {metricas.aguardandoExtrato > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{metricas.aguardandoExtrato}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="enviar" className="gap-1.5">
-            <Send className="h-3.5 w-3.5" />
-            Enviar
-            {metricas.aguardandoEnvio > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{metricas.aguardandoEnvio}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="aguardando" className="gap-1.5">
-            <Clock className="h-3.5 w-3.5" />
-            Ag. Pagamento
-            {metricas.aguardandoPagamento > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{metricas.aguardandoPagamento}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="recebidos" className="gap-1.5">
-            <CheckCircle className="h-3.5 w-3.5" />
-            Recebidos
-          </TabsTrigger>
-          <TabsTrigger value="vencidos" className="gap-1.5">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Vencidos
-            {clientesVencidos.length > 0 && (
-              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesVencidos.length}</Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="faturar" className="mt-4">
-          <ClientesFaturar clientes={clientesFaturar} />
-        </TabsContent>
-        <TabsContent value="enviar" className="mt-4">
-          <ClientesEnviar clientes={clientesEnviar} />
-        </TabsContent>
-        <TabsContent value="aguardando" className="mt-4">
-          <ClientesAguardando clientes={clientesAguardando} />
-        </TabsContent>
-        <TabsContent value="recebidos" className="mt-4">
-          <ClientesRecebidos clientes={clientesRecebidos} />
-        </TabsContent>
-        <TabsContent value="vencidos" className="mt-4">
-          <ClientesVencidos clientes={clientesVencidos} />
-        </TabsContent>
-      </Tabs>
+      <div className="rounded-lg border">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/40">
+                <th className="text-left p-3 font-medium">Cliente</th>
+                <th className="text-left p-3 font-medium">Descrição</th>
+                <th className="text-right p-3 font-medium">Valor</th>
+                <th className="text-left p-3 font-medium">Vencimento</th>
+                <th className="text-left p-3 font-medium">Status</th>
+                <th className="text-left p-3 font-medium">Pagamento</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lancamentos.length === 0 ? (
+                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Nenhum lançamento encontrado</td></tr>
+              ) : lancamentos.map(l => {
+                const isPago = l.status === 'pago';
+                const hoje = new Date(); hoje.setHours(0,0,0,0);
+                const venc = new Date(l.data_vencimento + 'T00:00:00');
+                const isVenc = !isPago && venc < hoje;
+                return (
+                  <tr key={l.id} className="border-b last:border-0 hover:bg-muted/20">
+                    <td className="p-3 font-medium truncate max-w-[160px]">{l.cliente_apelido || l.cliente_nome}</td>
+                    <td className="p-3 truncate max-w-[200px] text-muted-foreground">{l.processo_razao_social || l.descricao}</td>
+                    <td className="p-3 text-right font-medium">{formatBRL(l.valor)}</td>
+                    <td className="p-3">{formatDateBR(l.data_vencimento)}</td>
+                    <td className="p-3">
+                      {isPago ? (
+                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-xs">Pago</Badge>
+                      ) : isVenc ? (
+                        <Badge variant="destructive" className="text-xs">Vencido</Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs">Pendente</Badge>
+                      )}
+                    </td>
+                    <td className="p-3 text-muted-foreground">{formatDateBR(l.data_pagamento)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

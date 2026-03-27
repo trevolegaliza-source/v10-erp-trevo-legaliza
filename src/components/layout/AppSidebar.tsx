@@ -26,7 +26,6 @@ const navItems = [
   { path: '/processos', label: 'Processos', icon: Kanban },
   { path: '/clientes', label: 'Clientes', icon: Users },
   { path: '/financeiro', label: 'Financeiro', icon: DollarSign },
-  { path: '/contas-receber', label: 'Contas a Receber', icon: ArrowDownCircle },
   { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle },
   { path: '/colaboradores', label: 'Colaboradores', icon: UsersRound },
   { path: '/documentos', label: 'Documentos', icon: FileText },
