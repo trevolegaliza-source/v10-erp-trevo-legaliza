@@ -348,12 +348,17 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
   const mesNum = String(now.getMonth() + 1).padStart(2, '0');
 
   const totalHon = selected.reduce((s, st) => s + st.valorFinal, 0);
-  const totalTaxas = Object.values(data.valoresAdicionais).flat().reduce((s, va) => s + Number(va.valor), 0);
+  // Only count taxas for selected processes
+  const selectedIds = new Set(selected.map(s => s.processo.id));
+  const totalTaxas = Object.entries(data.valoresAdicionais)
+    .filter(([pid]) => selectedIds.has(pid))
+    .flatMap(([, vas]) => vas)
+    .reduce((s, va) => s + Number(va.valor), 0);
   const totalGeral = totalHon + totalTaxas;
-  const economiaProgressivo = steps.filter(s => !s.isManual).reduce((s, st) => s + st.desconto, 0);
-  // Include boas-vindas savings in economia
+  // Economia only for selected steps
+  const economiaProgressivo = selected.filter(s => !s.isManual).reduce((s, st) => s + st.desconto, 0);
   const base = data.cliente.valor_base ?? 580;
-  const economiaBoasVindas = steps.filter(s => s.label && s.label.includes('BOAS-VINDAS')).reduce((s, st) => s + (base - st.valorFinal), 0);
+  const economiaBoasVindas = selected.filter(s => s.label && s.label.includes('BOAS-VINDAS')).reduce((s, st) => s + (base - st.valorFinal), 0);
   const economia = economiaProgressivo + economiaBoasVindas;
   const descPct = data.cliente.desconto_progressivo ?? 0;
 
