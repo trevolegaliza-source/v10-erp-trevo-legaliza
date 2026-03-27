@@ -96,13 +96,33 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
       const blob = result.doc.output('blob');
       setLastPdfBlob(blob);
 
+      const clienteName = (clienteData as any)?.apelido || (clienteData as any)?.nome || 'extrato';
+      const filename = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const clienteName = (clienteData as any)?.apelido || (clienteData as any)?.nome || 'extrato';
-      a.download = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+
+      // Save extrato to system
+      const now = new Date();
+      try {
+        await salvarExtrato.mutateAsync({
+          clienteId,
+          pdfBlob: blob,
+          filename,
+          totalHonorarios: result.totalHonorarios,
+          totalTaxas: result.totalTaxas,
+          totalGeral: result.totalGeral,
+          processoIds: processosParaGerar.map(p => p.id),
+          competenciaMes: now.getMonth() + 1,
+          competenciaAno: now.getFullYear(),
+        });
+      } catch (saveErr) {
+        console.warn('Extrato gerado mas não salvo:', saveErr);
+      }
 
       toast.success('Extrato gerado com sucesso!');
       setShowMarkDialog(true);
