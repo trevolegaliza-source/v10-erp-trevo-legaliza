@@ -23,6 +23,15 @@ function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+/** Invalidate all financial queries across screens */
+function invalidateFinanceiro(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+  qc.invalidateQueries({ queryKey: ['contas_receber'] });
+  qc.invalidateQueries({ queryKey: ['lancamentos_receber'] });
+  qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+  qc.invalidateQueries({ queryKey: ['lancamentos'] });
+}
+
 function fmtDate(d: string | null | undefined) {
   if (!d) return '-';
   return new Date(d).toLocaleDateString('pt-BR');
@@ -181,7 +190,7 @@ function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       });
 
       setSelected(new Set());
-      qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      invalidateFinanceiro(qc);
     } catch (err: any) {
       toast.error('Erro ao gerar extrato: ' + err.message);
     } finally {
@@ -376,7 +385,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
         competenciaAno: now.getFullYear(),
       });
 
-      qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      invalidateFinanceiro(qc);
       toast.success('Extrato gerado e salvo no sistema!');
     } catch (err: any) {
       toast.error('Erro ao gerar extrato: ' + err.message);
@@ -393,7 +402,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       .update({ etapa_financeiro: 'cobranca_enviada', observacoes_financeiro: `Cobrança enviada em ${new Date().toLocaleDateString('pt-BR')}` } as any)
       .in('id', ids);
     if (error) { toast.error(error.message); return; }
-    qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+    invalidateFinanceiro(qc);
     toast.success('Cobrança marcada como enviada!');
   }
 
@@ -483,8 +492,7 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
       .in('id', ids);
     if (error) { toast.error(error.message); return; }
     setShowPago(false);
-    qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
-    qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+    invalidateFinanceiro(qc);
     toast.success('Pagamento confirmado!');
   }
 
@@ -614,7 +622,7 @@ function VencidoItem({ cliente }: { cliente: ClienteFinanceiro }) {
       .in('id', ids);
     if (error) { toast.error(error.message); return; }
     setShowPago(false);
-    qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+    invalidateFinanceiro(qc);
     toast.success('Pagamento confirmado!');
   }
 

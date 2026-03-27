@@ -8,9 +8,9 @@ import FaixasInadimplencia, { getFaixa } from './FaixasInadimplencia';
 
 interface Props {
   lancamentos: LancamentoReceber[];
-  onMarcarPago: (l: LancamentoReceber) => void;
-  onRegistrarContato: (l: LancamentoReceber) => void;
-  onReenviarCobranca: (l: LancamentoReceber) => void;
+  onMarcarPago?: (l: LancamentoReceber) => void;
+  onRegistrarContato?: (l: LancamentoReceber) => void;
+  onReenviarCobranca?: (l: LancamentoReceber) => void;
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -76,17 +76,25 @@ export default function InadimplenciaTab({ lancamentos, onMarcarPago, onRegistra
                   )}
                 </div>
               )}
+              {(onRegistrarContato || onReenviarCobranca || onMarcarPago) && (
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onRegistrarContato(l)}>
-                  <MessageSquare className="h-3.5 w-3.5 mr-1" /> Registrar Contato
-                </Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onReenviarCobranca(l)}>
-                  <Phone className="h-3.5 w-3.5 mr-1" /> Reenviar Cobrança
-                </Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs text-success" onClick={() => onMarcarPago(l)}>
-                  <CheckCircle className="h-3.5 w-3.5 mr-1" /> Pago
-                </Button>
+                {onRegistrarContato && (
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onRegistrarContato(l)}>
+                    <MessageSquare className="h-3.5 w-3.5 mr-1" /> Registrar Contato
+                  </Button>
+                )}
+                {onReenviarCobranca && (
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onReenviarCobranca(l)}>
+                    <Phone className="h-3.5 w-3.5 mr-1" /> Reenviar Cobrança
+                  </Button>
+                )}
+                {onMarcarPago && (
+                  <Button variant="outline" size="sm" className="h-7 text-xs text-success" onClick={() => onMarcarPago(l)}>
+                    <CheckCircle className="h-3.5 w-3.5 mr-1" /> Pago
+                  </Button>
+                )}
               </div>
+              )}
             </div>
           );
         })}
