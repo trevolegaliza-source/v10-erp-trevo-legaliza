@@ -288,24 +288,29 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
     if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
     const isLim = !s.isManual && !s.isUrgencia && limite > 0 && s.valorFinal <= limite;
     const isBoasVindas = s.label && s.label.includes('BOAS-VINDAS');
+    const opacityStyle = s.isSelected ? '' : 'opacity:0.35;';
+    const cobradoIndicator = s.isSelected
+      ? `<div style="font-size:7px;color:#22c55e;font-weight:700;margin-top:3px;">● COBRADO</div>`
+      : '';
 
     if (isBoasVindas) {
-      // Show boas-vindas step with original value strikethrough
       html += `
-        <div class="prog-step active">
+        <div class="prog-step active" style="${opacityStyle}">
           <div class="ps-label">${s.index}º Processo</div>
           <div style="font-size:7.5px;color:rgba(255,255,255,0.6);text-decoration:line-through;">${fmt(base)}</div>
           <div class="ps-value">${fmt(s.valorFinal)}</div>
           <div style="font-size:6px;color:#4ade80;font-weight:700;">(${s.label})</div>
+          ${cobradoIndicator}
         </div>
       `;
     } else {
       html += `
-        <div class="prog-step active">
+        <div class="prog-step active" style="${opacityStyle}">
           <div class="ps-label">${s.index}º Processo</div>
           <div class="ps-value">${fmt(s.valorFinal)}</div>
           <div class="ps-desc">${s.isManual ? s.label : (s.desconto > 0 ? `-${descPct}% sobre base` : '(base)')}</div>
           ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
+          ${cobradoIndicator}
         </div>
       `;
     }
@@ -343,12 +348,17 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
   const mesNum = String(now.getMonth() + 1).padStart(2, '0');
 
   const totalHon = selected.reduce((s, st) => s + st.valorFinal, 0);
-  const totalTaxas = Object.values(data.valoresAdicionais).flat().reduce((s, va) => s + Number(va.valor), 0);
+  // Only count taxas for selected processes
+  const selectedIds = new Set(selected.map(s => s.processo.id));
+  const totalTaxas = Object.entries(data.valoresAdicionais)
+    .filter(([pid]) => selectedIds.has(pid))
+    .flatMap(([, vas]) => vas)
+    .reduce((s, va) => s + Number(va.valor), 0);
   const totalGeral = totalHon + totalTaxas;
-  const economiaProgressivo = steps.filter(s => !s.isManual).reduce((s, st) => s + st.desconto, 0);
-  // Include boas-vindas savings in economia
+  // Economia only for selected steps
+  const economiaProgressivo = selected.filter(s => !s.isManual).reduce((s, st) => s + st.desconto, 0);
   const base = data.cliente.valor_base ?? 580;
-  const economiaBoasVindas = steps.filter(s => s.label && s.label.includes('BOAS-VINDAS')).reduce((s, st) => s + (base - st.valorFinal), 0);
+  const economiaBoasVindas = selected.filter(s => s.label && s.label.includes('BOAS-VINDAS')).reduce((s, st) => s + (base - st.valorFinal), 0);
   const economia = economiaProgressivo + economiaBoasVindas;
   const descPct = data.cliente.desconto_progressivo ?? 0;
 
@@ -426,7 +436,11 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
 
 function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo[], logoDataUrl: string | null, totalPages: number): string {
   const totalHon = selected.reduce((s, st) => s + st.valorFinal, 0);
-  const totalTaxas = Object.values(data.valoresAdicionais).flat().reduce((s, va) => s + Number(va.valor), 0);
+  const selectedIds = new Set(selected.map(s => s.processo.id));
+  const totalTaxas = Object.entries(data.valoresAdicionais)
+    .filter(([pid]) => selectedIds.has(pid))
+    .flatMap(([, vas]) => vas)
+    .reduce((s, va) => s + Number(va.valor), 0);
   const totalGeral = totalHon + totalTaxas;
   const descPct = data.cliente.desconto_progressivo ?? 0;
 
@@ -552,11 +566,16 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
       if (!s.isManual && s.desconto > 0) {
         desc = `-${descPct}%`;
       }
-      return `<tr class="${isLimite ? 'limite' : ''}">
+      const cobradoLabel = s.isSelected
+        ? '<span style="color:#22c55e;font-weight:600;">✓ COBRADO</span>'
+        : '<span style="color:#9ca3af;">—</span>';
+      const rowStyle = s.isSelected ? 'background:#f0fdf4;' : 'opacity:0.6;';
+      return `<tr class="${isLimite ? 'limite' : ''}" style="${rowStyle}">
         <td>${s.index}º</td>
         <td class="val">${fmt(s.valorFinal)}</td>
         <td class="desc">${desc}</td>
         <td class="status">${status}</td>
+        <td>${cobradoLabel}</td>
       </tr>`;
     }).join('');
 
@@ -568,7 +587,7 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
       <div class="prog-block">
         <div class="prog-title">PROGRESSÃO DE INCENTIVO POR VOLUME</div>
         <table class="prog-table">
-          <thead><tr><th>Proc.</th><th>Valor</th><th>Desc.</th><th>Status</th></tr></thead>
+          <thead><tr><th>Proc.</th><th>Valor</th><th>Desc.</th><th>Status</th><th>Extrato</th></tr></thead>
           <tbody>${progRows}</tbody>
         </table>
         <div class="prog-legal">${legalText}</div>
@@ -703,12 +722,35 @@ function countAttachments(data: ExtratoData): number {
     if (l?.url_recibo_taxa) count++;
     if (l?.comprovante_url) count++;
   }
-  const allVAs = Object.values(data.valoresAdicionais).flat();
-  for (const va of allVAs) {
-    if (va.comprovante_url) count++;
-    if (va.anexo_url) count++;
+  // Only count VAs for selected processes
+  for (const p of data.processos) {
+    const vas = data.valoresAdicionais[p.id] || [];
+    for (const va of vas) {
+      if (va.comprovante_url) count++;
+      if (va.anexo_url) count++;
+    }
   }
   return count;
+}
+
+/**
+ * Resolves a storage path or URL to a fetchable URL.
+ * If the value looks like a full URL (http/https), returns as-is.
+ * Otherwise treats it as a Supabase storage path and generates a signed URL.
+ */
+async function resolveStorageUrl(pathOrUrl: string): Promise<string> {
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+    return pathOrUrl;
+  }
+  // It's a storage path — generate signed URL from the 'contratos' bucket
+  const { data, error } = await supabase.storage
+    .from('contratos')
+    .createSignedUrl(pathOrUrl, 3600);
+  if (error || !data?.signedUrl) {
+    console.error(`Erro ao gerar signed URL para ${pathOrUrl}:`, error);
+    throw new Error('Failed to generate signed URL');
+  }
+  return data.signedUrl;
 }
 
 async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: number) {
@@ -721,18 +763,27 @@ async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: numb
     if (l?.boleto_url) atts.push({ label: `Boleto — ${p.razao_social}`, url: l.boleto_url });
     if (l?.url_recibo_taxa) atts.push({ label: `Guia/Recibo Taxa — ${p.razao_social}`, url: l.url_recibo_taxa });
     if (l?.comprovante_url) atts.push({ label: `Comprovante — ${p.razao_social}`, url: l.comprovante_url });
+
+    // Valores adicionais for this selected process
+    const vas = data.valoresAdicionais[p.id] || [];
+    for (const va of vas) {
+      if (va.comprovante_url) atts.push({ label: `Comprovante — ${va.descricao}`, url: va.comprovante_url });
+      if (va.anexo_url) atts.push({ label: `Anexo — ${va.descricao}`, url: va.anexo_url });
+    }
   }
-  const allVAs = Object.values(data.valoresAdicionais).flat();
-  for (const va of allVAs) {
-    if (va.comprovante_url) atts.push({ label: `Comprovante — ${va.descricao}`, url: va.comprovante_url });
-    if (va.anexo_url) atts.push({ label: `Anexo — ${va.descricao}`, url: va.anexo_url });
-  }
+
+  console.log('ANEXOS ENCONTRADOS:', atts.length, atts.map(a => a.label));
 
   let pageNum = 3;
   for (const att of atts) {
     try {
-      const imgData = await loadImageBase64(att.url);
-      if (!imgData) continue;
+      // Resolve storage paths to signed URLs
+      const resolvedUrl = await resolveStorageUrl(att.url);
+      const imgData = await loadImageBase64(resolvedUrl);
+      if (!imgData) {
+        console.warn(`Pulando anexo sem imagem: ${att.label} (${att.url})`);
+        continue;
+      }
 
       const attHtml = `
         <div class="page">
@@ -760,7 +811,8 @@ async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: numb
       doc.addPage();
       doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfW, pdfH);
       pageNum++;
-    } catch {
+    } catch (err) {
+      console.warn(`Erro ao renderizar anexo ${att.label}:`, err);
       // Skip failed attachments
     }
   }
@@ -768,16 +820,29 @@ async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: numb
 
 async function loadImageBase64(url: string): Promise<string | null> {
   try {
-    const r = await fetch(url);
-    if (!r.ok) return null;
+    const r = await fetch(url, { mode: 'cors' });
+    if (!r.ok) {
+      console.error(`Fetch falhou para ${url}: ${r.status}`);
+      return null;
+    }
     const blob = await r.blob();
+    if (!blob.type.startsWith('image/') && !blob.type.startsWith('application/pdf')) {
+      console.error(`URL não retornou imagem válida: ${url}, tipo: ${blob.type}`);
+      return null;
+    }
     return new Promise(res => {
       const fr = new FileReader();
       fr.onloadend = () => res(fr.result as string);
-      fr.onerror = () => res(null);
+      fr.onerror = () => {
+        console.error(`FileReader falhou para ${url}`);
+        res(null);
+      };
       fr.readAsDataURL(blob);
     });
-  } catch { return null; }
+  } catch (err) {
+    console.error(`Erro ao carregar imagem ${url}:`, err);
+    return null;
+  }
 }
 
 // ═══ DATA FETCHERS ═══
