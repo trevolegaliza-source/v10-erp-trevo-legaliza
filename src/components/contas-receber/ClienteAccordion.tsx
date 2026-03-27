@@ -12,8 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { CheckCircle, Phone, Building2, FileText, FileCheck, Eye, Trash, Plus, Download, ExternalLink } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CheckCircle, Phone, Building2, FileText, FileCheck, Eye, Trash, Plus } from 'lucide-react';
 import type { LancamentoReceber, ValorAdicionalSimple } from '@/hooks/useContasReceber';
 import { diasAtraso } from '@/hooks/useContasReceber';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +20,8 @@ import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useExtratos, buscarExtratoPorId } from '@/hooks/useExtratos';
 import { toast } from 'sonner';
+import { ExtratoPreviewDialog } from '@/components/financeiro/ExtratoPreviewDialog';
+import { downloadStorageFile } from '@/lib/storage-utils';
 
 interface ClienteGroup {
   clienteId: string;
@@ -182,17 +183,13 @@ function ClienteAccordionItem({
       }
 
       const storagePath = `extratos/${extrato.cliente_id}/${extrato.filename}`;
-      const { data: fileData, error } = await supabase.storage
-        .from('documentos')
-        .download(storagePath);
+      const blobUrl = await downloadStorageFile('documentos', storagePath);
 
-      if (error || !fileData) {
-        console.error('Erro ao baixar extrato:', error);
+      if (!blobUrl) {
         toast.error('Erro ao carregar o extrato. Tente novamente.');
         return;
       }
 
-      const blobUrl = URL.createObjectURL(fileData);
       setPreviewUrl(blobUrl);
       setPreviewFilename(extrato.filename);
     } catch (err) {
@@ -415,57 +412,17 @@ function ClienteAccordionItem({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Preview modal */}
-      <Dialog open={!!previewUrl} onOpenChange={(open) => {
-        if (!open) {
-          if (previewUrl) URL.revokeObjectURL(previewUrl);
-          setPreviewUrl(null);
-        }
-      }}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
-          <DialogHeader className="p-4 pb-2">
-            <DialogTitle className="flex items-center justify-between">
-              <span className="text-sm truncate">{previewFilename}</span>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    if (previewUrl) {
-                      const a = document.createElement('a');
-                      a.href = previewUrl;
-                      a.download = previewFilename;
-                      a.click();
-                    }
-                  }}
-                >
-                  <Download className="h-4 w-4 mr-1" />
-                  Baixar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    if (previewUrl) window.open(previewUrl, '_blank');
-                  }}
-                >
-                  <ExternalLink className="h-4 w-4 mr-1" />
-                  Nova aba
-                </Button>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 px-4 pb-4">
-            {previewUrl && (
-              <iframe
-                src={previewUrl}
-                className="w-full h-full rounded-lg border"
-                title="Preview do Extrato"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ExtratoPreviewDialog
+        open={!!previewUrl}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            setPreviewUrl(null);
+          }
+        }}
+        pdfBlobUrl={previewUrl}
+        filename={previewFilename}
+      />
     </>
   );
 }
