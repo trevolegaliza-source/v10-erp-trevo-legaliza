@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
-import { cn } from '@/lib/utils';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import ProcessoEditModal from './ProcessoEditModal';
 import {
