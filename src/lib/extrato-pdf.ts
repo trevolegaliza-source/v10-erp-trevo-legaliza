@@ -58,7 +58,9 @@ interface StepInfo {
   isMudancaUF: boolean;
   isManual: boolean;
   isUrgencia: boolean;
+  isCortesia: boolean;
   label: string;
+  slotsUsados: number;
 }
 
 // ═══ JGVCO LOGIC ═══
