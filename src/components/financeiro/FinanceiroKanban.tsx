@@ -44,7 +44,7 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
 
     if (
       processo.etapa_financeiro === 'solicitacao_criada' &&
-      targetEtapa === 'gerar_cobranca' &&
+      targetEtapa === 'cobranca_gerada' &&
       momentoFat === 'no_deferimento'
     ) {
       setPasswordTitle('Confirmar Antecipação');
@@ -58,14 +58,6 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
       setPasswordTitle('Trava de Inadimplência');
       setPasswordDesc('Para mover um honorário vencido, insira a senha master.');
       setPendingMove({ processo, target: targetEtapa });
-      setPasswordOpen(true);
-      return;
-    }
-
-    if (targetEtapa === 'cobranca_gerada' && processo.etapa_financeiro === 'gerar_cobranca') {
-      setPasswordTitle('Confirmar Geração de Cobrança');
-      setPasswordDesc('Insira a senha master para gerar a cobrança.');
-      setPendingMove({ processo, target: '__gerar_cobranca__' as any });
       setPasswordOpen(true);
       return;
     }
@@ -90,20 +82,8 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
 
   const handlePasswordConfirm = () => {
     if (pendingMove) {
-      if ((pendingMove.target as string) === '__gerar_cobranca__') {
-        setCobrancaProcesso(pendingMove.processo);
-        setCobrancaModalOpen(true);
-      } else {
-        executeMove(pendingMove.processo, pendingMove.target);
-      }
+      executeMove(pendingMove.processo, pendingMove.target);
       setPendingMove(null);
-    }
-  };
-
-  const handleCobrancaConfirm = () => {
-    if (cobrancaProcesso) {
-      executeMove(cobrancaProcesso, 'cobranca_gerada');
-      setCobrancaProcesso(null);
     }
   };
 
@@ -164,7 +144,12 @@ export default function FinanceiroKanban({ processos }: FinanceiroKanbanProps) {
         open={cobrancaModalOpen}
         onOpenChange={setCobrancaModalOpen}
         processo={cobrancaProcesso}
-        onConfirm={handleCobrancaConfirm}
+        onConfirm={() => {
+          if (cobrancaProcesso) {
+            executeMove(cobrancaProcesso, 'cobranca_gerada');
+            setCobrancaProcesso(null);
+          }
+        }}
       />
 
       <ProcessoEditModal

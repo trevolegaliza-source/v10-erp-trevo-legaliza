@@ -15,6 +15,8 @@ export interface Extrato {
   competencia_mes: number;
   competencia_ano: number;
   status: string;
+  enviado: boolean;
+  data_envio: string | null;
   observacoes: string | null;
   created_at: string;
   updated_at: string;

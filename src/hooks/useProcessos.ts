@@ -154,12 +154,12 @@ export function useDashboardStats() {
         }
       }
 
-      // COBRANÇAS A GERAR: lancamentos in 'gerar_cobranca' stage + processos in registro/finalizados without billing
+      // COBRANÇAS A GERAR: lancamentos in 'solicitacao_criada' stage + processos in registro/finalizados without billing
       const { data: cobrancasGerar } = await supabase
         .from('lancamentos')
         .select('valor')
         .eq('tipo', 'receber')
-        .eq('etapa_financeiro', 'gerar_cobranca');
+        .eq('etapa_financeiro', 'solicitacao_criada');
       let totalCobrancasGerar = (cobrancasGerar || []).reduce((s, r) => s + Number(r.valor), 0);
 
       // Also add processos in registro/finalizados stages
