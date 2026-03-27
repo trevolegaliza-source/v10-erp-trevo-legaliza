@@ -288,24 +288,29 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
     if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
     const isLim = !s.isManual && !s.isUrgencia && limite > 0 && s.valorFinal <= limite;
     const isBoasVindas = s.label && s.label.includes('BOAS-VINDAS');
+    const opacityStyle = s.isSelected ? '' : 'opacity:0.35;';
+    const cobradoIndicator = s.isSelected
+      ? `<div style="font-size:7px;color:#22c55e;font-weight:700;margin-top:3px;">● COBRADO</div>`
+      : '';
 
     if (isBoasVindas) {
-      // Show boas-vindas step with original value strikethrough
       html += `
-        <div class="prog-step active">
+        <div class="prog-step active" style="${opacityStyle}">
           <div class="ps-label">${s.index}º Processo</div>
           <div style="font-size:7.5px;color:rgba(255,255,255,0.6);text-decoration:line-through;">${fmt(base)}</div>
           <div class="ps-value">${fmt(s.valorFinal)}</div>
           <div style="font-size:6px;color:#4ade80;font-weight:700;">(${s.label})</div>
+          ${cobradoIndicator}
         </div>
       `;
     } else {
       html += `
-        <div class="prog-step active">
+        <div class="prog-step active" style="${opacityStyle}">
           <div class="ps-label">${s.index}º Processo</div>
           <div class="ps-value">${fmt(s.valorFinal)}</div>
           <div class="ps-desc">${s.isManual ? s.label : (s.desconto > 0 ? `-${descPct}% sobre base` : '(base)')}</div>
           ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
+          ${cobradoIndicator}
         </div>
       `;
     }
