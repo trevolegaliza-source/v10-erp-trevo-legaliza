@@ -308,9 +308,9 @@ function ClienteAccordionItem({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleVisualizarExtrato(extratoId)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Visualizar PDF
+                            <DropdownMenuItem onClick={() => handleBaixarExtrato(extratoId)}>
+                              <Download className="h-4 w-4 mr-2" />
+                              Baixar PDF
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
