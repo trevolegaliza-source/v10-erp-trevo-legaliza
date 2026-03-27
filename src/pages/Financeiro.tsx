@@ -26,6 +26,16 @@ export default function Financeiro() {
   const [activeTab, setActiveTab] = useState('faturar');
 
   // Filter clients per tab
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  const isLancamentoVencido = (l: { data_vencimento: string; status: string; etapa_financeiro: string }) => {
+    if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
+    if (l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido') return true;
+    const venc = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
+    return venc ? venc < hoje : false;
+  };
+
   const clientesFaturar = clientes.filter(c => c.qtd_sem_extrato > 0);
   const clientesEnviar = clientes.filter(c =>
     c.etapa_predominante === 'cobranca_gerada' && c.qtd_sem_extrato === 0
@@ -37,7 +47,7 @@ export default function Financeiro() {
     c.etapa_predominante === 'honorario_pago'
   );
   const clientesVencidos = clientes.filter(c =>
-    c.lancamentos.some(l => l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido')
+    c.lancamentos.some(l => isLancamentoVencido(l))
   );
 
   const totalRecebido = stats?.receitaPrevistaMes || 0;
