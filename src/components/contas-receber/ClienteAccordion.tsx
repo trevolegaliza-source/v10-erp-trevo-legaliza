@@ -20,8 +20,7 @@ import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useExtratos, buscarExtratoPorId } from '@/hooks/useExtratos';
 import { toast } from 'sonner';
-import { ExtratoPreviewDialog } from '@/components/financeiro/ExtratoPreviewDialog';
-import { downloadStorageFile } from '@/lib/storage-utils';
+import { downloadExtrato } from '@/lib/storage-utils';
 
 interface ClienteGroup {
   clienteId: string;
