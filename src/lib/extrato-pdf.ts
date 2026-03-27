@@ -708,8 +708,16 @@ async function preloadLogo(): Promise<string | null> {
   } catch { return null; }
 }
 
+export interface ExtratoResult {
+  doc: jsPDF;
+  totalHonorarios: number;
+  totalTaxas: number;
+  totalGeral: number;
+  processCount: number;
+}
+
 // ═══ MAIN EXPORT ═══
-export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
+export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult> {
   // Ensure DM Sans is loaded
   const fontLink = document.createElement('link');
   fontLink.rel = 'stylesheet';
@@ -722,6 +730,15 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
 
   const steps = buildEscadinha(data);
   const selected = steps.filter(s => s.isSelected);
+
+  // Calculate totals
+  const totalHonorarios = selected.reduce((s, st) => s + st.valorFinal, 0);
+  const selectedIds = new Set(selected.map(s => s.processo.id));
+  const totalTaxas = Object.entries(data.valoresAdicionais)
+    .filter(([pid]) => selectedIds.has(pid))
+    .flatMap(([, vas]) => vas)
+    .reduce((s, va) => s + Number(va.valor), 0);
+  const totalGeral = totalHonorarios + totalTaxas;
 
   // Determine total pages (2 base + attachments)
   const attCount = countAttachments(data);
@@ -752,7 +769,13 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<jsPDF> {
   // Attachments
   await renderAttachments(doc, data, totalPages);
 
-  return doc;
+  return {
+    doc,
+    totalHonorarios: Math.round(totalHonorarios * 100) / 100,
+    totalTaxas: Math.round(totalTaxas * 100) / 100,
+    totalGeral: Math.round(totalGeral * 100) / 100,
+    processCount: selected.length,
+  };
 }
 
 function countAttachments(data: ExtratoData): number {
