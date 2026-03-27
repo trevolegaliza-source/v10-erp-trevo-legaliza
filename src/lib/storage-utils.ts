@@ -16,7 +16,8 @@ export async function downloadStorageFile(bucket: string, path: string): Promise
       return null;
     }
 
-    return URL.createObjectURL(data);
+    const pdfBlob = new Blob([data], { type: 'application/pdf' });
+    return URL.createObjectURL(pdfBlob);
   } catch (err) {
     console.error('Storage download exception:', err);
     return null;
