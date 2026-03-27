@@ -457,7 +457,7 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     }
 
     let manualBadge = '';
-    if (step.isManual && step.label && !isBoasVindasDiscount) {
+    if (step.isManual && step.label && !isBoasVindasDiscount && !isCortesia && step.valorFinal > 0) {
       manualBadge = `<span class="manual-badge">${step.label}</span>`;
     }
     // Boas-vindas gets a green badge instead of orange manual badge
