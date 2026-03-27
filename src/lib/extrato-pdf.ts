@@ -507,7 +507,9 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     }
 
     let manualBadge = '';
-    if (step.isManual && step.label && !isBoasVindasDiscount && !isCortesia && step.valorFinal > 0) {
+    if (step.isMudancaUF) {
+      manualBadge = `<span style="display:inline-block;background:#3b82f6;color:#fff;font-size:7px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:3px;margin-left:6px;">MUDANÇA DE UF</span>`;
+    } else if (step.isManual && step.label && !isBoasVindasDiscount && !isCortesia && step.valorFinal > 0) {
       manualBadge = `<span class="manual-badge">${step.label}</span>`;
     }
     // Boas-vindas gets a green badge instead of orange manual badge
