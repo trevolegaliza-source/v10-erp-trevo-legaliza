@@ -10,7 +10,6 @@ import type { EtapaFinanceiro } from '@/types/financial';
 import { ETAPA_FINANCEIRO_ORDER, ETAPA_FINANCEIRO_LABELS, ETAPA_FINANCEIRO_COLORS, TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useMoveEtapaFinanceiro } from '@/hooks/useProcessosFinanceiro';
-import { useExtratos } from '@/hooks/useExtratos';
 import { formatBRL } from '@/lib/pricing-engine';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
