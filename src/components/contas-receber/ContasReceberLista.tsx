@@ -166,11 +166,11 @@ export default function ContasReceberLista({ lancamentos, taxasPorProcesso, onMa
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
-                      {l.status === 'pendente' && (
-                        <>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs text-success" onClick={() => onMarcarPago(l)}><CheckCircle className="h-3.5 w-3.5" /></Button>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs text-warning" onClick={() => onCobrar(l)}><Phone className="h-3.5 w-3.5" /></Button>
-                        </>
+                      {l.status === 'pendente' && onMarcarPago && (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-success" onClick={() => onMarcarPago(l)}><CheckCircle className="h-3.5 w-3.5" /></Button>
+                      )}
+                      {l.status === 'pendente' && onCobrar && (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-warning" onClick={() => onCobrar(l)}><Phone className="h-3.5 w-3.5" /></Button>
                       )}
                     </div>
                   </TableCell>

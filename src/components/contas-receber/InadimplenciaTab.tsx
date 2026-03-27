@@ -8,9 +8,9 @@ import FaixasInadimplencia, { getFaixa } from './FaixasInadimplencia';
 
 interface Props {
   lancamentos: LancamentoReceber[];
-  onMarcarPago: (l: LancamentoReceber) => void;
-  onRegistrarContato: (l: LancamentoReceber) => void;
-  onReenviarCobranca: (l: LancamentoReceber) => void;
+  onMarcarPago?: (l: LancamentoReceber) => void;
+  onRegistrarContato?: (l: LancamentoReceber) => void;
+  onReenviarCobranca?: (l: LancamentoReceber) => void;
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
