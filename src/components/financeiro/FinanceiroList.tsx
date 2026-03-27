@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
 import { supabase } from '@/integrations/supabase/client';
+import { useExtratos } from '@/hooks/useExtratos';
 import {
   AlertDialog,
   AlertDialogAction,
