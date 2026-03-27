@@ -1,6 +1,9 @@
 import { useState, useMemo } from 'react';
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { ArrowRight } from 'lucide-react';
 import { useLancamentosReceber, useValoresAdicionaisBatch } from '@/hooks/useContasReceber';
 import type { LancamentoReceber } from '@/hooks/useContasReceber';
 import PeriodoSelector from '@/components/contas-receber/PeriodoSelector';
@@ -9,13 +12,11 @@ import AlertaInadimplencia from '@/components/contas-receber/AlertaInadimplencia
 import ClienteAccordion from '@/components/contas-receber/ClienteAccordion';
 import ContasReceberLista from '@/components/contas-receber/ContasReceberLista';
 import InadimplenciaTab from '@/components/contas-receber/InadimplenciaTab';
-import MarcarRecebidoModal from '@/components/contas-receber/MarcarRecebidoModal';
-import RegistrarContatoModal from '@/components/contas-receber/RegistrarContatoModal';
-import ReenviarCobrancaModal from '@/components/contas-receber/ReenviarCobrancaModal';
 
 function toISO(d: Date) { return d.toISOString().split('T')[0]; }
 
 export default function ContasReceber() {
+  const navigate = useNavigate();
   const now = new Date();
   const [dataInicio, setDataInicio] = useState(toISO(startOfMonth(now)));
   const [dataFim, setDataFim] = useState(toISO(endOfMonth(now)));
@@ -24,11 +25,6 @@ export default function ContasReceber() {
   const { data: lancamentos, isLoading } = useLancamentosReceber(dataInicio, dataFim);
   const processoIds = useMemo(() => (lancamentos || []).map(l => l.processo_id).filter(Boolean) as string[], [lancamentos]);
   const { data: taxasPorProcesso } = useValoresAdicionaisBatch(processoIds);
-
-  // Modals
-  const [marcarPagoTarget, setMarcarPagoTarget] = useState<LancamentoReceber | null>(null);
-  const [contatoTarget, setContatoTarget] = useState<LancamentoReceber | null>(null);
-  const [cobrancaTarget, setCobrancaTarget] = useState<LancamentoReceber | null>(null);
 
   const handlePeriodoChange = (inicio: string, fim: string) => {
     setDataInicio(inicio);
@@ -52,9 +48,15 @@ export default function ContasReceber() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Contas a Receber</h1>
-          <p className="text-sm text-muted-foreground">Faturamento, recebimentos e inadimplência</p>
+          <p className="text-sm text-muted-foreground">Consulta de faturamento, recebimentos e inadimplência</p>
         </div>
-        <PeriodoSelector dataInicio={dataInicio} dataFim={dataFim} onChange={handlePeriodoChange} />
+        <div className="flex items-center gap-3">
+          <PeriodoSelector dataInicio={dataInicio} dataFim={dataFim} onChange={handlePeriodoChange} />
+          <Button variant="outline" size="sm" onClick={() => navigate('/financeiro')}>
+            <ArrowRight className="h-4 w-4 mr-1" />
+            Ir para Cobranças
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -68,10 +70,9 @@ export default function ContasReceber() {
           <AlertaInadimplencia lancamentos={lancamentos || []} onVerClick={() => setActiveTab('inadimplencia')} />
 
           {/* Tabs */}
-           <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="clientes">Por Cliente</TabsTrigger>
-              <TabsTrigger value="sem_extrato">Sem Extrato</TabsTrigger>
               <TabsTrigger value="lista">Lista Completa</TabsTrigger>
               <TabsTrigger value="inadimplencia">Inadimplência</TabsTrigger>
             </TabsList>
@@ -80,19 +81,6 @@ export default function ContasReceber() {
               <ClienteAccordion
                 groups={clienteGroups}
                 taxasPorProcesso={taxasPorProcesso || {}}
-                onMarcarPago={setMarcarPagoTarget}
-                onCobrar={setCobrancaTarget}
-              />
-            </TabsContent>
-
-            <TabsContent value="sem_extrato">
-              <ClienteAccordion
-                groups={clienteGroups.filter(g =>
-                  g.lancamentos.some(l => l.status === 'pendente' && !(l as any).extrato_id)
-                )}
-                taxasPorProcesso={taxasPorProcesso || {}}
-                onMarcarPago={setMarcarPagoTarget}
-                onCobrar={setCobrancaTarget}
               />
             </TabsContent>
 
@@ -100,27 +88,17 @@ export default function ContasReceber() {
               <ContasReceberLista
                 lancamentos={lancamentos || []}
                 taxasPorProcesso={taxasPorProcesso || {}}
-                onMarcarPago={setMarcarPagoTarget}
-                onCobrar={setCobrancaTarget}
               />
             </TabsContent>
 
             <TabsContent value="inadimplencia">
               <InadimplenciaTab
                 lancamentos={lancamentos || []}
-                onMarcarPago={setMarcarPagoTarget}
-                onRegistrarContato={setContatoTarget}
-                onReenviarCobranca={setCobrancaTarget}
               />
             </TabsContent>
           </Tabs>
         </>
       )}
-
-      {/* Modals */}
-      <MarcarRecebidoModal lancamento={marcarPagoTarget} open={!!marcarPagoTarget} onOpenChange={v => !v && setMarcarPagoTarget(null)} />
-      <RegistrarContatoModal lancamento={contatoTarget} open={!!contatoTarget} onOpenChange={v => !v && setContatoTarget(null)} />
-      <ReenviarCobrancaModal lancamento={cobrancaTarget} open={!!cobrancaTarget} onOpenChange={v => !v && setCobrancaTarget(null)} />
     </div>
   );
 }
