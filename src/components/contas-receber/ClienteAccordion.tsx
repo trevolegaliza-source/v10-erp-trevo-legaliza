@@ -12,7 +12,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { CheckCircle, Phone, Building2, FileText, FileCheck, Eye, RefreshCw, Trash, Plus } from 'lucide-react';
+import { CheckCircle, Phone, Building2, FileText, FileCheck, Eye, Trash, Plus, Download, ExternalLink } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { LancamentoReceber, ValorAdicionalSimple } from '@/hooks/useContasReceber';
 import { diasAtraso } from '@/hooks/useContasReceber';
 import { supabase } from '@/integrations/supabase/client';
