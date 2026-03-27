@@ -172,7 +172,7 @@ function ClienteAccordionItem({
     }
   };
 
-  const handleVisualizarExtrato = async (extratoId: string) => {
+  const handleBaixarExtrato = async (extratoId: string) => {
     try {
       const extrato = await buscarExtratoPorId(extratoId);
       if (!extrato) {
@@ -181,18 +181,10 @@ function ClienteAccordionItem({
       }
 
       const storagePath = `extratos/${extrato.cliente_id}/${extrato.filename}`;
-      const blobUrl = await downloadStorageFile('documentos', storagePath);
-
-      if (!blobUrl) {
-        toast.error('Erro ao carregar o extrato. Tente novamente.');
-        return;
-      }
-
-      setPreviewUrl(blobUrl);
-      setPreviewFilename(extrato.filename);
+      await downloadExtrato('documentos', storagePath, extrato.filename);
     } catch (err) {
-      console.error('Erro ao visualizar extrato:', err);
-      toast.error('Erro ao abrir o extrato.');
+      console.error('Erro ao baixar extrato:', err);
+      toast.error('Erro ao baixar o extrato.');
     }
   };
 
