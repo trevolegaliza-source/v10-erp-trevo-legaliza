@@ -290,22 +290,27 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
   const base = data.cliente.valor_base ?? 580;
   const limite = data.cliente.valor_limite_desconto ?? 0;
 
-  // Show all steps + 1 "next" step (max 5 total)
-  const displaySteps = steps.slice(-4); // last 4
+  // Show all steps + 1 "next" step (max last 4 steps)
+  const displaySteps = steps.slice(-4);
 
-  // Calculate next step value based on non-manual slot count
-  const nonManualCount = steps.filter(s => !s.isManual).length;
-  const lastSlot = Math.max(nonManualCount, 1);
+  // Calculate next step value based on total slots consumed
+  const totalSlots = steps.reduce((sum, s) => sum + (s.slotsUsados || 1), 0);
   let nextVal = base;
-  for (let i = 1; i <= lastSlot; i++) {
+  for (let i = 1; i <= totalSlots; i++) {
     nextVal = nextVal * (1 - descPct / 100);
   }
   const limitReached = limite > 0 && nextVal <= limite;
   if (limitReached) nextVal = limite;
 
+  // Responsive sizing
+  const totalDegraus = displaySteps.length + (limitReached ? 0 : 1);
+  const degrauWidth = totalDegraus <= 3 ? 180 : totalDegraus <= 5 ? 150 : totalDegraus <= 7 ? 120 : 100;
+  const fontSize = totalDegraus <= 3 ? '14px' : totalDegraus <= 5 ? '12px' : '11px';
+  const labelSize = totalDegraus <= 3 ? '9px' : totalDegraus <= 5 ? '8px' : '7px';
+
   const arrowSvg = (color: string) => `<svg viewBox="0 0 10 10"><polygon points="0,0 10,5 0,10" fill="${color}"/></svg>`;
 
-  let html = '<div class="prog-bar">';
+  let html = '<div class="prog-bar" style="flex-wrap:wrap;justify-content:center;gap:4px;">';
 
   displaySteps.forEach((s, i) => {
     if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
@@ -316,22 +321,30 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
       ? `<div style="font-size:7px;color:#22c55e;font-weight:700;margin-top:3px;">● COBRADO</div>`
       : '';
 
+    // Label for slot number
+    const slotLabel = s.isMudancaUF
+      ? `${s.index}º-${s.index + 1}º Processo`
+      : `${s.index}º Processo`;
+    const borderColor = s.isMudancaUF ? 'border:2px solid #3b82f6;' : '';
+
     if (isBoasVindas) {
       html += `
-        <div class="prog-step active" style="${opacityStyle}">
-          <div class="ps-label">${s.index}º Processo</div>
+        <div class="prog-step active" style="${opacityStyle}${borderColor}flex:0 0 auto;width:${degrauWidth}px;">
+          <div class="ps-label" style="font-size:${labelSize};">${slotLabel}</div>
           <div style="font-size:7.5px;color:rgba(255,255,255,0.6);text-decoration:line-through;">${fmt(base)}</div>
-          <div class="ps-value">${fmt(s.valorFinal)}</div>
+          <div class="ps-value" style="font-size:${fontSize};">${fmt(s.valorFinal)}</div>
           <div style="font-size:6px;color:#4ade80;font-weight:700;">(${s.label})</div>
           ${cobradoIndicator}
         </div>
       `;
     } else {
+      const descLabel = s.isMudancaUF ? 'MUDANÇA DE UF (2 slots)' : (s.isManual ? s.label : (s.desconto > 0 ? `-${descPct}% sobre base` : '(base)'));
+      const descColor = s.isMudancaUF ? 'color:#60a5fa;' : '';
       html += `
-        <div class="prog-step active" style="${opacityStyle}">
-          <div class="ps-label">${s.index}º Processo</div>
-          <div class="ps-value">${fmt(s.valorFinal)}</div>
-          <div class="ps-desc">${s.isManual ? s.label : (s.desconto > 0 ? `-${descPct}% sobre base` : '(base)')}</div>
+        <div class="prog-step active" style="${opacityStyle}${borderColor}flex:0 0 auto;width:${degrauWidth}px;">
+          <div class="ps-label" style="font-size:${labelSize};">${slotLabel}</div>
+          <div class="ps-value" style="font-size:${fontSize};">${fmt(s.valorFinal)}</div>
+          <div class="ps-desc" style="font-size:${labelSize};${descColor}">${descLabel}</div>
           ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
           ${cobradoIndicator}
         </div>
@@ -342,10 +355,10 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
   if (!limitReached) {
     html += `<div class="prog-arrow">${arrowSvg('#86efac')}</div>`;
     html += `
-      <div class="prog-step next">
-        <div class="ps-label">${steps.length + 1}º Processo</div>
-        <div class="ps-value">${fmt(Math.round(nextVal * 100) / 100)}</div>
-        <div class="ps-desc">-${descPct}% sobre base</div>
+      <div class="prog-step next" style="flex:0 0 auto;width:${degrauWidth}px;">
+        <div class="ps-label" style="font-size:${labelSize};">${totalSlots + 1}º Processo</div>
+        <div class="ps-value" style="font-size:${fontSize};">${fmt(Math.round(nextVal * 100) / 100)}</div>
+        <div class="ps-desc" style="font-size:${labelSize};">-${descPct}% sobre base</div>
         <div class="ps-next-label">SEU PRÓXIMO DESCONTO</div>
       </div>
     `;
