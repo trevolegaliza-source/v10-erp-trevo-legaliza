@@ -538,14 +538,19 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
   let progHTML = '';
   if (descPct > 0 && steps.length > 0) {
     const progRows = steps.map(s => {
-      let status = '—';
       let desc = '—';
-      const isLimite = data.cliente.valor_limite_desconto && s.valorFinal <= (data.cliente.valor_limite_desconto ?? 0);
-      if (s.isManual) {
-        status = s.label || 'Valor Manual';
-      } else if (s.desconto > 0) {
+      const isLimite = !s.isManual && !s.isUrgencia && data.cliente.valor_limite_desconto && s.valorFinal <= (data.cliente.valor_limite_desconto ?? 0);
+      const status = s.valorFinal === 0 && s.isManual
+        ? 'CORTESIA'
+        : s.isUrgencia
+          ? 'URGÊNCIA'
+          : s.isManual
+            ? 'VALOR MANUAL'
+            : s.desconto > 0
+              ? (isLimite ? 'Limite atingido' : 'DESC. PROGRESSIVO')
+              : '—';
+      if (!s.isManual && s.desconto > 0) {
         desc = `-${descPct}%`;
-        status = isLimite ? 'Limite atingido' : 'Desconto acumulado';
       }
       return `<tr class="${isLimite ? 'limite' : ''}">
         <td>${s.index}º</td>
