@@ -11,7 +11,6 @@ import {
   ChevronRight,
   PlusCircle,
   ArrowUpCircle,
-  ArrowUpCircle,
   LogOut,
   UsersRound,
 } from 'lucide-react';
