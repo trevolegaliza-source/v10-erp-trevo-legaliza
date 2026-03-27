@@ -402,17 +402,6 @@ function ClienteAccordionItem({
         </AlertDialogContent>
       </AlertDialog>
 
-      <ExtratoPreviewDialog
-        open={!!previewUrl}
-        onOpenChange={(open) => {
-          if (!open) {
-            if (previewUrl) URL.revokeObjectURL(previewUrl);
-            setPreviewUrl(null);
-          }
-        }}
-        pdfBlobUrl={previewUrl}
-        filename={previewFilename}
-      />
     </>
   );
 }
