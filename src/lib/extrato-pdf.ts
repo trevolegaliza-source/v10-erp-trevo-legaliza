@@ -286,7 +286,7 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
 
   displaySteps.forEach((s, i) => {
     if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
-    const isLim = limite > 0 && s.valorFinal <= limite;
+    const isLim = !s.isManual && !s.isUrgencia && limite > 0 && s.valorFinal <= limite;
     const isBoasVindas = s.label && s.label.includes('BOAS-VINDAS');
 
     if (isBoasVindas) {
