@@ -12,7 +12,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { CheckCircle, Phone, Building2, FileText, FileCheck, Eye, Trash, Plus } from 'lucide-react';
+import { CheckCircle, Phone, Building2, FileText, FileCheck, Download, Trash, Plus } from 'lucide-react';
 import type { LancamentoReceber, ValorAdicionalSimple } from '@/hooks/useContasReceber';
 import { diasAtraso } from '@/hooks/useContasReceber';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,8 +20,7 @@ import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { useExtratos, buscarExtratoPorId } from '@/hooks/useExtratos';
 import { toast } from 'sonner';
-import { ExtratoPreviewDialog } from '@/components/financeiro/ExtratoPreviewDialog';
-import { downloadStorageFile } from '@/lib/storage-utils';
+import { downloadExtrato } from '@/lib/storage-utils';
 
 interface ClienteGroup {
   clienteId: string;
@@ -65,8 +64,7 @@ function ClienteAccordionItem({
   const [selectedProcessos, setSelectedProcessos] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewFilename, setPreviewFilename] = useState<string>('');
+  
   const { salvarExtrato, excluirExtrato } = useExtratos(g.clienteId);
 
   const hoje = new Date().toISOString().split('T')[0];
@@ -174,7 +172,7 @@ function ClienteAccordionItem({
     }
   };
 
-  const handleVisualizarExtrato = async (extratoId: string) => {
+  const handleBaixarExtrato = async (extratoId: string) => {
     try {
       const extrato = await buscarExtratoPorId(extratoId);
       if (!extrato) {
@@ -183,18 +181,10 @@ function ClienteAccordionItem({
       }
 
       const storagePath = `extratos/${extrato.cliente_id}/${extrato.filename}`;
-      const blobUrl = await downloadStorageFile('documentos', storagePath);
-
-      if (!blobUrl) {
-        toast.error('Erro ao carregar o extrato. Tente novamente.');
-        return;
-      }
-
-      setPreviewUrl(blobUrl);
-      setPreviewFilename(extrato.filename);
+      await downloadExtrato('documentos', storagePath, extrato.filename);
     } catch (err) {
-      console.error('Erro ao visualizar extrato:', err);
-      toast.error('Erro ao abrir o extrato.');
+      console.error('Erro ao baixar extrato:', err);
+      toast.error('Erro ao baixar o extrato.');
     }
   };
 
@@ -318,9 +308,9 @@ function ClienteAccordionItem({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleVisualizarExtrato(extratoId)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Visualizar PDF
+                            <DropdownMenuItem onClick={() => handleBaixarExtrato(extratoId)}>
+                              <Download className="h-4 w-4 mr-2" />
+                              Baixar PDF
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -412,17 +402,6 @@ function ClienteAccordionItem({
         </AlertDialogContent>
       </AlertDialog>
 
-      <ExtratoPreviewDialog
-        open={!!previewUrl}
-        onOpenChange={(open) => {
-          if (!open) {
-            if (previewUrl) URL.revokeObjectURL(previewUrl);
-            setPreviewUrl(null);
-          }
-        }}
-        pdfBlobUrl={previewUrl}
-        filename={previewFilename}
-      />
     </>
   );
 }

@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { FileText, Send, Copy, Eye, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2 } from 'lucide-react';
+import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2 } from 'lucide-react';
 import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import { useExtratos } from '@/hooks/useExtratos';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
@@ -17,8 +17,7 @@ import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
-import { ExtratoPreviewDialog } from '@/components/financeiro/ExtratoPreviewDialog';
-import { downloadStorageFile } from '@/lib/storage-utils';
+import { downloadExtrato } from '@/lib/storage-utils';
 
 function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -254,9 +253,6 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const qc = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
   const [loadingExtrato, setLoadingExtrato] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
-  const [previewFilename, setPreviewFilename] = useState('');
   const { salvarExtrato } = useExtratos();
 
   const hasExtratoNoSistema = cliente.lancamentos.some(l => l.extrato_id);
@@ -274,37 +270,32 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     toast.success('Mensagem copiada para o clipboard!');
   }
 
-  async function handleVisualizarExtrato() {
+  async function handleBaixarExtrato() {
     setLoadingExtrato(true);
     try {
-      const openExtratoById = async (extratoId: string): Promise<boolean> => {
-        const { data: extrato, error } = await supabase
-          .from('extratos')
-          .select('cliente_id, filename')
-          .eq('id', extratoId)
-          .single();
-
-        if (error || !extrato) return false;
-
-        const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
-        const blobUrl = await downloadStorageFile('documentos', path);
-        if (!blobUrl) return false;
-
-        if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
-        setPreviewBlobUrl(blobUrl);
-        setPreviewFilename((extrato as any).filename);
-        setPreviewOpen(true);
-        return true;
-      };
-
       const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
-      if (lancComExtrato?.extrato_id && await openExtratoById(lancComExtrato.extrato_id)) return;
+      const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
 
-      if (cliente.extrato_mais_recente?.id && await openExtratoById(cliente.extrato_mais_recente.id)) return;
+      if (!extratoId) {
+        toast.error('Nenhum extrato encontrado. Gere novamente pela tab "Gerar Extrato".');
+        return;
+      }
 
-      toast.info('Este extrato foi gerado antes do novo sistema. Clique em "Gerar e Salvar Extrato" para gerar novamente e salvá-lo.', { duration: 5000 });
+      const { data: extrato } = await supabase
+        .from('extratos')
+        .select('cliente_id, filename')
+        .eq('id', extratoId)
+        .single();
+
+      if (!extrato) {
+        toast.error('Extrato não encontrado no sistema.');
+        return;
+      }
+
+      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
+      await downloadExtrato('documentos', path, (extrato as any).filename);
     } catch (err) {
-      console.error('Erro ao abrir extrato:', err);
+      console.error('Erro ao baixar extrato:', err);
       toast.error('Erro ao carregar o extrato.');
     } finally {
       setLoadingExtrato(false);
@@ -407,77 +398,57 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   }
 
   return (
-    <>
-      <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
-        <AccordionTrigger className="px-4 py-3 hover:no-underline">
-          <div className="flex items-center gap-3 flex-1 text-left">
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
-              <p className="text-xs text-muted-foreground">{fmt(cliente.total_faturado)} · {cliente.qtd_processos} proc.</p>
-            </div>
-            {hasExtratoNoSistema && cliente.extrato_mais_recente ? (
-              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-xs">
-                Extrato em {fmtDate(cliente.extrato_mais_recente.created_at)}
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs">
-                Extrato não salvo
-              </Badge>
-            )}
+    <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
+      <AccordionTrigger className="px-4 py-3 hover:no-underline">
+        <div className="flex items-center gap-3 flex-1 text-left">
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
+            <p className="text-xs text-muted-foreground">{fmt(cliente.total_faturado)} · {cliente.qtd_processos} proc.</p>
           </div>
-        </AccordionTrigger>
-        <AccordionContent className="px-4 pb-4">
-          <div className="space-y-2">
-            {!hasExtratoNoSistema && (
-              <div className="flex items-center gap-2 text-sm text-warning mb-2">
-                <AlertTriangle className="h-4 w-4" />
-                <span>Extrato gerado pelo sistema antigo — não salvo no sistema.</span>
-              </div>
-            )}
-            {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
-            <div className="flex gap-2 mt-3 flex-wrap">
-              {hasExtratoNoSistema ? (
-                <Button size="sm" variant="outline" onClick={handleVisualizarExtrato} disabled={loadingExtrato}>
-                  {loadingExtrato ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Carregando...
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="h-4 w-4 mr-1" /> Ver Extrato
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" onClick={handleRegerarExtrato} disabled={regenerating}>
-                  <RefreshCw className="h-4 w-4 mr-1" />
-                  {regenerating ? 'Gerando...' : 'Gerar e Salvar Extrato'}
-                </Button>
-              )}
-              <Button size="sm" variant="outline" onClick={handleCopiarMensagem}>
-                <Copy className="h-4 w-4 mr-1" /> Copiar WhatsApp
-              </Button>
-              <Button size="sm" onClick={handleMarcarEnviado} className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Send className="h-4 w-4 mr-1" /> Marcar como Enviado
+          {hasExtratoNoSistema && cliente.extrato_mais_recente ? (
+            <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-xs">
+              Extrato em {fmtDate(cliente.extrato_mais_recente.created_at)}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs">
+              Extrato não salvo
+            </Badge>
+          )}
+        </div>
+      </AccordionTrigger>
+      <AccordionContent className="px-4 pb-4">
+        <div className="space-y-2">
+          {!hasExtratoNoSistema && (
+            <div className="flex items-center gap-2 p-2 rounded bg-amber-500/10 text-amber-600 text-sm mb-2">
+              <AlertTriangle className="h-4 w-4" />
+              <span>Extrato gerado pelo sistema anterior. Gere novamente para salvar no sistema.</span>
+              <Button size="sm" variant="outline" onClick={handleRegerarExtrato} disabled={regenerating}>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                {regenerating ? 'Gerando...' : 'Gerar e Salvar'}
               </Button>
             </div>
+          )}
+          {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
+          <div className="flex gap-2 mt-3 flex-wrap">
+            {hasExtratoNoSistema && (
+              <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato}>
+                {loadingExtrato ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Baixando...</>
+                ) : (
+                  <><Download className="h-4 w-4 mr-1" /> Baixar Extrato</>
+                )}
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={handleCopiarMensagem}>
+              <Copy className="h-4 w-4 mr-1" /> Copiar WhatsApp
+            </Button>
+            <Button size="sm" onClick={handleMarcarEnviado} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Send className="h-4 w-4 mr-1" /> Marcar como Enviado
+            </Button>
           </div>
-        </AccordionContent>
-      </AccordionItem>
-
-      <ExtratoPreviewDialog
-        open={previewOpen}
-        onOpenChange={(open) => {
-          if (!open && previewBlobUrl) {
-            URL.revokeObjectURL(previewBlobUrl);
-            setPreviewBlobUrl(null);
-          }
-          setPreviewOpen(open);
-        }}
-        pdfBlobUrl={previewBlobUrl}
-        filename={previewFilename}
-      />
-    </>
+        </div>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
