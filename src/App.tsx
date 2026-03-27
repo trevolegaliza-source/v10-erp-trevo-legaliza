@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,7 +16,6 @@ const FaturamentoDetalhe = lazy(() => import("./pages/FaturamentoDetalhe"));
 const Clientes = lazy(() => import("./pages/Clientes"));
 const ClienteDetalhe = lazy(() => import("./pages/ClienteDetalhe"));
 const Financeiro = lazy(() => import("./pages/Financeiro"));
-const ContasReceber = lazy(() => import("./pages/ContasReceber"));
 const ContasPagar = lazy(() => import("./pages/ContasPagar"));
 const Colaboradores = lazy(() => import("./pages/Colaboradores"));
 const CadastroRapido = lazy(() => import("./pages/CadastroRapido"));
@@ -64,7 +63,7 @@ const App = () => (
                   <Route path="/clientes/:id" element={<ClienteDetalhe />} />
                   <Route path="/cadastro-rapido" element={<CadastroRapido />} />
                   <Route path="/financeiro" element={<Financeiro />} />
-                  <Route path="/contas-receber" element={<ContasReceber />} />
+                  <Route path="/contas-receber" element={<Navigate to="/financeiro" replace />} />
                   <Route path="/contas-pagar" element={<ContasPagar />} />
                   <Route path="/colaboradores" element={<Colaboradores />} />
                   <Route path="/documentos" element={<Documentos />} />
