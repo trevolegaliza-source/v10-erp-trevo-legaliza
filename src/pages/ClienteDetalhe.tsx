@@ -362,8 +362,7 @@ export default function ClienteDetalhe() {
         setEditing(false);
         loadAll(cliente.id);
         toast.success('Parâmetros atualizados!');
-        // Invalidate financeiro cache
-        const { QueryClient } = require('@tanstack/react-query');
+        qcRef.invalidateQueries({ queryKey: ['financeiro_clientes'] });
       },
       onError: (err: any) => { toast.error('Erro ao salvar: ' + (err?.message || 'Erro desconhecido')); },
     });
