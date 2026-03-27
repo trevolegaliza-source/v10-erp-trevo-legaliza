@@ -194,17 +194,24 @@ export default function FinanceiroClienteKanban({ processos }: FinanceiroCliente
 
   // ENVIAR: copy WhatsApp message and mark as sent
   const handleEnviar = async (group: ClienteGroup) => {
-    const cliente = group.processos[0].cliente as any;
-    const msg = gerarMensagemCobranca({
-      clienteNome: group.clienteApelido,
-      totalValor: group.totalValor,
-      processos: group.processos.map(p => ({
-        razaoSocial: p.razao_social,
-        tipo: TIPO_PROCESSO_LABELS[p.tipo] || p.tipo,
-        valor: Number(p.lancamento?.valor ?? p.valor ?? 0),
-      })),
-      vencimento: group.vencimentoMaisProximo,
+    const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const vencStr = group.vencimentoMaisProximo
+      ? new Date(group.vencimentoMaisProximo).toLocaleDateString('pt-BR')
+      : 'a combinar';
+
+    const lines = [
+      `Olá! 👋`,
+      ``,
+      `Segue a cobrança referente aos serviços prestados para *${group.clienteApelido}*:`,
+      ``,
+    ];
+    group.processos.forEach((p, i) => {
+      const tipo = TIPO_PROCESSO_LABELS[p.tipo] || p.tipo;
+      lines.push(`${i + 1}. ${tipo} — ${p.razao_social}: ${fmt(Number(p.lancamento?.valor ?? p.valor ?? 0))}`);
     });
+    lines.push(``, `💰 *Total: ${fmt(group.totalValor)}*`, `📅 Vencimento: ${vencStr}`, ``, `O extrato detalhado segue em anexo.`, `Qualquer dúvida, estou à disposição!`, ``, `Trevo Legaliza 🍀`);
+
+    const msg = lines.join('\n');
 
     await navigator.clipboard.writeText(msg);
     toast.success('Mensagem copiada! Cole no WhatsApp.');
