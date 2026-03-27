@@ -136,17 +136,31 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
       return;
     }
     try {
-      await supabase.from('processos').update({ valor: novoValor, updated_at: new Date().toISOString() }).eq('id', processo.id);
-      if (lanc?.id) {
-        await supabase.from('lancamentos').update({ valor: novoValor, updated_at: new Date().toISOString() }).eq('id', lanc.id);
-      }
       const dateStr = new Date().toLocaleDateString('pt-BR');
       const notaValor = `Valor alterado manualmente de R$ ${valorAnterior.toFixed(2)} para R$ ${novoValor.toFixed(2)} em ${dateStr}`;
       const currentNotas = processo.notas || '';
-      await supabase.from('processos').update({ notas: currentNotas ? `${currentNotas}\n${notaValor}` : notaValor }).eq('id', processo.id);
-      toast.success('Valor atualizado com sucesso');
+      const notasAtualizadas = currentNotas ? `${currentNotas}\n${notaValor}` : notaValor;
+
+      // 1. Update processo valor + notas in a single call
+      const { error: errProc } = await supabase
+        .from('processos')
+        .update({ valor: novoValor, notas: notasAtualizadas, updated_at: new Date().toISOString() })
+        .eq('id', processo.id);
+      if (errProc) throw errProc;
+
+      // 2. Update lancamento if exists
+      if (lanc?.id) {
+        const { error: errLanc } = await supabase
+          .from('lancamentos')
+          .update({ valor: novoValor, updated_at: new Date().toISOString() })
+          .eq('id', lanc.id);
+        if (errLanc) console.warn('Erro ao atualizar lançamento:', errLanc);
+      }
+
+      toast.success(`Valor atualizado para R$ ${novoValor.toFixed(2)}`);
       setEditingValue(false);
-      // Force refresh
+
+      // 3. Force cache refresh via mutation
       updateLanc.mutate({
         processoId: processo.id,
         lancamentoId: lanc?.id,
@@ -155,7 +169,8 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
         updates: {},
       });
     } catch (err: any) {
-      toast.error('Erro ao atualizar valor: ' + err.message);
+      console.error('Erro ao salvar valor:', err);
+      toast.error('Erro ao salvar o novo valor: ' + (err.message || 'Tente novamente'));
     }
   };
 
