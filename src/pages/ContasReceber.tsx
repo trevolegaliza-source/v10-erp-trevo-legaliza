@@ -68,9 +68,10 @@ export default function ContasReceber() {
           <AlertaInadimplencia lancamentos={lancamentos || []} onVerClick={() => setActiveTab('inadimplencia')} />
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="clientes">Por Cliente</TabsTrigger>
+              <TabsTrigger value="sem_extrato">Sem Extrato</TabsTrigger>
               <TabsTrigger value="lista">Lista Completa</TabsTrigger>
               <TabsTrigger value="inadimplencia">Inadimplência</TabsTrigger>
             </TabsList>
@@ -78,6 +79,17 @@ export default function ContasReceber() {
             <TabsContent value="clientes">
               <ClienteAccordion
                 groups={clienteGroups}
+                taxasPorProcesso={taxasPorProcesso || {}}
+                onMarcarPago={setMarcarPagoTarget}
+                onCobrar={setCobrancaTarget}
+              />
+            </TabsContent>
+
+            <TabsContent value="sem_extrato">
+              <ClienteAccordion
+                groups={clienteGroups.filter(g =>
+                  g.lancamentos.some(l => l.status === 'pendente' && !(l as any).extrato_id)
+                )}
                 taxasPorProcesso={taxasPorProcesso || {}}
                 onMarcarPago={setMarcarPagoTarget}
                 onCobrar={setCobrancaTarget}

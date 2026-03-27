@@ -252,13 +252,13 @@ export default function ClienteDetalhe() {
         fetchValoresAdicionaisMulti(procsToGenerate.map(p => p.id)),
         fetchCompetenciaProcessos(cliente.id),
       ]);
-      const doc = await gerarExtratoPDF({
+      const result = await gerarExtratoPDF({
         processos: processosFin,
         allCompetencia,
         valoresAdicionais,
         cliente: clienteData as any,
       });
-      const blob = doc.output('blob');
+      const blob = result.doc.output('blob');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

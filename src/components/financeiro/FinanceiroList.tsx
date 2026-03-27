@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
 import { supabase } from '@/integrations/supabase/client';
+import { useExtratos } from '@/hooks/useExtratos';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +48,7 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
   const [showDeferimentoAlert, setShowDeferimentoAlert] = useState(false);
   const [deferimentoAlertData, setDeferimentoAlertData] = useState<DeferimentoAlertData | null>(null);
   const qc = useQueryClient();
+  const { salvarExtrato } = useExtratos();
 
   const allChecked = processos.length > 0 && selected.size === processos.length;
 
@@ -84,23 +86,43 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
         fetchCompetenciaProcessos(clienteId),
       ]);
 
-      const doc = await gerarExtratoPDF({
+      const result = await gerarExtratoPDF({
         processos: processosParaGerar,
         allCompetencia,
         valoresAdicionais,
         cliente: clienteData as any,
       });
 
-      const blob = doc.output('blob');
+      const blob = result.doc.output('blob');
       setLastPdfBlob(blob);
+
+      const clienteName = (clienteData as any)?.apelido || (clienteData as any)?.nome || 'extrato';
+      const filename = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const clienteName = (clienteData as any)?.apelido || (clienteData as any)?.nome || 'extrato';
-      a.download = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+
+      // Save extrato to system
+      const now = new Date();
+      try {
+        await salvarExtrato.mutateAsync({
+          clienteId,
+          pdfBlob: blob,
+          filename,
+          totalHonorarios: result.totalHonorarios,
+          totalTaxas: result.totalTaxas,
+          totalGeral: result.totalGeral,
+          processoIds: processosParaGerar.map(p => p.id),
+          competenciaMes: now.getMonth() + 1,
+          competenciaAno: now.getFullYear(),
+        });
+      } catch (saveErr) {
+        console.warn('Extrato gerado mas não salvo:', saveErr);
+      }
 
       toast.success('Extrato gerado com sucesso!');
       setShowMarkDialog(true);
