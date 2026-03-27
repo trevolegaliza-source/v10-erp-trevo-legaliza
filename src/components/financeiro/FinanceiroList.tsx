@@ -84,14 +84,14 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
         fetchCompetenciaProcessos(clienteId),
       ]);
 
-      const doc = await gerarExtratoPDF({
+      const result = await gerarExtratoPDF({
         processos: processosParaGerar,
         allCompetencia,
         valoresAdicionais,
         cliente: clienteData as any,
       });
 
-      const blob = doc.output('blob');
+      const blob = result.doc.output('blob');
       setLastPdfBlob(blob);
 
       const url = URL.createObjectURL(blob);
