@@ -569,10 +569,10 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
       <div class="process-card" style="page-break-inside: avoid;">
         <div class="process-header">
           <div class="ph-left">
-            <div class="ph-badge">${step.index}º</div>
+            <div class="ph-badge">${step.isMudancaUF ? `${step.index}º-${step.index + 1}º` : `${step.index}º`}</div>
             <div class="ph-info">
               <div class="ph-title">${p.tipo.toUpperCase()} — ${p.razao_social}${manualBadge}</div>
-              <div class="ph-date">${fmtDate(p.created_at)}</div>
+              <div class="ph-date">${fmtDate(p.created_at)}${step.isMudancaUF ? ' • Consome 2 slots na progressão' : ''}</div>
               ${discountLine}
             </div>
           </div>
