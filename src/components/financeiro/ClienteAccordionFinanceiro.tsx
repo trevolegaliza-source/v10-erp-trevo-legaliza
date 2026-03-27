@@ -23,6 +23,15 @@ function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+/** Invalidate all financial queries across screens */
+function invalidateFinanceiro(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+  qc.invalidateQueries({ queryKey: ['contas_receber'] });
+  qc.invalidateQueries({ queryKey: ['lancamentos_receber'] });
+  qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+  qc.invalidateQueries({ queryKey: ['lancamentos'] });
+}
+
 function fmtDate(d: string | null | undefined) {
   if (!d) return '-';
   return new Date(d).toLocaleDateString('pt-BR');
