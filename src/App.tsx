@@ -16,7 +16,6 @@ const FaturamentoDetalhe = lazy(() => import("./pages/FaturamentoDetalhe"));
 const Clientes = lazy(() => import("./pages/Clientes"));
 const ClienteDetalhe = lazy(() => import("./pages/ClienteDetalhe"));
 const Financeiro = lazy(() => import("./pages/Financeiro"));
-const ContasReceber = lazy(() => import("./pages/ContasReceber"));
 const ContasPagar = lazy(() => import("./pages/ContasPagar"));
 const Colaboradores = lazy(() => import("./pages/Colaboradores"));
 const CadastroRapido = lazy(() => import("./pages/CadastroRapido"));
