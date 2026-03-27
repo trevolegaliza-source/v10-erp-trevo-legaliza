@@ -474,7 +474,14 @@ function VencidoItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split('T')[0]);
   const qc = useQueryClient();
 
-  const lancVencidos = cliente.lancamentos.filter(l => l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido');
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const lancVencidos = cliente.lancamentos.filter(l => {
+    if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
+    if (l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido') return true;
+    const venc = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
+    return venc ? venc < hoje : false;
+  });
   const maiorAtraso = Math.max(...lancVencidos.map(l => diasAtraso(l.data_vencimento)), 0);
 
   async function confirmarPago() {
