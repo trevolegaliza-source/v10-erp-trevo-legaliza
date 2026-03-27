@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { FileText, Send, Copy, Eye, CheckCircle, AlertTriangle, Clock, Calendar } from 'lucide-react';
+import { FileText, Send, Copy, Eye, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw } from 'lucide-react';
 import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import { useExtratos } from '@/hooks/useExtratos';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
