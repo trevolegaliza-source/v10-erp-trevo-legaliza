@@ -92,50 +92,71 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
       ? valorProcesso
       : (Number.isFinite(valorLancamento) ? valorLancamento : 0);
 
-    const slotsCount = isMudancaUF ? 2 : 1;
-
-    for (let s = 0; s < slotsCount; s++) {
-      slot++;
-      let valorFinal: number;
-      let desconto = 0;
-      let isManual = false;
-      let label = '';
-
-      if ((hasManualFlag || isUrgencia || hasBoasVindas) && s === 0) {
-        valorFinal = hasManualFlag ? (valorReal || 0) : valorReal;
-        desconto = 0;
-        isManual = true;
-        if (hasManualFlag) {
-          label = valorFinal === 0 ? 'CORTESIA' : 'VALOR MANUAL';
-        } else if (isUrgencia) {
-          label = 'MÉTODO TREVO / URGÊNCIA';
-        } else {
-          const pctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
-          label = pctMatch ? `BOAS-VINDAS ${pctMatch[1]}%` : 'BOAS-VINDAS';
-        }
-      } else if (valorReal > 0) {
-        valorFinal = valorReal;
-        desconto = base - valorFinal;
-      } else {
-        valorFinal = base;
-        if (descPct > 0 && slot > 1) {
-          for (let i = 1; i < slot; i++) {
-            valorFinal = valorFinal * (1 - descPct / 100);
-          }
-        }
-        if (limite > 0 && valorFinal < limite) valorFinal = limite;
-        desconto = base - valorFinal;
-      }
-
-      valorFinal = Math.round(valorFinal * 100) / 100;
-
+    // Mudança de UF: valor no banco JÁ é consolidado (soma dos 2 slots)
+    // Gera apenas 1 StepInfo, consome 2 slots na progressão
+    if (isMudancaUF) {
+      const startSlot = slot + 1;
+      slot += 2; // consome 2 posições
+      const valorFinal = Math.round((Number(valorReal) || 0) * 100) / 100;
       steps.push({
-        index: slot, processo: p, valorBase: isManual ? valorFinal : base,
-        desconto: Math.round(desconto * 100) / 100, valorFinal,
-        isSelected: selectedIds.has(p.id), isMudancaUF: isMudancaUF && s === 0,
-        isManual, isUrgencia, label,
+        index: startSlot,
+        processo: p,
+        valorBase: base,
+        desconto: 0,
+        valorFinal,
+        isSelected: selectedIds.has(p.id),
+        isMudancaUF: true,
+        isManual: true,
+        isUrgencia: false,
+        isCortesia: valorFinal === 0,
+        label: 'MUDANÇA DE UF',
+        slotsUsados: 2,
       });
+      continue;
     }
+
+    // Processos normais: 1 slot
+    slot++;
+    let valorFinal: number;
+    let desconto = 0;
+    let isManual = false;
+    let label = '';
+
+    if (hasManualFlag || isUrgencia || hasBoasVindas) {
+      valorFinal = hasManualFlag ? (valorReal || 0) : valorReal;
+      desconto = 0;
+      isManual = true;
+      if (hasManualFlag) {
+        label = valorFinal === 0 ? 'CORTESIA' : 'VALOR MANUAL';
+      } else if (isUrgencia) {
+        label = 'MÉTODO TREVO / URGÊNCIA';
+      } else {
+        const pctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
+        label = pctMatch ? `BOAS-VINDAS ${pctMatch[1]}%` : 'BOAS-VINDAS';
+      }
+    } else if (valorReal > 0) {
+      valorFinal = valorReal;
+      desconto = base - valorFinal;
+    } else {
+      valorFinal = base;
+      if (descPct > 0 && slot > 1) {
+        for (let i = 1; i < slot; i++) {
+          valorFinal = valorFinal * (1 - descPct / 100);
+        }
+      }
+      if (limite > 0 && valorFinal < limite) valorFinal = limite;
+      desconto = base - valorFinal;
+    }
+
+    valorFinal = Math.round(valorFinal * 100) / 100;
+
+    steps.push({
+      index: slot, processo: p, valorBase: isManual ? valorFinal : base,
+      desconto: Math.round(desconto * 100) / 100, valorFinal,
+      isSelected: selectedIds.has(p.id), isMudancaUF: false,
+      isManual, isUrgencia, isCortesia: valorFinal === 0 && isManual,
+      label, slotsUsados: 1,
+    });
   }
   return steps;
 }
