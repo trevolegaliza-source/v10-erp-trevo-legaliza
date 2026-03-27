@@ -100,11 +100,11 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
       let label = '';
 
       if ((hasManualFlag || isUrgencia || hasBoasVindas) && s === 0) {
-        valorFinal = valorReal;
+        valorFinal = hasManualFlag ? (valorReal || 0) : valorReal;
         desconto = 0;
         isManual = true;
         if (hasManualFlag) {
-          label = 'VALOR MANUAL';
+          label = valorFinal === 0 ? 'CORTESIA' : 'VALOR MANUAL';
         } else if (isUrgencia) {
           label = 'MÉTODO TREVO / URGÊNCIA';
         } else {
@@ -286,7 +286,7 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
 
   displaySteps.forEach((s, i) => {
     if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
-    const isLim = limite > 0 && s.valorFinal <= limite;
+    const isLim = !s.isManual && !s.isUrgencia && limite > 0 && s.valorFinal <= limite;
     const isBoasVindas = s.label && s.label.includes('BOAS-VINDAS');
 
     if (isBoasVindas) {
@@ -457,7 +457,7 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     }
 
     let manualBadge = '';
-    if (step.isManual && step.label && !isBoasVindasDiscount) {
+    if (step.isManual && step.label && !isBoasVindasDiscount && !isCortesia && step.valorFinal > 0) {
       manualBadge = `<span class="manual-badge">${step.label}</span>`;
     }
     // Boas-vindas gets a green badge instead of orange manual badge
@@ -538,14 +538,19 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
   let progHTML = '';
   if (descPct > 0 && steps.length > 0) {
     const progRows = steps.map(s => {
-      let status = '—';
       let desc = '—';
-      const isLimite = data.cliente.valor_limite_desconto && s.valorFinal <= (data.cliente.valor_limite_desconto ?? 0);
-      if (s.isManual) {
-        status = s.label || 'Valor Manual';
-      } else if (s.desconto > 0) {
+      const isLimite = !s.isManual && !s.isUrgencia && data.cliente.valor_limite_desconto && s.valorFinal <= (data.cliente.valor_limite_desconto ?? 0);
+      const status = s.valorFinal === 0 && s.isManual
+        ? 'CORTESIA'
+        : s.isUrgencia
+          ? 'URGÊNCIA'
+          : s.isManual
+            ? 'VALOR MANUAL'
+            : s.desconto > 0
+              ? (isLimite ? 'Limite atingido' : 'DESC. PROGRESSIVO')
+              : '—';
+      if (!s.isManual && s.desconto > 0) {
         desc = `-${descPct}%`;
-        status = isLimite ? 'Limite atingido' : 'Desconto acumulado';
       }
       return `<tr class="${isLimite ? 'limite' : ''}">
         <td>${s.index}º</td>
