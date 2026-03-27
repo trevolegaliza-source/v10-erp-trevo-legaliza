@@ -492,8 +492,7 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
       .in('id', ids);
     if (error) { toast.error(error.message); return; }
     setShowPago(false);
-    qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
-    qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+    invalidateFinanceiro(qc);
     toast.success('Pagamento confirmado!');
   }
 
