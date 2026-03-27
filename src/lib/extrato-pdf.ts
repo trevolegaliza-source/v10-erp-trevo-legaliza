@@ -844,11 +844,6 @@ async function loadImageBase64(url: string): Promise<string | null> {
     return null;
   }
 }
-      fr.onerror = () => res(null);
-      fr.readAsDataURL(blob);
-    });
-  } catch { return null; }
-}
 
 // ═══ DATA FETCHERS ═══
 export async function fetchValoresAdicionaisMulti(processoIds: string[]): Promise<Record<string, ValorAdicional[]>> {
