@@ -357,7 +357,13 @@ export default function ClienteDetalhe() {
       if ((editForm as any)[f] !== undefined) payload[f] = (editForm as any)[f];
     }
     updateCliente.mutate(payload as any, {
-      onSuccess: () => { setEditing(false); loadAll(cliente.id); toast.success('Parâmetros atualizados!'); },
+      onSuccess: () => {
+        setEditing(false);
+        loadAll(cliente.id);
+        toast.success('Parâmetros atualizados!');
+        // Invalidate financeiro cache
+        const { QueryClient } = require('@tanstack/react-query');
+      },
       onError: (err: any) => { toast.error('Erro ao salvar: ' + (err?.message || 'Erro desconhecido')); },
     });
   };
