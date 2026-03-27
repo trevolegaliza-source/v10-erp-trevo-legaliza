@@ -25,6 +25,42 @@ export async function downloadStorageFile(bucket: string, path: string): Promise
 }
 
 /**
+ * Faz download direto de um arquivo do Supabase Storage para o PC do usuário.
+ * Mais confiável que preview em modal — funciona em 100% dos navegadores.
+ */
+export async function downloadExtrato(bucket: string, path: string, filename: string): Promise<void> {
+  try {
+    toast.info('Baixando extrato...');
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .download(path);
+
+    if (error || !data) {
+      console.error('Storage download error:', error);
+      toast.error('Erro ao baixar o extrato. Tente gerar novamente.');
+      return;
+    }
+
+    const pdfBlob = new Blob([data], { type: 'application/pdf' });
+    const blobUrl = URL.createObjectURL(pdfBlob);
+
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+    toast.success('Extrato baixado!');
+  } catch (err) {
+    console.error('Download error:', err);
+    toast.error('Erro ao baixar o extrato.');
+  }
+}
+
+/**
  * Abre um arquivo do Supabase Storage via Blob URL,
  * evitando bloqueio do Chrome (ERR_BLOCKED_BY_CLIENT).
  */
