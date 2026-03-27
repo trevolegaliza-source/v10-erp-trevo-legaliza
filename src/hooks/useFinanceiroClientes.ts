@@ -239,6 +239,16 @@ export function useFinanceiroClientes() {
   });
 
   const clientes = query.data || [];
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const isVencido = (l: LancamentoFinanceiro) => {
+    if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
+    if (l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido') return true;
+    const venc = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
+    return venc ? venc < hoje : false;
+  };
+
   const metricas = {
     aguardandoExtrato: clientes.filter(c => c.qtd_sem_extrato > 0).length,
     valorAguardandoExtrato: clientes.filter(c => c.qtd_sem_extrato > 0).reduce((s, c) => s + c.total_pendente, 0),
@@ -246,8 +256,8 @@ export function useFinanceiroClientes() {
     valorAguardandoEnvio: clientes.filter(c => c.etapa_predominante === 'cobranca_gerada').reduce((s, c) => s + c.total_pendente, 0),
     aguardandoPagamento: clientes.filter(c => c.etapa_predominante === 'cobranca_enviada').length,
     valorAguardandoPagamento: clientes.filter(c => c.etapa_predominante === 'cobranca_enviada').reduce((s, c) => s + c.total_pendente, 0),
-    vencidos: clientes.filter(c => c.lancamentos.some(l => l.status === 'atrasado')).length,
-    valorVencido: clientes.filter(c => c.lancamentos.some(l => l.status === 'atrasado')).reduce((s, c) => s + c.lancamentos.filter(l => l.status === 'atrasado').reduce((ss, l) => ss + l.valor, 0), 0),
+    vencidos: clientes.filter(c => c.lancamentos.some(l => isVencido(l))).length,
+    valorVencido: clientes.filter(c => c.lancamentos.some(l => isVencido(l))).reduce((s, c) => s + c.lancamentos.filter(l => isVencido(l)).reduce((ss, l) => ss + l.valor, 0), 0),
   };
 
   return {

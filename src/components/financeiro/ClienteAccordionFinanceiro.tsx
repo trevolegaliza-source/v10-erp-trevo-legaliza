@@ -57,10 +57,25 @@ const BADGE_COLORS: Record<string, string> = {
   'Cortesia': 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
 };
 
-function tipoLabel(c: ClienteFinanceiro) {
+function tipoLabel(c: ClienteFinanceiro): string {
   if (c.cliente_momento_faturamento === 'no_deferimento') return 'No deferimento';
-  if (c.cliente_tipo === 'MENSALISTA') return `Mensal dia ${c.cliente_dia_vencimento_mensal || 15}`;
-  return `Avulso D+${c.cliente_dia_cobranca || 4}`;
+
+  if (c.cliente_tipo === 'MENSALISTA') {
+    return `Mensalista${c.cliente_dia_vencimento_mensal ? ` — dia ${c.cliente_dia_vencimento_mensal}` : ''}`;
+  }
+
+  if (c.cliente_tipo === 'PRE_PAGO') return 'Pré-Pago';
+
+  // AVULSO_4D: verificar forma de cobrança
+  if (c.cliente_dia_vencimento_mensal && c.cliente_dia_vencimento_mensal > 0 && !c.cliente_dia_cobranca) {
+    return `Fatura mensal — dia ${c.cliente_dia_vencimento_mensal}`;
+  }
+
+  if (c.cliente_dia_cobranca && c.cliente_dia_cobranca > 0) {
+    return `Avulso D+${c.cliente_dia_cobranca}`;
+  }
+
+  return 'Avulso';
 }
 
 // ══════════ TAB: FATURAR ══════════
@@ -437,7 +452,16 @@ export function ClientesRecebidos({ clientes }: { clientes: ClienteFinanceiro[] 
 
 // ══════════ TAB: VENCIDOS ══════════
 export function ClientesVencidos({ clientes }: { clientes: ClienteFinanceiro[] }) {
-  if (clientes.length === 0) return <EmptyState text="Nenhum cliente com cobrança vencida." />;
+  if (clientes.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+          <CheckCircle className="h-10 w-10 text-emerald-500/40 mb-3" />
+          <p className="text-sm text-muted-foreground">Nenhuma cobrança vencida. Tudo em dia! ✓</p>
+        </CardContent>
+      </Card>
+    );
+  }
   return (
     <Accordion type="multiple" className="space-y-2">
       {clientes.map(c => <VencidoItem key={c.cliente_id} cliente={c} />)}
@@ -450,7 +474,14 @@ function VencidoItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split('T')[0]);
   const qc = useQueryClient();
 
-  const lancVencidos = cliente.lancamentos.filter(l => l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido');
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const lancVencidos = cliente.lancamentos.filter(l => {
+    if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
+    if (l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido') return true;
+    const venc = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
+    return venc ? venc < hoje : false;
+  });
   const maiorAtraso = Math.max(...lancVencidos.map(l => diasAtraso(l.data_vencimento)), 0);
 
   async function confirmarPago() {

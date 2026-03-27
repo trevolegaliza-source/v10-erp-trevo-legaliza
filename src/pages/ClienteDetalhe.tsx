@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -52,6 +53,7 @@ interface DeferimentoAlertData {
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const qcRef = useQueryClient();
   const [cliente, setCliente] = useState<ClienteDB | null>(null);
   const [processos, setProcessos] = useState<ProcessoDB[]>([]);
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
@@ -357,7 +359,12 @@ export default function ClienteDetalhe() {
       if ((editForm as any)[f] !== undefined) payload[f] = (editForm as any)[f];
     }
     updateCliente.mutate(payload as any, {
-      onSuccess: () => { setEditing(false); loadAll(cliente.id); toast.success('Parâmetros atualizados!'); },
+      onSuccess: () => {
+        setEditing(false);
+        loadAll(cliente.id);
+        toast.success('Parâmetros atualizados!');
+        qcRef.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      },
       onError: (err: any) => { toast.error('Erro ao salvar: ' + (err?.message || 'Erro desconhecido')); },
     });
   };

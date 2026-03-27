@@ -26,6 +26,16 @@ export default function Financeiro() {
   const [activeTab, setActiveTab] = useState('faturar');
 
   // Filter clients per tab
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  const isLancamentoVencido = (l: { data_vencimento: string; status: string; etapa_financeiro: string }) => {
+    if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
+    if (l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido') return true;
+    const venc = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
+    return venc ? venc < hoje : false;
+  };
+
   const clientesFaturar = clientes.filter(c => c.qtd_sem_extrato > 0);
   const clientesEnviar = clientes.filter(c =>
     c.etapa_predominante === 'cobranca_gerada' && c.qtd_sem_extrato === 0
@@ -37,7 +47,7 @@ export default function Financeiro() {
     c.etapa_predominante === 'honorario_pago'
   );
   const clientesVencidos = clientes.filter(c =>
-    c.lancamentos.some(l => l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido')
+    c.lancamentos.some(l => isLancamentoVencido(l))
   );
 
   const totalRecebido = stats?.receitaPrevistaMes || 0;
@@ -179,13 +189,13 @@ export default function Financeiro() {
             <CheckCircle className="h-3.5 w-3.5" />
             Recebidos
           </TabsTrigger>
-          {metricas.vencidos > 0 && (
-            <TabsTrigger value="vencidos" className="gap-1.5 text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Vencidos
-              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{metricas.vencidos}</Badge>
-            </TabsTrigger>
-          )}
+          <TabsTrigger value="vencidos" className="gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Vencidos
+            {clientesVencidos.length > 0 && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesVencidos.length}</Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="faturar" className="mt-4">
