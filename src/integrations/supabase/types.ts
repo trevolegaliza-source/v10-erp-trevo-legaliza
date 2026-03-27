@@ -374,6 +374,71 @@ export type Database = {
           },
         ]
       }
+      extratos: {
+        Row: {
+          cliente_id: string
+          competencia_ano: number
+          competencia_mes: number
+          created_at: string | null
+          created_by: string | null
+          filename: string
+          id: string
+          observacoes: string | null
+          pdf_url: string
+          processo_ids: string[]
+          qtd_processos: number
+          status: string
+          total_geral: number
+          total_honorarios: number
+          total_taxas: number
+          updated_at: string | null
+        }
+        Insert: {
+          cliente_id: string
+          competencia_ano: number
+          competencia_mes: number
+          created_at?: string | null
+          created_by?: string | null
+          filename: string
+          id?: string
+          observacoes?: string | null
+          pdf_url: string
+          processo_ids?: string[]
+          qtd_processos?: number
+          status?: string
+          total_geral?: number
+          total_honorarios?: number
+          total_taxas?: number
+          updated_at?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          competencia_ano?: number
+          competencia_mes?: number
+          created_at?: string | null
+          created_by?: string | null
+          filename?: string
+          id?: string
+          observacoes?: string | null
+          pdf_url?: string
+          processo_ids?: string[]
+          qtd_processos?: number
+          status?: string
+          total_geral?: number
+          total_honorarios?: number
+          total_taxas?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extratos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lancamentos: {
         Row: {
           boleto_url: string | null
@@ -392,6 +457,7 @@ export type Database = {
           descricao: string
           despesa_recorrente_id: string | null
           etapa_financeiro: string
+          extrato_id: string | null
           fornecedor: string | null
           honorario_extra: number | null
           id: string
@@ -426,6 +492,7 @@ export type Database = {
           descricao: string
           despesa_recorrente_id?: string | null
           etapa_financeiro?: string
+          extrato_id?: string | null
           fornecedor?: string | null
           honorario_extra?: number | null
           id?: string
@@ -460,6 +527,7 @@ export type Database = {
           descricao?: string
           despesa_recorrente_id?: string | null
           etapa_financeiro?: string
+          extrato_id?: string | null
           fornecedor?: string | null
           honorario_extra?: number | null
           id?: string
@@ -497,6 +565,13 @@ export type Database = {
             columns: ["despesa_recorrente_id"]
             isOneToOne: false
             referencedRelation: "despesas_recorrentes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "extratos"
             referencedColumns: ["id"]
           },
           {
