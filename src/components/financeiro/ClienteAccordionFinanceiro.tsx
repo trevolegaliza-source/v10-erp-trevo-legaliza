@@ -402,7 +402,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       .update({ etapa_financeiro: 'cobranca_enviada', observacoes_financeiro: `Cobrança enviada em ${new Date().toLocaleDateString('pt-BR')}` } as any)
       .in('id', ids);
     if (error) { toast.error(error.message); return; }
-    qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+    invalidateFinanceiro(qc);
     toast.success('Cobrança marcada como enviada!');
   }
 
