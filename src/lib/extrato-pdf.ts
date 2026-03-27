@@ -58,7 +58,9 @@ interface StepInfo {
   isMudancaUF: boolean;
   isManual: boolean;
   isUrgencia: boolean;
+  isCortesia: boolean;
   label: string;
+  slotsUsados: number;
 }
 
 // ═══ JGVCO LOGIC ═══
@@ -90,50 +92,71 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
       ? valorProcesso
       : (Number.isFinite(valorLancamento) ? valorLancamento : 0);
 
-    const slotsCount = isMudancaUF ? 2 : 1;
-
-    for (let s = 0; s < slotsCount; s++) {
-      slot++;
-      let valorFinal: number;
-      let desconto = 0;
-      let isManual = false;
-      let label = '';
-
-      if ((hasManualFlag || isUrgencia || hasBoasVindas) && s === 0) {
-        valorFinal = hasManualFlag ? (valorReal || 0) : valorReal;
-        desconto = 0;
-        isManual = true;
-        if (hasManualFlag) {
-          label = valorFinal === 0 ? 'CORTESIA' : 'VALOR MANUAL';
-        } else if (isUrgencia) {
-          label = 'MÉTODO TREVO / URGÊNCIA';
-        } else {
-          const pctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
-          label = pctMatch ? `BOAS-VINDAS ${pctMatch[1]}%` : 'BOAS-VINDAS';
-        }
-      } else if (valorReal > 0) {
-        valorFinal = valorReal;
-        desconto = base - valorFinal;
-      } else {
-        valorFinal = base;
-        if (descPct > 0 && slot > 1) {
-          for (let i = 1; i < slot; i++) {
-            valorFinal = valorFinal * (1 - descPct / 100);
-          }
-        }
-        if (limite > 0 && valorFinal < limite) valorFinal = limite;
-        desconto = base - valorFinal;
-      }
-
-      valorFinal = Math.round(valorFinal * 100) / 100;
-
+    // Mudança de UF: valor no banco JÁ é consolidado (soma dos 2 slots)
+    // Gera apenas 1 StepInfo, consome 2 slots na progressão
+    if (isMudancaUF) {
+      const startSlot = slot + 1;
+      slot += 2; // consome 2 posições
+      const valorFinal = Math.round((Number(valorReal) || 0) * 100) / 100;
       steps.push({
-        index: slot, processo: p, valorBase: isManual ? valorFinal : base,
-        desconto: Math.round(desconto * 100) / 100, valorFinal,
-        isSelected: selectedIds.has(p.id), isMudancaUF: isMudancaUF && s === 0,
-        isManual, isUrgencia, label,
+        index: startSlot,
+        processo: p,
+        valorBase: base,
+        desconto: 0,
+        valorFinal,
+        isSelected: selectedIds.has(p.id),
+        isMudancaUF: true,
+        isManual: true,
+        isUrgencia: false,
+        isCortesia: valorFinal === 0,
+        label: 'MUDANÇA DE UF',
+        slotsUsados: 2,
       });
+      continue;
     }
+
+    // Processos normais: 1 slot
+    slot++;
+    let valorFinal: number;
+    let desconto = 0;
+    let isManual = false;
+    let label = '';
+
+    if (hasManualFlag || isUrgencia || hasBoasVindas) {
+      valorFinal = hasManualFlag ? (valorReal || 0) : valorReal;
+      desconto = 0;
+      isManual = true;
+      if (hasManualFlag) {
+        label = valorFinal === 0 ? 'CORTESIA' : 'VALOR MANUAL';
+      } else if (isUrgencia) {
+        label = 'MÉTODO TREVO / URGÊNCIA';
+      } else {
+        const pctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
+        label = pctMatch ? `BOAS-VINDAS ${pctMatch[1]}%` : 'BOAS-VINDAS';
+      }
+    } else if (valorReal > 0) {
+      valorFinal = valorReal;
+      desconto = base - valorFinal;
+    } else {
+      valorFinal = base;
+      if (descPct > 0 && slot > 1) {
+        for (let i = 1; i < slot; i++) {
+          valorFinal = valorFinal * (1 - descPct / 100);
+        }
+      }
+      if (limite > 0 && valorFinal < limite) valorFinal = limite;
+      desconto = base - valorFinal;
+    }
+
+    valorFinal = Math.round(valorFinal * 100) / 100;
+
+    steps.push({
+      index: slot, processo: p, valorBase: isManual ? valorFinal : base,
+      desconto: Math.round(desconto * 100) / 100, valorFinal,
+      isSelected: selectedIds.has(p.id), isMudancaUF: false,
+      isManual, isUrgencia, isCortesia: valorFinal === 0 && isManual,
+      label, slotsUsados: 1,
+    });
   }
   return steps;
 }
@@ -267,22 +290,27 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
   const base = data.cliente.valor_base ?? 580;
   const limite = data.cliente.valor_limite_desconto ?? 0;
 
-  // Show all steps + 1 "next" step (max 5 total)
-  const displaySteps = steps.slice(-4); // last 4
+  // Show all steps + 1 "next" step (max last 4 steps)
+  const displaySteps = steps.slice(-4);
 
-  // Calculate next step value based on non-manual slot count
-  const nonManualCount = steps.filter(s => !s.isManual).length;
-  const lastSlot = Math.max(nonManualCount, 1);
+  // Calculate next step value based on total slots consumed
+  const totalSlots = steps.reduce((sum, s) => sum + (s.slotsUsados || 1), 0);
   let nextVal = base;
-  for (let i = 1; i <= lastSlot; i++) {
+  for (let i = 1; i <= totalSlots; i++) {
     nextVal = nextVal * (1 - descPct / 100);
   }
   const limitReached = limite > 0 && nextVal <= limite;
   if (limitReached) nextVal = limite;
 
+  // Responsive sizing
+  const totalDegraus = displaySteps.length + (limitReached ? 0 : 1);
+  const degrauWidth = totalDegraus <= 3 ? 180 : totalDegraus <= 5 ? 150 : totalDegraus <= 7 ? 120 : 100;
+  const fontSize = totalDegraus <= 3 ? '14px' : totalDegraus <= 5 ? '12px' : '11px';
+  const labelSize = totalDegraus <= 3 ? '9px' : totalDegraus <= 5 ? '8px' : '7px';
+
   const arrowSvg = (color: string) => `<svg viewBox="0 0 10 10"><polygon points="0,0 10,5 0,10" fill="${color}"/></svg>`;
 
-  let html = '<div class="prog-bar">';
+  let html = '<div class="prog-bar" style="flex-wrap:wrap;justify-content:center;gap:4px;">';
 
   displaySteps.forEach((s, i) => {
     if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
@@ -293,22 +321,30 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
       ? `<div style="font-size:7px;color:#22c55e;font-weight:700;margin-top:3px;">● COBRADO</div>`
       : '';
 
+    // Label for slot number
+    const slotLabel = s.isMudancaUF
+      ? `${s.index}º-${s.index + 1}º Processo`
+      : `${s.index}º Processo`;
+    const borderColor = s.isMudancaUF ? 'border:2px solid #3b82f6;' : '';
+
     if (isBoasVindas) {
       html += `
-        <div class="prog-step active" style="${opacityStyle}">
-          <div class="ps-label">${s.index}º Processo</div>
+        <div class="prog-step active" style="${opacityStyle}${borderColor}flex:0 0 auto;width:${degrauWidth}px;">
+          <div class="ps-label" style="font-size:${labelSize};">${slotLabel}</div>
           <div style="font-size:7.5px;color:rgba(255,255,255,0.6);text-decoration:line-through;">${fmt(base)}</div>
-          <div class="ps-value">${fmt(s.valorFinal)}</div>
+          <div class="ps-value" style="font-size:${fontSize};">${fmt(s.valorFinal)}</div>
           <div style="font-size:6px;color:#4ade80;font-weight:700;">(${s.label})</div>
           ${cobradoIndicator}
         </div>
       `;
     } else {
+      const descLabel = s.isMudancaUF ? 'MUDANÇA DE UF (2 slots)' : (s.isManual ? s.label : (s.desconto > 0 ? `-${descPct}% sobre base` : '(base)'));
+      const descColor = s.isMudancaUF ? 'color:#60a5fa;' : '';
       html += `
-        <div class="prog-step active" style="${opacityStyle}">
-          <div class="ps-label">${s.index}º Processo</div>
-          <div class="ps-value">${fmt(s.valorFinal)}</div>
-          <div class="ps-desc">${s.isManual ? s.label : (s.desconto > 0 ? `-${descPct}% sobre base` : '(base)')}</div>
+        <div class="prog-step active" style="${opacityStyle}${borderColor}flex:0 0 auto;width:${degrauWidth}px;">
+          <div class="ps-label" style="font-size:${labelSize};">${slotLabel}</div>
+          <div class="ps-value" style="font-size:${fontSize};">${fmt(s.valorFinal)}</div>
+          <div class="ps-desc" style="font-size:${labelSize};${descColor}">${descLabel}</div>
           ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
           ${cobradoIndicator}
         </div>
@@ -319,10 +355,10 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
   if (!limitReached) {
     html += `<div class="prog-arrow">${arrowSvg('#86efac')}</div>`;
     html += `
-      <div class="prog-step next">
-        <div class="ps-label">${steps.length + 1}º Processo</div>
-        <div class="ps-value">${fmt(Math.round(nextVal * 100) / 100)}</div>
-        <div class="ps-desc">-${descPct}% sobre base</div>
+      <div class="prog-step next" style="flex:0 0 auto;width:${degrauWidth}px;">
+        <div class="ps-label" style="font-size:${labelSize};">${totalSlots + 1}º Processo</div>
+        <div class="ps-value" style="font-size:${fontSize};">${fmt(Math.round(nextVal * 100) / 100)}</div>
+        <div class="ps-desc" style="font-size:${labelSize};">-${descPct}% sobre base</div>
         <div class="ps-next-label">SEU PRÓXIMO DESCONTO</div>
       </div>
     `;
@@ -373,7 +409,7 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         ${data.cliente.telefone ? `<div class="client-contact">📱 ${data.cliente.telefone}</div>` : ''}
         ${data.cliente.email ? `<div class="client-contact">✉ ${data.cliente.email}</div>` : ''}
         <div class="client-meta">Relatório de Performance: 01/${mesNum}/${now.getFullYear()} até ${emissao}</div>
-        <div class="client-meta">Emissão: ${emissao} • ${data.processos.length} processo(s) cobrado(s)</div>
+        <div class="client-meta">Emissão: ${emissao} • ${selected.length} processo(s) cobrado(s)</div>
       </div>
 
       <div class="fin-section">
@@ -382,8 +418,8 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
           <div class="total-label">TOTAL</div>
           ${economiaBoasVindas > 0 ? `<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;margin-bottom:2px;">${fmt(totalGeral + economiaBoasVindas)}</div>` : ''}
           <div class="total-value"><span class="total-prefix">R$ </span>${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-          ${economiaBoasVindas > 0 ? `<div style="font-size:8px;color:#4ade80;margin-top:4px;">Desconto de boas-vindas aplicado</div>` : ''}
-          <div class="total-ctx">${selected.length} processo(s) cobrado(s) neste período</div>
+          ${economiaBoasVindas > 0 ? `<div style="font-size:9px;color:#4ade80;margin-top:8px;">↓ Desconto de boas-vindas aplicado no 1º processo</div>` : ''}
+          <div style="font-size:9px;color:#94a3b8;margin-top:4px;">${selected.length} processo(s) cobrado(s) neste período</div>
         </div>
 
         <div class="kpi-row">
@@ -471,7 +507,9 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     }
 
     let manualBadge = '';
-    if (step.isManual && step.label && !isBoasVindasDiscount && !isCortesia && step.valorFinal > 0) {
+    if (step.isMudancaUF) {
+      manualBadge = `<span style="display:inline-block;background:#3b82f6;color:#fff;font-size:7px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:3px;margin-left:6px;">MUDANÇA DE UF</span>`;
+    } else if (step.isManual && step.label && !isBoasVindasDiscount && !isCortesia && step.valorFinal > 0) {
       manualBadge = `<span class="manual-badge">${step.label}</span>`;
     }
     // Boas-vindas gets a green badge instead of orange manual badge
@@ -531,10 +569,10 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
       <div class="process-card" style="page-break-inside: avoid;">
         <div class="process-header">
           <div class="ph-left">
-            <div class="ph-badge">${step.index}º</div>
+            <div class="ph-badge">${step.isMudancaUF ? `${step.index}º-${step.index + 1}º` : `${step.index}º`}</div>
             <div class="ph-info">
               <div class="ph-title">${p.tipo.toUpperCase()} — ${p.razao_social}${manualBadge}</div>
-              <div class="ph-date">${fmtDate(p.created_at)}</div>
+              <div class="ph-date">${fmtDate(p.created_at)}${step.isMudancaUF ? ' • Consome 2 slots na progressão' : ''}</div>
               ${discountLine}
             </div>
           </div>
@@ -554,15 +592,17 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
     const progRows = steps.map(s => {
       let desc = '—';
       const isLimite = !s.isManual && !s.isUrgencia && data.cliente.valor_limite_desconto && s.valorFinal <= (data.cliente.valor_limite_desconto ?? 0);
-      const status = s.valorFinal === 0 && s.isManual
+      const status = s.isCortesia
         ? 'CORTESIA'
-        : s.isUrgencia
-          ? 'URGÊNCIA'
-          : s.isManual
-            ? 'VALOR MANUAL'
-            : s.desconto > 0
-              ? (isLimite ? 'Limite atingido' : 'DESC. PROGRESSIVO')
-              : '—';
+        : s.isMudancaUF
+          ? 'MUDANÇA DE UF (2 slots)'
+          : s.isUrgencia
+            ? 'URGÊNCIA'
+            : s.isManual
+              ? 'VALOR MANUAL'
+              : s.desconto > 0
+                ? (isLimite ? 'Limite atingido' : 'DESC. PROGRESSIVO')
+                : '—';
       if (!s.isManual && s.desconto > 0) {
         desc = `-${descPct}%`;
       }
@@ -570,8 +610,9 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         ? '<span style="color:#22c55e;font-weight:600;">✓ COBRADO</span>'
         : '<span style="color:#9ca3af;">—</span>';
       const rowStyle = s.isSelected ? 'background:#f0fdf4;' : 'opacity:0.6;';
+      const procLabel = s.isMudancaUF ? `${s.index}º-${s.index + 1}º` : `${s.index}º`;
       return `<tr class="${isLimite ? 'limite' : ''}" style="${rowStyle}">
-        <td>${s.index}º</td>
+        <td>${procLabel}</td>
         <td class="val">${fmt(s.valorFinal)}</td>
         <td class="desc">${desc}</td>
         <td class="status">${status}</td>
