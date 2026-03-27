@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { FileText, Send, Copy, Eye, CheckCircle, AlertTriangle, Clock, Calendar } from 'lucide-react';
+import { FileText, Send, Copy, Eye, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw } from 'lucide-react';
 import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import { useExtratos } from '@/hooks/useExtratos';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
@@ -250,6 +250,10 @@ export function ClientesEnviar({ clientes }: { clientes: ClienteFinanceiro[] }) 
 
 function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const qc = useQueryClient();
+  const [regenerating, setRegenerating] = useState(false);
+  const { salvarExtrato } = useExtratos();
+
+  const hasExtratoNoSistema = cliente.lancamentos.some(l => l.extrato_id);
 
   async function handleCopiarMensagem() {
     const l = cliente.lancamentos[0];
@@ -265,22 +269,135 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   }
 
   async function handleVisualizarExtrato() {
-    if (!cliente.extrato_mais_recente) { toast.info('Nenhum extrato encontrado.'); return; }
-    try {
-      const { data: extrato } = await supabase
-        .from('extratos')
-        .select('cliente_id, filename')
-        .eq('id', cliente.extrato_mais_recente.id)
-        .single();
-      if (!extrato) return;
-      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
-      const { data: fileData } = await supabase.storage.from('documentos').download(path);
-      if (fileData) {
-        const blobUrl = URL.createObjectURL(fileData);
-        window.open(blobUrl, '_blank');
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    // Try finding extrato via lancamento extrato_id
+    const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
+    if (lancComExtrato?.extrato_id) {
+      try {
+        const { data: extrato } = await supabase
+          .from('extratos')
+          .select('cliente_id, filename')
+          .eq('id', lancComExtrato.extrato_id)
+          .single();
+        if (extrato) {
+          const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
+          const { data: fileData } = await supabase.storage.from('documentos').download(path);
+          if (fileData) {
+            const blobUrl = URL.createObjectURL(fileData);
+            window.open(blobUrl, '_blank');
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao buscar extrato:', err);
       }
-    } catch { toast.error('Erro ao abrir extrato.'); }
+    }
+
+    // Fallback: try extrato_mais_recente
+    if (cliente.extrato_mais_recente) {
+      try {
+        const { data: extrato } = await supabase
+          .from('extratos')
+          .select('cliente_id, filename')
+          .eq('id', cliente.extrato_mais_recente!.id)
+          .single();
+        if (extrato) {
+          const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
+          const { data: fileData } = await supabase.storage.from('documentos').download(path);
+          if (fileData) {
+            const blobUrl = URL.createObjectURL(fileData);
+            window.open(blobUrl, '_blank');
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+            return;
+          }
+        }
+      } catch { /* fall through */ }
+    }
+
+    toast.info('Este extrato foi gerado antes do novo sistema. Clique em "Gerar e Salvar Extrato" para gerar novamente e salvá-lo.', { duration: 5000 });
+  }
+
+  async function handleRegerarExtrato() {
+    setRegenerating(true);
+    try {
+      const { data: clienteData } = await supabase
+        .from('clientes')
+        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador, dia_cobranca, dia_vencimento_mensal')
+        .eq('id', cliente.cliente_id)
+        .single();
+
+      const processoIds = cliente.lancamentos.map(l => l.processo_id).filter(Boolean);
+      const { data: processosData } = await supabase
+        .from('processos')
+        .select('*, cliente:clientes(*)')
+        .in('id', processoIds);
+
+      const { data: lancamentosData } = await supabase
+        .from('lancamentos')
+        .select('*, cliente:clientes(*)')
+        .eq('tipo', 'receber')
+        .in('processo_id', processoIds);
+
+      const lancMap = new Map<string, any>();
+      (lancamentosData || []).forEach((l: any) => { if (!lancMap.has(l.processo_id)) lancMap.set(l.processo_id, l); });
+
+      const processosFinanceiro: ProcessoFinanceiro[] = (processosData || []).map((p: any) => ({
+        ...p,
+        lancamento: lancMap.get(p.id) || null,
+        etapa_financeiro: lancMap.get(p.id)?.etapa_financeiro || 'solicitacao_criada',
+      }));
+
+      const [valoresAdicionais, allCompetencia] = await Promise.all([
+        fetchValoresAdicionaisMulti(processoIds),
+        fetchCompetenciaProcessos(cliente.cliente_id),
+      ]);
+
+      const allCompetenciaFinanceiro: ProcessoFinanceiro[] = (allCompetencia as any[]).map((p: any) => ({
+        ...p,
+        lancamento: lancMap.get(p.id) || null,
+        etapa_financeiro: lancMap.get(p.id)?.etapa_financeiro || 'solicitacao_criada',
+      }));
+
+      const result = await gerarExtratoPDF({
+        processos: processosFinanceiro,
+        allCompetencia: allCompetenciaFinanceiro,
+        valoresAdicionais,
+        cliente: clienteData as any,
+      });
+
+      const blob = result.doc.output('blob');
+      const clienteName = clienteData?.apelido || clienteData?.nome || 'extrato';
+      const filename = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      // Download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      // Save
+      const now = new Date();
+      await salvarExtrato.mutateAsync({
+        clienteId: cliente.cliente_id,
+        pdfBlob: blob,
+        filename,
+        totalHonorarios: result.totalHonorarios,
+        totalTaxas: result.totalTaxas,
+        totalGeral: result.totalGeral,
+        processoIds,
+        competenciaMes: now.getMonth() + 1,
+        competenciaAno: now.getFullYear(),
+      });
+
+      qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      toast.success('Extrato gerado e salvo no sistema!');
+    } catch (err: any) {
+      toast.error('Erro ao gerar extrato: ' + err.message);
+    } finally {
+      setRegenerating(false);
+    }
   }
 
   async function handleMarcarEnviado() {
@@ -303,20 +420,37 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
             <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
             <p className="text-xs text-muted-foreground">{fmt(cliente.total_faturado)} · {cliente.qtd_processos} proc.</p>
           </div>
-          {cliente.extrato_mais_recente && (
+          {hasExtratoNoSistema && cliente.extrato_mais_recente ? (
             <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-xs">
               Extrato em {fmtDate(cliente.extrato_mais_recente.created_at)}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs">
+              Extrato não salvo
             </Badge>
           )}
         </div>
       </AccordionTrigger>
       <AccordionContent className="px-4 pb-4">
         <div className="space-y-2">
+          {!hasExtratoNoSistema && (
+            <div className="flex items-center gap-2 text-sm text-warning mb-2">
+              <AlertTriangle className="h-4 w-4" />
+              <span>Extrato gerado pelo sistema antigo — não salvo no sistema.</span>
+            </div>
+          )}
           {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
           <div className="flex gap-2 mt-3 flex-wrap">
-            <Button size="sm" variant="outline" onClick={handleVisualizarExtrato}>
-              <Eye className="h-4 w-4 mr-1" /> Ver Extrato
-            </Button>
+            {hasExtratoNoSistema ? (
+              <Button size="sm" variant="outline" onClick={handleVisualizarExtrato}>
+                <Eye className="h-4 w-4 mr-1" /> Ver Extrato
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={handleRegerarExtrato} disabled={regenerating}>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                {regenerating ? 'Gerando...' : 'Gerar e Salvar Extrato'}
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={handleCopiarMensagem}>
               <Copy className="h-4 w-4 mr-1" /> Copiar WhatsApp
             </Button>
