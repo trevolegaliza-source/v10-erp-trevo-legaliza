@@ -48,6 +48,7 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
   const [showDeferimentoAlert, setShowDeferimentoAlert] = useState(false);
   const [deferimentoAlertData, setDeferimentoAlertData] = useState<DeferimentoAlertData | null>(null);
   const qc = useQueryClient();
+  const { salvarExtrato } = useExtratos();
 
   const allChecked = processos.length > 0 && selected.size === processos.length;
 
