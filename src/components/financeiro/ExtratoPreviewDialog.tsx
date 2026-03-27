@@ -44,7 +44,25 @@ export function ExtratoPreviewDialog({
         </DialogHeader>
         <div className="flex-1 min-h-0">
           {pdfBlobUrl ? (
-            <iframe src={pdfBlobUrl} className="w-full h-full border-0" title="Preview do Extrato" />
+            <object
+              data={pdfBlobUrl}
+              type="application/pdf"
+              className="w-full h-full"
+              title="Preview do Extrato"
+            >
+              <embed
+                src={pdfBlobUrl}
+                type="application/pdf"
+                className="w-full h-full"
+              />
+              <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
+                <p>Não foi possível exibir o PDF no navegador.</p>
+                <Button variant="outline" onClick={handleDownload}>
+                  <Download className="h-4 w-4 mr-1" />
+                  Baixar PDF
+                </Button>
+              </div>
+            </object>
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground">Carregando extrato...</div>
           )}
