@@ -37,6 +37,6 @@ export async function getSignedUrl(storagePath: string): Promise<string> {
 }
 
 export async function viewFile(storagePath: string) {
-  const url = await getSignedUrl(storagePath);
-  window.open(url, '_blank');
+  const { abrirArquivoStorage } = await import('@/lib/storage-utils');
+  await abrirArquivoStorage(BUCKET, storagePath);
 }

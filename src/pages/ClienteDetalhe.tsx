@@ -529,12 +529,8 @@ export default function ClienteDetalhe() {
   const handleViewContract = async (fileName: string) => {
     if (!cliente) return;
     const storagePath = `${cliente.id}/${fileName}`;
-    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(storagePath, 3600);
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, '_blank');
-    } else {
-      toast.error('Erro: Arquivo antigo incompatível, por favor re-anexe');
-    }
+    const { abrirArquivoStorage } = await import('@/lib/storage-utils');
+    await abrirArquivoStorage(STORAGE_BUCKETS.CONTRACTS, storagePath);
   };
 
   const handleDeleteContract = (fileName: string) => {

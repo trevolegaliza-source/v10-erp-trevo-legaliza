@@ -67,13 +67,8 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
   };
 
   const viewComprovante = async (url: string) => {
-    try {
-      const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(url, 3600);
-      if (error) throw error;
-      window.open(data.signedUrl, '_blank');
-    } catch (err: any) {
-      toast.error('Erro ao abrir comprovante: ' + (err?.message || 'Desconhecido'));
-    }
+    const { abrirArquivoStorage } = await import('@/lib/storage-utils');
+    await abrirArquivoStorage(STORAGE_BUCKETS.CONTRACTS, url);
   };
 
   const handleReciboUpload = async (lancamentoId: string, file: File) => {
