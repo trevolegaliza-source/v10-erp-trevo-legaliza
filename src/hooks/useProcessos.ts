@@ -183,7 +183,6 @@ export function useDashboardStats() {
       }
 
       // Also count processos without lancamento (they default to solicitacao_criada)
-      // For "cobranças a gerar" we sum valor of processos in gerar_cobranca stage
 
       // VALORES REEMBOLSÁVEIS: sum of all valores_adicionais not yet paid
       const { data: valoresReemb } = await supabase
