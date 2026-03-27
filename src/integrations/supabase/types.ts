@@ -381,6 +381,8 @@ export type Database = {
           competencia_mes: number
           created_at: string | null
           created_by: string | null
+          data_envio: string | null
+          enviado: boolean
           filename: string
           id: string
           observacoes: string | null
@@ -399,6 +401,8 @@ export type Database = {
           competencia_mes: number
           created_at?: string | null
           created_by?: string | null
+          data_envio?: string | null
+          enviado?: boolean
           filename: string
           id?: string
           observacoes?: string | null
@@ -417,6 +421,8 @@ export type Database = {
           competencia_mes?: number
           created_at?: string | null
           created_by?: string | null
+          data_envio?: string | null
+          enviado?: boolean
           filename?: string
           id?: string
           observacoes?: string | null
