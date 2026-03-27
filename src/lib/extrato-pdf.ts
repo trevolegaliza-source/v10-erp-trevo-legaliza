@@ -566,11 +566,16 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
       if (!s.isManual && s.desconto > 0) {
         desc = `-${descPct}%`;
       }
-      return `<tr class="${isLimite ? 'limite' : ''}">
+      const cobradoLabel = s.isSelected
+        ? '<span style="color:#22c55e;font-weight:600;">✓ COBRADO</span>'
+        : '<span style="color:#9ca3af;">—</span>';
+      const rowStyle = s.isSelected ? 'background:#f0fdf4;' : 'opacity:0.6;';
+      return `<tr class="${isLimite ? 'limite' : ''}" style="${rowStyle}">
         <td>${s.index}º</td>
         <td class="val">${fmt(s.valorFinal)}</td>
         <td class="desc">${desc}</td>
         <td class="status">${status}</td>
+        <td>${cobradoLabel}</td>
       </tr>`;
     }).join('');
 
@@ -582,7 +587,7 @@ function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
       <div class="prog-block">
         <div class="prog-title">PROGRESSÃO DE INCENTIVO POR VOLUME</div>
         <table class="prog-table">
-          <thead><tr><th>Proc.</th><th>Valor</th><th>Desc.</th><th>Status</th></tr></thead>
+          <thead><tr><th>Proc.</th><th>Valor</th><th>Desc.</th><th>Status</th><th>Extrato</th></tr></thead>
           <tbody>${progRows}</tbody>
         </table>
         <div class="prog-legal">${legalText}</div>
