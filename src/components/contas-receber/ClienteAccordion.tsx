@@ -64,7 +64,6 @@ function ClienteAccordionItem({
   const [selectedProcessos, setSelectedProcessos] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewFilename, setPreviewFilename] = useState<string>('');
   const { salvarExtrato, excluirExtrato } = useExtratos(g.clienteId);
 
