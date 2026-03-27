@@ -190,7 +190,7 @@ function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       });
 
       setSelected(new Set());
-      qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      invalidateFinanceiro(qc);
     } catch (err: any) {
       toast.error('Erro ao gerar extrato: ' + err.message);
     } finally {
