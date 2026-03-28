@@ -38,6 +38,7 @@ import ProcessoEditModal from '@/components/financeiro/ProcessoEditModal';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import { Textarea } from '@/components/ui/textarea';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
+import { gerarRelatorioStatusPDF, calcularProgresso, getEtapasConcluidas } from '@/lib/relatorio-status-pdf';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -1845,24 +1846,37 @@ export default function ClienteDetalhe() {
             <Button variant="outline" onClick={() => setShowRelatorioDialog(false)}>Cancelar</Button>
             <Button
               disabled={selectedRelatorioProcessos.size === 0}
-              onClick={() => {
+              onClick={async () => {
                 const selected = processos.filter(p => selectedRelatorioProcessos.has(p.id));
-                const lines = [
-                  `RELATÓRIO - ${cliente.nome}`,
-                  `Data: ${new Date().toLocaleDateString('pt-BR')}`,
-                  `Código: ${cliente.codigo_identificador}`,
-                  '',
-                  'PROCESSOS:',
-                  ...selected.map((p, i) => `${i + 1}. ${p.razao_social} | ${TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo} | ${Number(p.valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} | Etapa: ${KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa}`),
-                  '',
-                  `TOTAL: ${selected.reduce((s, p) => s + Number(p.valor || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
-                ];
-                const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = `relatorio_${cliente.codigo_identificador}_${Date.now()}.txt`; a.click();
-                URL.revokeObjectURL(url);
-                toast.success(`Relatório gerado com ${selected.length} processo(s)`);
-                setShowRelatorioDialog(false);
+                if (!cliente || selected.length === 0) return;
+
+                try {
+                  const relatorioData = {
+                    cliente_nome: cliente.apelido || cliente.nome,
+                    cliente_cnpj: cliente.cnpj || '',
+                    data_emissao: new Date().toLocaleDateString('pt-BR'),
+                    processos: selected.map(p => {
+                      const prog = calcularProgresso(p.etapa);
+                      const { concluidas, pendentes } = getEtapasConcluidas(p.etapa);
+                      return {
+                        razao_social: p.razao_social,
+                        tipo: p.tipo,
+                        etapa: p.etapa,
+                        created_at: p.created_at || new Date().toISOString(),
+                        progresso: prog,
+                        etapas_concluidas: concluidas,
+                        etapas_pendentes: pendentes,
+                      };
+                    }),
+                  };
+
+                  const doc = await gerarRelatorioStatusPDF(relatorioData);
+                  doc.save(`status_${(cliente.apelido || cliente.nome).replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+                  toast.success(`Relatório gerado com ${selected.length} processo(s)`);
+                  setShowRelatorioDialog(false);
+                } catch (err: any) {
+                  toast.error('Erro ao gerar relatório: ' + (err.message || 'Erro desconhecido'));
+                }
               }}
             >
               Gerar Relatório ({selectedRelatorioProcessos.size})
