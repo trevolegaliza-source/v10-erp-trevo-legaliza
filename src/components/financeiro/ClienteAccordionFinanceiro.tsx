@@ -690,6 +690,84 @@ function VencidoItem({ cliente }: { cliente: ClienteFinanceiro }) {
   );
 }
 
+// ══════════ MOVER PARA MENU ══════════
+function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
+  const qc = useQueryClient();
+
+  async function handleMoverPara(novaEtapa: string) {
+    const lancamentoIds = cliente.lancamentos
+      .filter(l => l.status !== 'pago')
+      .map(l => l.id);
+
+    if (lancamentoIds.length === 0) {
+      toast.error('Nenhum lançamento pendente para mover.');
+      return;
+    }
+
+    const updates: Record<string, any> = { etapa_financeiro: novaEtapa };
+
+    if (novaEtapa === 'honorario_pago') {
+      updates.status = 'pago';
+      updates.data_pagamento = new Date().toISOString().split('T')[0];
+      updates.confirmado_recebimento = true;
+    }
+
+    if (novaEtapa === 'solicitacao_criada') {
+      updates.extrato_id = null;
+    }
+
+    const { error } = await supabase
+      .from('lancamentos')
+      .update(updates)
+      .in('id', lancamentoIds);
+
+    if (error) {
+      toast.error('Erro ao mover: ' + error.message);
+      return;
+    }
+
+    invalidateFinanceiro(qc);
+
+    const nomes: Record<string, string> = {
+      solicitacao_criada: 'Cobrar',
+      cobranca_gerada: 'Enviados',
+      cobranca_enviada: 'Ag. Pagamento',
+      honorario_pago: 'Pagos',
+    };
+    toast.success(`${cliente.cliente_apelido || cliente.cliente_nome} movido para "${nomes[novaEtapa] || novaEtapa}"`);
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Mover para</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => handleMoverPara('solicitacao_criada')}>
+          <FileText className="h-4 w-4 mr-2" />
+          Cobrar (resetar)
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleMoverPara('cobranca_gerada')}>
+          <Send className="h-4 w-4 mr-2" />
+          Enviados (extrato gerado)
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleMoverPara('cobranca_enviada')}>
+          <Clock className="h-4 w-4 mr-2" />
+          Ag. Pagamento (enviado)
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => handleMoverPara('honorario_pago')} className="text-emerald-500">
+          <CheckCircle className="h-4 w-4 mr-2" />
+          Marcar como Pago
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // ══════════ SHARED COMPONENTS ══════════
 function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: LancamentoFinanceiro; checked?: boolean; onToggle?: () => void }) {
   const badges = parseBadges(l.processo_notas);
