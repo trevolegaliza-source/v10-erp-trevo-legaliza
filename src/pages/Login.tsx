@@ -3,9 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { LogIn, Loader2 } from 'lucide-react';
+import logoTrevo from '@/assets/logo-trevo.png';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -28,14 +29,25 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 dark">
-      <Card className="w-full max-w-sm border-border/60">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto h-12 w-12 rounded-xl bg-primary/15 flex items-center justify-center">
-            <span className="text-xl font-bold text-primary">T1</span>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#0a1a0f] via-[#0d2818] to-[#0a1a0f]">
+      {/* Subtle pattern overlay */}
+      <div className="fixed inset-0 opacity-[0.03]" style={{
+        backgroundImage: 'radial-gradient(circle at 25% 25%, #22c55e 1px, transparent 1px), radial-gradient(circle at 75% 75%, #22c55e 1px, transparent 1px)',
+        backgroundSize: '60px 60px',
+      }} />
+
+      <Card className="relative w-full max-w-md border-border/50 bg-card/80 backdrop-blur-xl shadow-2xl shadow-primary/5">
+        <CardHeader className="text-center space-y-4 pb-2">
+          <div className="flex justify-center">
+            <img
+              src={logoTrevo}
+              alt="Trevo Legaliza"
+              className="h-16 w-auto logo-pulse"
+            />
           </div>
-          <CardTitle className="text-xl">Trevo Legaliza 🍀</CardTitle>
-          <p className="text-sm text-muted-foreground">{isSignUp ? 'Crie sua conta' : 'Acesse o sistema ERP'}</p>
+          <p className="text-sm text-muted-foreground">
+            {isSignUp ? 'Crie sua conta' : 'Sistema de Gestão Societária'}
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -69,6 +81,9 @@ export default function Login() {
               {isSignUp ? 'Já tem conta? Faça login' : 'Primeiro acesso? Crie sua conta'}
             </Button>
           </form>
+          <p className="text-[10px] text-muted-foreground text-center mt-6">
+            Trevo Engine v10 · © {new Date().getFullYear()} Trevo Legaliza
+          </p>
         </CardContent>
       </Card>
     </div>
