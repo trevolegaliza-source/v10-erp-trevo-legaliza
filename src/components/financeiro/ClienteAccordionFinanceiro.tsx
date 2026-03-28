@@ -218,6 +218,7 @@ function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 Ag. deferimento ({cliente.qtd_aguardando_deferimento})
               </Badge>
             )}
+            <MoverParaMenu cliente={cliente} />
           </div>
         </div>
       </AccordionTrigger>
