@@ -52,6 +52,10 @@ const ETAPAS_PRE_DEFERIMENTO = [
   'assinaturas', 'assinado', 'em_analise',
 ];
 
+const ETAPAS_POS_DEFERIMENTO = [
+  'registro', 'mat', 'inscricao_me', 'alvaras', 'conselho', 'finalizados', 'arquivo',
+];
+
 const ETAPA_ORDER: Record<string, number> = {
   solicitacao_criada: 0,
   cobranca_gerada: 1,
@@ -59,6 +63,53 @@ const ETAPA_ORDER: Record<string, number> = {
   honorario_vencido: 3,
   honorario_pago: 4,
 };
+
+/**
+ * Determines if a client should appear in the "Cobrar" tab based on billing rules.
+ * Returns { show: boolean, isFutura: boolean } — isFutura means it belongs in "Próximas faturas".
+ */
+export function clienteDeveAparecerEmCobrar(cliente: ClienteFinanceiro): { show: boolean; isFutura: boolean } {
+  if (cliente.qtd_sem_extrato === 0) return { show: false, isFutura: false };
+
+  const hoje = new Date();
+  const diaHoje = hoje.getDate();
+
+  // No deferimento: only show if there are post-deferimento processes without extrato
+  if (cliente.cliente_momento_faturamento === 'no_deferimento') {
+    const temDeferido = cliente.lancamentos.some(l =>
+      !l.extrato_id && ETAPAS_POS_DEFERIMENTO.includes(l.processo_etapa)
+    );
+    return { show: temDeferido, isFutura: false };
+  }
+
+  // Fatura mensal dia X: show 5 days before
+  if (cliente.cliente_dia_vencimento_mensal && cliente.cliente_dia_vencimento_mensal > 0) {
+    const diaFatura = cliente.cliente_dia_vencimento_mensal;
+    // Already past billing day this month → overdue, show
+    if (diaHoje > diaFatura) return { show: true, isFutura: false };
+    // Within 5-day window → show
+    if (diaHoje >= diaFatura - 5) return { show: true, isFutura: false };
+    // Outside window → future billing
+    return { show: false, isFutura: true };
+  }
+
+  // Avulso D+X or default: show immediately
+  return { show: true, isFutura: false };
+}
+
+/**
+ * A lancamento is "vencido" only if it was SENT to the client (cobranca_enviada)
+ * and the due date has passed.
+ */
+export function isLancamentoVencidoReal(l: LancamentoFinanceiro): boolean {
+  if (l.etapa_financeiro !== 'cobranca_enviada') return false;
+  if (l.status === 'pago') return false;
+  if (!l.data_vencimento) return false;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const venc = new Date(l.data_vencimento + 'T00:00:00');
+  return venc < hoje;
+}
 
 /** Invalidate all financial queries across screens */
 export function invalidateFinanceiro(qc: ReturnType<typeof useQueryClient>) {
