@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -12,7 +13,6 @@ export function useDashboardData() {
       const seisMesesAtras = new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString().split('T')[0];
       const seteDiasFrente = new Date();
       seteDiasFrente.setDate(seteDiasFrente.getDate() + 7);
-      const hoje = now.toISOString().split('T')[0];
 
       const [
         { data: lancMes },
@@ -65,7 +65,6 @@ export function useDashboardData() {
 }
 
 export function useCountUp(target: number, duration = 800): number {
-  const { useState, useEffect } = require('react');
   const [count, setCount] = useState(0);
 
   useEffect(() => {
