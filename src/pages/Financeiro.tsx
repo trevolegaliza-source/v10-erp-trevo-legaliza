@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search } from 'lucide-react';
+import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown } from 'lucide-react';
 import { useFinanceiroClientes, type LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import {
   ClientesFaturar,
@@ -43,42 +43,29 @@ function getPeriodoDates(preset: PeriodoPreset): { inicio: string; fim: string }
   }
 }
 
-function isLancamentoVencido(l: LancamentoFinanceiro): boolean {
-  if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
-  if (!l.data_vencimento) return false;
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const venc = new Date(l.data_vencimento + 'T00:00:00');
-  return venc < hoje;
-}
-
 export default function Financeiro() {
   const [periodo, setPeriodo] = useState<PeriodoPreset>('este_mes');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
   const [activeTab, setActiveTab] = useState('cobrar');
   const [searchTodos, setSearchTodos] = useState('');
+  const [showFuturas, setShowFuturas] = useState(false);
 
   const dates = periodo === 'custom'
     ? { inicio: customInicio, fim: customFim }
     : getPeriodoDates(periodo);
 
-  const { clientes, metricas, isLoading } = useFinanceiroClientes(dates.inicio, dates.fim);
-
-  // Filter clients per tab
-  const clientesCobrar = useMemo(() => clientes.filter(c => c.qtd_sem_extrato > 0), [clientes]);
-  const clientesEnviados = useMemo(() => clientes.filter(c =>
-    c.etapa_predominante === 'cobranca_gerada' && c.qtd_sem_extrato === 0
-  ), [clientes]);
-  const clientesAguardando = useMemo(() => clientes.filter(c =>
-    c.etapa_predominante === 'cobranca_enviada'
-  ), [clientes]);
-  const clientesPagos = useMemo(() => clientes.filter(c =>
-    c.etapa_predominante === 'honorario_pago'
-  ), [clientes]);
-  const clientesVencidos = useMemo(() => clientes.filter(c =>
-    c.lancamentos.some(l => isLancamentoVencido(l))
-  ), [clientes]);
+  const {
+    clientes,
+    clientesCobrar,
+    clientesFuturaFatura,
+    clientesEnviados,
+    clientesAguardando,
+    clientesPagos,
+    clientesVencidos,
+    metricas,
+    isLoading,
+  } = useFinanceiroClientes(dates.inicio, dates.fim);
 
   const kpis = [
     {
@@ -251,6 +238,41 @@ export default function Financeiro() {
 
             <TabsContent value="cobrar" className="mt-4">
               <ClientesFaturar clientes={clientesCobrar} />
+              
+              {clientesFuturaFatura.length > 0 && (
+                <div className="mt-6">
+                  <button
+                    onClick={() => setShowFuturas(!showFuturas)}
+                    className="text-sm text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
+                  >
+                    <Clock className="h-3 w-3" />
+                    {clientesFuturaFatura.length} cliente(s) com fatura futura
+                    <ChevronDown className={`h-3 w-3 transition-transform ${showFuturas ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showFuturas && (
+                    <div className="mt-2 space-y-2 opacity-60">
+                      {clientesFuturaFatura.map(c => {
+                        const diaFatura = c.cliente_dia_vencimento_mensal || 0;
+                        const diasAte = diaFatura - new Date().getDate();
+                        return (
+                          <div key={c.cliente_id} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-border/60">
+                            <div>
+                              <p className="text-sm font-medium">{c.cliente_apelido || c.cliente_nome}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {c.qtd_sem_extrato} proc. · {formatBRL(c.total_faturado)} · Fatura dia {diaFatura}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {diasAte > 0 ? `Cobrar em ${diasAte} dias` : 'Próximo mês'}
+                            </Badge>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </TabsContent>
             <TabsContent value="enviados" className="mt-4">
               <ClientesEnviar clientes={clientesEnviados} />
