@@ -307,14 +307,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   const clientes = query.data || [];
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const isVencido = (l: LancamentoFinanceiro) => {
-    if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
-    const venc = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
-    return venc ? venc < hoje : false;
-  };
-
   // Correct KPI calculations
   const allLanc = clientes.flatMap(c => c.lancamentos);
   const totalFaturado = allLanc.reduce((s, l) => s + l.valor, 0);
@@ -327,20 +319,43 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const totalPendente = totalFaturado - totalRecebido;
   const taxaRecebimento = totalFaturado > 0 ? Math.round(totalRecebido / totalFaturado * 100) : 0;
 
+  // Tab-specific client lists
+  const cobrarResult = clientes.map(c => ({ c, result: clienteDeveAparecerEmCobrar(c) }));
+  const clientesCobrar = cobrarResult.filter(x => x.result.show).map(x => x.c);
+  const clientesFuturaFatura = cobrarResult.filter(x => x.result.isFutura).map(x => x.c);
+
+  const clientesEnviados = clientes.filter(c =>
+    c.lancamentos.some(l => l.etapa_financeiro === 'cobranca_gerada') &&
+    c.qtd_sem_extrato === 0 &&
+    c.etapa_predominante !== 'honorario_pago'
+  );
+
+  const clientesAguardando = clientes.filter(c =>
+    c.lancamentos.some(l => l.etapa_financeiro === 'cobranca_enviada' && l.status !== 'pago')
+  );
+
+  const clientesPagos = clientes.filter(c =>
+    c.etapa_predominante === 'honorario_pago'
+  );
+
+  const clientesVencidos = clientes.filter(c =>
+    c.lancamentos.some(l => isLancamentoVencidoReal(l))
+  );
+
   const metricas = {
     totalFaturado,
     totalCobrado,
     totalPendente,
     totalRecebido,
     taxaRecebimento,
-    aguardandoExtrato: clientes.filter(c => c.qtd_sem_extrato > 0).length,
-    valorAguardandoExtrato: clientes.filter(c => c.qtd_sem_extrato > 0).reduce((s, c) => s + c.total_pendente, 0),
-    aguardandoEnvio: clientes.filter(c => c.etapa_predominante === 'cobranca_gerada').length,
-    valorAguardandoEnvio: clientes.filter(c => c.etapa_predominante === 'cobranca_gerada').reduce((s, c) => s + c.total_pendente, 0),
-    aguardandoPagamento: clientes.filter(c => c.etapa_predominante === 'cobranca_enviada').length,
-    valorAguardandoPagamento: clientes.filter(c => c.etapa_predominante === 'cobranca_enviada').reduce((s, c) => s + c.total_pendente, 0),
-    vencidos: clientes.filter(c => c.lancamentos.some(l => isVencido(l))).length,
-    valorVencido: clientes.filter(c => c.lancamentos.some(l => isVencido(l))).reduce((s, c) => s + c.lancamentos.filter(l => isVencido(l)).reduce((ss, l) => ss + l.valor, 0), 0),
+    aguardandoExtrato: clientesCobrar.length,
+    valorAguardandoExtrato: clientesCobrar.reduce((s, c) => s + c.total_pendente, 0),
+    aguardandoEnvio: clientesEnviados.length,
+    valorAguardandoEnvio: clientesEnviados.reduce((s, c) => s + c.total_pendente, 0),
+    aguardandoPagamento: clientesAguardando.length,
+    valorAguardandoPagamento: clientesAguardando.reduce((s, c) => s + c.total_pendente, 0),
+    vencidos: clientesVencidos.length,
+    valorVencido: clientesVencidos.reduce((s, c) => s + c.lancamentos.filter(l => isLancamentoVencidoReal(l)).reduce((ss, l) => ss + l.valor, 0), 0),
     totalProcessos: allLanc.length,
     clientesCobrados: clientes.filter(c => c.lancamentos.some(l => l.extrato_id != null || ['cobranca_gerada', 'cobranca_enviada', 'honorario_pago'].includes(l.etapa_financeiro))).length,
     clientesPendentes: clientes.filter(c => c.lancamentos.some(l => l.status !== 'pago')).length,
@@ -348,9 +363,15 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   return {
     clientes,
+    clientesCobrar,
+    clientesFuturaFatura,
+    clientesEnviados,
+    clientesAguardando,
+    clientesPagos,
+    clientesVencidos,
     metricas,
     isLoading: query.isLoading,
-    isVencido,
+    isVencido: isLancamentoVencidoReal,
     marcarEnviado,
     marcarPago,
     refetch: query.refetch,
