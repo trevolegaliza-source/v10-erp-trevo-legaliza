@@ -246,7 +246,7 @@ export default function Financeiro() {
                     className="text-sm text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
                   >
                     <Clock className="h-3 w-3" />
-                    {clientesFuturaFatura.length} cliente(s) com fatura futura
+                    Próximas faturas ({clientesFuturaFatura.length})
                     <ChevronDown className={`h-3 w-3 transition-transform ${showFuturas ? 'rotate-180' : ''}`} />
                   </button>
 
@@ -254,7 +254,9 @@ export default function Financeiro() {
                     <div className="mt-2 space-y-2 opacity-60">
                       {clientesFuturaFatura.map(c => {
                         const diaFatura = c.cliente_dia_vencimento_mensal || 0;
-                        const diasAte = diaFatura - new Date().getDate();
+                        const hoje = new Date().getDate();
+                        const diaInicioJanela = Math.max(1, diaFatura - 5);
+                        const diasAteCobranca = Math.max(1, diaInicioJanela - hoje);
                         return (
                           <div key={c.cliente_id} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-border/60">
                             <div>
@@ -264,7 +266,7 @@ export default function Financeiro() {
                               </p>
                             </div>
                             <Badge variant="outline" className="text-xs">
-                              {diasAte > 0 ? `Cobrar em ${diasAte} dias` : 'Próximo mês'}
+                              Cobrar em {diasAteCobranca} dia{diasAteCobranca > 1 ? 's' : ''}
                             </Badge>
                           </div>
                         );
