@@ -518,6 +518,7 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
             )}>
               {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
             </Badge>
+            <MoverParaMenu cliente={cliente} />
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-4 pb-4">
