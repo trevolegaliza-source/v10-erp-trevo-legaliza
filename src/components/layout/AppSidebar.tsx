@@ -37,6 +37,7 @@ type BadgeVariant = 'default' | 'warning' | 'info';
 
 const badgeVariants: Record<string, BadgeVariant> = {
   processosAtivos: 'default',
+  orcamentosPendentes: 'info',
   pendentesFinanceiro: 'warning',
   docsPendentes: 'info',
 };
