@@ -189,4 +189,22 @@
   .neon-pulse {
     box-shadow: 0 0 8px hsl(142 71% 45% / 0.4);
   }
+
+  /* Dashboard animations */
+  .dashboard-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .dashboard-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .dashboard-section {
+    animation: dashFadeInUp 0.4s ease-out both;
+  }
+
+  @keyframes dashFadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 }
