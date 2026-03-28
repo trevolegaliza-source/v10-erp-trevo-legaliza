@@ -82,8 +82,8 @@ export function clienteDeveAparecerEmCobrar(cliente: ClienteFinanceiro): { show:
     return { show: temDeferido, isFutura: false };
   }
 
-  // Fatura mensal dia X: show 5 days before
-  if (cliente.cliente_dia_vencimento_mensal && cliente.cliente_dia_vencimento_mensal > 0) {
+  // Fatura mensal dia X (somente quando NÃO há dia_cobranca): show 5 days before
+  if (cliente.cliente_dia_vencimento_mensal && cliente.cliente_dia_vencimento_mensal > 0 && !cliente.cliente_dia_cobranca) {
     const diaFatura = cliente.cliente_dia_vencimento_mensal;
     // Already past billing day this month → overdue, show
     if (diaHoje > diaFatura) return { show: true, isFutura: false };
@@ -93,7 +93,7 @@ export function clienteDeveAparecerEmCobrar(cliente: ClienteFinanceiro): { show:
     return { show: false, isFutura: true };
   }
 
-  // Avulso D+X or default: show immediately
+  // Avulso D+X ou padrão: mostrar imediatamente
   return { show: true, isFutura: false };
 }
 
@@ -321,18 +321,18 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   // ── Exclusive tab assignment: each client in ONE tab only ──
   function getTabCliente(c: ClienteFinanceiro): string {
-    const pendentes = c.lancamentos.filter(l => l.status !== 'pago');
-    if (pendentes.length === 0) return 'pagos';
+    const lancPendentes = c.lancamentos.filter(l => l.status !== 'pago' && l.etapa_financeiro !== 'honorario_pago');
+    if (lancPendentes.length === 0) return 'pagos';
 
     // Priority 1: Overdue (sent AND past due)
-    const temVencido = pendentes.some(l => isLancamentoVencidoReal(l));
+    const temVencido = lancPendentes.some(l => isLancamentoVencidoReal(l));
     if (temVencido) return 'vencidos';
 
     // Priority 2: Awaiting payment (sent to client)
-    if (pendentes.some(l => l.etapa_financeiro === 'cobranca_enviada')) return 'aguardando';
+    if (lancPendentes.some(l => l.etapa_financeiro === 'cobranca_enviada')) return 'aguardando';
 
     // Priority 3: Extrato generated, awaiting sending (must have real extrato_id)
-    if (pendentes.some(l => l.etapa_financeiro === 'cobranca_gerada' && l.extrato_id)) return 'enviados';
+    if (lancPendentes.some(l => l.etapa_financeiro === 'cobranca_gerada' && l.extrato_id)) return 'enviados';
 
     // Priority 4: Needs extrato
     return 'cobrar';
