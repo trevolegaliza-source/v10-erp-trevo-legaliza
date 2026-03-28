@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search } from 'lucide-react';
+import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown } from 'lucide-react';
 import { useFinanceiroClientes, type LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import {
   ClientesFaturar,
@@ -43,42 +43,29 @@ function getPeriodoDates(preset: PeriodoPreset): { inicio: string; fim: string }
   }
 }
 
-function isLancamentoVencido(l: LancamentoFinanceiro): boolean {
-  if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
-  if (!l.data_vencimento) return false;
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const venc = new Date(l.data_vencimento + 'T00:00:00');
-  return venc < hoje;
-}
-
 export default function Financeiro() {
   const [periodo, setPeriodo] = useState<PeriodoPreset>('este_mes');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
   const [activeTab, setActiveTab] = useState('cobrar');
   const [searchTodos, setSearchTodos] = useState('');
+  const [showFuturas, setShowFuturas] = useState(false);
 
   const dates = periodo === 'custom'
     ? { inicio: customInicio, fim: customFim }
     : getPeriodoDates(periodo);
 
-  const { clientes, metricas, isLoading } = useFinanceiroClientes(dates.inicio, dates.fim);
-
-  // Filter clients per tab
-  const clientesCobrar = useMemo(() => clientes.filter(c => c.qtd_sem_extrato > 0), [clientes]);
-  const clientesEnviados = useMemo(() => clientes.filter(c =>
-    c.etapa_predominante === 'cobranca_gerada' && c.qtd_sem_extrato === 0
-  ), [clientes]);
-  const clientesAguardando = useMemo(() => clientes.filter(c =>
-    c.etapa_predominante === 'cobranca_enviada'
-  ), [clientes]);
-  const clientesPagos = useMemo(() => clientes.filter(c =>
-    c.etapa_predominante === 'honorario_pago'
-  ), [clientes]);
-  const clientesVencidos = useMemo(() => clientes.filter(c =>
-    c.lancamentos.some(l => isLancamentoVencido(l))
-  ), [clientes]);
+  const {
+    clientes,
+    clientesCobrar,
+    clientesFuturaFatura,
+    clientesEnviados,
+    clientesAguardando,
+    clientesPagos,
+    clientesVencidos,
+    metricas,
+    isLoading,
+  } = useFinanceiroClientes(dates.inicio, dates.fim);
 
   const kpis = [
     {
