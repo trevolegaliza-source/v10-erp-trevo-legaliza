@@ -11,9 +11,9 @@ export interface Orcamento {
   prospect_telefone: string | null;
   prospect_contato: string | null;
   tipo_contrato: string;
-  servicos: string[];
-  naturezas: string[];
-  escopo: string[];
+  servicos: any; // now stores OrcamentoItem[] as jsonb
+  naturezas: any;
+  escopo: any;
   valor_base: number;
   qtd_processos: number;
   desconto_pct: number;
@@ -33,6 +33,7 @@ export interface Orcamento {
   created_at: string;
   updated_at: string;
   created_by: string | null;
+  prazo_execucao?: string | null;
 }
 
 export type OrcamentoInsert = Omit<Orcamento, 'id' | 'numero' | 'share_token' | 'created_at' | 'updated_at'>;
@@ -104,61 +105,6 @@ export function useDeleteOrcamento() {
       qc.invalidateQueries({ queryKey: ['orcamentos'] });
       qc.invalidateQueries({ queryKey: ['orcamento_kpis'] });
       toast.success('Orçamento excluído');
-    },
-  });
-}
-
-export function useConverterOrcamento() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (orcamento: Orcamento) => {
-      // Create client
-      const codigo = (orcamento.prospect_cnpj || '').replace(/\D/g, '').slice(0, 6) || 'ORC' + orcamento.numero;
-      const { data: cliente, error: cErr } = await supabase.from('clientes').insert({
-        nome: orcamento.prospect_nome,
-        cnpj: orcamento.prospect_cnpj,
-        email: orcamento.prospect_email,
-        telefone: orcamento.prospect_telefone,
-        codigo_identificador: codigo,
-        tipo: orcamento.tipo_contrato === 'mensal' ? 'MENSALISTA' : 'AVULSO_4D',
-        is_archived: false,
-        valor_base: orcamento.valor_base,
-        desconto_progressivo: orcamento.desconto_progressivo_ativo ? orcamento.desconto_progressivo_pct : 0,
-        valor_limite_desconto: orcamento.desconto_progressivo_ativo ? orcamento.desconto_progressivo_limite : null,
-      } as any).select('id').single();
-      if (cErr) throw cErr;
-
-      // Create processes for each service
-      const tipoMap: Record<string, string> = {
-        'Abertura': 'abertura', 'Alteração': 'alteracao', 'Baixa': 'baixa',
-        'Transformação': 'transformacao', 'Cisão': 'avulso', 'Fusão': 'avulso',
-        'Incorporação': 'avulso', 'Marcas e Patentes': 'avulso',
-      };
-      for (const servico of orcamento.servicos) {
-        await supabase.from('processos').insert({
-          cliente_id: cliente.id,
-          razao_social: orcamento.prospect_nome,
-          tipo: tipoMap[servico] || 'avulso',
-          valor: orcamento.valor_final / Math.max(orcamento.servicos.length, 1),
-          etapa: 'recebidos',
-          prioridade: 'normal',
-        } as any);
-      }
-
-      // Update orcamento
-      await supabase.from('orcamentos').update({
-        status: 'convertido',
-        cliente_id: cliente.id,
-        convertido_em: new Date().toISOString(),
-      } as any).eq('id', orcamento.id);
-
-      return cliente.id;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['orcamentos'] });
-      qc.invalidateQueries({ queryKey: ['orcamento_kpis'] });
-      qc.invalidateQueries({ queryKey: ['sidebar_counts'] });
-      toast.success('Orçamento convertido em cliente!');
     },
   });
 }
