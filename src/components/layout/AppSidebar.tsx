@@ -12,6 +12,7 @@ import {
   ArrowUpCircle,
   LogOut,
   UsersRound,
+  Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -25,6 +26,7 @@ const navItems = [
   { path: '/cadastro-rapido', label: 'Cadastro Rápido', icon: PlusCircle, badgeKey: null },
   { path: '/processos', label: 'Processos', icon: Kanban, badgeKey: 'processosAtivos' as const },
   { path: '/clientes', label: 'Clientes', icon: Users, badgeKey: null },
+  { path: '/orcamentos', label: 'Orçamentos', icon: Receipt, badgeKey: 'orcamentosPendentes' as const },
   { path: '/financeiro', label: 'Financeiro', icon: DollarSign, badgeKey: 'pendentesFinanceiro' as const },
   { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle, badgeKey: null },
   { path: '/colaboradores', label: 'Colaboradores', icon: UsersRound, badgeKey: null },
@@ -36,6 +38,7 @@ type BadgeVariant = 'default' | 'warning' | 'info';
 
 const badgeVariants: Record<string, BadgeVariant> = {
   processosAtivos: 'default',
+  orcamentosPendentes: 'info',
   pendentesFinanceiro: 'warning',
   docsPendentes: 'info',
 };

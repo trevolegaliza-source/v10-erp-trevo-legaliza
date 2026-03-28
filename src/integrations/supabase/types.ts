@@ -589,6 +589,113 @@ export type Database = {
           },
         ]
       }
+      orcamentos: {
+        Row: {
+          cliente_id: string | null
+          convertido_em: string | null
+          created_at: string | null
+          created_by: string | null
+          desconto_pct: number | null
+          desconto_progressivo_ativo: boolean | null
+          desconto_progressivo_limite: number | null
+          desconto_progressivo_pct: number | null
+          escopo: Json
+          id: string
+          naturezas: Json
+          numero: number
+          observacoes: string | null
+          pagamento: string | null
+          pdf_url: string | null
+          prospect_cnpj: string | null
+          prospect_contato: string | null
+          prospect_email: string | null
+          prospect_nome: string
+          prospect_telefone: string | null
+          qtd_processos: number | null
+          servicos: Json
+          share_token: string | null
+          sla: string | null
+          status: string | null
+          tipo_contrato: string
+          updated_at: string | null
+          validade_dias: number | null
+          valor_base: number
+          valor_final: number
+        }
+        Insert: {
+          cliente_id?: string | null
+          convertido_em?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          desconto_pct?: number | null
+          desconto_progressivo_ativo?: boolean | null
+          desconto_progressivo_limite?: number | null
+          desconto_progressivo_pct?: number | null
+          escopo?: Json
+          id?: string
+          naturezas?: Json
+          numero?: number
+          observacoes?: string | null
+          pagamento?: string | null
+          pdf_url?: string | null
+          prospect_cnpj?: string | null
+          prospect_contato?: string | null
+          prospect_email?: string | null
+          prospect_nome: string
+          prospect_telefone?: string | null
+          qtd_processos?: number | null
+          servicos?: Json
+          share_token?: string | null
+          sla?: string | null
+          status?: string | null
+          tipo_contrato?: string
+          updated_at?: string | null
+          validade_dias?: number | null
+          valor_base?: number
+          valor_final?: number
+        }
+        Update: {
+          cliente_id?: string | null
+          convertido_em?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          desconto_pct?: number | null
+          desconto_progressivo_ativo?: boolean | null
+          desconto_progressivo_limite?: number | null
+          desconto_progressivo_pct?: number | null
+          escopo?: Json
+          id?: string
+          naturezas?: Json
+          numero?: number
+          observacoes?: string | null
+          pagamento?: string | null
+          pdf_url?: string | null
+          prospect_cnpj?: string | null
+          prospect_contato?: string | null
+          prospect_email?: string | null
+          prospect_nome?: string
+          prospect_telefone?: string | null
+          qtd_processos?: number | null
+          servicos?: Json
+          share_token?: string | null
+          sla?: string | null
+          status?: string | null
+          tipo_contrato?: string
+          updated_at?: string | null
+          validade_dias?: number | null
+          valor_base?: number
+          valor_final?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       precos_tiers: {
         Row: {
           descricao: string | null

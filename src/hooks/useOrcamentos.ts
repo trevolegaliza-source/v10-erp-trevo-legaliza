@@ -1,0 +1,164 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export interface Orcamento {
+  id: string;
+  numero: number;
+  prospect_nome: string;
+  prospect_cnpj: string | null;
+  prospect_email: string | null;
+  prospect_telefone: string | null;
+  prospect_contato: string | null;
+  tipo_contrato: string;
+  servicos: string[];
+  naturezas: string[];
+  escopo: string[];
+  valor_base: number;
+  qtd_processos: number;
+  desconto_pct: number;
+  valor_final: number;
+  desconto_progressivo_ativo: boolean;
+  desconto_progressivo_pct: number;
+  desconto_progressivo_limite: number;
+  validade_dias: number;
+  pagamento: string | null;
+  sla: string | null;
+  observacoes: string | null;
+  status: string;
+  share_token: string;
+  cliente_id: string | null;
+  convertido_em: string | null;
+  pdf_url: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+}
+
+export type OrcamentoInsert = Omit<Orcamento, 'id' | 'numero' | 'share_token' | 'created_at' | 'updated_at'>;
+
+export function useOrcamentos(statusFilter?: string) {
+  return useQuery({
+    queryKey: ['orcamentos', statusFilter],
+    queryFn: async () => {
+      let q = supabase.from('orcamentos').select('*').order('created_at', { ascending: false });
+      if (statusFilter && statusFilter !== 'todos') {
+        q = q.eq('status', statusFilter);
+      }
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data || []) as unknown as Orcamento[];
+    },
+  });
+}
+
+export function useOrcamentoKPIs() {
+  return useQuery({
+    queryKey: ['orcamento_kpis'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('orcamentos').select('status, valor_final');
+      if (error) throw error;
+      const all = (data || []) as unknown as { status: string; valor_final: number }[];
+      const total = all.length;
+      const enviados = all.filter(o => o.status === 'enviado').length;
+      const aprovados = all.filter(o => o.status === 'aprovado').length;
+      const convertidos = all.filter(o => o.status === 'convertido').length;
+      const taxa = total > 0 ? Math.round(((aprovados + convertidos) / total) * 100) : 0;
+      const valorTotal = all.reduce((s, o) => s + Number(o.valor_final), 0);
+      return { total, enviados, aprovados, convertidos, taxa, valorTotal };
+    },
+  });
+}
+
+export function useSaveOrcamento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orcamento: Partial<OrcamentoInsert> & { id?: string }) => {
+      const { id, ...rest } = orcamento;
+      if (id) {
+        const { error } = await supabase.from('orcamentos').update(rest as any).eq('id', id);
+        if (error) throw error;
+        return id;
+      } else {
+        const { data, error } = await supabase.from('orcamentos').insert(rest as any).select('id').single();
+        if (error) throw error;
+        return data.id;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orcamentos'] });
+      qc.invalidateQueries({ queryKey: ['orcamento_kpis'] });
+      qc.invalidateQueries({ queryKey: ['sidebar_counts'] });
+    },
+  });
+}
+
+export function useDeleteOrcamento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('orcamentos').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orcamentos'] });
+      qc.invalidateQueries({ queryKey: ['orcamento_kpis'] });
+      toast.success('Orçamento excluído');
+    },
+  });
+}
+
+export function useConverterOrcamento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orcamento: Orcamento) => {
+      // Create client
+      const codigo = (orcamento.prospect_cnpj || '').replace(/\D/g, '').slice(0, 6) || 'ORC' + orcamento.numero;
+      const { data: cliente, error: cErr } = await supabase.from('clientes').insert({
+        nome: orcamento.prospect_nome,
+        cnpj: orcamento.prospect_cnpj,
+        email: orcamento.prospect_email,
+        telefone: orcamento.prospect_telefone,
+        codigo_identificador: codigo,
+        tipo: orcamento.tipo_contrato === 'mensal' ? 'MENSALISTA' : 'AVULSO_4D',
+        is_archived: false,
+        valor_base: orcamento.valor_base,
+        desconto_progressivo: orcamento.desconto_progressivo_ativo ? orcamento.desconto_progressivo_pct : 0,
+        valor_limite_desconto: orcamento.desconto_progressivo_ativo ? orcamento.desconto_progressivo_limite : null,
+      } as any).select('id').single();
+      if (cErr) throw cErr;
+
+      // Create processes for each service
+      const tipoMap: Record<string, string> = {
+        'Abertura': 'abertura', 'Alteração': 'alteracao', 'Baixa': 'baixa',
+        'Transformação': 'transformacao', 'Cisão': 'avulso', 'Fusão': 'avulso',
+        'Incorporação': 'avulso', 'Marcas e Patentes': 'avulso',
+      };
+      for (const servico of orcamento.servicos) {
+        await supabase.from('processos').insert({
+          cliente_id: cliente.id,
+          razao_social: orcamento.prospect_nome,
+          tipo: tipoMap[servico] || 'avulso',
+          valor: orcamento.valor_final / Math.max(orcamento.servicos.length, 1),
+          etapa: 'recebidos',
+          prioridade: 'normal',
+        } as any);
+      }
+
+      // Update orcamento
+      await supabase.from('orcamentos').update({
+        status: 'convertido',
+        cliente_id: cliente.id,
+        convertido_em: new Date().toISOString(),
+      } as any).eq('id', orcamento.id);
+
+      return cliente.id;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orcamentos'] });
+      qc.invalidateQueries({ queryKey: ['orcamento_kpis'] });
+      qc.invalidateQueries({ queryKey: ['sidebar_counts'] });
+      toast.success('Orçamento convertido em cliente!');
+    },
+  });
+}
