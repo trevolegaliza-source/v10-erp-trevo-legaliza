@@ -1,0 +1,1 @@
+ALTER TABLE public.orcamentos ADD COLUMN IF NOT EXISTS prazo_execucao text;

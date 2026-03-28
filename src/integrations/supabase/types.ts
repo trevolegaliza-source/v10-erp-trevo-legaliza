@@ -606,6 +606,7 @@ export type Database = {
           observacoes: string | null
           pagamento: string | null
           pdf_url: string | null
+          prazo_execucao: string | null
           prospect_cnpj: string | null
           prospect_contato: string | null
           prospect_email: string | null
@@ -638,6 +639,7 @@ export type Database = {
           observacoes?: string | null
           pagamento?: string | null
           pdf_url?: string | null
+          prazo_execucao?: string | null
           prospect_cnpj?: string | null
           prospect_contato?: string | null
           prospect_email?: string | null
@@ -670,6 +672,7 @@ export type Database = {
           observacoes?: string | null
           pagamento?: string | null
           pdf_url?: string | null
+          prazo_execucao?: string | null
           prospect_cnpj?: string | null
           prospect_contato?: string | null
           prospect_email?: string | null
