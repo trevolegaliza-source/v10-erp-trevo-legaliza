@@ -571,6 +571,7 @@ export function ClientesRecebidos({ clientes }: { clientes: ClienteFinanceiro[] 
               <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-xs">
                 <CheckCircle className="h-3 w-3 mr-1" /> Pago
               </Badge>
+              <MoverParaMenu cliente={c} />
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
