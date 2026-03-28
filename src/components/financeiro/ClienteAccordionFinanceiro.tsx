@@ -657,6 +657,7 @@ function VencidoItem({ cliente }: { cliente: ClienteFinanceiro }) {
             <Badge variant="destructive" className="text-xs">
               <AlertTriangle className="h-3 w-3 mr-1" /> Vencido há {maiorAtraso}d
             </Badge>
+            <MoverParaMenu cliente={cliente} />
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-4 pb-4">
