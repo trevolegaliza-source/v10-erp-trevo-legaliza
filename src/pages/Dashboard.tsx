@@ -308,29 +308,24 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* SEÇÃO 4: Gráfico + Mapa lado a lado */}
-      <div className="grid gap-6 lg:grid-cols-2 dashboard-section">
-        <div className="space-y-3">
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Receita mensal</h3>
-          <Card className="p-4">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={dadosMensais} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} className="fill-muted-foreground" />
-                <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} className="fill-muted-foreground" tickFormatter={v => `R$ ${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  formatter={(value: number, name: string) => [fmt(value), name === 'recebido' ? 'Recebido' : 'Pendente']}
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }}
-                />
-                <Bar dataKey="recebido" stackId="a" fill="#22c55e" name="Recebido" />
-                <Bar dataKey="pendente" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Pendente" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        </div>
-
-        {/* Mapa do Brasil */}
-        <MapaBrasil />
+      {/* SEÇÃO 4: Gráfico de Receita */}
+      <div className="space-y-3 dashboard-section">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Receita mensal</h3>
+        <Card className="p-4">
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={dadosMensais} barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis dataKey="mes" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} className="fill-muted-foreground" />
+              <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} className="fill-muted-foreground" tickFormatter={v => `R$ ${(v / 1000).toFixed(0)}k`} />
+              <Tooltip
+                formatter={(value: number, name: string) => [fmt(value), name === 'recebido' ? 'Recebido' : 'Pendente']}
+                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }}
+              />
+              <Bar dataKey="recebido" stackId="a" fill="hsl(var(--primary))" name="Recebido" />
+              <Bar dataKey="pendente" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Pendente" />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
       </div>
 
       {/* SEÇÃO 5: Top Clientes + Próximos Vencimentos */}
