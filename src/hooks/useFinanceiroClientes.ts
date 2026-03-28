@@ -85,11 +85,9 @@ export function clienteDeveAparecerEmCobrar(cliente: ClienteFinanceiro): { show:
   // Fatura mensal dia X (somente quando NÃO há dia_cobranca): show 5 days before
   if (cliente.cliente_dia_vencimento_mensal && cliente.cliente_dia_vencimento_mensal > 0 && !cliente.cliente_dia_cobranca) {
     const diaFatura = cliente.cliente_dia_vencimento_mensal;
-    // Already past billing day this month → overdue, show
-    if (diaHoje > diaFatura) return { show: true, isFutura: false };
-    // Within 5-day window → show
-    if (diaHoje >= diaFatura - 5) return { show: true, isFutura: false };
-    // Outside window → future billing
+    // Within 5-day window before billing day → show in main list
+    if (diaHoje >= diaFatura - 5 && diaHoje <= diaFatura) return { show: true, isFutura: false };
+    // Outside window (before or after billing day) → future billing for next cycle
     return { show: false, isFutura: true };
   }
 
