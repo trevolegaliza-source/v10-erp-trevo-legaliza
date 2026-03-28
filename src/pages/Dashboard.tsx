@@ -12,6 +12,7 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
+import MapaBrasil from '@/components/dashboard/MapaBrasil';
 import type { LucideIcon } from 'lucide-react';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -153,10 +154,10 @@ export default function Dashboard() {
       <div className="space-y-6">
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
         </div>
-        <Skeleton className="h-40" />
-        <Skeleton className="h-60" />
+        <Skeleton className="h-40 rounded-xl" />
+        <Skeleton className="h-60 rounded-xl" />
       </div>
     );
   }
@@ -167,9 +168,9 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="dashboard-section" style={{ animationDelay: '0ms' }}>
+      <div className="dashboard-section">
         <h1 className="text-2xl font-bold text-foreground">
-          {getSaudacao()}, {getNomeUsuario(user?.email)}
+          {getSaudacao()}, {getNomeUsuario(user?.email)} <span className="animate-trevo-wave">🍀</span>
         </h1>
         <p className="text-sm text-muted-foreground">
           {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -177,15 +178,17 @@ export default function Dashboard() {
       </div>
 
       {/* SEÇÃO 1: KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 dashboard-section" style={{ animationDelay: '50ms' }}>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 dashboard-section">
         {/* Receita */}
-        <Card className="p-5 cursor-pointer dashboard-card" onClick={() => navigate('/financeiro')}>
+        <Card className="p-5 cursor-pointer group hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300" onClick={() => navigate('/financeiro')}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">Receita do mês</span>
-            <DollarSign className="h-4 w-4 text-green-500" />
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">Receita do mês</span>
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+              <DollarSign className="h-4 w-4 text-primary" />
+            </div>
           </div>
-          <p className="text-2xl font-semibold text-foreground">{fmt(animFaturado)}</p>
-          <div className="flex items-center gap-1 mt-1">
+          <p className="text-2xl font-bold tracking-tight text-foreground">{fmt(animFaturado)}</p>
+          <div className="flex items-center gap-1 mt-2">
             {variacaoReceita >= 0 ? <TrendingUp className="h-3 w-3 text-green-500" /> : <TrendingDown className="h-3 w-3 text-destructive" />}
             <span className={`text-xs ${variacaoReceita >= 0 ? 'text-green-500' : 'text-destructive'}`}>
               {variacaoReceita >= 0 ? '+' : ''}{variacaoReceita}% vs mês anterior
@@ -194,22 +197,26 @@ export default function Dashboard() {
         </Card>
 
         {/* A Receber */}
-        <Card className="p-5 cursor-pointer dashboard-card" onClick={() => navigate('/financeiro')}>
+        <Card className="p-5 cursor-pointer group hover:-translate-y-1 hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-300" onClick={() => navigate('/financeiro')}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">A receber</span>
-            <Clock className="h-4 w-4 text-amber-500" />
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">A receber</span>
+            <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
+              <Clock className="h-4 w-4 text-amber-500" />
+            </div>
           </div>
-          <p className="text-2xl font-semibold text-amber-500">{fmt(animPendente)}</p>
-          <p className="text-xs text-muted-foreground mt-1">pendente de confirmação</p>
+          <p className="text-2xl font-bold tracking-tight text-amber-500">{fmt(animPendente)}</p>
+          <p className="text-xs text-muted-foreground mt-2">pendente de confirmação</p>
         </Card>
 
         {/* Recebido */}
-        <Card className="p-5 dashboard-card">
+        <Card className="p-5 group hover:-translate-y-1 hover:shadow-lg hover:shadow-green-500/10 transition-all duration-300">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">Recebido</span>
-            <CheckCircle className="h-4 w-4 text-green-500" />
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">Recebido</span>
+            <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </div>
           </div>
-          <p className="text-2xl font-semibold text-green-500">{fmt(animRecebido)}</p>
+          <p className="text-2xl font-bold tracking-tight text-green-500">{fmt(animRecebido)}</p>
           <div className="w-full bg-muted rounded-full h-2 mt-2">
             <div className="bg-green-500 h-2 rounded-full transition-all duration-500" style={{ width: `${taxaRecebimento}%` }} />
           </div>
@@ -217,19 +224,21 @@ export default function Dashboard() {
         </Card>
 
         {/* Processos Ativos */}
-        <Card className="p-5 cursor-pointer dashboard-card" onClick={() => navigate('/processos')}>
+        <Card className="p-5 cursor-pointer group hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300" onClick={() => navigate('/processos')}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground uppercase tracking-wide">Processos ativos</span>
-            <Activity className="h-4 w-4 text-blue-500" />
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">Processos ativos</span>
+            <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+              <Activity className="h-4 w-4 text-blue-500" />
+            </div>
           </div>
-          <p className="text-2xl font-semibold text-foreground">{animAtivos}</p>
-          <p className="text-xs text-muted-foreground mt-1">{processosNovos} novos esta semana</p>
+          <p className="text-2xl font-bold tracking-tight text-foreground">{animAtivos}</p>
+          <p className="text-xs text-muted-foreground mt-2">{processosNovos} novos esta semana</p>
         </Card>
       </div>
 
       {/* SEÇÃO 2: Ações Urgentes */}
-      <div className="space-y-2 dashboard-section" style={{ animationDelay: '100ms' }}>
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Ações urgentes</h3>
+      <div className="space-y-2 dashboard-section">
+        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Ações urgentes</h3>
         {alertas.length === 0 ? (
           <Card className="p-4 border-green-500/30 bg-green-500/5">
             <div className="flex items-center gap-3">
@@ -251,7 +260,7 @@ export default function Dashboard() {
                 info: { border: 'border-blue-500/30 bg-blue-500/5', circle: 'bg-blue-500/20', icon: 'text-blue-500' },
               }[alerta.severity];
               return (
-                <Card key={alerta.id} className={`p-4 cursor-pointer dashboard-card ${colors.border}`} onClick={() => navigate(alerta.link)}>
+                <Card key={alerta.id} className={`p-4 cursor-pointer hover:-translate-y-0.5 transition-all duration-200 ${colors.border}`} onClick={() => navigate(alerta.link)}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className={`h-8 w-8 rounded-full flex items-center justify-center ${colors.circle}`}>
@@ -273,9 +282,9 @@ export default function Dashboard() {
 
       {/* SEÇÃO 3: Pipeline */}
       {totalPipeline > 0 && (
-        <div className="space-y-3 dashboard-section" style={{ animationDelay: '150ms' }}>
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Pipeline de processos</h3>
-          <div className="flex gap-1 h-10 rounded-lg overflow-hidden">
+        <div className="space-y-3 dashboard-section">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pipeline de processos</h3>
+          <div className="flex gap-0.5 h-8 rounded-lg overflow-hidden">
             {fases.filter(f => f.qtd > 0).map(fase => (
               <div
                 key={fase.id}
@@ -284,13 +293,13 @@ export default function Dashboard() {
                 onClick={() => navigate('/processos')}
                 title={`${fase.nome}: ${fase.qtd}`}
               >
-                <span className="text-xs font-medium text-white">{fase.qtd}</span>
+                <span className="text-[10px] font-bold text-white drop-shadow-sm">{fase.qtd}</span>
               </div>
             ))}
           </div>
-          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+          <div className="flex flex-wrap gap-3">
             {fases.map(fase => (
-              <span key={fase.id} className="flex items-center gap-1.5">
+              <span key={fase.id} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <div className={`w-2 h-2 rounded-full ${fase.cor}`} />
                 {fase.nome} ({fase.qtd})
               </span>
@@ -299,31 +308,36 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* SEÇÃO 4: Gráfico */}
-      <div className="space-y-3 dashboard-section" style={{ animationDelay: '200ms' }}>
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Receita mensal</h3>
-        <Card className="p-4">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={dadosMensais} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="mes" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} className="fill-muted-foreground" />
-              <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} className="fill-muted-foreground" tickFormatter={v => `R$ ${(v / 1000).toFixed(0)}k`} />
-              <Tooltip
-                formatter={(value: number, name: string) => [fmt(value), name === 'recebido' ? 'Recebido' : 'Pendente']}
-                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }}
-              />
-              <Bar dataKey="recebido" stackId="a" fill="#22c55e" name="Recebido" />
-              <Bar dataKey="pendente" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Pendente" />
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
+      {/* SEÇÃO 4: Gráfico + Mapa lado a lado */}
+      <div className="grid gap-6 lg:grid-cols-2 dashboard-section">
+        <div className="space-y-3">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Receita mensal</h3>
+          <Card className="p-4">
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={dadosMensais} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="mes" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} className="fill-muted-foreground" />
+                <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} className="fill-muted-foreground" tickFormatter={v => `R$ ${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  formatter={(value: number, name: string) => [fmt(value), name === 'recebido' ? 'Recebido' : 'Pendente']}
+                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }}
+                />
+                <Bar dataKey="recebido" stackId="a" fill="#22c55e" name="Recebido" />
+                <Bar dataKey="pendente" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Pendente" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        </div>
+
+        {/* Mapa do Brasil */}
+        <MapaBrasil />
       </div>
 
       {/* SEÇÃO 5: Top Clientes + Próximos Vencimentos */}
-      <div className="grid gap-6 lg:grid-cols-2 dashboard-section" style={{ animationDelay: '250ms' }}>
+      <div className="grid gap-6 lg:grid-cols-2 dashboard-section">
         {/* Top Clientes */}
         <Card className="p-4">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Top clientes do mês</h3>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Top clientes do mês</h3>
           {topClientes.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">Nenhum lançamento neste mês</p>
           ) : (
@@ -359,7 +373,7 @@ export default function Dashboard() {
 
         {/* Próximos Vencimentos */}
         <Card className="p-4">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Próximos vencimentos</h3>
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Próximos vencimentos</h3>
           {proximosVencimentos.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">Nenhum vencimento próximo</p>
           ) : (

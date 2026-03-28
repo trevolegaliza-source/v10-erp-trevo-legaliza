@@ -6,39 +6,52 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { NotificationPopover } from '@/components/NotificationPopover';
 import { useTheme } from 'next-themes';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function AppLayout() {
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
+
+  const initials = user?.email
+    ? user.email.split('@')[0].slice(0, 2).toUpperCase()
+    : 'ML';
+
+  const userName = user?.email
+    ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1).replace(/[._-]/g, ' ')
+    : 'Master';
 
   return (
     <div className="min-h-screen bg-background">
       <AppSidebar />
       <div className="ml-60 flex min-h-screen flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 bg-card/80 glass px-6">
-          <div className="relative w-80">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border/50 bg-background/80 backdrop-blur-sm px-4">
+          <div className="relative w-72">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Buscar processos, clientes..." className="pl-9 bg-muted/50 border-0" />
+            <Input placeholder="Buscar processos, clientes..." className="pl-9 h-9 bg-muted/50 border-none" />
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded hidden md:inline">
+              ⌘K
+            </kbd>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-9 w-9"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               title={theme === 'dark' ? 'Tema Claro' : 'Tema Escuro'}
             >
               {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
             <NotificationPopover />
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 ml-2">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                  ML
+                <AvatarFallback className="bg-primary/20 text-primary text-xs font-bold">
+                  {initials}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:flex flex-col">
-                <span className="text-sm font-medium">Master</span>
-                <span className="text-[11px] text-muted-foreground">Administrador</span>
+                <span className="text-xs font-medium leading-none">{userName}</span>
+                <span className="text-[10px] text-muted-foreground">Administrador</span>
               </div>
             </div>
           </div>
