@@ -38,6 +38,7 @@ import ProcessoEditModal from '@/components/financeiro/ProcessoEditModal';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import { Textarea } from '@/components/ui/textarea';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
+import { gerarRelatorioStatusPDF, calcularProgresso, getEtapasConcluidas } from '@/lib/relatorio-status-pdf';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
