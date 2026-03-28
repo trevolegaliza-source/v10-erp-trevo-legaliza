@@ -319,28 +319,34 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const totalPendente = totalFaturado - totalRecebido;
   const taxaRecebimento = totalFaturado > 0 ? Math.round(totalRecebido / totalFaturado * 100) : 0;
 
-  // Tab-specific client lists
-  const cobrarResult = clientes.map(c => ({ c, result: clienteDeveAparecerEmCobrar(c) }));
+  // ── Exclusive tab assignment: each client in ONE tab only ──
+  function getTabCliente(c: ClienteFinanceiro): string {
+    const pendentes = c.lancamentos.filter(l => l.status !== 'pago');
+    if (pendentes.length === 0) return 'pagos';
+
+    // Priority 1: Overdue (sent AND past due)
+    const temVencido = pendentes.some(l => isLancamentoVencidoReal(l));
+    if (temVencido) return 'vencidos';
+
+    // Priority 2: Awaiting payment (sent to client)
+    if (pendentes.some(l => l.etapa_financeiro === 'cobranca_enviada')) return 'aguardando';
+
+    // Priority 3: Extrato generated, awaiting sending (must have real extrato_id)
+    if (pendentes.some(l => l.etapa_financeiro === 'cobranca_gerada' && l.extrato_id)) return 'enviados';
+
+    // Priority 4: Needs extrato
+    return 'cobrar';
+  }
+
+  const clientesCobrarRaw = clientes.filter(c => getTabCliente(c) === 'cobrar');
+  const cobrarResult = clientesCobrarRaw.map(c => ({ c, result: clienteDeveAparecerEmCobrar(c) }));
   const clientesCobrar = cobrarResult.filter(x => x.result.show).map(x => x.c);
   const clientesFuturaFatura = cobrarResult.filter(x => x.result.isFutura).map(x => x.c);
 
-  const clientesEnviados = clientes.filter(c =>
-    c.lancamentos.some(l => l.etapa_financeiro === 'cobranca_gerada') &&
-    c.qtd_sem_extrato === 0 &&
-    c.etapa_predominante !== 'honorario_pago'
-  );
-
-  const clientesAguardando = clientes.filter(c =>
-    c.lancamentos.some(l => l.etapa_financeiro === 'cobranca_enviada' && l.status !== 'pago')
-  );
-
-  const clientesPagos = clientes.filter(c =>
-    c.etapa_predominante === 'honorario_pago'
-  );
-
-  const clientesVencidos = clientes.filter(c =>
-    c.lancamentos.some(l => isLancamentoVencidoReal(l))
-  );
+  const clientesEnviados = clientes.filter(c => getTabCliente(c) === 'enviados');
+  const clientesAguardando = clientes.filter(c => getTabCliente(c) === 'aguardando');
+  const clientesPagos = clientes.filter(c => getTabCliente(c) === 'pagos');
+  const clientesVencidos = clientes.filter(c => getTabCliente(c) === 'vencidos');
 
   const metricas = {
     totalFaturado,
