@@ -256,7 +256,10 @@ export default function Financeiro() {
                         const diaFatura = c.cliente_dia_vencimento_mensal || 0;
                         const hoje = new Date().getDate();
                         const diaInicioJanela = Math.max(1, diaFatura - 5);
-                        const diasAteCobranca = Math.max(1, diaInicioJanela - hoje);
+                        // If we're past the billing day, calculate days until next month's window
+                        const diasAteCobranca = hoje > diaFatura
+                          ? (new Date(new Date().getFullYear(), new Date().getMonth() + 1, diaInicioJanela).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24) | 0
+                          : Math.max(1, diaInicioJanela - hoje);
                         return (
                           <div key={c.cliente_id} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-border/60">
                             <div>
