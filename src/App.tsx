@@ -21,6 +21,7 @@ const Colaboradores = lazy(() => import("./pages/Colaboradores"));
 const CadastroRapido = lazy(() => import("./pages/CadastroRapido"));
 const Documentos = lazy(() => import("./pages/Documentos"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+const Orcamentos = lazy(() => import("./pages/Orcamentos"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
