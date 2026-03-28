@@ -425,6 +425,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
               Extrato não salvo
             </Badge>
           )}
+          <MoverParaMenu cliente={cliente} />
         </div>
       </AccordionTrigger>
       <AccordionContent className="px-4 pb-4">
