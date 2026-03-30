@@ -631,18 +631,50 @@ function VencidoItem({ cliente }: { cliente: ClienteFinanceiro }) {
     toast.success('Pagamento confirmado!');
   }
 
+  const [loadingExtrato, setLoadingExtrato] = useState(false);
+
   async function handleCopiarCobranca() {
-    const l = lancVencidos[0];
-    if (!l) return;
-    const msg = gerarMensagemCobranca({
+    if (lancVencidos.length === 0) return;
+    const primeiro = lancVencidos[0];
+    const adicionais = lancVencidos.slice(1).map(l => ({
       tipo: l.processo_tipo,
       razao_social: l.processo_razao_social,
-      valor: cliente.total_faturado,
-      data_vencimento: l.data_vencimento,
+      valor: l.valor,
+    }));
+    const msg = gerarMensagemCobranca({
+      tipo: primeiro.processo_tipo,
+      razao_social: primeiro.processo_razao_social,
+      valor: primeiro.valor,
+      data_vencimento: primeiro.data_vencimento,
       diasAtraso: maiorAtraso,
+      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
     });
     await navigator.clipboard.writeText(msg);
     toast.success('Mensagem de cobrança copiada!');
+  }
+
+  async function handleBaixarExtrato() {
+    setLoadingExtrato(true);
+    try {
+      const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
+      const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
+      if (!extratoId) {
+        toast.error('Nenhum extrato encontrado para este cliente.');
+        return;
+      }
+      const { data: extrato } = await supabase
+        .from('extratos')
+        .select('cliente_id, filename')
+        .eq('id', extratoId)
+        .single();
+      if (!extrato) { toast.error('Extrato não encontrado.'); return; }
+      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
+      await downloadExtrato('documentos', path, (extrato as any).filename);
+    } catch (err) {
+      toast.error('Erro ao baixar extrato.');
+    } finally {
+      setLoadingExtrato(false);
+    }
   }
 
   return (
