@@ -109,7 +109,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
     entries.push({
       descricao: `DAS - ${colab.nome}`,
       valor: das,
-      data_vencimento: fmt(new Date(year, month, diaDas)),
+      data_vencimento: fmt(safeDate(year, month, diaDas)),
       categoria: 'folha',
       subcategoria: 'DAS Colaborador',
     });
