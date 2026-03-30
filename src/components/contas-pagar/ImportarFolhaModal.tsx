@@ -115,6 +115,11 @@ export default function ImportarFolhaModal({ open, onClose, onConfirm, mes: mesP
         <DialogHeader>
           <DialogTitle>Importar Folha de Pagamento</DialogTitle>
         </DialogHeader>
+        <div className="flex items-center justify-center gap-3 py-1">
+          <Button variant="ghost" size="sm" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
+          <span className="text-sm font-semibold text-foreground">{MESES_PT[selectedMes - 1]} {selectedAno}</span>
+          <Button variant="ghost" size="sm" onClick={nextMo}><ChevronRight className="h-4 w-4" /></Button>
+        </div>
         <div className="space-y-3 py-2">
           <div className="flex items-center gap-2 pb-2 border-b border-border">
             <Checkbox checked={linhas.every(l => l.selected)} onCheckedChange={c => toggleAll(!!c)} />
