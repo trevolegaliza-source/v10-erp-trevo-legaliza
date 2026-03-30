@@ -32,6 +32,13 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { data, isLoading } = useDashboardData();
 
+  const [diasAlertaPagar, setDiasAlertaPagar] = useState(() => {
+    return parseInt(localStorage.getItem('trevo_dias_alerta_pagar') || '7');
+  });
+  useEffect(() => {
+    localStorage.setItem('trevo_dias_alerta_pagar', String(diasAlertaPagar));
+  }, [diasAlertaPagar]);
+
   const calc = useMemo(() => {
     if (!data) return null;
     const { lancamentosMes, lancamentosMesAnterior, processos, proximosVencimentos, lancamentosHistorico } = data;
