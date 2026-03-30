@@ -2,16 +2,15 @@ import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useColaboradores } from '@/hooks/useColaboradores';
-import { AlertTriangle, Clock, Hourglass } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import FluxoAgendaModal from './FluxoAgendaModal';
 import FluxoItemDetalheModal from './FluxoItemDetalheModal';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const DIAS_SEMANA = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
-
 type Urgencia = 'atrasado' | 'urgente' | 'normal';
 
-interface LancItem {
+export interface LancItem {
   id: string;
   descricao: string;
   valor: number;
@@ -24,29 +23,7 @@ interface LancItem {
   urgencia: Urgencia;
 }
 
-interface BeneficioRow {
-  type: 'beneficio';
-  colaborador_id: string;
-  nome: string;
-  valor: number;
-  vt: LancItem | null;
-  vr: LancItem | null;
-  vt_diario: number;
-  vr_diario: number;
-  vt_dias: number;
-  vr_dias: number;
-  urgencia: Urgencia;
-  data_vencimento: string;
-}
-
-interface NormalRow {
-  type: 'normal';
-  item: LancItem;
-}
-
-type AgendaRow = BeneficioRow | NormalRow;
-
-function getUrgencia(dataVenc: string): Urgencia {
+export function getUrgencia(dataVenc: string): Urgencia {
   const hoje = new Date().toISOString().split('T')[0];
   const em7 = new Date(); em7.setDate(em7.getDate() + 7);
   const em7Str = em7.toISOString().split('T')[0];
@@ -55,27 +32,8 @@ function getUrgencia(dataVenc: string): Urgencia {
   return 'normal';
 }
 
-function UrgencyIcon({ urgencia }: { urgencia: Urgencia }) {
-  if (urgencia === 'atrasado') return <AlertTriangle className="h-4 w-4 flex-shrink-0" style={{ color: '#EF4444' }} />;
-  if (urgencia === 'urgente') return <Clock className="h-4 w-4 flex-shrink-0" style={{ color: '#F59E0B' }} />;
-  return <Hourglass className="h-4 w-4 flex-shrink-0 text-muted-foreground" />;
-}
-
-function getDayLabel(dateStr: string): string {
-  const hoje = new Date();
-  const hojeStr = hoje.toISOString().split('T')[0];
-  const amanha = new Date(hoje); amanha.setDate(amanha.getDate() + 1);
-  const amanhaStr = amanha.toISOString().split('T')[0];
-  const d = new Date(dateStr + 'T12:00:00');
-  const diaSemana = DIAS_SEMANA[d.getDay()];
-  const dataFmt = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-  if (dateStr === hojeStr) return `HOJE · ${diaSemana}, ${dataFmt}`;
-  if (dateStr === amanhaStr) return `AMANHÃ · ${diaSemana}, ${dataFmt}`;
-  return `${diaSemana}, ${dataFmt}`;
-}
-
 export default function FluxoProximos15Dias() {
+  const [agendaOpen, setAgendaOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<LancItem | null>(null);
   const queryClient = useQueryClient();
   const { data: colaboradores = [] } = useColaboradores();
@@ -106,84 +64,6 @@ export default function FluxoProximos15Dias() {
     refetchInterval: 30000,
   });
 
-  // Build agenda grouped by date, merging VT+VR into Benefícios
-  const agenda = useMemo(() => {
-    const colabMap = new Map(colaboradores.map(c => [c.id, c]));
-
-    const grouped: Record<string, LancItem[]> = {};
-    items.forEach(item => {
-      const key = item.data_vencimento;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(item);
-    });
-
-    const result: { date: string; label: string; total: number; rows: AgendaRow[] }[] = [];
-
-    Object.keys(grouped).sort().forEach(dateStr => {
-      const dayItems = grouped[dateStr];
-      const rows: AgendaRow[] = [];
-
-      // Separate VT/VR for benefícios merge
-      const vtVr = dayItems.filter(i => i.subcategoria === 'Vale Transporte (VT)' || i.subcategoria === 'Vale Refeição (VR)');
-      const others = dayItems.filter(i => i.subcategoria !== 'Vale Transporte (VT)' && i.subcategoria !== 'Vale Refeição (VR)');
-
-      // Group VT/VR by colaborador
-      const byColab: Record<string, { vt: LancItem | null; vr: LancItem | null }> = {};
-      vtVr.forEach(item => {
-        const key = item.colaborador_id || 'none';
-        if (!byColab[key]) byColab[key] = { vt: null, vr: null };
-        if (item.subcategoria === 'Vale Transporte (VT)') byColab[key].vt = item;
-        else byColab[key].vr = item;
-      });
-
-      Object.entries(byColab).forEach(([colabId, { vt, vr }]) => {
-        const colab = colabMap.get(colabId);
-        const vtDiario = colab?.vt_diario || 0;
-        const vrDiario = colab?.vr_diario || 0;
-        const vtDias = vt && vtDiario > 0 ? Math.round(vt.valor / vtDiario) : 0;
-        const vrDias = vr && vrDiario > 0 ? Math.round(vr.valor / vrDiario) : 0;
-        const totalVal = (vt?.valor || 0) + (vr?.valor || 0);
-        const nome = colab?.nome || vt?.descricao || vr?.descricao || 'COLABORADOR';
-        const dataVenc = vt?.data_vencimento || vr?.data_vencimento || dateStr;
-        const urg: Urgencia = (vt?.urgencia === 'atrasado' || vr?.urgencia === 'atrasado') ? 'atrasado'
-          : (vt?.urgencia === 'urgente' || vr?.urgencia === 'urgente') ? 'urgente' : 'normal';
-
-        rows.push({
-          type: 'beneficio',
-          colaborador_id: colabId,
-          nome: nome.toUpperCase(),
-          valor: totalVal,
-          vt, vr,
-          vt_diario: vtDiario,
-          vr_diario: vrDiario,
-          vt_dias: vtDias,
-          vr_dias: vrDias,
-          urgencia: urg,
-          data_vencimento: dataVenc,
-        });
-      });
-
-      others.forEach(item => {
-        rows.push({ type: 'normal', item });
-      });
-
-      const total = dayItems.reduce((s, i) => s + i.valor, 0);
-      result.push({ date: dateStr, label: getDayLabel(dateStr), total, rows });
-    });
-
-    return result;
-  }, [items, colaboradores]);
-
-  if (items.length === 0) return null;
-
-  const totalGeral = items.reduce((s, i) => s + i.valor, 0);
-  const hoje = new Date();
-  const em7 = new Date(hoje); em7.setDate(em7.getDate() + 7);
-  const em7Str = em7.toISOString().split('T')[0];
-  const criticos7 = items.filter(i => i.data_vencimento <= em7Str).length;
-
-  const hojeStr = hoje.toLocaleDateString('pt-BR');
-
   const handleMarcarPago = async (id: string) => {
     const dataPagamento = new Date().toISOString().split('T')[0];
     await supabase.from('lancamentos').update({
@@ -197,102 +77,55 @@ export default function FluxoProximos15Dias() {
     setSelectedItem(null);
   };
 
-  function getRowLabel(row: NormalRow): string {
-    const item = row.item;
-    const parts: string[] = [];
-    if (item.subcategoria) parts.push(item.subcategoria.toUpperCase());
-    else if (item.categoria) parts.push(item.categoria.toUpperCase());
-    if (item.fornecedor) parts.push(item.fornecedor.toUpperCase());
-    else parts.push(item.descricao.toUpperCase());
-    return parts.join(' · ');
-  }
+  if (items.length === 0) return null;
+
+  const totalGeral = items.reduce((s, i) => s + i.valor, 0);
+  const hoje = new Date();
+  const em7 = new Date(hoje); em7.setDate(em7.getDate() + 7);
+  const em7Str = em7.toISOString().split('T')[0];
+  const criticos7 = items.filter(i => i.data_vencimento <= em7Str);
+  const valorCritico = criticos7.reduce((s, i) => s + i.valor, 0);
+  const hojeStr = hoje.toLocaleDateString('pt-BR');
 
   return (
     <>
-      <div className="bg-card rounded-lg border border-border p-4 space-y-0">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold tracking-widest text-muted-foreground">
-            FLUXO · PRÓXIMOS 15 DIAS
+      {/* Compact card — original visual */}
+      <div
+        className="bg-card rounded-lg border border-border border-l-4 border-l-primary p-4 cursor-pointer transition-colors hover:bg-muted/50"
+        onClick={() => setAgendaOpen(true)}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+            Fluxo · Próximos 15 dias
           </span>
-          <span className="text-xs text-muted-foreground">HOJE: {hojeStr.toUpperCase()}</span>
+          <span className="text-xs text-muted-foreground">hoje: {hojeStr}</span>
         </div>
 
-        {/* Day groups */}
-        {agenda.map((day, di) => (
-          <div key={day.date}>
-            {di > 0 && <div className="h-px bg-border my-3" />}
-            {/* Day header */}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-foreground tracking-wide">{day.label}</span>
-              <span className="text-sm font-bold text-foreground">{fmt(day.total)}</span>
-            </div>
-            {/* Items */}
-            <div className="space-y-1 pl-2">
-              {day.rows.map((row, ri) => {
-                if (row.type === 'beneficio') {
-                  const bRow = row;
-                  return (
-                    <div
-                      key={`ben-${bRow.colaborador_id}-${di}`}
-                      className="cursor-pointer rounded-md px-2 py-1.5 hover:bg-muted/50 transition-colors"
-                      onClick={() => {
-                        // Open detail for the first underlying item
-                        const firstItem = bRow.vt || bRow.vr;
-                        if (firstItem) setSelectedItem(firstItem);
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <UrgencyIcon urgencia={bRow.urgencia} />
-                        <span className="text-xs font-semibold text-foreground flex-1 truncate">
-                          BENEFÍCIOS · {bRow.nome}
-                        </span>
-                        <span className="text-xs font-bold text-foreground whitespace-nowrap">{fmt(bRow.valor)}</span>
-                      </div>
-                      <div className="pl-6 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground">
-                          {bRow.vt && `VT R$ ${bRow.vt_diario.toFixed(2).replace('.', ',')}/DIA × ${bRow.vt_dias} DIAS`}
-                          {bRow.vt && bRow.vr && ' + '}
-                          {bRow.vr && `VR R$ ${bRow.vr_diario.toFixed(2).replace('.', ',')}/DIA × ${bRow.vr_dias} DIAS`}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-
-                const item = row.item;
-                return (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-2 cursor-pointer rounded-md px-2 py-1.5 hover:bg-muted/50 transition-colors"
-                    onClick={() => setSelectedItem(item)}
-                  >
-                    <UrgencyIcon urgencia={item.urgencia} />
-                    <span className="text-xs font-semibold text-foreground flex-1 truncate">
-                      {getRowLabel(row)}
-                    </span>
-                    <span className="text-xs font-bold text-foreground whitespace-nowrap">{fmt(item.valor)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        {/* Footer */}
-        <div className="h-px bg-border my-3" />
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-muted-foreground tracking-wide">TOTAL DOS PRÓXIMOS 15 DIAS</span>
-          <span className="text-sm font-bold text-foreground">{fmt(totalGeral)}</span>
+        <div className="flex items-baseline gap-4">
+          <span className="text-2xl font-bold text-foreground">{fmt(totalGeral)}</span>
+          <span className="text-sm text-muted-foreground">{items.length} despesa{items.length !== 1 ? 's' : ''}</span>
         </div>
-        {criticos7 > 0 && (
-          <div className="flex items-center gap-1.5 mt-1.5 text-xs" style={{ color: '#F59E0B' }}>
-            <AlertTriangle className="h-3.5 w-3.5" />
-            <span>⚠ {criticos7} VENCE{criticos7 !== 1 ? 'M' : ''} EM ATÉ 7 DIAS</span>
+
+        {criticos7.length > 0 && (
+          <div className="flex items-center gap-1.5 mt-2 text-sm" style={{ color: '#F59E0B' }}>
+            <AlertTriangle className="h-4 w-4" />
+            <span>
+              {criticos7.length} vence{criticos7.length !== 1 ? 'm' : ''} em até 7 dias · {fmt(valorCritico)}
+            </span>
           </div>
         )}
       </div>
 
+      {/* Agenda modal */}
+      <FluxoAgendaModal
+        open={agendaOpen}
+        onClose={() => setAgendaOpen(false)}
+        items={items}
+        colaboradores={colaboradores}
+        onSelectItem={setSelectedItem}
+      />
+
+      {/* Item detail modal */}
       <FluxoItemDetalheModal
         item={selectedItem}
         onClose={() => setSelectedItem(null)}
