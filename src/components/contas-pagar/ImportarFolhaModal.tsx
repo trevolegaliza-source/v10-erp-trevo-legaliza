@@ -101,8 +101,8 @@ export default function ImportarFolhaModal({ open, onClose, onConfirm, mes: mesP
       subcategoria: l.subcategoria,
       fornecedor: l.colaboradorNome,
       colaborador_id: l.colaboradorId,
-      competencia_mes: mes,
-      competencia_ano: ano,
+      competencia_mes: selectedMes,
+      competencia_ano: selectedAno,
       etapa_financeiro: 'solicitacao_criada',
     }));
     onConfirm(lancamentos);
