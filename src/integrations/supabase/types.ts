@@ -277,6 +277,54 @@ export type Database = {
         }
         Relationships: []
       }
+      contatos_estado: {
+        Row: {
+          contato_interno: string | null
+          created_at: string | null
+          email: string | null
+          endereco: string | null
+          id: string
+          municipio: string | null
+          nome: string
+          observacoes: string | null
+          site_url: string | null
+          telefone: string | null
+          tipo: string
+          uf: string
+          updated_at: string | null
+        }
+        Insert: {
+          contato_interno?: string | null
+          created_at?: string | null
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          municipio?: string | null
+          nome: string
+          observacoes?: string | null
+          site_url?: string | null
+          telefone?: string | null
+          tipo: string
+          uf: string
+          updated_at?: string | null
+        }
+        Update: {
+          contato_interno?: string | null
+          created_at?: string | null
+          email?: string | null
+          endereco?: string | null
+          id?: string
+          municipio?: string | null
+          nome?: string
+          observacoes?: string | null
+          site_url?: string | null
+          telefone?: string | null
+          tipo?: string
+          uf?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       despesas_recorrentes: {
         Row: {
           ativo: boolean
@@ -588,6 +636,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notas_estado: {
+        Row: {
+          conteudo: string | null
+          id: string
+          uf: string
+          updated_at: string | null
+        }
+        Insert: {
+          conteudo?: string | null
+          id?: string
+          uf: string
+          updated_at?: string | null
+        }
+        Update: {
+          conteudo?: string | null
+          id?: string
+          uf?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       orcamentos: {
         Row: {

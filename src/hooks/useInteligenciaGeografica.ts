@@ -71,13 +71,17 @@ export function useEstadoDetalhe(uf: string) {
   return useQuery({
     queryKey: ['estado_detalhe', uf],
     queryFn: async () => {
-      const [{ data: contatos }, { data: notas }, { data: clientes }] = await Promise.all([
-        supabase.from('contatos_estado').select('*').eq('uf', uf).order('tipo').order('nome'),
-        supabase.from('notas_estado').select('*').eq('uf', uf).maybeSingle(),
+      const [contatosRes, notasRes, clientesRes] = await Promise.all([
+        supabase.from('contatos_estado' as any).select('*').eq('uf', uf).order('tipo').order('nome'),
+        supabase.from('notas_estado' as any).select('*').eq('uf', uf).limit(1).single(),
         supabase.from('clientes').select('id, nome, apelido, cnpj, estado').eq('estado', uf).eq('is_archived', false),
       ]);
 
-      const clienteIds = clientes?.map((c: any) => c.id) || [];
+      const contatos = (contatosRes.data || []) as unknown as ContatoEstado[];
+      const notaRow = notasRes.data as any;
+      const clientes = clientesRes.data || [];
+
+      const clienteIds = clientes.map((c: any) => c.id);
       let processosCliente: any[] = [];
       let lancamentosCliente: any[] = [];
 
@@ -91,10 +95,10 @@ export function useEstadoDetalhe(uf: string) {
       }
 
       return {
-        contatos: (contatos || []) as ContatoEstado[],
-        nota: notas?.conteudo || '',
-        notaId: notas?.id || null,
-        clientes: (clientes || []).map((c: any) => {
+        contatos,
+        nota: notaRow?.conteudo || '',
+        notaId: notaRow?.id || null,
+        clientes: clientes.map((c: any) => {
           const procs = processosCliente.filter(p => p.cliente_id === c.id);
           const lancs = lancamentosCliente.filter(l => l.cliente_id === c.id);
           const receita = lancs.reduce((s: number, l: any) => s + Number(l.valor), 0);
@@ -112,12 +116,12 @@ export function useSalvarContato() {
   return useMutation({
     mutationFn: async (contato: Partial<ContatoEstado> & { uf: string; nome: string; tipo: string }) => {
       if (contato.id) {
-        const { error } = await supabase.from('contatos_estado').update({
+        const { error } = await (supabase.from('contatos_estado' as any) as any).update({
           ...contato, updated_at: new Date().toISOString(),
         }).eq('id', contato.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('contatos_estado').insert(contato as any);
+        const { error } = await (supabase.from('contatos_estado' as any) as any).insert(contato);
         if (error) throw error;
       }
     },
@@ -133,7 +137,7 @@ export function useRemoverContato() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, uf }: { id: string; uf: string }) => {
-      const { error } = await supabase.from('contatos_estado').delete().eq('id', id);
+      const { error } = await (supabase.from('contatos_estado' as any) as any).delete().eq('id', id);
       if (error) throw error;
       return uf;
     },
@@ -149,9 +153,9 @@ export function useSalvarNotaEstado() {
   return useMutation({
     mutationFn: async ({ uf, conteudo, notaId }: { uf: string; conteudo: string; notaId: string | null }) => {
       if (notaId) {
-        await supabase.from('notas_estado').update({ conteudo, updated_at: new Date().toISOString() }).eq('id', notaId);
+        await (supabase.from('notas_estado' as any) as any).update({ conteudo, updated_at: new Date().toISOString() }).eq('id', notaId);
       } else {
-        await supabase.from('notas_estado').insert({ uf, conteudo } as any);
+        await (supabase.from('notas_estado' as any) as any).insert({ uf, conteudo });
       }
     },
     onSuccess: (_, v) => {
