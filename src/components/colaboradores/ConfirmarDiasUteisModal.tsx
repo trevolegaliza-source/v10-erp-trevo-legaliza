@@ -12,10 +12,20 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   year: number;
-  month: number; // 0-indexed
+  month: number; // 0-indexed (competência)
   colaboradores: Colaborador[];
   onConfirm: (diasUteis: number) => void;
   isPending: boolean;
+}
+
+// VT/VR is paid on the 1st of the month AFTER competência,
+// so business days should be calculated for the PAYMENT month.
+function getPaymentMonth(year: number, month: number) {
+  const nextMonth = month + 1;
+  return {
+    payYear: nextMonth > 11 ? year + 1 : year,
+    payMonth: nextMonth > 11 ? 0 : nextMonth,
+  };
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
