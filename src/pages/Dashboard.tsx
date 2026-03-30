@@ -95,21 +95,19 @@ export default function Dashboard() {
 
     // Gráfico 6 meses
     const dadosMensais: { mes: string; recebido: number; pendente: number }[] = [];
+    const agora = new Date();
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(); d.setMonth(d.getMonth() - i);
-      const m = d.getMonth() + 1;
-      const a = d.getFullYear();
+      const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+      const mes = d.getMonth();
+      const ano = d.getFullYear();
+      const label = d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '') + '/' + String(ano).slice(2);
       const lancMes = lancamentosHistorico.filter(l => {
         const ld = new Date(l.data_vencimento || l.created_at || '');
-        return ld.getMonth() + 1 === m && ld.getFullYear() === a;
+        return ld.getMonth() === mes && ld.getFullYear() === ano;
       });
       const fat = lancMes.reduce((s, l) => s + Number(l.valor), 0);
       const rec = lancMes.filter(l => l.status === 'pago' && l.confirmado_recebimento === true).reduce((s, l) => s + Number(l.valor), 0);
-      dadosMensais.push({
-        mes: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''),
-        recebido: rec,
-        pendente: fat - rec,
-      });
+      dadosMensais.push({ mes: label, recebido: rec, pendente: fat - rec });
     }
 
     // Top clientes
