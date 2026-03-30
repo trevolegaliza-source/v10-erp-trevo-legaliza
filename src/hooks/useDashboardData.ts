@@ -20,6 +20,7 @@ export function useDashboardData() {
         { data: processos },
         { data: proxVenc },
         { data: lancHist },
+        { data: lancPagar },
       ] = await Promise.all([
         supabase
           .from('lancamentos')
@@ -50,6 +51,12 @@ export function useDashboardData() {
           .select('id, valor, status, confirmado_recebimento, data_vencimento, created_at')
           .eq('tipo', 'receber')
           .gte('data_vencimento', seisMesesAtras),
+        supabase
+          .from('lancamentos')
+          .select('id, valor, data_vencimento, status, descricao')
+          .eq('tipo', 'pagar')
+          .in('status', ['pendente', 'atrasado'])
+          .order('data_vencimento', { ascending: true }),
       ]);
 
       return {
@@ -58,6 +65,7 @@ export function useDashboardData() {
         processos: processos || [],
         proximosVencimentos: proxVenc || [],
         lancamentosHistorico: lancHist || [],
+        lancamentosPagar: lancPagar || [],
       };
     },
     staleTime: 2 * 60 * 1000,

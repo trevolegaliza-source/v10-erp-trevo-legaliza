@@ -22,6 +22,8 @@ const CadastroRapido = lazy(() => import("./pages/CadastroRapido"));
 const Documentos = lazy(() => import("./pages/Documentos"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const Orcamentos = lazy(() => import("./pages/Orcamentos"));
+const InteligenciaGeografica = lazy(() => import("./pages/InteligenciaGeografica"));
+const EstadoDetalhe = lazy(() => import("./pages/EstadoDetalhe"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -69,6 +71,8 @@ const App = () => (
                   <Route path="/contas-pagar" element={<ContasPagar />} />
                   <Route path="/colaboradores" element={<Colaboradores />} />
                   <Route path="/documentos" element={<Documentos />} />
+                  <Route path="/inteligencia-geografica" element={<InteligenciaGeografica />} />
+                  <Route path="/inteligencia-geografica/:uf" element={<EstadoDetalhe />} />
                   <Route path="/configuracoes" element={<Configuracoes />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />

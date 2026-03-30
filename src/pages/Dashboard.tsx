@@ -1,13 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardData, useCountUp } from '@/hooks/useDashboardData';
 import { getNomeUsuario, getSaudacao } from '@/hooks/useDashboard';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   DollarSign, Clock, CheckCircle, Activity, TrendingUp, TrendingDown,
-  AlertTriangle, FileText, Send, PauseCircle, ChevronRight, Check,
+  AlertTriangle, FileText, Send, PauseCircle, ChevronRight, Check, CreditCard,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -31,9 +32,16 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { data, isLoading } = useDashboardData();
 
+  const [diasAlertaPagar, setDiasAlertaPagar] = useState(() => {
+    return parseInt(localStorage.getItem('trevo_dias_alerta_pagar') || '7');
+  });
+  useEffect(() => {
+    localStorage.setItem('trevo_dias_alerta_pagar', String(diasAlertaPagar));
+  }, [diasAlertaPagar]);
+
   const calc = useMemo(() => {
     if (!data) return null;
-    const { lancamentosMes, lancamentosMesAnterior, processos, proximosVencimentos, lancamentosHistorico } = data;
+    const { lancamentosMes, lancamentosMesAnterior, processos, proximosVencimentos, lancamentosHistorico, lancamentosPagar } = data;
 
     const totalFaturado = lancamentosMes.reduce((s, l) => s + Number(l.valor), 0);
     const totalRecebido = lancamentosMes
@@ -84,7 +92,26 @@ export default function Dashboard() {
       alertas.push({ id: 'parados', titulo: `${parados.length} processos parados`, descricao: 'Sem movimentação há 7+ dias', severity: 'info', icon: PauseCircle, link: '/processos' });
     }
 
-    // Pipeline
+    // Contas a pagar alerts
+    const limite = new Date(hoje);
+    limite.setDate(limite.getDate() + diasAlertaPagar);
+    const contasVencidas = lancamentosPagar.filter((l: any) => {
+      const venc = new Date(l.data_vencimento + 'T00:00:00');
+      return venc < hoje;
+    });
+    const contasAVencer = lancamentosPagar.filter((l: any) => {
+      const venc = new Date(l.data_vencimento + 'T00:00:00');
+      return venc >= hoje && venc <= limite;
+    });
+    if (contasVencidas.length > 0) {
+      const valorVencido = contasVencidas.reduce((s: number, l: any) => s + Number(l.valor), 0);
+      alertas.push({ id: 'contas_pagar_vencidas', titulo: `${contasVencidas.length} contas a pagar vencidas`, descricao: `R$ ${valorVencido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em atraso`, severity: 'critical', icon: CreditCard, link: '/contas-pagar' });
+    }
+    if (contasAVencer.length > 0) {
+      const valorAVencer = contasAVencer.reduce((s: number, l: any) => s + Number(l.valor), 0);
+      alertas.push({ id: 'contas_pagar_proximas', titulo: `${contasAVencer.length} contas a pagar nos próximos ${diasAlertaPagar} dias`, descricao: `R$ ${valorAVencer.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a vencer`, severity: 'warning', icon: CreditCard, link: '/contas-pagar' });
+    }
+
     const fases = [
       { id: 'entrada', nome: 'Entrada', etapas: ['recebidos', 'analise_documental'], cor: 'bg-blue-500' },
       { id: 'andamento', nome: 'Em andamento', etapas: ['contrato', 'viabilidade', 'dbe', 'vre', 'em_analise'], cor: 'bg-teal-500' },
@@ -140,7 +167,7 @@ export default function Dashboard() {
         cliente_apelido: (v.clientes as any)?.apelido || null,
       })),
     };
-  }, [data]);
+  }, [data, diasAlertaPagar]);
 
   const animFaturado = useCountUp(calc?.totalFaturado ?? 0);
   const animPendente = useCountUp(calc?.totalPendente ?? 0);
@@ -236,7 +263,21 @@ export default function Dashboard() {
 
       {/* SEÇÃO 2: Ações Urgentes */}
       <div className="space-y-2 dashboard-section">
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Ações urgentes</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Ações urgentes</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Alertar contas em</span>
+            <Input
+              type="number"
+              value={diasAlertaPagar}
+              onChange={(e) => setDiasAlertaPagar(parseInt(e.target.value) || 7)}
+              className="w-16 h-7 text-xs text-center"
+              min={1}
+              max={90}
+            />
+            <span className="text-xs text-muted-foreground">dias</span>
+          </div>
+        </div>
         {alertas.length === 0 ? (
           <Card className="p-4 border-green-500/30 bg-green-500/5">
             <div className="flex items-center gap-3">

@@ -13,6 +13,7 @@ import {
   LogOut,
   UsersRound,
   Receipt,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -31,6 +32,7 @@ const navItems = [
   { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle, badgeKey: null },
   { path: '/colaboradores', label: 'Colaboradores', icon: UsersRound, badgeKey: null },
   { path: '/documentos', label: 'Documentos', icon: FileText, badgeKey: 'docsPendentes' as const },
+  { path: '/inteligencia-geografica', label: 'Intel. Geográfica', icon: MapPin, badgeKey: null },
   { path: '/configuracoes', label: 'Configurações', icon: Settings, badgeKey: null },
 ];
 
