@@ -158,19 +158,40 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
             </Select>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-2">
             <Label className="text-foreground">Salário Base (R$)</Label>
             <Input type="number" step="0.01" min="0" value={form.salario_base} onChange={e => setForm(f => ({ ...f, salario_base: e.target.value }))} />
           </div>
           <div className="grid gap-2">
-            <Label className="text-foreground">VT Diário (R$)</Label>
-            <Input type="number" step="0.01" min="0" value={form.vt_diario} onChange={e => setForm(f => ({ ...f, vt_diario: e.target.value }))} />
-          </div>
-          <div className="grid gap-2">
             <Label className="text-foreground">VR Diário (R$)</Label>
             <Input type="number" step="0.01" min="0" value={form.vr_diario} onChange={e => setForm(f => ({ ...f, vr_diario: e.target.value }))} />
           </div>
+        </div>
+        <div className="rounded-lg border border-border/60 p-3 space-y-3">
+          <div className="grid gap-2">
+            <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">Tipo de Transporte</Label>
+            <Select value={form.tipo_transporte} onValueChange={v => setForm(f => ({ ...f, tipo_transporte: v as any }))}>
+              <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vt">Vale Transporte (VT) — valor diário × dias úteis</SelectItem>
+                <SelectItem value="auxilio_combustivel">Auxílio Combustível — valor fixo mensal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {form.tipo_transporte === 'vt' ? (
+            <div className="grid gap-2">
+              <Label className="text-foreground">VT Diário (R$)</Label>
+              <Input type="number" step="0.01" min="0" value={form.vt_diario} onChange={e => setForm(f => ({ ...f, vt_diario: e.target.value }))} />
+              <p className="text-[10px] text-muted-foreground">Multiplicado pelos dias úteis do mês</p>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              <Label className="text-foreground">Auxílio Combustível Fixo (R$)</Label>
+              <Input type="number" step="0.01" min="0" value={form.auxilio_combustivel_valor} onChange={e => setForm(f => ({ ...f, auxilio_combustivel_valor: e.target.value }))} />
+              <p className="text-[10px] text-muted-foreground">Valor fixo pago todo mês, independente dos dias úteis</p>
+            </div>
+          )}
         </div>
         {form.regime !== 'INDEFINIDO' && (
           <div className="grid gap-2">

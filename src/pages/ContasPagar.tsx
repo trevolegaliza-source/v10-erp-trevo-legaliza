@@ -259,7 +259,7 @@ export default function ContasPagar() {
       />
 
       {/* Tabs */}
-      <Tabs defaultValue="categoria" className="space-y-4">
+      <Tabs defaultValue="categoria" value={selectionMode ? 'lista' : undefined} className="space-y-4">
         <TabsList>
           <TabsTrigger value="categoria">Visão por Categoria</TabsTrigger>
           <TabsTrigger value="lista">Lista</TabsTrigger>

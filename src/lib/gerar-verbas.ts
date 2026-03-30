@@ -196,7 +196,10 @@ async function aplicarAumentos(colaboradores: Colaborador[], year: number, month
 export function estimarCustoTotal(colab: Colaborador, diasUteis?: number): number {
   const du = diasUteis ?? 22;
   const sal = Number(colab.salario_base);
-  const vt = Number(colab.vt_diario) * du;
+  const tipoTransporte = (colab as any).tipo_transporte || 'vt';
+  const vt = tipoTransporte === 'auxilio_combustivel' 
+    ? (Number((colab as any).auxilio_combustivel_valor) || 0) 
+    : Number(colab.vt_diario) * du;
   const vr = Number(colab.vr_diario) * du;
   const das = colab.regime !== 'INDEFINIDO' ? (Number(colab.valor_das) || 0) : 0;
   let total = sal + vt + vr + das;
