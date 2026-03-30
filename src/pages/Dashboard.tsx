@@ -263,7 +263,21 @@ export default function Dashboard() {
 
       {/* SEÇÃO 2: Ações Urgentes */}
       <div className="space-y-2 dashboard-section">
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Ações urgentes</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Ações urgentes</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Alertar contas em</span>
+            <Input
+              type="number"
+              value={diasAlertaPagar}
+              onChange={(e) => setDiasAlertaPagar(parseInt(e.target.value) || 7)}
+              className="w-16 h-7 text-xs text-center"
+              min={1}
+              max={90}
+            />
+            <span className="text-xs text-muted-foreground">dias</span>
+          </div>
+        </div>
         {alertas.length === 0 ? (
           <Card className="p-4 border-green-500/30 bg-green-500/5">
             <div className="flex items-center gap-3">
