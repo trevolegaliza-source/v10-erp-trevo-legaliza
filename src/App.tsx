@@ -71,6 +71,8 @@ const App = () => (
                   <Route path="/contas-pagar" element={<ContasPagar />} />
                   <Route path="/colaboradores" element={<Colaboradores />} />
                   <Route path="/documentos" element={<Documentos />} />
+                  <Route path="/inteligencia-geografica" element={<InteligenciaGeografica />} />
+                  <Route path="/inteligencia-geografica/:uf" element={<EstadoDetalhe />} />
                   <Route path="/configuracoes" element={<Configuracoes />} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
