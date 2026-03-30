@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Settings, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
+import FluxoProximos15Dias from '@/components/contas-pagar/FluxoProximos15Dias';
 import ContasPagarKPIs from '@/components/contas-pagar/ContasPagarKPIs';
 import CategoriaAccordion from '@/components/contas-pagar/CategoriaAccordion';
 import ContasPagarLista from '@/components/contas-pagar/ContasPagarLista';
