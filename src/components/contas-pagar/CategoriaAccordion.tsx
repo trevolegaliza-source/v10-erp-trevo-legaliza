@@ -312,6 +312,14 @@ function BeneficiosRow({
                 <MessageCircle className="h-3.5 w-3.5 text-green-600" />
               </Button>
             )}
+            {items.map(item => {
+              const hasComprovante = item.comprovante_url || item.url_comprovante;
+              return hasComprovante ? (
+                <Button key={`view-${item.id}`} variant="ghost" size="icon" className="h-7 w-7" title="Ver comprovante" onClick={() => setShowComprovante(item)}>
+                  <Eye className="h-3.5 w-3.5 text-blue-500" />
+                </Button>
+              ) : null;
+            })}
             {items.map(item => (
               item.status === 'pendente' && (
                 <Button key={`pay-${item.id}`} variant="ghost" size="icon" className="h-7 w-7" title={`Pagar ${item.subcategoria}`} onClick={() => onMarcarPago(item)}>
