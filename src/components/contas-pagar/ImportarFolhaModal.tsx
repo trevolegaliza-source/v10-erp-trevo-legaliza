@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import { buildVerbas } from '@/lib/gerar-verbas';
+
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 interface Props {
   open: boolean;
@@ -24,17 +27,31 @@ interface LinhaFolha {
   selected: boolean;
 }
 
-export default function ImportarFolhaModal({ open, onClose, onConfirm, mes, ano }: Props) {
+export default function ImportarFolhaModal({ open, onClose, onConfirm, mes: mesProp, ano: anoProp }: Props) {
   const { data: colaboradores } = useColaboradores();
-  const activeColabs = (colaboradores || []).filter(c => c.status === 'ativo');
+  const activeColabs = useMemo(() => (colaboradores || []).filter(c => c.status === 'ativo'), [colaboradores]);
 
-  const [linhas, setLinhas] = useState<LinhaFolha[]>(() => generateLinhas());
+  // Default to NEXT month relative to current view
+  const nextMonth = mesProp === 12 ? 1 : mesProp + 1;
+  const nextYear = mesProp === 12 ? anoProp + 1 : anoProp;
+  const [selectedMes, setSelectedMes] = useState(nextMonth);
+  const [selectedAno, setSelectedAno] = useState(nextYear);
+
+  // Reset to next month when modal opens
+  useEffect(() => {
+    if (open) {
+      const nm = mesProp === 12 ? 1 : mesProp + 1;
+      const ny = mesProp === 12 ? anoProp + 1 : anoProp;
+      setSelectedMes(nm);
+      setSelectedAno(ny);
+    }
+  }, [open, mesProp, anoProp]);
 
   function generateLinhas(): LinhaFolha[] {
     const result: LinhaFolha[] = [];
-    const month0 = mes - 1; // buildVerbas uses 0-indexed month
+    const month0 = selectedMes - 1; // buildVerbas uses 0-indexed month
     activeColabs.forEach(c => {
-      const verbas = buildVerbas(c, ano, month0);
+      const verbas = buildVerbas(c, selectedAno, month0);
       verbas.forEach(v => {
         result.push({
           colaboradorId: c.id,
@@ -49,8 +66,23 @@ export default function ImportarFolhaModal({ open, onClose, onConfirm, mes, ano 
     return result;
   }
 
-  // Regenerate when colabs change
-  useState(() => { setLinhas(generateLinhas()); });
+  const [linhas, setLinhas] = useState<LinhaFolha[]>([]);
+
+  // Regenerate when colabs or month changes
+  useEffect(() => {
+    if (open && activeColabs.length > 0) {
+      setLinhas(generateLinhas());
+    }
+  }, [open, activeColabs, selectedMes, selectedAno]);
+
+  const prevMonth = () => {
+    if (selectedMes === 1) { setSelectedMes(12); setSelectedAno(y => y - 1); }
+    else setSelectedMes(m => m - 1);
+  };
+  const nextMo = () => {
+    if (selectedMes === 12) { setSelectedMes(1); setSelectedAno(y => y + 1); }
+    else setSelectedMes(m => m + 1);
+  };
 
   const toggleAll = (checked: boolean) => setLinhas(ls => ls.map(l => ({ ...l, selected: checked })));
   const toggle = (idx: number) => setLinhas(ls => ls.map((l, i) => i === idx ? { ...l, selected: !l.selected } : l));
