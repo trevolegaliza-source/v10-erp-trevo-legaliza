@@ -20,10 +20,19 @@ export default function ReenviarCobrancaModal({ lancamento, open, onOpenChange }
   const dias = diasAtraso(lancamento.data_vencimento, lancamento.status);
 
   const handleCopiarMsg = async () => {
+    // Fetch valores adicionais for the process
+    let valorAdicional = 0;
+    if (lancamento.processo_id) {
+      const { data: vas } = await supabase
+        .from('valores_adicionais')
+        .select('valor')
+        .eq('processo_id', lancamento.processo_id);
+      if (vas) valorAdicional = vas.reduce((s, v) => s + v.valor, 0);
+    }
     const msg = gerarMensagemCobranca({
       tipo: lancamento.processo?.tipo || 'processo',
       razao_social: lancamento.processo?.razao_social || lancamento.descricao,
-      valor: Number(lancamento.valor),
+      valor: Number(lancamento.valor) + valorAdicional,
       data_vencimento: lancamento.data_vencimento,
       diasAtraso: dias,
     });
