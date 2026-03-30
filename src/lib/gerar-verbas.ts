@@ -5,6 +5,12 @@ import { toast } from 'sonner';
 
 const fmt = (d: Date) => d.toISOString().split('T')[0];
 
+/** Clamp day to the last day of the month to avoid rollover */
+function safeDate(year: number, month: number, day: number): Date {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, Math.min(day, lastDay));
+}
+
 interface VerbaEntry {
   descricao: string;
   valor: number;
