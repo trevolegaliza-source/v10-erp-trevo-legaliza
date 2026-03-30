@@ -26,25 +26,23 @@ interface LinhaFolha {
 export default function ImportarFolhaModal({ open, onClose, onConfirm, mes, ano }: Props) {
   const { data: colaboradores } = useColaboradores();
   const activeColabs = (colaboradores || []).filter(c => c.status === 'ativo');
-  const diasUteis = getBusinessDaysInMonth();
 
   const [linhas, setLinhas] = useState<LinhaFolha[]>(() => generateLinhas());
 
   function generateLinhas(): LinhaFolha[] {
     const result: LinhaFolha[] = [];
+    const month0 = mes - 1; // buildVerbas uses 0-indexed month
     activeColabs.forEach(c => {
-      if (Number(c.salario_base) > 0) {
-        result.push({ colaboradorId: c.id, colaboradorNome: c.nome, subcategoria: 'Salário', valor: Number(c.salario_base), selected: true });
-      }
-      if (Number(c.vt_diario) > 0) {
-        result.push({ colaboradorId: c.id, colaboradorNome: c.nome, subcategoria: 'Vale Transporte (VT)', valor: Number(c.vt_diario) * diasUteis, selected: true });
-      }
-      if (Number(c.vr_diario) > 0) {
-        result.push({ colaboradorId: c.id, colaboradorNome: c.nome, subcategoria: 'Vale Refeição (VR)', valor: Number(c.vr_diario) * diasUteis, selected: true });
-      }
-      if (Number(c.valor_das) > 0) {
-        result.push({ colaboradorId: c.id, colaboradorNome: c.nome, subcategoria: 'DAS Colaborador', valor: Number(c.valor_das), selected: true });
-      }
+      const verbas = buildVerbas(c, ano, month0);
+      verbas.forEach(v => {
+        result.push({
+          colaboradorId: c.id,
+          colaboradorNome: c.nome,
+          subcategoria: v.subcategoria,
+          valor: v.valor,
+          selected: true,
+        });
+      });
     });
     return result;
   }
