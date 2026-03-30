@@ -65,6 +65,7 @@ export function useDashboardData() {
         processos: processos || [],
         proximosVencimentos: proxVenc || [],
         lancamentosHistorico: lancHist || [],
+        lancamentosPagar: lancPagar || [],
       };
     },
     staleTime: 2 * 60 * 1000,
