@@ -219,27 +219,48 @@ function BeneficiosRow({
 
 const SUBCATEGORIA_ORDER = ['Adiantamento', 'Salário', 'Benefícios', '13º Salário (Provisão)', 'DAS Colaborador', 'Férias (Provisão)', 'FGTS', 'INSS'];
 
-function getEarliestDate(items: any[]): string | null {
-  if (!items.length) return null;
-  return items.reduce((min: string, l: any) => l.data_vencimento < min ? l.data_vencimento : min, items[0].data_vencimento);
+const DIAS_SEMANA = ['DOMINGO', 'SEGUNDA-FEIRA', 'TERÇA-FEIRA', 'QUARTA-FEIRA', 'QUINTA-FEIRA', 'SEXTA-FEIRA', 'SÁBADO'];
+
+type DateGroupUrgency = 'atrasado' | 'urgente' | 'normal' | 'pago';
+
+function getDateGroupUrgency(dateStr: string, items: any[]): DateGroupUrgency {
+  const allPago = items.every(l => l.status === 'pago');
+  if (allPago) return 'pago';
+  const hoje = new Date().toISOString().split('T')[0];
+  if (dateStr <= hoje) return 'atrasado';
+  const em7dias = new Date();
+  em7dias.setDate(em7dias.getDate() + 7);
+  const limite7 = em7dias.toISOString().split('T')[0];
+  if (dateStr <= limite7) return 'urgente';
+  return 'normal';
 }
 
-function formatDateBR(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-');
-  return `${d}/${m}/${y}`;
+function getDateGroupSortKey(dateStr: string, urgency: DateGroupUrgency): number {
+  // 1=atrasado, 2=urgente, 3=normal, 4=pago
+  const map: Record<DateGroupUrgency, number> = { atrasado: 1, urgente: 2, normal: 3, pago: 4 };
+  return map[urgency];
 }
 
-function SubGroupHeader({ label, total, items }: { label: string; total: number; items: any[] }) {
-  const earliest = getEarliestDate(items);
+function getDateGroupIcon(urgency: DateGroupUrgency) {
+  switch (urgency) {
+    case 'atrasado': return <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />;
+    case 'urgente': return <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
+    case 'normal': return <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />;
+    case 'pago': return <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />;
+  }
+}
+
+function DateGroupHeader({ dateStr, total, items, urgency }: { dateStr: string; total: number; items: any[]; urgency: DateGroupUrgency }) {
+  const date = new Date(dateStr + 'T12:00:00');
+  const formatted = date.toLocaleDateString('pt-BR');
+  const diaSemana = DIAS_SEMANA[date.getDay()];
   const pagos = items.filter(l => l.status === 'pago').length;
   const pendentes = items.length - pagos;
 
   return (
     <div className="flex items-center gap-2 w-full flex-wrap">
-      <span className="font-medium text-foreground uppercase">{label}</span>
-      {earliest && (
-        <span className="text-muted-foreground text-xs">· {formatDateBR(earliest)}</span>
-      )}
+      {getDateGroupIcon(urgency)}
+      <span className="font-medium text-foreground uppercase text-sm">{formatted} · {diaSemana}</span>
       <span className="ml-auto mr-2 font-bold text-sm text-foreground">{fmt(total)}</span>
       <span className="flex items-center gap-2 text-[11px]">
         {pagos > 0 && (
@@ -248,8 +269,8 @@ function SubGroupHeader({ label, total, items }: { label: string; total: number;
           </span>
         )}
         {pendentes > 0 && (
-          <span className="flex items-center gap-0.5 text-amber-600 font-medium uppercase">
-            ⏳ {pendentes} {pendentes === 1 ? 'PENDENTE' : 'PENDENTES'}
+          <span className={`flex items-center gap-0.5 font-medium uppercase ${urgency === 'atrasado' ? 'text-destructive' : urgency === 'urgente' ? 'text-amber-600' : 'text-muted-foreground'}`}>
+            {urgency === 'atrasado' ? '⚠' : urgency === 'urgente' ? '⏰' : '⏳'} {pendentes} {pendentes === 1 ? 'PENDENTE' : 'PENDENTES'}
           </span>
         )}
       </span>
@@ -257,40 +278,50 @@ function SubGroupHeader({ label, total, items }: { label: string; total: number;
   );
 }
 
+function getSubcatLabel(l: any): string {
+  if (l.subcategoria === 'Vale Transporte (VT)' || l.subcategoria === 'Vale Refeição (VR)') return 'BENEFÍCIOS';
+  return (l.subcategoria || 'OUTROS').toUpperCase();
+}
+
+function getColabName(desc: string): string {
+  const parts = desc.split('—');
+  return parts.length > 1 ? parts[parts.length - 1].trim().toUpperCase() : desc.toUpperCase();
+}
+
 function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit: (l: any) => void; onMarcarPago: (l: any) => void }) {
   const { data: colaboradores } = useColaboradores();
 
-  // Separate VT/VR from other items
-  const vtVrItems = items.filter(l => l.subcategoria === 'Vale Transporte (VT)' || l.subcategoria === 'Vale Refeição (VR)');
-  const otherItems = items.filter(l => l.subcategoria !== 'Vale Transporte (VT)' && l.subcategoria !== 'Vale Refeição (VR)');
-
-  // Group other items by subcategoria
-  const grouped: Record<string, any[]> = {};
-  otherItems.forEach(l => {
-    const sub = l.subcategoria || 'Outros Folha';
-    if (!grouped[sub]) grouped[sub] = [];
-    grouped[sub].push(l);
+  // Group by date
+  const byDate: Record<string, any[]> = {};
+  items.forEach(l => {
+    const d = l.data_vencimento;
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(l);
   });
 
-  // Build unified Benefícios group
-  if (vtVrItems.length > 0) {
-    grouped['Benefícios'] = vtVrItems;
-  }
-
-  const sortedKeys = Object.keys(grouped).sort((a, b) => {
-    const ia = SUBCATEGORIA_ORDER.indexOf(a);
-    const ib = SUBCATEGORIA_ORDER.indexOf(b);
-    if (ia === -1 && ib === -1) return a.localeCompare(b);
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
-    return ia - ib;
+  // Sort date groups
+  const sortedDates = Object.keys(byDate).sort((a, b) => {
+    const ua = getDateGroupUrgency(a, byDate[a]);
+    const ub = getDateGroupUrgency(b, byDate[b]);
+    const ka = getDateGroupSortKey(a, ua);
+    const kb = getDateGroupSortKey(b, ub);
+    if (ka !== kb) return ka - kb;
+    // Within same urgency group
+    if (ua === 'pago') return b.localeCompare(a); // most recent first for paid
+    return a.localeCompare(b); // earliest first for others
   });
 
-  // Build beneficios unified rows
+  // Determine default open groups (those with any pending)
+  const defaultOpen = sortedDates.filter(d => {
+    const urgency = getDateGroupUrgency(d, byDate[d]);
+    return urgency !== 'pago';
+  });
+
+  // Build beneficios unified rows for a set of VT/VR items
   const buildBeneficiosRows = (vtVrRaw: any[]) => {
     const byColab: Record<string, { vt: any | null; vr: any | null }> = {};
     vtVrRaw.forEach(l => {
-      const key = `${l.colaborador_id || 'none'}_${l.competencia_mes}_${l.competencia_ano}`;
+      const key = l.colaborador_id || 'none';
       if (!byColab[key]) byColab[key] = { vt: null, vr: null };
       if (l.subcategoria === 'Vale Transporte (VT)') byColab[key].vt = l;
       if (l.subcategoria === 'Vale Refeição (VR)') byColab[key].vr = l;
@@ -298,43 +329,94 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
     return Object.values(byColab);
   };
 
+  // Render items within a date group, sorted: pendentes first, pagos last; grouped by subcategoria label
+  const renderDateItems = (dateItems: any[]) => {
+    // Sort: pendentes/atrasados first, pagos last
+    const sorted = [...dateItems].sort((a, b) => {
+      const aP = a.status === 'pago' ? 1 : 0;
+      const bP = b.status === 'pago' ? 1 : 0;
+      if (aP !== bP) return aP - bP;
+      // Then by subcategoria order
+      const sa = SUBCATEGORIA_ORDER.indexOf(getSubcatLabel(a) === 'BENEFÍCIOS' ? 'Benefícios' : (a.subcategoria || ''));
+      const sb = SUBCATEGORIA_ORDER.indexOf(getSubcatLabel(b) === 'BENEFÍCIOS' ? 'Benefícios' : (b.subcategoria || ''));
+      return (sa === -1 ? 99 : sa) - (sb === -1 ? 99 : sb);
+    });
+
+    // Separate VT/VR for unified display
+    const vtVrItems = sorted.filter(l => l.subcategoria === 'Vale Transporte (VT)' || l.subcategoria === 'Vale Refeição (VR)');
+    const regularItems = sorted.filter(l => l.subcategoria !== 'Vale Transporte (VT)' && l.subcategoria !== 'Vale Refeição (VR)');
+
+    // Determine where to insert beneficios rows (at the position of Benefícios in SUBCATEGORIA_ORDER)
+    const beneficiosRows = vtVrItems.length > 0 ? buildBeneficiosRows(vtVrItems) : [];
+
+    return (
+      <div className="space-y-1">
+        {regularItems.map((l: any) => {
+          const urgencia = getUrgencia(l);
+          const style = getRowStyle(urgencia);
+          const subcatLabel = getSubcatLabel(l);
+          const colabName = getColabName(l.descricao);
+          return (
+            <div
+              key={l.id}
+              className="flex items-center justify-between py-2.5 px-2 gap-3 rounded-md"
+              style={{ backgroundColor: style.bg, borderLeft: style.borderLeft }}
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {urgencia === 'pago' && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+                <p className={`text-sm font-medium truncate uppercase ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+                  {subcatLabel} · {colabName}
+                </p>
+              </div>
+              <span className={`font-bold text-sm whitespace-nowrap ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+                {fmt(Number(l.valor))}
+              </span>
+              {getStatusBadge(l)}
+              <div className="flex gap-1">
+                {l.status === 'pendente' && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
+                    <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                  </Button>
+                )}
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+        {beneficiosRows.map((pair, idx) => {
+          const colabId = pair.vt?.colaborador_id || pair.vr?.colaborador_id;
+          const colab = colaboradores?.find(c => c.id === colabId) || null;
+          return (
+            <BeneficiosRow
+              key={`ben-${idx}`}
+              vtItem={pair.vt}
+              vrItem={pair.vr}
+              colaborador={colab}
+              onEdit={onEdit}
+              onMarcarPago={onMarcarPago}
+            />
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
-    <Accordion type="multiple" className="space-y-1">
-      {sortedKeys.map(sub => {
-        const subItems = grouped[sub];
-        const isBeneficios = sub === 'Benefícios';
-        const subTotal = subItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
+    <Accordion type="multiple" defaultValue={defaultOpen} className="space-y-1">
+      {sortedDates.map(dateStr => {
+        const dateItems = byDate[dateStr];
+        const urgency = getDateGroupUrgency(dateStr, dateItems);
+        const total = dateItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
 
         return (
-          <AccordionItem key={sub} value={sub} className="border rounded-md overflow-hidden">
+          <AccordionItem key={dateStr} value={dateStr} className="border rounded-md overflow-hidden">
             <AccordionTrigger className="px-3 py-2 hover:no-underline text-sm">
-              <SubGroupHeader label={sub} total={subTotal} items={subItems} />
+              <DateGroupHeader dateStr={dateStr} total={total} items={dateItems} urgency={urgency} />
             </AccordionTrigger>
             <AccordionContent className="px-3 pb-2">
-              {isBeneficios ? (
-                <div className="space-y-1.5">
-                  {buildBeneficiosRows(subItems).map((pair, idx) => {
-                    const colabId = pair.vt?.colaborador_id || pair.vr?.colaborador_id;
-                    const colab = colaboradores?.find(c => c.id === colabId) || null;
-                    return (
-                      <BeneficiosRow
-                        key={idx}
-                        vtItem={pair.vt}
-                        vrItem={pair.vr}
-                        colaborador={colab}
-                        onEdit={onEdit}
-                        onMarcarPago={onMarcarPago}
-                      />
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {sortByStatusThenDate(subItems).map((l: any) => (
-                    <LancamentoRow key={l.id} l={l} onEdit={onEdit} onMarcarPago={onMarcarPago} />
-                  ))}
-                </div>
-              )}
+              {renderDateItems(dateItems)}
             </AccordionContent>
           </AccordionItem>
         );
