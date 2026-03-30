@@ -44,7 +44,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
       entries.push({
         descricao: `Adiantamento - ${colab.nome}`,
         valor: valorAdiant,
-        data_vencimento: fmt(new Date(year, month, diaAdiantamento)),
+        data_vencimento: fmt(safeDate(year, month, diaAdiantamento)),
         categoria: 'folha',
         subcategoria: 'Adiantamento',
       });
