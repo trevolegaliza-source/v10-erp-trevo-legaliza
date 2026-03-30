@@ -217,7 +217,45 @@ function BeneficiosRow({
   );
 }
 
-const SUBCATEGORIA_ORDER = ['Adiantamento', 'Salário', 'Benefícios'];
+const SUBCATEGORIA_ORDER = ['Adiantamento', 'Salário', 'Benefícios', '13º Salário (Provisão)', 'DAS Colaborador', 'Férias (Provisão)', 'FGTS', 'INSS'];
+
+function getEarliestDate(items: any[]): string | null {
+  if (!items.length) return null;
+  return items.reduce((min: string, l: any) => l.data_vencimento < min ? l.data_vencimento : min, items[0].data_vencimento);
+}
+
+function formatDateBR(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function SubGroupHeader({ label, total, items }: { label: string; total: number; items: any[] }) {
+  const earliest = getEarliestDate(items);
+  const pagos = items.filter(l => l.status === 'pago').length;
+  const pendentes = items.length - pagos;
+
+  return (
+    <div className="flex items-center gap-2 w-full flex-wrap">
+      <span className="font-medium text-foreground uppercase">{label}</span>
+      {earliest && (
+        <span className="text-muted-foreground text-xs">· {formatDateBR(earliest)}</span>
+      )}
+      <span className="ml-auto mr-2 font-bold text-sm text-foreground">{fmt(total)}</span>
+      <span className="flex items-center gap-2 text-[11px]">
+        {pagos > 0 && (
+          <span className="flex items-center gap-0.5 text-green-600 font-medium uppercase">
+            <Check className="h-3 w-3" /> {pagos} {pagos === 1 ? 'PAGO' : 'PAGOS'}
+          </span>
+        )}
+        {pendentes > 0 && (
+          <span className="flex items-center gap-0.5 text-amber-600 font-medium uppercase">
+            ⏳ {pendentes} {pendentes === 1 ? 'PENDENTE' : 'PENDENTES'}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
 
 function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit: (l: any) => void; onMarcarPago: (l: any) => void }) {
   const { data: colaboradores } = useColaboradores();
@@ -236,7 +274,7 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
 
   // Build unified Benefícios group
   if (vtVrItems.length > 0) {
-    grouped['Benefícios'] = vtVrItems; // raw items, we'll process them in render
+    grouped['Benefícios'] = vtVrItems;
   }
 
   const sortedKeys = Object.keys(grouped).sort((a, b) => {
@@ -250,7 +288,6 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
 
   // Build beneficios unified rows
   const buildBeneficiosRows = (vtVrRaw: any[]) => {
-    // Group by colaborador_id + competencia
     const byColab: Record<string, { vt: any | null; vr: any | null }> = {};
     vtVrRaw.forEach(l => {
       const key = `${l.colaborador_id || 'none'}_${l.competencia_mes}_${l.competencia_ano}`;
@@ -266,29 +303,12 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
       {sortedKeys.map(sub => {
         const subItems = grouped[sub];
         const isBeneficios = sub === 'Benefícios';
-
-        let subTotal: number;
-        let countPagos: number;
-        let countPendentes: number;
-
-        if (isBeneficios) {
-          subTotal = subItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
-          countPagos = subItems.filter((l: any) => l.status === 'pago').length;
-          countPendentes = subItems.length - countPagos;
-        } else {
-          subTotal = subItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
-          countPagos = subItems.filter((l: any) => l.status === 'pago').length;
-          countPendentes = subItems.length - countPagos;
-        }
+        const subTotal = subItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
 
         return (
           <AccordionItem key={sub} value={sub} className="border rounded-md overflow-hidden">
             <AccordionTrigger className="px-3 py-2 hover:no-underline text-sm">
-              <div className="flex items-center gap-3 w-full">
-                <span className="font-medium text-foreground">{sub}</span>
-                <span className="ml-auto mr-2 font-bold text-sm text-foreground">{fmt(subTotal)}</span>
-                <SubGroupCounters items={subItems} />
-              </div>
+              <SubGroupHeader label={sub} total={subTotal} items={subItems} />
             </AccordionTrigger>
             <AccordionContent className="px-3 pb-2">
               {isBeneficios ? (

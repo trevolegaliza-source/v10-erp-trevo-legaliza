@@ -165,14 +165,17 @@ export default function ConfirmarDiasUteisModal({ open, onOpenChange, year, mont
                       <div key={c.id} className="space-y-0.5">
                         {vt > 0 && (
                           <p className="text-xs text-foreground">
-                            VT · {c.nome}: {fmt(vt)} × {diasUteis} dias = <span className="font-semibold">{fmt(vt * diasUteis)}</span>
+                            VT · {c.nome}: {fmt(vt)} × {diasUteis} dias ({MESES_PT[payMonth]}) = <span className="font-semibold">{fmt(vt * diasUteis)}</span>
                           </p>
                         )}
                         {vr > 0 && (
                           <p className="text-xs text-foreground">
-                            VR · {c.nome}: {fmt(vr)} × {diasUteis} dias = <span className="font-semibold">{fmt(vr * diasUteis)}</span>
+                            VR · {c.nome}: {fmt(vr)} × {diasUteis} dias ({MESES_PT[payMonth]}) = <span className="font-semibold">{fmt(vr * diasUteis)}</span>
                           </p>
                         )}
+                        <p className="text-[10px] text-muted-foreground">
+                          Vencimento: 01/{String(payMonth + 1).padStart(2, '0')}/{payYear}
+                        </p>
                       </div>
                     );
                   })}

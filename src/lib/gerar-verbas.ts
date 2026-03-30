@@ -214,43 +214,75 @@ export function estimarCustoTotal(colab: Colaborador, diasUteis?: number): numbe
 
 /**
  * Generate all financial entries for a collaborator for a given month/year.
- * Returns count of newly created entries.
+ * Uses upsert logic: update existing pending, skip paid, insert new.
+ * Returns count of created/updated entries.
  */
 export async function gerarVerbasColaborador(colab: Colaborador, year: number, month: number, diasUteisOverride?: number): Promise<number> {
   const entries = buildVerbas(colab, year, month, diasUteisOverride);
   if (entries.length === 0) return 0;
 
-  // Delete existing PENDING entries for this collaborator/month
-  await (supabase as any)
+  // Fetch existing entries for this collaborator/month
+  const { data: existing } = await (supabase as any)
     .from('lancamentos')
-    .delete()
+    .select('id, subcategoria, status')
     .eq('tipo', 'pagar')
     .eq('colaborador_id', colab.id)
     .eq('competencia_mes', month + 1)
-    .eq('competencia_ano', year)
-    .eq('status', 'pendente');
+    .eq('competencia_ano', year);
 
-  const rows = entries.map(e => ({
-    tipo: 'pagar' as const,
-    descricao: e.descricao,
-    valor: e.valor,
-    categoria: e.categoria,
-    subcategoria: e.subcategoria,
-    status: 'pendente' as const,
-    data_vencimento: e.data_vencimento,
-    colaborador_id: colab.id,
-    fornecedor: colab.nome,
-    competencia_mes: month + 1,
-    competencia_ano: year,
-    etapa_financeiro: 'solicitacao_criada',
-  }));
+  const existingMap = new Map<string, { id: string; status: string }>();
+  (existing || []).forEach((e: any) => {
+    existingMap.set(e.subcategoria || '', e);
+  });
 
-  const { error } = await (supabase as any).from('lancamentos').insert(rows);
-  if (error) {
-    toast.error(`Erro ao gerar verbas de ${colab.nome}: ${error.message}`);
-    throw error;
+  let count = 0;
+
+  for (const e of entries) {
+    const found = existingMap.get(e.subcategoria);
+
+    if (found) {
+      if (found.status === 'pago') {
+        // Already paid — skip
+        continue;
+      }
+      // Update existing pending entry
+      await (supabase as any)
+        .from('lancamentos')
+        .update({
+          descricao: e.descricao,
+          valor: e.valor,
+          data_vencimento: e.data_vencimento,
+          categoria: e.categoria,
+          fornecedor: colab.nome,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', found.id);
+      count++;
+    } else {
+      // Insert new
+      const { error } = await (supabase as any).from('lancamentos').insert({
+        tipo: 'pagar' as const,
+        descricao: e.descricao,
+        valor: e.valor,
+        categoria: e.categoria,
+        subcategoria: e.subcategoria,
+        status: 'pendente' as const,
+        data_vencimento: e.data_vencimento,
+        colaborador_id: colab.id,
+        fornecedor: colab.nome,
+        competencia_mes: month + 1,
+        competencia_ano: year,
+        etapa_financeiro: 'solicitacao_criada',
+      });
+      if (error) {
+        toast.error(`Erro ao gerar verbas de ${colab.nome}: ${error.message}`);
+        throw error;
+      }
+      count++;
+    }
   }
-  return rows.length;
+
+  return count;
 }
 
 /**
