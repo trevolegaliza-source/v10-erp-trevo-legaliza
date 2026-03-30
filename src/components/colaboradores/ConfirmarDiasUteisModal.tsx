@@ -71,8 +71,12 @@ export default function ConfirmarDiasUteisModal({ open, onOpenChange, year, mont
       <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-foreground">
-            Confirmar Dias Úteis · {MESES_PT[month]} {year}
+            Confirmar Dias Úteis · {MESES_PT[payMonth]} {payYear}
           </DialogTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            VT e VR de {MESES_PT[month]} serão pagos em 01/{String(payMonth + 1).padStart(2, '0')}/{payYear}.
+            Informe os dias úteis de {MESES_PT[payMonth]} para o cálculo.
+          </p>
         </DialogHeader>
 
         {loading ? (
