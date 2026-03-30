@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, CheckCircle, AlertTriangle, Clock, Check, MessageCircle } from 'lucide-react';
+import { Pencil, CheckCircle, AlertTriangle, Clock, Check, MessageCircle, Key, Copy } from 'lucide-react';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import AvisarColaboradorModal from './AvisarColaboradorModal';
@@ -55,6 +55,47 @@ function StatusIcon({ urgencia }: { urgencia: Urgencia }) {
   if (urgencia === 'atrasado') return <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />;
   if (urgencia === 'urgente') return <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
   return null;
+}
+
+function PixInfo({ colaborador }: { colaborador: any | null }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    if (!colaborador?.pix_chave) return;
+    navigator.clipboard.writeText(colaborador.pix_chave);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [colaborador?.pix_chave]);
+
+  if (!colaborador) return null;
+
+  const pixTipo = colaborador.pix_tipo ? colaborador.pix_tipo : 'Chave';
+  const pixChave = colaborador.pix_chave;
+
+  return (
+    <p className="flex items-center gap-1.5">
+      <Key className="h-3 w-3 shrink-0" />
+      {pixChave ? (
+        <>
+          <span>PIX ({pixTipo.toUpperCase()}): {pixChave}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1.5 text-[10px] font-semibold uppercase"
+            onClick={handleCopy}
+          >
+            {copied ? (
+              <span className="flex items-center gap-0.5 text-green-600"><Check className="h-3 w-3" /> COPIADO!</span>
+            ) : (
+              <span className="flex items-center gap-0.5"><Copy className="h-3 w-3" /> COPIAR</span>
+            )}
+          </Button>
+        </>
+      ) : (
+        <span className="italic">PIX: NÃO CADASTRADO</span>
+      )}
+    </p>
+  );
 }
 
 function DateWithIcon({ l, urgencia }: { l: any; urgencia: Urgencia }) {
@@ -224,7 +265,8 @@ function BeneficiosRow({
               {(urgencia === 'urgente' || urgencia === 'atrasado') && <StatusIcon urgencia={urgencia} />}
               VENCIMENTO: {new Date(vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
             </p>
-          )}
+           )}
+          {urgencia !== 'pago' && <PixInfo colaborador={colaborador} />}
         </div>
       </div>
       <AvisarColaboradorModal
@@ -379,39 +421,49 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
           const style = getRowStyle(urgencia);
           const subcatLabel = getSubcatLabel(l);
           const colabName = getColabName(l.descricao);
-          return (
-            <div
-              key={l.id}
-              className="flex items-center justify-between py-2.5 px-2 gap-3 rounded-md"
-              style={{ backgroundColor: style.bg, borderLeft: style.borderLeft }}
-            >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {urgencia === 'pago' && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
-                <p className={`text-sm font-medium truncate uppercase ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
-                  {subcatLabel} · {colabName}
-                </p>
+            return (
+              <div
+                key={l.id}
+                className="py-2.5 px-2 rounded-md space-y-1"
+                style={{ backgroundColor: style.bg, borderLeft: style.borderLeft }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {urgencia === 'pago' && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+                    <p className={`text-sm font-medium truncate uppercase ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+                      {subcatLabel} · {colabName}
+                    </p>
+                  </div>
+                  <span className={`font-bold text-sm whitespace-nowrap ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+                    {fmt(Number(l.valor))}
+                  </span>
+                  {getStatusBadge(l)}
+                  <div className="flex gap-1">
+                    {l.status === 'pago' && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Avisar colaborador" onClick={() => setAvisarTarget(l)}>
+                        <MessageCircle className="h-3.5 w-3.5 text-green-600" />
+                      </Button>
+                    )}
+                    {l.status === 'pendente' && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
+                        <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                {urgencia !== 'pago' && l.colaborador_id && (() => {
+                  const colab = colaboradores?.find(c => c.id === l.colaborador_id) || null;
+                  return (
+                    <div className="text-xs pl-6 text-muted-foreground uppercase">
+                      <PixInfo colaborador={colab} />
+                    </div>
+                  );
+                })()}
               </div>
-              <span className={`font-bold text-sm whitespace-nowrap ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
-                {fmt(Number(l.valor))}
-              </span>
-              {getStatusBadge(l)}
-              <div className="flex gap-1">
-                {l.status === 'pago' && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Avisar colaborador" onClick={() => setAvisarTarget(l)}>
-                    <MessageCircle className="h-3.5 w-3.5 text-green-600" />
-                  </Button>
-                )}
-                {l.status === 'pendente' && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
-                    <CheckCircle className="h-3.5 w-3.5 text-primary" />
-                  </Button>
-                )}
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          );
+            );
         })}
         {beneficiosRows.map((pair, idx) => {
           const colabId = pair.vt?.colaborador_id || pair.vr?.colaborador_id;
