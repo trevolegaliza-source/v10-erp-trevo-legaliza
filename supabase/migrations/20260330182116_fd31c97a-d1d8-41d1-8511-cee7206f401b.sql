@@ -1,0 +1,2 @@
+ALTER TABLE public.colaboradores DROP CONSTRAINT colaboradores_regime_check;
+ALTER TABLE public.colaboradores ADD CONSTRAINT colaboradores_regime_check CHECK (regime = ANY (ARRAY['CLT'::text, 'PJ'::text, 'INDEFINIDO'::text]));
