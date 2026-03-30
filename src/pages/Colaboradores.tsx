@@ -70,6 +70,8 @@ export default function Colaboradores() {
       provisionar_13: c.provisionar_13 ?? true,
       provisionar_ferias: c.provisionar_ferias ?? true,
       observacoes_pagamento: c.observacoes_pagamento || '',
+      tipo_transporte: (c as any).tipo_transporte || 'vt',
+      auxilio_combustivel_valor: String((c as any).auxilio_combustivel_valor || ''),
     });
     setDialog(true);
   };
