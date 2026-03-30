@@ -26,7 +26,8 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
   const ultimoDia = new Date(year, month + 1, 0);
   const lastBizDay = getLastBusinessDay(year, month);
 
-  const vencVtVr = diaVtVr > 0 ? fmt(new Date(year, month, diaVtVr)) : fmt(lastBizDay);
+  // VT/VR: if custom day set, use it; otherwise 1st of NEXT month
+  const vencVtVr = diaVtVr > 0 ? fmt(new Date(year, month, diaVtVr)) : fmt(new Date(year, month + 1, 1));
 
   const entries: VerbaEntry[] = [];
 

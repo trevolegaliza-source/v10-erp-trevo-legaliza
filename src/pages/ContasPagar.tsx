@@ -1,8 +1,19 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Settings, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Plus, Settings, ChevronLeft, ChevronRight, Users, CheckSquare, X } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 import FluxoProximos15Dias from '@/components/contas-pagar/FluxoProximos15Dias';
 import ContasPagarKPIs from '@/components/contas-pagar/ContasPagarKPIs';
@@ -30,13 +41,14 @@ import {
   useDeleteRecorrente,
   gerarLancamentosRecorrentes,
 } from '@/hooks/useContasPagar';
+import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 
 const MESES_NAV = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 export default function ContasPagar() {
   const now = new Date();
-  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1); // 1-indexed
+  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
   const [viewYear, setViewYear] = useState(now.getFullYear());
 
   // Queries
@@ -45,7 +57,7 @@ export default function ContasPagar() {
   const { data: recorrentes = [] } = useDespesasRecorrentes();
   const queryClient = useQueryClient();
 
-  // Merge: use competencia-based, fall back to date-based for legacy rows
+  // Merge
   const lancamentos = useMemo(() => {
     const compSet = new Set((lancByComp || []).map(l => l.id));
     const legacy = (lancByDate || []).filter(l => !compSet.has(l.id));
@@ -88,6 +100,54 @@ export default function ContasPagar() {
   const [folhaModal, setFolhaModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+
+  // Bulk selection state
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const selectableIds = useMemo(() => {
+    return lancamentos.filter(l => l.status !== 'pago').map(l => l.id);
+  }, [lancamentos]);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      if (prev.size === selectableIds.length) return new Set();
+      return new Set(selectableIds);
+    });
+  }, [selectableIds]);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleBulkDelete = useCallback(async () => {
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase.from('lancamentos').delete().in('id', ids);
+      if (error) throw error;
+      toast.success(`${ids.length} lançamento(s) excluído(s) com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ['lancamentos_pagar'] });
+      queryClient.invalidateQueries({ queryKey: ['lancamentos_pagar_date'] });
+      exitSelectionMode();
+    } catch (e: any) {
+      toast.error('Erro ao excluir: ' + e.message);
+    } finally {
+      setBulkDeleting(false);
+      setShowBulkDeleteConfirm(false);
+    }
+  }, [selectedIds, queryClient, exitSelectionMode]);
 
   // KPIs
   const hoje = new Date().toISOString().split('T')[0];
@@ -172,6 +232,15 @@ export default function ContasPagar() {
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+          {selectionMode ? (
+            <Button size="sm" variant="outline" onClick={exitSelectionMode}>
+              <X className="h-4 w-4 mr-1" />Cancelar
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => setSelectionMode(true)}>
+              <CheckSquare className="h-4 w-4 mr-1" />Selecionar
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => setFolhaModal(true)}>
             <Users className="h-4 w-4 mr-1" />Importar Folha
           </Button>
@@ -211,6 +280,9 @@ export default function ContasPagar() {
             onEdit={l => { setEditDespesa(l); setDespesaModal(true); }}
             onMarcarPago={l => setPagoModal(l)}
             onDelete={handleDelete}
+            selectionMode={selectionMode}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
           />
         </TabsContent>
 
@@ -227,6 +299,30 @@ export default function ContasPagar() {
 
       {/* Provisão */}
       <ProvisaoBarra recorrentes={recorrentes} mesAtual={viewMonth} anoAtual={viewYear} />
+
+      {/* Bulk selection bar */}
+      {selectionMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border shadow-lg px-6 py-3">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={selectedIds.size === selectableIds.length && selectableIds.length > 0}
+                onCheckedChange={toggleSelectAll}
+              />
+              <span className="text-sm text-muted-foreground">Selecionar todos</span>
+              <span className="text-sm font-semibold text-foreground ml-4">
+                {selectedIds.size} {selectedIds.size === 1 ? 'ITEM SELECIONADO' : 'ITENS SELECIONADOS'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={exitSelectionMode}>Cancelar</Button>
+              <Button variant="destructive" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
+                Excluir Seleção
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <DespesaFormModal
@@ -265,6 +361,29 @@ export default function ContasPagar() {
         onOpenChange={setShowPasswordDialog}
         onConfirm={confirmDelete}
       />
+
+      {/* Bulk delete confirmation */}
+      <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a excluir {selectedIds.size} lançamento{selectedIds.size > 1 ? 's' : ''}.
+              <br />Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting ? 'Excluindo...' : 'Confirmar Exclusão'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
