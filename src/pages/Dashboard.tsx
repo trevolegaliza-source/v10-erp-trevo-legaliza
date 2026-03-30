@@ -41,7 +41,7 @@ export default function Dashboard() {
 
   const calc = useMemo(() => {
     if (!data) return null;
-    const { lancamentosMes, lancamentosMesAnterior, processos, proximosVencimentos, lancamentosHistorico } = data;
+    const { lancamentosMes, lancamentosMesAnterior, processos, proximosVencimentos, lancamentosHistorico, lancamentosPagar } = data;
 
     const totalFaturado = lancamentosMes.reduce((s, l) => s + Number(l.valor), 0);
     const totalRecebido = lancamentosMes
