@@ -603,6 +603,11 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
         lancamento={avisarTarget}
         colaborador={avisarColab}
       />
+      <ComprovanteLightbox
+        open={!!comprovanteTarget}
+        onClose={() => setComprovanteTarget(null)}
+        lancamento={comprovanteTarget}
+      />
     </>
   );
 }
