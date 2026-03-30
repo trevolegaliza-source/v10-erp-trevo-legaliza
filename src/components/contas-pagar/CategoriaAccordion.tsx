@@ -260,6 +260,7 @@ function BeneficiosRow({
   onMarcarPago: (l: any) => void;
 }) {
   const [showAvisar, setShowAvisar] = useState(false);
+  const [showComprovante, setShowComprovante] = useState<any>(null);
   const items = [vtItem, vrItem].filter(Boolean);
   const totalValor = items.reduce((s, i) => s + Number(i.valor), 0);
   const anyPendente = items.some(i => i.status !== 'pago');
