@@ -57,3 +57,28 @@ export function feriadosDoMes(
   const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
   return feriados.filter(f => f.date.startsWith(prefix));
 }
+
+/**
+ * Advance a date to the next business day if it falls on a weekend or national holiday.
+ * Keeps advancing until a valid business day is found.
+ */
+export function proximoDiaUtil(date: Date, feriados: FeriadoNacional[]): Date {
+  const feriadoSet = new Set(feriados.map(f => f.date));
+  const result = new Date(date);
+  
+  const toIso = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  while (true) {
+    const dow = result.getDay();
+    if (dow !== 0 && dow !== 6 && !feriadoSet.has(toIso(result))) {
+      break;
+    }
+    result.setDate(result.getDate() + 1);
+  }
+  return result;
+}
