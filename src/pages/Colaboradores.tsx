@@ -114,12 +114,12 @@ export default function Colaboradores() {
     }
   };
 
-  const handleGerarVerbas = async (selectedIds: string[], year: number, month: number) => {
+  const handleGerarVerbas = async (selectedIds: string[], year: number, month: number, diasUteis: number) => {
     if (!colaboradores) return;
     setGerando(true);
     try {
       const selected = colaboradores.filter(c => selectedIds.includes(c.id));
-      const total = await gerarVerbasDoMes(selected, year, month);
+      const total = await gerarVerbasDoMes(selected, year, month, diasUteis);
       toast.success(`${total} lançamentos gerados para ${selected.length} colaboradores!`);
       setVerbasModal(false);
     } catch { /* handled */ }
