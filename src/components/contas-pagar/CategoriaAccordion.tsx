@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, CheckCircle, AlertTriangle, Clock, Check, MessageCircle } from 'lucide-react';
+import { Pencil, CheckCircle, AlertTriangle, Clock, Check, MessageCircle, Key, Copy } from 'lucide-react';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import AvisarColaboradorModal from './AvisarColaboradorModal';
