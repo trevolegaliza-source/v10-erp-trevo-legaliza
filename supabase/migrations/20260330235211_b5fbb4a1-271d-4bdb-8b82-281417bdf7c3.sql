@@ -1,0 +1,1 @@
+UPDATE lancamentos SET descricao = 'VT (20d) - ARTHUR SHIGUEMI' WHERE id = '3ad89ef1-6aa2-465b-b712-a9655055cdd1' AND descricao LIKE 'folha -%';
