@@ -1,11 +1,13 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, CheckCircle, AlertTriangle, Clock, Check, MessageCircle, Key, Copy } from 'lucide-react';
+import { Pencil, CheckCircle, AlertTriangle, Clock, Check, MessageCircle, Key, Copy, Eye, Paperclip, Download, X } from 'lucide-react';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import AvisarColaboradorModal from './AvisarColaboradorModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
 import * as LucideIcons from 'lucide-react';
 
 interface Props {
@@ -95,6 +97,76 @@ function PixInfo({ colaborador }: { colaborador: any | null }) {
         <span className="italic">PIX: NÃO CADASTRADO</span>
       )}
     </p>
+  );
+}
+
+function ComprovanteLightbox({ open, onClose, lancamento }: { open: boolean; onClose: () => void; lancamento: any }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const comprovanteUrl = lancamento?.comprovante_url || lancamento?.url_comprovante;
+  const ext = comprovanteUrl?.split('.').pop()?.toLowerCase() || '';
+  const isImage = ['png', 'jpg', 'jpeg', 'webp'].includes(ext);
+
+  const colabName = (() => {
+    const parts = (lancamento?.descricao || '').split('—');
+    return parts.length > 1 ? parts[parts.length - 1].trim().toUpperCase() : (lancamento?.descricao || '').toUpperCase();
+  })();
+  const subcatLabel = (lancamento?.subcategoria || 'PAGAMENTO').toUpperCase();
+  const dateStr = lancamento?.data_vencimento ? new Date(lancamento.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+
+  useEffect(() => {
+    if (!open || !comprovanteUrl) { setBlobUrl(null); return; }
+    setLoading(true);
+    let revoke: string | null = null;
+    const bucket = comprovanteUrl.startsWith('contratos/') ? 'contratos' : 'documentos';
+    supabase.storage.from(bucket).download(comprovanteUrl).then(({ data, error }) => {
+      if (data && !error) {
+        const url = URL.createObjectURL(data);
+        revoke = url;
+        setBlobUrl(url);
+      }
+      setLoading(false);
+    });
+    return () => { if (revoke) URL.revokeObjectURL(revoke); };
+  }, [open, comprovanteUrl]);
+
+  const handleDownload = () => {
+    if (!blobUrl) return;
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `comprovante-${colabName}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-[80vw] max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogDescription className="sr-only">Visualização do comprovante</DialogDescription>
+        <DialogHeader className="px-6 py-3 border-b border-border/60 shrink-0">
+          <DialogTitle className="uppercase text-sm">COMPROVANTE · {colabName}</DialogTitle>
+          <p className="text-xs text-muted-foreground uppercase">{subcatLabel} · {dateStr}</p>
+        </DialogHeader>
+        <div className="flex-1 min-h-0 flex items-center justify-center p-4 bg-muted/10 overflow-auto">
+          {loading && <p className="text-sm text-muted-foreground">Carregando...</p>}
+          {!loading && blobUrl && isImage && (
+            <img src={blobUrl} alt="Comprovante" className="max-w-full max-h-[70vh] object-contain rounded-md" />
+          )}
+          {!loading && blobUrl && !isImage && (
+            <iframe src={blobUrl} className="w-full h-[70vh] border-0 rounded-md" title="Comprovante" />
+          )}
+          {!loading && !blobUrl && <p className="text-sm text-muted-foreground">Não foi possível carregar o comprovante.</p>}
+        </div>
+        <DialogFooter className="px-6 py-3 border-t border-border/60">
+          <Button variant="outline" onClick={handleDownload} disabled={!blobUrl} className="gap-1.5">
+            <Download className="h-3.5 w-3.5" /> BAIXAR
+          </Button>
+          <Button variant="outline" onClick={onClose}>FECHAR</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -188,6 +260,7 @@ function BeneficiosRow({
   onMarcarPago: (l: any) => void;
 }) {
   const [showAvisar, setShowAvisar] = useState(false);
+  const [showComprovante, setShowComprovante] = useState<any>(null);
   const items = [vtItem, vrItem].filter(Boolean);
   const totalValor = items.reduce((s, i) => s + Number(i.valor), 0);
   const anyPendente = items.some(i => i.status !== 'pago');
@@ -239,6 +312,14 @@ function BeneficiosRow({
                 <MessageCircle className="h-3.5 w-3.5 text-green-600" />
               </Button>
             )}
+            {items.map(item => {
+              const hasComprovante = item.comprovante_url || item.url_comprovante;
+              return hasComprovante ? (
+                <Button key={`view-${item.id}`} variant="ghost" size="icon" className="h-7 w-7" title="Ver comprovante" onClick={() => setShowComprovante(item)}>
+                  <Eye className="h-3.5 w-3.5 text-blue-500" />
+                </Button>
+              ) : null;
+            })}
             {items.map(item => (
               item.status === 'pendente' && (
                 <Button key={`pay-${item.id}`} variant="ghost" size="icon" className="h-7 w-7" title={`Pagar ${item.subcategoria}`} onClick={() => onMarcarPago(item)}>
@@ -276,6 +357,11 @@ function BeneficiosRow({
         colaborador={colaborador}
         vtItem={vtItem}
         vrItem={vrItem}
+      />
+      <ComprovanteLightbox
+        open={!!showComprovante}
+        onClose={() => setShowComprovante(null)}
+        lancamento={showComprovante}
       />
     </>
   );
@@ -354,6 +440,7 @@ function getColabName(desc: string): string {
 
 function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit: (l: any) => void; onMarcarPago: (l: any) => void }) {
   const [avisarTarget, setAvisarTarget] = useState<any>(null);
+  const [comprovanteTarget, setComprovanteTarget] = useState<any>(null);
   const { data: colaboradores } = useColaboradores();
 
   // Group by date
@@ -439,6 +526,11 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
                   </span>
                   {getStatusBadge(l)}
                   <div className="flex gap-1">
+                    {(l.comprovante_url || l.url_comprovante) && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver comprovante" onClick={() => setComprovanteTarget(l)}>
+                        <Eye className="h-3.5 w-3.5 text-blue-500" />
+                      </Button>
+                    )}
                     {l.status === 'pago' && (
                       <Button variant="ghost" size="icon" className="h-7 w-7" title="Avisar colaborador" onClick={() => setAvisarTarget(l)}>
                         <MessageCircle className="h-3.5 w-3.5 text-green-600" />
@@ -510,6 +602,11 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
         onClose={() => setAvisarTarget(null)}
         lancamento={avisarTarget}
         colaborador={avisarColab}
+      />
+      <ComprovanteLightbox
+        open={!!comprovanteTarget}
+        onClose={() => setComprovanteTarget(null)}
+        lancamento={comprovanteTarget}
       />
     </>
   );

@@ -31,6 +31,16 @@ export default function AvisarColaboradorModal({ open, onClose, lancamento, cola
   const isBeneficios = lancamento.subcategoria === 'Vale Transporte (VT)' ||
     lancamento.subcategoria === 'Vale Refeição (VR)';
 
+  // For Benefícios, the month displayed is competencia_mes + 1 (payment month, not generation month)
+  let displayMesAno = mesAno;
+  if (isBeneficios || (vtItem || vrItem)) {
+    if (mes && ano) {
+      const nextMes = mes === 12 ? 1 : mes + 1;
+      const nextAno = mes === 12 ? ano + 1 : ano;
+      displayMesAno = `${MESES_EXTENSO[nextMes]}/${nextAno}`;
+    }
+  }
+
   let message: string;
 
   if (isBeneficios || (vtItem || vrItem)) {
@@ -42,7 +52,7 @@ export default function AvisarColaboradorModal({ open, onClose, lancamento, cola
     const vrDias = vrDiario > 0 ? Math.round(vrVal / vrDiario) : 0;
     const total = vtVal + vrVal;
 
-    const lines = [`Olá, ${nome}! 👋`, '', 'Seu pagamento foi realizado:', '', `🚌 Benefícios · ${mesAno}`];
+    const lines = [`Olá, ${nome}! 👋`, '', 'Seu pagamento foi realizado:', '', `🚌 Benefícios · ${displayMesAno}`];
     if (vtItem) lines.push(`VT: ${fmt(vtDiario)}/dia × ${vtDias} dias = ${fmt(vtVal)}`);
     if (vrItem) lines.push(`VR: ${fmt(vrDiario)}/dia × ${vrDias} dias = ${fmt(vrVal)}`);
     lines.push(`Total: ${fmt(total)}`, `Data do pagamento: ${dataPag}`);
