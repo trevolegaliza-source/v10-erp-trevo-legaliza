@@ -92,7 +92,26 @@ export default function Dashboard() {
       alertas.push({ id: 'parados', titulo: `${parados.length} processos parados`, descricao: 'Sem movimentação há 7+ dias', severity: 'info', icon: PauseCircle, link: '/processos' });
     }
 
-    // Pipeline
+    // Contas a pagar alerts
+    const limite = new Date(hoje);
+    limite.setDate(limite.getDate() + diasAlertaPagar);
+    const contasVencidas = lancamentosPagar.filter((l: any) => {
+      const venc = new Date(l.data_vencimento + 'T00:00:00');
+      return venc < hoje;
+    });
+    const contasAVencer = lancamentosPagar.filter((l: any) => {
+      const venc = new Date(l.data_vencimento + 'T00:00:00');
+      return venc >= hoje && venc <= limite;
+    });
+    if (contasVencidas.length > 0) {
+      const valorVencido = contasVencidas.reduce((s: number, l: any) => s + Number(l.valor), 0);
+      alertas.push({ id: 'contas_pagar_vencidas', titulo: `${contasVencidas.length} contas a pagar vencidas`, descricao: `R$ ${valorVencido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em atraso`, severity: 'critical', icon: CreditCard, link: '/contas-pagar' });
+    }
+    if (contasAVencer.length > 0) {
+      const valorAVencer = contasAVencer.reduce((s: number, l: any) => s + Number(l.valor), 0);
+      alertas.push({ id: 'contas_pagar_proximas', titulo: `${contasAVencer.length} contas a pagar nos próximos ${diasAlertaPagar} dias`, descricao: `R$ ${valorAVencer.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a vencer`, severity: 'warning', icon: CreditCard, link: '/contas-pagar' });
+    }
+
     const fases = [
       { id: 'entrada', nome: 'Entrada', etapas: ['recebidos', 'analise_documental'], cor: 'bg-blue-500' },
       { id: 'andamento', nome: 'Em andamento', etapas: ['contrato', 'viabilidade', 'dbe', 'vre', 'em_analise'], cor: 'bg-teal-500' },
