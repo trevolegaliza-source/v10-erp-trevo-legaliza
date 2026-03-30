@@ -13,8 +13,8 @@ interface VerbaEntry {
   subcategoria: string;
 }
 
-function buildVerbas(colab: Colaborador, year: number, month: number): VerbaEntry[] {
-  const diasUteis = getBusinessDaysInMonth(year, month);
+function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisOverride?: number): VerbaEntry[] {
+  const diasUteis = diasUteisOverride ?? getBusinessDaysInMonth(year, month);
   const sal = Number(colab.salario_base);
   const vt = Number(colab.vt_diario);
   const vr = Number(colab.vr_diario);
@@ -201,8 +201,8 @@ export function estimarCustoTotal(colab: Colaborador, diasUteis?: number): numbe
  * Generate all financial entries for a collaborator for a given month/year.
  * Returns count of newly created entries.
  */
-export async function gerarVerbasColaborador(colab: Colaborador, year: number, month: number): Promise<number> {
-  const entries = buildVerbas(colab, year, month);
+export async function gerarVerbasColaborador(colab: Colaborador, year: number, month: number, diasUteisOverride?: number): Promise<number> {
+  const entries = buildVerbas(colab, year, month, diasUteisOverride);
   if (entries.length === 0) return 0;
 
   // Delete existing PENDING entries for this collaborator/month
@@ -241,12 +241,12 @@ export async function gerarVerbasColaborador(colab: Colaborador, year: number, m
 /**
  * Generate all verbas for all active collaborators for a given month.
  */
-export async function gerarVerbasDoMes(colaboradores: Colaborador[], year: number, month: number) {
+export async function gerarVerbasDoMes(colaboradores: Colaborador[], year: number, month: number, diasUteisOverride?: number) {
   const ativos = colaboradores.filter(c => c.status === 'ativo');
   await aplicarAumentos(ativos, year, month);
   let total = 0;
   for (const colab of ativos) {
-    const count = await gerarVerbasColaborador(colab, year, month);
+    const count = await gerarVerbasColaborador(colab, year, month, diasUteisOverride);
     total += count;
   }
   return total;
