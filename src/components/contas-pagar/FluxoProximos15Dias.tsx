@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertTriangle } from 'lucide-react';
+import FluxoDetalheModal from './FluxoDetalheModal';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function FluxoProximos15Dias() {
+  const [modalOpen, setModalOpen] = useState(false);
   const { data } = useQuery({
     queryKey: ['fluxo_proximos_15dias'],
     queryFn: async () => {
