@@ -1,0 +1,1 @@
+UPDATE lancamentos SET subcategoria = 'Vale Transporte (VT)' WHERE id = '3ad89ef1-6aa2-465b-b712-a9655055cdd1' AND subcategoria IS NULL;

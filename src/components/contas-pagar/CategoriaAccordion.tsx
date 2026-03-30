@@ -119,15 +119,28 @@ function ComprovanteLightbox({ open, onClose, lancamento }: { open: boolean; onC
     if (!open || !comprovanteUrl) { setBlobUrl(null); return; }
     setLoading(true);
     let revoke: string | null = null;
-    const bucket = comprovanteUrl.startsWith('contratos/') ? 'contratos' : 'documentos';
-    supabase.storage.from(bucket).download(comprovanteUrl).then(({ data, error }) => {
-      if (data && !error) {
-        const url = URL.createObjectURL(data);
-        revoke = url;
-        setBlobUrl(url);
+
+    // Try contratos bucket first (where uploads go), then documentos as fallback
+    const tryDownload = async () => {
+      for (const bucket of ['contratos', 'documentos']) {
+        const { data, error } = await supabase.storage.from(bucket).download(comprovanteUrl);
+        if (data && !error) {
+          const url = URL.createObjectURL(data);
+          revoke = url;
+          setBlobUrl(url);
+          setLoading(false);
+          return;
+        }
+      }
+      // If direct download fails, try createSignedUrl
+      const { data: signedData } = await supabase.storage.from('contratos').createSignedUrl(comprovanteUrl, 3600);
+      if (signedData?.signedUrl) {
+        setBlobUrl(signedData.signedUrl);
       }
       setLoading(false);
-    });
+    };
+    tryDownload();
+
     return () => { if (revoke) URL.revokeObjectURL(revoke); };
   }, [open, comprovanteUrl]);
 
