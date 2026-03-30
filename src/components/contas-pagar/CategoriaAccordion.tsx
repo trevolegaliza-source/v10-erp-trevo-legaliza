@@ -440,6 +440,7 @@ function getColabName(desc: string): string {
 
 function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit: (l: any) => void; onMarcarPago: (l: any) => void }) {
   const [avisarTarget, setAvisarTarget] = useState<any>(null);
+  const [comprovanteTarget, setComprovanteTarget] = useState<any>(null);
   const { data: colaboradores } = useColaboradores();
 
   // Group by date
