@@ -238,7 +238,7 @@ export default function ContasPagar() {
               <X className="h-4 w-4 mr-1" />Cancelar
             </Button>
           ) : (
-            <Button size="sm" variant="outline" onClick={() => setSelectionMode(true)}>
+            <Button size="sm" variant="outline" onClick={() => { setSelectionMode(true); setActiveTab('lista'); }}>
               <CheckSquare className="h-4 w-4 mr-1" />Selecionar
             </Button>
           )}
