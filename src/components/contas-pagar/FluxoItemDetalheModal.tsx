@@ -21,9 +21,9 @@ interface Props {
 }
 
 function statusBadge(status: string) {
-  if (status === 'pago') return <Badge className="bg-green-100 text-green-800 border-green-300">PAGO</Badge>;
-  if (status === 'atrasado') return <Badge className="bg-red-100 text-red-800 border-red-300">ATRASADO</Badge>;
-  return <Badge className="bg-amber-100 text-amber-800 border-amber-300">PENDENTE</Badge>;
+  if (status === 'pago') return <Badge variant="secondary" className="border">PAGO</Badge>;
+  if (status === 'atrasado') return <Badge variant="destructive">ATRASADO</Badge>;
+  return <Badge variant="outline">PENDENTE</Badge>;
 }
 
 export default function FluxoItemDetalheModal({ item, onClose, onMarcarPago }: Props) {
