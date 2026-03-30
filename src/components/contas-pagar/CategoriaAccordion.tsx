@@ -265,7 +265,8 @@ function BeneficiosRow({
               {(urgencia === 'urgente' || urgencia === 'atrasado') && <StatusIcon urgencia={urgencia} />}
               VENCIMENTO: {new Date(vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
             </p>
-          )}
+           )}
+          {urgencia !== 'pago' && <PixInfo colaborador={colaborador} />}
         </div>
       </div>
       <AvisarColaboradorModal
