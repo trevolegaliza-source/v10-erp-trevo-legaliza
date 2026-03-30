@@ -699,6 +699,11 @@ function VencidoItem({ cliente }: { cliente: ClienteFinanceiro }) {
               <Button size="sm" variant="outline" onClick={handleCopiarCobranca}>
                 <Copy className="h-4 w-4 mr-1" /> Reenviar Cobrança
               </Button>
+              {(cliente.lancamentos.some(l => l.extrato_id) || cliente.extrato_mais_recente) && (
+                <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato}>
+                  <Download className="h-4 w-4 mr-1" /> {loadingExtrato ? 'Baixando...' : 'Baixar Extrato'}
+                </Button>
+              )}
               <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                 <CheckCircle className="h-4 w-4 mr-1" /> Marcar como Pago
               </Button>
