@@ -20,6 +20,7 @@ interface LinhaFolha {
   colaboradorNome: string;
   subcategoria: string;
   valor: number;
+  dataVencimento: string;
   selected: boolean;
 }
 
