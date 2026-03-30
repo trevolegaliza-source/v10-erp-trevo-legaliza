@@ -396,6 +396,11 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
               </span>
               {getStatusBadge(l)}
               <div className="flex gap-1">
+                {l.status === 'pago' && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Avisar colaborador" onClick={() => setAvisarTarget(l)}>
+                    <MessageCircle className="h-3.5 w-3.5 text-green-600" />
+                  </Button>
+                )}
                 {l.status === 'pendente' && (
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
                     <CheckCircle className="h-3.5 w-3.5 text-primary" />
