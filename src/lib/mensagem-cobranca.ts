@@ -4,6 +4,11 @@ interface ProcessoCobranca {
   valor: number;
 }
 
+function formatarRazaoSocialWhatsapp(razaoSocial: string) {
+  const limpa = razaoSocial.trim().replace(/^\*+|\*+$/g, '');
+  return `*${limpa}*`;
+}
+
 export function gerarMensagemCobranca(params: {
   tipo: string;
   razao_social: string;
@@ -28,13 +33,13 @@ export function gerarMensagemCobranca(params: {
   const processoLines = allProcessos.length > 1
     ? allProcessos.map(p => {
         const v = p.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        return `• ${p.tipo} - ${p.razao_social} (${v})`;
+        return `• ${p.tipo} - ${formatarRazaoSocialWhatsapp(p.razao_social)} (${v})`;
       }).join('\n')
     : null;
 
   const processoDesc = processoLines
     ? `referente aos seguintes processos:\n${processoLines}\n\nValor total: ${valorFmt}`
-    : `referente ao processo de ${params.tipo} - ${params.razao_social} no valor de ${valorFmt}`;
+    : `referente ao processo de ${params.tipo} - ${formatarRazaoSocialWhatsapp(params.razao_social)} no valor de ${valorFmt}`;
 
   return `Olá! Aqui é da Trevo Legaliza 🍀.
 
