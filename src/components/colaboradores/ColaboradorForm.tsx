@@ -51,6 +51,7 @@ export const EMPTY_FORM: ColaboradorFormData = {
   aumento_previsto_valor: '', aumento_previsto_data: '',
   data_inicio: '', aniversario: '',
   dia_adiantamento: '20', dia_salario: '5', dia_vt_vr: '0', dia_das: '20',
+  tipo_transporte: 'vt', auxilio_combustivel_valor: '',
   fgts_percentual: '8', inss_patronal_percentual: '20',
   provisionar_13: true, provisionar_ferias: true,
   observacoes_pagamento: '',
