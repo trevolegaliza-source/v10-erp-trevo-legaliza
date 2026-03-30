@@ -4,8 +4,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Search, Pencil, CheckCircle, Trash2 } from 'lucide-react';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import * as LucideIcons from 'lucide-react';
 
 interface Props {
@@ -13,6 +15,9 @@ interface Props {
   onEdit: (l: any) => void;
   onMarcarPago: (l: any) => void;
   onDelete: (l: any) => void;
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -24,7 +29,7 @@ function getStatusBadge(l: any) {
   return <Badge className="bg-warning/15 text-warning border-0">Pendente</Badge>;
 }
 
-export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, onDelete }: Props) {
+export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, onDelete, selectionMode, selectedIds, onToggleSelect }: Props) {
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -77,6 +82,7 @@ export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, on
         <Table>
           <TableHeader>
             <TableRow>
+              {selectionMode && <TableHead className="w-10" />}
               <TableHead>Categoria</TableHead>
               <TableHead>Descrição</TableHead>
               <TableHead>Fornecedor</TableHead>
@@ -88,13 +94,35 @@ export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, on
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">Nenhuma despesa encontrada</TableCell></TableRow>
+              <TableRow><TableCell colSpan={selectionMode ? 8 : 7} className="text-center text-muted-foreground py-8">Nenhuma despesa encontrada</TableCell></TableRow>
             ) : filtered.map(l => {
               const catKey = (l.categoria || 'outros') as CategoriaKey;
               const cat = CATEGORIAS_DESPESAS[catKey] || CATEGORIAS_DESPESAS.outros;
               const IconComp = (LucideIcons as any)[cat.icon] || LucideIcons.Circle;
+              const isPago = l.status === 'pago';
               return (
                 <TableRow key={l.id}>
+                  {selectionMode && (
+                    <TableCell>
+                      {isPago ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div>
+                                <Checkbox disabled checked={false} />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>Lançamento já pago não pode ser excluído</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        <Checkbox
+                          checked={selectedIds?.has(l.id) || false}
+                          onCheckedChange={() => onToggleSelect?.(l.id)}
+                        />
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <IconComp className="h-3.5 w-3.5" style={{ color: cat.color }} />
