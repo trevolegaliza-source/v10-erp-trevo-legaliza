@@ -317,39 +317,61 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const totalPendente = totalFaturado - totalRecebido;
   const taxaRecebimento = totalFaturado > 0 ? Math.round(totalRecebido / totalFaturado * 100) : 0;
 
-  // ── Exclusive tab assignment: each client in ONE tab only ──
-  function getTabCliente(c: ClienteFinanceiro): string {
-    const lancPendentes = c.lancamentos.filter(l => l.status !== 'pago' && l.etapa_financeiro !== 'honorario_pago');
-    if (lancPendentes.length === 0) return 'pagos';
+  // ── Multi-tab assignment: a client can appear in MULTIPLE tabs ──
+  // Each tab gets a "view" of the client with only the relevant lancamentos.
+  function buildClienteView(c: ClienteFinanceiro, filteredLancs: LancamentoFinanceiro[]): ClienteFinanceiro {
+    return {
+      ...c,
+      lancamentos: filteredLancs,
+      total_faturado: filteredLancs.reduce((s, l) => s + l.valor, 0),
+      total_pendente: filteredLancs.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+      qtd_processos: filteredLancs.length,
+      qtd_sem_extrato: filteredLancs.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+    };
+  }
 
-    // Priority 1: Overdue (sent AND past due)
-    const temVencido = lancPendentes.some(l => isLancamentoVencidoReal(l));
-    if (temVencido) return 'vencidos';
-
-    // Priority 2: Awaiting payment (sent to client)
-    if (lancPendentes.some(l => l.etapa_financeiro === 'cobranca_enviada')) return 'aguardando';
-
-    // Priority 3: If client still has lancamentos without extrato (solicitacao_criada),
-    // keep in "cobrar" so operator can generate extratos for remaining processes.
-    const temSemExtrato = lancPendentes.some(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada');
-    if (temSemExtrato) return 'cobrar';
-
-    // Priority 4: ALL pending lancamentos have extrato generated → awaiting sending
-    if (lancPendentes.some(l => l.etapa_financeiro === 'cobranca_gerada' && l.extrato_id)) return 'enviados';
-
-    // Priority 5: Needs extrato
+  function getLancamentoTab(l: LancamentoFinanceiro): string {
+    if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return 'pagos';
+    if (isLancamentoVencidoReal(l)) return 'vencidos';
+    if (l.etapa_financeiro === 'cobranca_enviada') return 'aguardando';
+    if (l.etapa_financeiro === 'cobranca_gerada' && l.extrato_id) return 'enviados';
     return 'cobrar';
   }
 
-  const clientesCobrarRaw = clientes.filter(c => getTabCliente(c) === 'cobrar');
+  // Build per-tab client views
+  const tabMap: Record<string, Map<string, LancamentoFinanceiro[]>> = {
+    cobrar: new Map(), enviados: new Map(), aguardando: new Map(), pagos: new Map(), vencidos: new Map(),
+  };
+
+  for (const c of clientes) {
+    for (const l of c.lancamentos) {
+      const tab = getLancamentoTab(l);
+      if (!tabMap[tab].has(c.cliente_id)) tabMap[tab].set(c.cliente_id, []);
+      tabMap[tab].get(c.cliente_id)!.push(l);
+    }
+  }
+
+  const clienteById = new Map(clientes.map(c => [c.cliente_id, c]));
+
+  function buildTabClientes(tab: string): ClienteFinanceiro[] {
+    const entries = tabMap[tab];
+    const result: ClienteFinanceiro[] = [];
+    for (const [clienteId, lancs] of entries) {
+      const original = clienteById.get(clienteId);
+      if (original) result.push(buildClienteView(original, lancs));
+    }
+    return result;
+  }
+
+  const clientesCobrarRaw = buildTabClientes('cobrar');
   const cobrarResult = clientesCobrarRaw.map(c => ({ c, result: clienteDeveAparecerEmCobrar(c) }));
   const clientesCobrar = cobrarResult.filter(x => x.result.show).map(x => x.c);
   const clientesFuturaFatura = cobrarResult.filter(x => x.result.isFutura).map(x => x.c);
 
-  const clientesEnviados = clientes.filter(c => getTabCliente(c) === 'enviados');
-  const clientesAguardando = clientes.filter(c => getTabCliente(c) === 'aguardando');
-  const clientesPagos = clientes.filter(c => getTabCliente(c) === 'pagos');
-  const clientesVencidos = clientes.filter(c => getTabCliente(c) === 'vencidos');
+  const clientesEnviados = buildTabClientes('enviados');
+  const clientesAguardando = buildTabClientes('aguardando');
+  const clientesPagos = buildTabClientes('pagos');
+  const clientesVencidos = buildTabClientes('vencidos');
 
   const metricas = {
     totalFaturado,
