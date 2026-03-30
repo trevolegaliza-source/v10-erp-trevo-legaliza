@@ -122,6 +122,12 @@ export default function Colaboradores() {
     if (!colaboradores) return;
     setGerando(true);
     try {
+      // First, fix any existing records with weekend/holiday dates
+      const corrigidos = await corrigirDatasExistentes();
+      if (corrigidos > 0) {
+        toast.info(`${corrigidos} lançamento(s) existente(s) corrigido(s) — datas movidas para dia útil.`);
+      }
+
       const selected = colaboradores.filter(c => selectedIds.includes(c.id));
       const total = await gerarVerbasDoMes(selected, year, month, diasUteis);
       toast.success(`${total} lançamentos gerados para ${selected.length} colaboradores!`);
