@@ -197,11 +197,7 @@ export default function FluxoProximos15Dias() {
     setSelectedItem(null);
   };
 
-  function getRowLabel(row: AgendaRow): string {
-    if (row.type === 'beneficio') {
-      const sub = row.item ? (row.item as any).subcategoria : null;
-      return `BENEFÍCIOS · ${row.nome}`;
-    }
+  function getRowLabel(row: NormalRow): string {
     const item = row.item;
     const parts: string[] = [];
     if (item.subcategoria) parts.push(item.subcategoria.toUpperCase());
