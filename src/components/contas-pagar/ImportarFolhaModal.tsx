@@ -41,6 +41,7 @@ export default function ImportarFolhaModal({ open, onClose, onConfirm, mes, ano 
           colaboradorNome: c.nome,
           subcategoria: v.subcategoria,
           valor: v.valor,
+          dataVencimento: v.data_vencimento,
           selected: true,
         });
       });
