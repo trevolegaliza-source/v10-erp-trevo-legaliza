@@ -99,7 +99,6 @@ export default function Colaboradores() {
       aniversario: form.aniversario || null,
       tipo_transporte: form.tipo_transporte,
       auxilio_combustivel_valor: Number(form.auxilio_combustivel_valor) || 0,
-      aniversario: form.aniversario || null,
       dia_adiantamento: Number(form.dia_adiantamento) || 20,
       dia_salario: Number(form.dia_salario) || 5,
       dia_vt_vr: Number(form.dia_vt_vr) || 0,
