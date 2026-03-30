@@ -167,7 +167,7 @@ export default function Dashboard() {
         cliente_apelido: (v.clientes as any)?.apelido || null,
       })),
     };
-  }, [data]);
+  }, [data, diasAlertaPagar]);
 
   const animFaturado = useCountUp(calc?.totalFaturado ?? 0);
   const animPendente = useCountUp(calc?.totalPendente ?? 0);
