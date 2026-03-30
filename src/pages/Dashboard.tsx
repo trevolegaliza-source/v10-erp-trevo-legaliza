@@ -1,13 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardData, useCountUp } from '@/hooks/useDashboardData';
 import { getNomeUsuario, getSaudacao } from '@/hooks/useDashboard';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   DollarSign, Clock, CheckCircle, Activity, TrendingUp, TrendingDown,
-  AlertTriangle, FileText, Send, PauseCircle, ChevronRight, Check,
+  AlertTriangle, FileText, Send, PauseCircle, ChevronRight, Check, CreditCard,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
