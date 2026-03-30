@@ -115,18 +115,21 @@ function ComprovanteLightbox({ open, onClose, lancamento }: { open: boolean; onC
   const subcatLabel = (lancamento?.subcategoria || 'PAGAMENTO').toUpperCase();
   const dateStr = lancamento?.data_vencimento ? new Date(lancamento.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '';
 
-  useState(() => {
-    if (!open || !comprovanteUrl) return;
+  useEffect(() => {
+    if (!open || !comprovanteUrl) { setBlobUrl(null); return; }
     setLoading(true);
+    let revoke: string | null = null;
     const bucket = comprovanteUrl.startsWith('contratos/') ? 'contratos' : 'documentos';
     supabase.storage.from(bucket).download(comprovanteUrl).then(({ data, error }) => {
       if (data && !error) {
-        setBlobUrl(URL.createObjectURL(data));
+        const url = URL.createObjectURL(data);
+        revoke = url;
+        setBlobUrl(url);
       }
       setLoading(false);
     });
-    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
-  });
+    return () => { if (revoke) URL.revokeObjectURL(revoke); };
+  }, [open, comprovanteUrl]);
 
   const handleDownload = () => {
     if (!blobUrl) return;
