@@ -11,6 +11,8 @@ interface Props {
   prov13: boolean;
   provFerias: boolean;
   diasUteis: number;
+  tipoTransporte?: 'vt' | 'auxilio_combustivel';
+  auxilioCombustivelValor?: number;
 }
 
 export default function CustoResumoCard({ salario, vtDiario, vrDiario, das, regime, fgtsPct, inssPct, prov13, provFerias, diasUteis }: Props) {
