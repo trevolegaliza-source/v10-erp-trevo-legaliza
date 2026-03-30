@@ -421,39 +421,49 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
           const style = getRowStyle(urgencia);
           const subcatLabel = getSubcatLabel(l);
           const colabName = getColabName(l.descricao);
-          return (
-            <div
-              key={l.id}
-              className="flex items-center justify-between py-2.5 px-2 gap-3 rounded-md"
-              style={{ backgroundColor: style.bg, borderLeft: style.borderLeft }}
-            >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {urgencia === 'pago' && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
-                <p className={`text-sm font-medium truncate uppercase ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
-                  {subcatLabel} · {colabName}
-                </p>
+            return (
+              <div
+                key={l.id}
+                className="py-2.5 px-2 rounded-md space-y-1"
+                style={{ backgroundColor: style.bg, borderLeft: style.borderLeft }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {urgencia === 'pago' && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+                    <p className={`text-sm font-medium truncate uppercase ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+                      {subcatLabel} · {colabName}
+                    </p>
+                  </div>
+                  <span className={`font-bold text-sm whitespace-nowrap ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+                    {fmt(Number(l.valor))}
+                  </span>
+                  {getStatusBadge(l)}
+                  <div className="flex gap-1">
+                    {l.status === 'pago' && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Avisar colaborador" onClick={() => setAvisarTarget(l)}>
+                        <MessageCircle className="h-3.5 w-3.5 text-green-600" />
+                      </Button>
+                    )}
+                    {l.status === 'pendente' && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
+                        <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                {urgencia !== 'pago' && l.colaborador_id && (() => {
+                  const colab = colaboradores?.find(c => c.id === l.colaborador_id) || null;
+                  return (
+                    <div className="text-xs pl-6 text-muted-foreground uppercase">
+                      <PixInfo colaborador={colab} />
+                    </div>
+                  );
+                })()}
               </div>
-              <span className={`font-bold text-sm whitespace-nowrap ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
-                {fmt(Number(l.valor))}
-              </span>
-              {getStatusBadge(l)}
-              <div className="flex gap-1">
-                {l.status === 'pago' && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Avisar colaborador" onClick={() => setAvisarTarget(l)}>
-                    <MessageCircle className="h-3.5 w-3.5 text-green-600" />
-                  </Button>
-                )}
-                {l.status === 'pendente' && (
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
-                    <CheckCircle className="h-3.5 w-3.5 text-primary" />
-                  </Button>
-                )}
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          );
+            );
         })}
         {beneficiosRows.map((pair, idx) => {
           const colabId = pair.vt?.colaborador_id || pair.vr?.colaborador_id;
