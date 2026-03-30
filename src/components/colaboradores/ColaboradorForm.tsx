@@ -34,6 +34,8 @@ export interface ColaboradorFormData {
   dia_salario: string;
   dia_vt_vr: string;
   dia_das: string;
+  tipo_transporte: 'vt' | 'auxilio_combustivel';
+  auxilio_combustivel_valor: string;
   fgts_percentual: string;
   inss_patronal_percentual: string;
   provisionar_13: boolean;
@@ -49,6 +51,7 @@ export const EMPTY_FORM: ColaboradorFormData = {
   aumento_previsto_valor: '', aumento_previsto_data: '',
   data_inicio: '', aniversario: '',
   dia_adiantamento: '20', dia_salario: '5', dia_vt_vr: '0', dia_das: '20',
+  tipo_transporte: 'vt', auxilio_combustivel_valor: '',
   fgts_percentual: '8', inss_patronal_percentual: '20',
   provisionar_13: true, provisionar_ferias: true,
   observacoes_pagamento: '',
@@ -155,19 +158,40 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
             </Select>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-2">
             <Label className="text-foreground">Salário Base (R$)</Label>
             <Input type="number" step="0.01" min="0" value={form.salario_base} onChange={e => setForm(f => ({ ...f, salario_base: e.target.value }))} />
           </div>
           <div className="grid gap-2">
-            <Label className="text-foreground">VT Diário (R$)</Label>
-            <Input type="number" step="0.01" min="0" value={form.vt_diario} onChange={e => setForm(f => ({ ...f, vt_diario: e.target.value }))} />
-          </div>
-          <div className="grid gap-2">
             <Label className="text-foreground">VR Diário (R$)</Label>
             <Input type="number" step="0.01" min="0" value={form.vr_diario} onChange={e => setForm(f => ({ ...f, vr_diario: e.target.value }))} />
           </div>
+        </div>
+        <div className="rounded-lg border border-border/60 p-3 space-y-3">
+          <div className="grid gap-2">
+            <Label className="text-xs font-semibold text-foreground uppercase tracking-wider">Tipo de Transporte</Label>
+            <Select value={form.tipo_transporte} onValueChange={v => setForm(f => ({ ...f, tipo_transporte: v as any }))}>
+              <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vt">Vale Transporte (VT) — valor diário × dias úteis</SelectItem>
+                <SelectItem value="auxilio_combustivel">Auxílio Combustível — valor fixo mensal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {form.tipo_transporte === 'vt' ? (
+            <div className="grid gap-2">
+              <Label className="text-foreground">VT Diário (R$)</Label>
+              <Input type="number" step="0.01" min="0" value={form.vt_diario} onChange={e => setForm(f => ({ ...f, vt_diario: e.target.value }))} />
+              <p className="text-[10px] text-muted-foreground">Multiplicado pelos dias úteis do mês</p>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              <Label className="text-foreground">Auxílio Combustível Fixo (R$)</Label>
+              <Input type="number" step="0.01" min="0" value={form.auxilio_combustivel_valor} onChange={e => setForm(f => ({ ...f, auxilio_combustivel_valor: e.target.value }))} />
+              <p className="text-[10px] text-muted-foreground">Valor fixo pago todo mês, independente dos dias úteis</p>
+            </div>
+          )}
         </div>
         {form.regime !== 'INDEFINIDO' && (
           <div className="grid gap-2">
@@ -287,6 +311,8 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
         inssPct={Number(form.inss_patronal_percentual) || 20}
         prov13={form.provisionar_13} provFerias={form.provisionar_ferias}
         diasUteis={diasUteis}
+        tipoTransporte={form.tipo_transporte}
+        auxilioCombustivelValor={Number(form.auxilio_combustivel_valor) || 0}
       />
 
       <Button type="submit" disabled={isPending} className="w-full">

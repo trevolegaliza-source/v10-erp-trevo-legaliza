@@ -185,6 +185,7 @@ export type Database = {
           aniversario: string | null
           aumento_previsto_data: string | null
           aumento_previsto_valor: number | null
+          auxilio_combustivel_valor: number
           created_at: string | null
           data_inicio: string | null
           dia_adiantamento: number | null
@@ -206,6 +207,7 @@ export type Database = {
           regime: string
           salario_base: number
           status: string
+          tipo_transporte: string
           updated_at: string | null
           valor_das: number
           vr_diario: number
@@ -217,6 +219,7 @@ export type Database = {
           aniversario?: string | null
           aumento_previsto_data?: string | null
           aumento_previsto_valor?: number | null
+          auxilio_combustivel_valor?: number
           created_at?: string | null
           data_inicio?: string | null
           dia_adiantamento?: number | null
@@ -238,6 +241,7 @@ export type Database = {
           regime?: string
           salario_base?: number
           status?: string
+          tipo_transporte?: string
           updated_at?: string | null
           valor_das?: number
           vr_diario?: number
@@ -249,6 +253,7 @@ export type Database = {
           aniversario?: string | null
           aumento_previsto_data?: string | null
           aumento_previsto_valor?: number | null
+          auxilio_combustivel_valor?: number
           created_at?: string | null
           data_inicio?: string | null
           dia_adiantamento?: number | null
@@ -270,6 +275,7 @@ export type Database = {
           regime?: string
           salario_base?: number
           status?: string
+          tipo_transporte?: string
           updated_at?: string | null
           valor_das?: number
           vr_diario?: number

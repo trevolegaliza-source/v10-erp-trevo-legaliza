@@ -70,6 +70,8 @@ export default function Colaboradores() {
       provisionar_13: c.provisionar_13 ?? true,
       provisionar_ferias: c.provisionar_ferias ?? true,
       observacoes_pagamento: c.observacoes_pagamento || '',
+      tipo_transporte: (c as any).tipo_transporte || 'vt',
+      auxilio_combustivel_valor: String((c as any).auxilio_combustivel_valor || ''),
     });
     setDialog(true);
   };
@@ -95,6 +97,8 @@ export default function Colaboradores() {
       aumento_previsto_data: form.aumento_previsto_data || null,
       data_inicio: form.data_inicio || null,
       aniversario: form.aniversario || null,
+      tipo_transporte: form.tipo_transporte,
+      auxilio_combustivel_valor: Number(form.auxilio_combustivel_valor) || 0,
       dia_adiantamento: Number(form.dia_adiantamento) || 20,
       dia_salario: Number(form.dia_salario) || 5,
       dia_vt_vr: Number(form.dia_vt_vr) || 0,

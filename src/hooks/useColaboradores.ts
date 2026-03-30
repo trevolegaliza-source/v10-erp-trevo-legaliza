@@ -32,6 +32,8 @@ export interface Colaborador {
   provisionar_13: boolean;
   provisionar_ferias: boolean;
   observacoes_pagamento: string | null;
+  tipo_transporte: 'vt' | 'auxilio_combustivel';
+  auxilio_combustivel_valor: number;
   created_at: string;
   updated_at: string;
 }

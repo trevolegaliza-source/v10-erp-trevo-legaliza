@@ -106,6 +106,7 @@ export default function ContasPagar() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [activeTab, setActiveTab] = useState('categoria');
 
   const selectableIds = useMemo(() => {
     return lancamentos.filter(l => l.status !== 'pago').map(l => l.id);
@@ -237,7 +238,7 @@ export default function ContasPagar() {
               <X className="h-4 w-4 mr-1" />Cancelar
             </Button>
           ) : (
-            <Button size="sm" variant="outline" onClick={() => setSelectionMode(true)}>
+            <Button size="sm" variant="outline" onClick={() => { setSelectionMode(true); setActiveTab('lista'); }}>
               <CheckSquare className="h-4 w-4 mr-1" />Selecionar
             </Button>
           )}
@@ -259,7 +260,7 @@ export default function ContasPagar() {
       />
 
       {/* Tabs */}
-      <Tabs defaultValue="categoria" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={v => { setActiveTab(v); if (v !== 'lista') exitSelectionMode(); }} className="space-y-4">
         <TabsList>
           <TabsTrigger value="categoria">Visão por Categoria</TabsTrigger>
           <TabsTrigger value="lista">Lista</TabsTrigger>
