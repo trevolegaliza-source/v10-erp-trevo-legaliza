@@ -57,6 +57,47 @@ function StatusIcon({ urgencia }: { urgencia: Urgencia }) {
   return null;
 }
 
+function PixInfo({ colaborador }: { colaborador: any | null }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    if (!colaborador?.pix_chave) return;
+    navigator.clipboard.writeText(colaborador.pix_chave);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [colaborador?.pix_chave]);
+
+  if (!colaborador) return null;
+
+  const pixTipo = colaborador.pix_tipo ? colaborador.pix_tipo : 'Chave';
+  const pixChave = colaborador.pix_chave;
+
+  return (
+    <p className="flex items-center gap-1.5">
+      <Key className="h-3 w-3 shrink-0" />
+      {pixChave ? (
+        <>
+          <span>PIX ({pixTipo.toUpperCase()}): {pixChave}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-1.5 text-[10px] font-semibold uppercase"
+            onClick={handleCopy}
+          >
+            {copied ? (
+              <span className="flex items-center gap-0.5 text-green-600"><Check className="h-3 w-3" /> COPIADO!</span>
+            ) : (
+              <span className="flex items-center gap-0.5"><Copy className="h-3 w-3" /> COPIAR</span>
+            )}
+          </Button>
+        </>
+      ) : (
+        <span className="italic">PIX: NÃO CADASTRADO</span>
+      )}
+    </p>
+  );
+}
+
 function DateWithIcon({ l, urgencia }: { l: any; urgencia: Urgencia }) {
   const dateStr = new Date(l.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
   return (
