@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { gerarMensagemCobranca } from '@/lib/mensagem-cobranca';
+import { supabase } from '@/integrations/supabase/client';
 import { diasAtraso, useRegistrarContato } from '@/hooks/useContasReceber';
 import type { LancamentoReceber } from '@/hooks/useContasReceber';
 
