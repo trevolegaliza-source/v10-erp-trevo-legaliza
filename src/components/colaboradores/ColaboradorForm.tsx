@@ -311,6 +311,8 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
         inssPct={Number(form.inss_patronal_percentual) || 20}
         prov13={form.provisionar_13} provFerias={form.provisionar_ferias}
         diasUteis={diasUteis}
+        tipoTransporte={form.tipo_transporte}
+        auxilioCombustivelValor={Number(form.auxilio_combustivel_valor) || 0}
       />
 
       <Button type="submit" disabled={isPending} className="w-full">
