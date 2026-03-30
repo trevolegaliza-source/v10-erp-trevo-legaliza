@@ -1,10 +1,13 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertTriangle } from 'lucide-react';
+import FluxoDetalheModal from './FluxoDetalheModal';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function FluxoProximos15Dias() {
+  const [modalOpen, setModalOpen] = useState(false);
   const { data } = useQuery({
     queryKey: ['fluxo_proximos_15dias'],
     queryFn: async () => {
@@ -42,27 +45,34 @@ export default function FluxoProximos15Dias() {
   const hoje = new Date().toLocaleDateString('pt-BR');
 
   return (
-    <div className="bg-card rounded-lg border border-border border-l-4 border-l-primary p-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-          Fluxo · Próximos 15 dias
-        </span>
-        <span className="text-xs text-muted-foreground">hoje: {hoje}</span>
-      </div>
-
-      <div className="flex items-baseline gap-4">
-        <span className="text-2xl font-bold text-foreground">{fmt(data.total_valor)}</span>
-        <span className="text-sm text-muted-foreground">{data.total_despesas} despesa{data.total_despesas !== 1 ? 's' : ''}</span>
-      </div>
-
-      {data.criticos_7dias > 0 && (
-        <div className="flex items-center gap-1.5 mt-2 text-sm" style={{ color: '#F59E0B' }}>
-          <AlertTriangle className="h-4 w-4" />
-          <span>
-            {data.criticos_7dias} vence{data.criticos_7dias !== 1 ? 'm' : ''} em até 7 dias · {fmt(data.valor_critico_7dias)}
+    <>
+      <div
+        className="bg-card rounded-lg border border-border border-l-4 border-l-primary p-4 cursor-pointer transition-colors hover:bg-muted/50"
+        onClick={() => setModalOpen(true)}
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+            Fluxo · Próximos 15 dias
           </span>
+          <span className="text-xs text-muted-foreground">hoje: {hoje}</span>
         </div>
-      )}
-    </div>
+
+        <div className="flex items-baseline gap-4">
+          <span className="text-2xl font-bold text-foreground">{fmt(data.total_valor)}</span>
+          <span className="text-sm text-muted-foreground">{data.total_despesas} despesa{data.total_despesas !== 1 ? 's' : ''}</span>
+        </div>
+
+        {data.criticos_7dias > 0 && (
+          <div className="flex items-center gap-1.5 mt-2 text-sm" style={{ color: '#F59E0B' }}>
+            <AlertTriangle className="h-4 w-4" />
+            <span>
+              {data.criticos_7dias} vence{data.criticos_7dias !== 1 ? 'm' : ''} em até 7 dias · {fmt(data.valor_critico_7dias)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      <FluxoDetalheModal open={modalOpen} onClose={() => setModalOpen(false)} />
+    </>
   );
 }
