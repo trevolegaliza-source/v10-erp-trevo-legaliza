@@ -2,10 +2,12 @@ import { useState, useCallback } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, CheckCircle, AlertTriangle, Clock, Check, MessageCircle, Key, Copy } from 'lucide-react';
+import { Pencil, CheckCircle, AlertTriangle, Clock, Check, MessageCircle, Key, Copy, Eye, Paperclip, Download, X } from 'lucide-react';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import AvisarColaboradorModal from './AvisarColaboradorModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
 import * as LucideIcons from 'lucide-react';
 
 interface Props {
