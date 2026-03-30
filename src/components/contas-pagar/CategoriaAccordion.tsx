@@ -100,6 +100,73 @@ function PixInfo({ colaborador }: { colaborador: any | null }) {
   );
 }
 
+function ComprovanteLightbox({ open, onClose, lancamento }: { open: boolean; onClose: () => void; lancamento: any }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const comprovanteUrl = lancamento?.comprovante_url || lancamento?.url_comprovante;
+  const ext = comprovanteUrl?.split('.').pop()?.toLowerCase() || '';
+  const isImage = ['png', 'jpg', 'jpeg', 'webp'].includes(ext);
+
+  const colabName = (() => {
+    const parts = (lancamento?.descricao || '').split('—');
+    return parts.length > 1 ? parts[parts.length - 1].trim().toUpperCase() : (lancamento?.descricao || '').toUpperCase();
+  })();
+  const subcatLabel = (lancamento?.subcategoria || 'PAGAMENTO').toUpperCase();
+  const dateStr = lancamento?.data_vencimento ? new Date(lancamento.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR') : '';
+
+  useState(() => {
+    if (!open || !comprovanteUrl) return;
+    setLoading(true);
+    const bucket = comprovanteUrl.startsWith('contratos/') ? 'contratos' : 'documentos';
+    supabase.storage.from(bucket).download(comprovanteUrl).then(({ data, error }) => {
+      if (data && !error) {
+        setBlobUrl(URL.createObjectURL(data));
+      }
+      setLoading(false);
+    });
+    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  });
+
+  const handleDownload = () => {
+    if (!blobUrl) return;
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = `comprovante-${colabName}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-[80vw] max-h-[90vh] flex flex-col p-0 gap-0">
+        <DialogDescription className="sr-only">Visualização do comprovante</DialogDescription>
+        <DialogHeader className="px-6 py-3 border-b border-border/60 shrink-0">
+          <DialogTitle className="uppercase text-sm">COMPROVANTE · {colabName}</DialogTitle>
+          <p className="text-xs text-muted-foreground uppercase">{subcatLabel} · {dateStr}</p>
+        </DialogHeader>
+        <div className="flex-1 min-h-0 flex items-center justify-center p-4 bg-muted/10 overflow-auto">
+          {loading && <p className="text-sm text-muted-foreground">Carregando...</p>}
+          {!loading && blobUrl && isImage && (
+            <img src={blobUrl} alt="Comprovante" className="max-w-full max-h-[70vh] object-contain rounded-md" />
+          )}
+          {!loading && blobUrl && !isImage && (
+            <iframe src={blobUrl} className="w-full h-[70vh] border-0 rounded-md" title="Comprovante" />
+          )}
+          {!loading && !blobUrl && <p className="text-sm text-muted-foreground">Não foi possível carregar o comprovante.</p>}
+        </div>
+        <DialogFooter className="px-6 py-3 border-t border-border/60">
+          <Button variant="outline" onClick={handleDownload} disabled={!blobUrl} className="gap-1.5">
+            <Download className="h-3.5 w-3.5" /> BAIXAR
+          </Button>
+          <Button variant="outline" onClick={onClose}>FECHAR</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DateWithIcon({ l, urgencia }: { l: any; urgencia: Urgencia }) {
   const dateStr = new Date(l.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
   return (
