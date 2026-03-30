@@ -64,7 +64,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
       entries.push({
         descricao: label,
         valor: valorSalario,
-        data_vencimento: fmt(new Date(year, month, diaSalario)),
+        data_vencimento: fmt(safeDate(year, month, diaSalario)),
         categoria: 'folha',
         subcategoria: 'Salário',
       });
