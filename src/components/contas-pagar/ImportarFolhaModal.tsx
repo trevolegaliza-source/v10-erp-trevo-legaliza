@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useColaboradores } from '@/hooks/useColaboradores';
-import { getBusinessDaysInMonth } from '@/lib/business-days';
+import { buildVerbas } from '@/lib/gerar-verbas';
 
 interface Props {
   open: boolean;
