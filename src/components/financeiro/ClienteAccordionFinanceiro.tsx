@@ -269,13 +269,38 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const hasExtratoNoSistema = cliente.lancamentos.some(l => l.extrato_id);
 
   async function handleCopiarMensagem() {
+    const lancamentosComProcesso = cliente.lancamentos.filter(l => l.processo_id);
+    const processoIds = [...new Set(lancamentosComProcesso.map(l => l.processo_id).filter(Boolean))] as string[];
+    const vaMap: Record<string, number> = {};
+
+    if (processoIds.length > 0) {
+      const { data: vas } = await supabase
+        .from('valores_adicionais')
+        .select('processo_id, valor')
+        .in('processo_id', processoIds);
+
+      if (vas) {
+        for (const va of vas) {
+          vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor;
+        }
+      }
+    }
+
     const l = cliente.lancamentos[0];
+    const valorPrimeiro = l.valor + (l.processo_id ? (vaMap[l.processo_id] || 0) : 0);
+    const adicionais = cliente.lancamentos.slice(1).map(item => ({
+      tipo: item.processo_tipo,
+      razao_social: item.processo_razao_social,
+      valor: item.valor + (item.processo_id ? (vaMap[item.processo_id] || 0) : 0),
+    }));
+
     const msg = gerarMensagemCobranca({
       tipo: l.processo_tipo,
       razao_social: l.processo_razao_social,
-      valor: cliente.total_faturado,
+      valor: valorPrimeiro,
       data_vencimento: l.data_vencimento,
       diasAtraso: 0,
+      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
     });
     await navigator.clipboard.writeText(msg);
     toast.success('Mensagem copiada para o clipboard!');
