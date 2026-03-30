@@ -241,12 +241,12 @@ export async function gerarVerbasColaborador(colab: Colaborador, year: number, m
 /**
  * Generate all verbas for all active collaborators for a given month.
  */
-export async function gerarVerbasDoMes(colaboradores: Colaborador[], year: number, month: number) {
+export async function gerarVerbasDoMes(colaboradores: Colaborador[], year: number, month: number, diasUteisOverride?: number) {
   const ativos = colaboradores.filter(c => c.status === 'ativo');
   await aplicarAumentos(ativos, year, month);
   let total = 0;
   for (const colab of ativos) {
-    const count = await gerarVerbasColaborador(colab, year, month);
+    const count = await gerarVerbasColaborador(colab, year, month, diasUteisOverride);
     total += count;
   }
   return total;
