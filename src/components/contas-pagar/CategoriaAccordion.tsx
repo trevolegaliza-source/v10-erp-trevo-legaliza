@@ -431,25 +431,35 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
     );
   };
 
-  return (
-    <Accordion type="multiple" defaultValue={defaultOpen} className="space-y-1">
-      {sortedDates.map(dateStr => {
-        const dateItems = byDate[dateStr];
-        const urgency = getDateGroupUrgency(dateStr, dateItems);
-        const total = dateItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
+  const avisarColab = avisarTarget ? colaboradores?.find(c => c.id === avisarTarget.colaborador_id) || undefined : undefined;
 
-        return (
-          <AccordionItem key={dateStr} value={dateStr} className="border rounded-md overflow-hidden">
-            <AccordionTrigger className="px-3 py-2 hover:no-underline text-sm">
-              <DateGroupHeader dateStr={dateStr} total={total} items={dateItems} urgency={urgency} />
-            </AccordionTrigger>
-            <AccordionContent className="px-3 pb-2">
-              {renderDateItems(dateItems)}
-            </AccordionContent>
-          </AccordionItem>
-        );
-      })}
-    </Accordion>
+  return (
+    <>
+      <Accordion type="multiple" defaultValue={defaultOpen} className="space-y-1">
+        {sortedDates.map(dateStr => {
+          const dateItems = byDate[dateStr];
+          const urgency = getDateGroupUrgency(dateStr, dateItems);
+          const total = dateItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
+
+          return (
+            <AccordionItem key={dateStr} value={dateStr} className="border rounded-md overflow-hidden">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline text-sm">
+                <DateGroupHeader dateStr={dateStr} total={total} items={dateItems} urgency={urgency} />
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-2">
+                {renderDateItems(dateItems)}
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
+      <AvisarColaboradorModal
+        open={!!avisarTarget}
+        onClose={() => setAvisarTarget(null)}
+        lancamento={avisarTarget}
+        colaborador={avisarColab}
+      />
+    </>
   );
 }
 
