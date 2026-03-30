@@ -201,8 +201,8 @@ export function estimarCustoTotal(colab: Colaborador, diasUteis?: number): numbe
  * Generate all financial entries for a collaborator for a given month/year.
  * Returns count of newly created entries.
  */
-export async function gerarVerbasColaborador(colab: Colaborador, year: number, month: number): Promise<number> {
-  const entries = buildVerbas(colab, year, month);
+export async function gerarVerbasColaborador(colab: Colaborador, year: number, month: number, diasUteisOverride?: number): Promise<number> {
+  const entries = buildVerbas(colab, year, month, diasUteisOverride);
   if (entries.length === 0) return 0;
 
   // Delete existing PENDING entries for this collaborator/month
