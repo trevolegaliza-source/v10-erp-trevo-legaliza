@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Users, Search, Pencil, Trash2, Zap, Copy, Cake, DollarSign, CalendarDays } from 'lucide-react';
 import { useColaboradores, useCreateColaborador, useUpdateColaborador, useDeleteColaborador, type Colaborador } from '@/hooks/useColaboradores';
 import { getBusinessDaysInMonth } from '@/lib/business-days';
-import { gerarVerbasDoMes, estimarCustoTotal } from '@/lib/gerar-verbas';
+import { gerarVerbasDoMes, estimarCustoTotal, corrigirDatasExistentes } from '@/lib/gerar-verbas';
 import ColaboradorForm, { EMPTY_FORM, type ColaboradorFormData } from '@/components/colaboradores/ColaboradorForm';
 import ColaboradorDetalheModal from '@/components/colaboradores/ColaboradorDetalheModal';
 import GerarVerbasModal from '@/components/colaboradores/GerarVerbasModal';
@@ -122,6 +122,12 @@ export default function Colaboradores() {
     if (!colaboradores) return;
     setGerando(true);
     try {
+      // First, fix any existing records with weekend/holiday dates
+      const corrigidos = await corrigirDatasExistentes();
+      if (corrigidos > 0) {
+        toast.info(`${corrigidos} lançamento(s) existente(s) corrigido(s) — datas movidas para dia útil.`);
+      }
+
       const selected = colaboradores.filter(c => selectedIds.includes(c.id));
       const total = await gerarVerbasDoMes(selected, year, month, diasUteis);
       toast.success(`${total} lançamentos gerados para ${selected.length} colaboradores!`);
