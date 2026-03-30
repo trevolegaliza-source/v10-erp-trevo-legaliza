@@ -128,13 +128,38 @@ export function useMarcarPago() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data_pagamento, comprovante_url }: { id: string; data_pagamento: string; comprovante_url?: string }) => {
-      const { error } = await supabase.from('lancamentos').update({
-        status: 'pago' as any,
-        data_pagamento,
-        comprovante_url: comprovante_url || null,
-        updated_at: new Date().toISOString(),
-      }).eq('id', id);
-      if (error) throw error;
+      // First, mark the target lancamento
+      const { data: target, error: fetchError } = await supabase
+        .from('lancamentos')
+        .select('id, colaborador_id, competencia_mes, competencia_ano, subcategoria')
+        .eq('id', id)
+        .single();
+      if (fetchError) throw fetchError;
+
+      const isVtVr = target.subcategoria === 'Vale Transporte (VT)' || target.subcategoria === 'Vale Refeição (VR)';
+
+      if (isVtVr && target.colaborador_id && target.competencia_mes && target.competencia_ano) {
+        // Mark both VT and VR for the same collaborator/month
+        const { error } = await supabase.from('lancamentos').update({
+          status: 'pago' as any,
+          data_pagamento,
+          comprovante_url: comprovante_url || null,
+          updated_at: new Date().toISOString(),
+        })
+          .eq('colaborador_id', target.colaborador_id)
+          .eq('competencia_mes', target.competencia_mes)
+          .eq('competencia_ano', target.competencia_ano)
+          .in('subcategoria', ['Vale Transporte (VT)', 'Vale Refeição (VR)']);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('lancamentos').update({
+          status: 'pago' as any,
+          data_pagamento,
+          comprovante_url: comprovante_url || null,
+          updated_at: new Date().toISOString(),
+        }).eq('id', id);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['lancamentos_pagar'] });

@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, CheckCircle, AlertTriangle, Clock, Check } from 'lucide-react';
+import { Pencil, CheckCircle, AlertTriangle, Clock, Check, MessageCircle } from 'lucide-react';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
 import { useColaboradores } from '@/hooks/useColaboradores';
+import AvisarColaboradorModal from './AvisarColaboradorModal';
 import * as LucideIcons from 'lucide-react';
 
 interface Props {
@@ -144,22 +146,20 @@ function BeneficiosRow({
   onEdit: (l: any) => void;
   onMarcarPago: (l: any) => void;
 }) {
+  const [showAvisar, setShowAvisar] = useState(false);
   const items = [vtItem, vrItem].filter(Boolean);
   const totalValor = items.reduce((s, i) => s + Number(i.valor), 0);
   const anyPendente = items.some(i => i.status !== 'pago');
+  const allPago = items.every(i => i.status === 'pago');
   const representativeItem = anyPendente ? items.find(i => i.status !== 'pago') || items[0] : items[0];
   const urgencia = anyPendente ? getUrgencia(representativeItem) : 'pago';
   const style = getRowStyle(urgencia);
 
-  const nomeColab = vtItem?.descricao?.replace(/^.*?—\s*/, '').replace(/^VT\s*—?\s*/i, '') ||
-    vrItem?.descricao?.replace(/^.*?—\s*/, '').replace(/^VR\s*—?\s*/i, '') ||
-    colaborador?.nome || 'Colaborador';
-  // Extract just the name from description patterns like "VT — NOME" or "Vale Transporte (VT) — NOME"
   const cleanName = (desc: string) => {
     const parts = desc.split('—');
     return parts.length > 1 ? parts[parts.length - 1].trim() : parts[0].trim();
   };
-  const displayName = vtItem ? cleanName(vtItem.descricao) : vrItem ? cleanName(vrItem.descricao) : nomeColab;
+  const displayName = vtItem ? cleanName(vtItem.descricao) : vrItem ? cleanName(vrItem.descricao) : colaborador?.nome || 'Colaborador';
 
   const vtDiario = colaborador?.vt_diario || 0;
   const vrDiario = colaborador?.vr_diario || 0;
@@ -168,52 +168,74 @@ function BeneficiosRow({
 
   const vencimento = vtItem?.data_vencimento || vrItem?.data_vencimento;
 
+  // Build title parts
+  const benefParts: string[] = [];
+  if (vtItem) benefParts.push('VT');
+  if (vrItem) benefParts.push('VR');
+  const days = vtDias || vrDias;
+  const titleSuffix = benefParts.join(' + ') + (days > 0 ? ` (${days}d)` : '');
+
   return (
-    <div
-      className="py-2.5 px-2 rounded-md space-y-1"
-      style={{ backgroundColor: style.bg, borderLeft: style.borderLeft }}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {urgencia === 'pago' && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
-          <p className={`text-sm font-medium truncate ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
-            Benefícios — {displayName}
-          </p>
-        </div>
-        <span className={`font-bold text-sm whitespace-nowrap ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
-          {fmt(totalValor)}
-        </span>
-        {getStatusBadge(representativeItem)}
-        <div className="flex gap-1">
-          {items.map(item => (
-            item.status === 'pendente' && (
-              <Button key={`pay-${item.id}`} variant="ghost" size="icon" className="h-7 w-7" title={`Pagar ${item.subcategoria}`} onClick={() => onMarcarPago(item)}>
-                <CheckCircle className="h-3.5 w-3.5 text-primary" />
+    <>
+      <div
+        className="py-2.5 px-2 rounded-md space-y-1"
+        style={{ backgroundColor: style.bg, borderLeft: style.borderLeft }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {urgencia === 'pago' && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+            <p className={`text-sm font-medium truncate uppercase ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+              BENEFÍCIOS — {titleSuffix} - {displayName}
+            </p>
+          </div>
+          <span className={`font-bold text-sm whitespace-nowrap ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+            {fmt(totalValor)}
+          </span>
+          {getStatusBadge(representativeItem)}
+          <div className="flex gap-1">
+            {allPago && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" title="Avisar colaborador" onClick={() => setShowAvisar(true)}>
+                <MessageCircle className="h-3.5 w-3.5 text-green-600" />
               </Button>
-            )
-          ))}
-          {items.map(item => (
-            <Button key={`edit-${item.id}`} variant="ghost" size="icon" className="h-7 w-7" title={`Editar ${item.subcategoria}`} onClick={() => onEdit(item)}>
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-          ))}
+            )}
+            {items.map(item => (
+              item.status === 'pendente' && (
+                <Button key={`pay-${item.id}`} variant="ghost" size="icon" className="h-7 w-7" title={`Pagar ${item.subcategoria}`} onClick={() => onMarcarPago(item)}>
+                  <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                </Button>
+              )
+            ))}
+            {items.map(item => (
+              <Button key={`edit-${item.id}`} variant="ghost" size="icon" className="h-7 w-7" title={`Editar ${item.subcategoria}`} onClick={() => onEdit(item)}>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className={`text-xs pl-6 space-y-0.5 uppercase ${urgencia === 'pago' ? 'text-green-300' : 'text-muted-foreground'}`}>
+          {vtItem && (
+            <p>VT: {fmt(vtDiario)}/DIA × {vtDias} DIAS = {fmt(Number(vtItem.valor))}</p>
+          )}
+          {vrItem && (
+            <p>VR: {fmt(vrDiario)}/DIA × {vrDias} DIAS = {fmt(Number(vrItem.valor))}</p>
+          )}
+          {vencimento && (
+            <p className="flex items-center gap-1">
+              {(urgencia === 'urgente' || urgencia === 'atrasado') && <StatusIcon urgencia={urgencia} />}
+              VENCIMENTO: {new Date(vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
+            </p>
+          )}
         </div>
       </div>
-      <div className={`text-xs pl-6 space-y-0.5 ${urgencia === 'pago' ? 'text-green-300' : 'text-muted-foreground'}`}>
-        {vtItem && (
-          <p>VT: {fmt(vtDiario)}/dia × {vtDias} dias = {fmt(Number(vtItem.valor))}</p>
-        )}
-        {vrItem && (
-          <p>VR: {fmt(vrDiario)}/dia × {vrDias} dias = {fmt(Number(vrItem.valor))}</p>
-        )}
-        {vencimento && (
-          <p className="flex items-center gap-1">
-            {(urgencia === 'urgente' || urgencia === 'atrasado') && <StatusIcon urgencia={urgencia} />}
-            Vencimento: {new Date(vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
-          </p>
-        )}
-      </div>
-    </div>
+      <AvisarColaboradorModal
+        open={showAvisar}
+        onClose={() => setShowAvisar(false)}
+        lancamento={representativeItem}
+        colaborador={colaborador}
+        vtItem={vtItem}
+        vrItem={vrItem}
+      />
+    </>
   );
 }
 
@@ -289,6 +311,7 @@ function getColabName(desc: string): string {
 }
 
 function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit: (l: any) => void; onMarcarPago: (l: any) => void }) {
+  const [avisarTarget, setAvisarTarget] = useState<any>(null);
   const { data: colaboradores } = useColaboradores();
 
   // Group by date
@@ -373,6 +396,11 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
               </span>
               {getStatusBadge(l)}
               <div className="flex gap-1">
+                {l.status === 'pago' && (
+                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Avisar colaborador" onClick={() => setAvisarTarget(l)}>
+                    <MessageCircle className="h-3.5 w-3.5 text-green-600" />
+                  </Button>
+                )}
                 {l.status === 'pendente' && (
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
                     <CheckCircle className="h-3.5 w-3.5 text-primary" />
@@ -403,25 +431,35 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
     );
   };
 
-  return (
-    <Accordion type="multiple" defaultValue={defaultOpen} className="space-y-1">
-      {sortedDates.map(dateStr => {
-        const dateItems = byDate[dateStr];
-        const urgency = getDateGroupUrgency(dateStr, dateItems);
-        const total = dateItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
+  const avisarColab = avisarTarget ? colaboradores?.find(c => c.id === avisarTarget.colaborador_id) || undefined : undefined;
 
-        return (
-          <AccordionItem key={dateStr} value={dateStr} className="border rounded-md overflow-hidden">
-            <AccordionTrigger className="px-3 py-2 hover:no-underline text-sm">
-              <DateGroupHeader dateStr={dateStr} total={total} items={dateItems} urgency={urgency} />
-            </AccordionTrigger>
-            <AccordionContent className="px-3 pb-2">
-              {renderDateItems(dateItems)}
-            </AccordionContent>
-          </AccordionItem>
-        );
-      })}
-    </Accordion>
+  return (
+    <>
+      <Accordion type="multiple" defaultValue={defaultOpen} className="space-y-1">
+        {sortedDates.map(dateStr => {
+          const dateItems = byDate[dateStr];
+          const urgency = getDateGroupUrgency(dateStr, dateItems);
+          const total = dateItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
+
+          return (
+            <AccordionItem key={dateStr} value={dateStr} className="border rounded-md overflow-hidden">
+              <AccordionTrigger className="px-3 py-2 hover:no-underline text-sm">
+                <DateGroupHeader dateStr={dateStr} total={total} items={dateItems} urgency={urgency} />
+              </AccordionTrigger>
+              <AccordionContent className="px-3 pb-2">
+                {renderDateItems(dateItems)}
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
+      <AvisarColaboradorModal
+        open={!!avisarTarget}
+        onClose={() => setAvisarTarget(null)}
+        lancamento={avisarTarget}
+        colaborador={avisarColab}
+      />
+    </>
   );
 }
 
