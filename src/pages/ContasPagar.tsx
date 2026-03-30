@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Settings, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
+import FluxoProximos15Dias from '@/components/contas-pagar/FluxoProximos15Dias';
 import ContasPagarKPIs from '@/components/contas-pagar/ContasPagarKPIs';
 import CategoriaAccordion from '@/components/contas-pagar/CategoriaAccordion';
 import ContasPagarLista from '@/components/contas-pagar/ContasPagarLista';
@@ -149,6 +150,9 @@ export default function ContasPagar() {
 
   return (
     <div className="space-y-6">
+      {/* Fluxo 15 dias */}
+      <FluxoProximos15Dias />
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
