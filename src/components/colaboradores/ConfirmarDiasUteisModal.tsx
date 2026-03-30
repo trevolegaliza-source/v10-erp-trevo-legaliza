@@ -31,6 +31,7 @@ function getPaymentMonth(year: number, month: number) {
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function ConfirmarDiasUteisModal({ open, onOpenChange, year, month, colaboradores, onConfirm, isPending }: Props) {
+  const { payYear, payMonth } = getPaymentMonth(year, month);
   const [loading, setLoading] = useState(false);
   const [feriados, setFeriados] = useState<FeriadoNacional[]>([]);
   const [feriadosMes, setFeriadosMes] = useState<FeriadoNacional[]>([]);
@@ -41,7 +42,7 @@ export default function ConfirmarDiasUteisModal({ open, onOpenChange, year, mont
     if (!open) return;
     setLoading(true);
     setApiError(false);
-    fetchFeriadosNacionais(year).then(result => {
+    fetchFeriadosNacionais(payYear).then(result => {
       if (result.length === 0) {
         setApiError(true);
         setDiasUteis(22);
@@ -49,13 +50,13 @@ export default function ConfirmarDiasUteisModal({ open, onOpenChange, year, mont
         setFeriadosMes([]);
       } else {
         setFeriados(result);
-        const doMes = feriadosDoMes(result, year, month);
+        const doMes = feriadosDoMes(result, payYear, payMonth);
         setFeriadosMes(doMes);
-        setDiasUteis(calcularDiasUteis(year, month, result));
+        setDiasUteis(calcularDiasUteis(payYear, payMonth, result));
       }
       setLoading(false);
     });
-  }, [open, year, month]);
+  }, [open, payYear, payMonth]);
 
   const ativos = colaboradores.filter(c => c.status === 'ativo');
   const colabsComBeneficios = ativos.filter(c => Number(c.vt_diario) > 0 || Number(c.vr_diario) > 0);
