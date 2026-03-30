@@ -1,8 +1,9 @@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, CheckCircle } from 'lucide-react';
+import { Pencil, CheckCircle, AlertTriangle, Clock, Check } from 'lucide-react';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
+import { useColaboradores } from '@/hooks/useColaboradores';
 import * as LucideIcons from 'lucide-react';
 
 interface Props {
@@ -13,22 +14,230 @@ interface Props {
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-function getStatusBadge(l: any) {
+type Urgencia = 'pago' | 'atrasado' | 'urgente' | 'normal';
+
+function getUrgencia(l: any): Urgencia {
+  if (l.status === 'pago') return 'pago';
   const hoje = new Date().toISOString().split('T')[0];
-  if (l.status === 'pago') return <Badge className="bg-primary/15 text-primary border-0 text-[10px]">Pago</Badge>;
-  if (l.status === 'pendente' && l.data_vencimento < hoje) return <Badge className="bg-destructive/15 text-destructive border-0 text-[10px]">Vencido</Badge>;
+  if (l.status === 'atrasado' || (l.status === 'pendente' && l.data_vencimento < hoje)) return 'atrasado';
+  const em7dias = new Date();
+  em7dias.setDate(em7dias.getDate() + 7);
+  const limite7 = em7dias.toISOString().split('T')[0];
+  if (l.status === 'pendente' && l.data_vencimento <= limite7) return 'urgente';
+  return 'normal';
+}
+
+function getStatusBadge(l: any) {
+  const urgencia = getUrgencia(l);
+  if (urgencia === 'pago') return <Badge className="bg-primary/15 text-primary border-0 text-[10px]">Pago</Badge>;
+  if (urgencia === 'atrasado') return <Badge className="bg-destructive/15 text-destructive border-0 text-[10px]">Vencido</Badge>;
+  if (urgencia === 'urgente') return <Badge className="bg-warning/15 text-warning border-0 text-[10px]">Pendente</Badge>;
   return <Badge className="bg-warning/15 text-warning border-0 text-[10px]">Pendente</Badge>;
 }
 
-const SUBCATEGORIA_ORDER = ['Adiantamento', 'Salário', 'Vale Transporte (VT)', 'Vale Refeição (VR)'];
+function getRowStyle(urgencia: Urgencia): { bg: string; borderLeft: string; textClass: string } {
+  switch (urgencia) {
+    case 'pago':
+      return { bg: '#F0FDF4', borderLeft: '', textClass: 'text-green-300' };
+    case 'atrasado':
+      return { bg: '#FEF2F2', borderLeft: '3px solid #EF4444', textClass: '' };
+    case 'urgente':
+      return { bg: '#FFFBEB', borderLeft: '3px solid #F59E0B', textClass: '' };
+    default:
+      return { bg: '', borderLeft: '', textClass: '' };
+  }
+}
+
+function StatusIcon({ urgencia }: { urgencia: Urgencia }) {
+  if (urgencia === 'pago') return <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />;
+  if (urgencia === 'atrasado') return <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />;
+  if (urgencia === 'urgente') return <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />;
+  return null;
+}
+
+function DateWithIcon({ l, urgencia }: { l: any; urgencia: Urgencia }) {
+  const dateStr = new Date(l.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR');
+  return (
+    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+      {(urgencia === 'urgente' || urgencia === 'atrasado') && <StatusIcon urgencia={urgencia} />}
+      {l.fornecedor && `${l.fornecedor} • `}
+      {dateStr}
+    </span>
+  );
+}
+
+function sortByStatusThenDate(items: any[]): any[] {
+  return [...items].sort((a, b) => {
+    const ua = getUrgencia(a);
+    const ub = getUrgencia(b);
+    const order: Record<Urgencia, number> = { pago: 0, atrasado: 1, urgente: 2, normal: 3 };
+    if (order[ua] !== order[ub]) return order[ua] - order[ub];
+    return a.data_vencimento.localeCompare(b.data_vencimento);
+  });
+}
+
+function SubGroupCounters({ items }: { items: any[] }) {
+  const pagos = items.filter(l => l.status === 'pago').length;
+  const pendentes = items.length - pagos;
+  return (
+    <span className="flex items-center gap-2 text-[11px]">
+      {pagos > 0 && (
+        <span className="flex items-center gap-0.5 text-green-600 font-medium">
+          <Check className="h-3 w-3" /> {pagos} pago{pagos > 1 ? 's' : ''}
+        </span>
+      )}
+      {pendentes > 0 && (
+        <span className="flex items-center gap-0.5 text-amber-600 font-medium">
+          ⏳ {pendentes} pendente{pendentes > 1 ? 's' : ''}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function LancamentoRow({ l, onEdit, onMarcarPago }: { l: any; onEdit: (l: any) => void; onMarcarPago: (l: any) => void }) {
+  const urgencia = getUrgencia(l);
+  const style = getRowStyle(urgencia);
+  return (
+    <div
+      className="flex items-center justify-between py-2.5 px-2 gap-3 rounded-md"
+      style={{ backgroundColor: style.bg, borderLeft: style.borderLeft }}
+    >
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        {urgencia === 'pago' && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+        <div className="min-w-0">
+          <p className={`text-sm font-medium truncate ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+            {l.descricao}
+          </p>
+          <DateWithIcon l={l} urgencia={urgencia} />
+        </div>
+      </div>
+      <span className={`font-bold text-sm whitespace-nowrap ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+        {fmt(Number(l.valor))}
+      </span>
+      {getStatusBadge(l)}
+      <div className="flex gap-1">
+        {l.status === 'pendente' && (
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
+            <CheckCircle className="h-3.5 w-3.5 text-primary" />
+          </Button>
+        )}
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Unified VT+VR "Benefícios" row
+function BeneficiosRow({
+  vtItem,
+  vrItem,
+  colaborador,
+  onEdit,
+  onMarcarPago,
+}: {
+  vtItem: any | null;
+  vrItem: any | null;
+  colaborador: any | null;
+  onEdit: (l: any) => void;
+  onMarcarPago: (l: any) => void;
+}) {
+  const items = [vtItem, vrItem].filter(Boolean);
+  const totalValor = items.reduce((s, i) => s + Number(i.valor), 0);
+  const anyPendente = items.some(i => i.status !== 'pago');
+  const representativeItem = anyPendente ? items.find(i => i.status !== 'pago') || items[0] : items[0];
+  const urgencia = anyPendente ? getUrgencia(representativeItem) : 'pago';
+  const style = getRowStyle(urgencia);
+
+  const nomeColab = vtItem?.descricao?.replace(/^.*?—\s*/, '').replace(/^VT\s*—?\s*/i, '') ||
+    vrItem?.descricao?.replace(/^.*?—\s*/, '').replace(/^VR\s*—?\s*/i, '') ||
+    colaborador?.nome || 'Colaborador';
+  // Extract just the name from description patterns like "VT — NOME" or "Vale Transporte (VT) — NOME"
+  const cleanName = (desc: string) => {
+    const parts = desc.split('—');
+    return parts.length > 1 ? parts[parts.length - 1].trim() : parts[0].trim();
+  };
+  const displayName = vtItem ? cleanName(vtItem.descricao) : vrItem ? cleanName(vrItem.descricao) : nomeColab;
+
+  const vtDiario = colaborador?.vt_diario || 0;
+  const vrDiario = colaborador?.vr_diario || 0;
+  const vtDias = vtItem && vtDiario > 0 ? Math.round(Number(vtItem.valor) / vtDiario) : 0;
+  const vrDias = vrItem && vrDiario > 0 ? Math.round(Number(vrItem.valor) / vrDiario) : 0;
+
+  const vencimento = vtItem?.data_vencimento || vrItem?.data_vencimento;
+
+  return (
+    <div
+      className="py-2.5 px-2 rounded-md space-y-1"
+      style={{ backgroundColor: style.bg, borderLeft: style.borderLeft }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {urgencia === 'pago' && <Check className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+          <p className={`text-sm font-medium truncate ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+            Benefícios — {displayName}
+          </p>
+        </div>
+        <span className={`font-bold text-sm whitespace-nowrap ${urgencia === 'pago' ? 'text-green-300' : 'text-foreground'}`}>
+          {fmt(totalValor)}
+        </span>
+        {getStatusBadge(representativeItem)}
+        <div className="flex gap-1">
+          {items.map(item => (
+            item.status === 'pendente' && (
+              <Button key={`pay-${item.id}`} variant="ghost" size="icon" className="h-7 w-7" title={`Pagar ${item.subcategoria}`} onClick={() => onMarcarPago(item)}>
+                <CheckCircle className="h-3.5 w-3.5 text-primary" />
+              </Button>
+            )
+          ))}
+          {items.map(item => (
+            <Button key={`edit-${item.id}`} variant="ghost" size="icon" className="h-7 w-7" title={`Editar ${item.subcategoria}`} onClick={() => onEdit(item)}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          ))}
+        </div>
+      </div>
+      <div className={`text-xs pl-6 space-y-0.5 ${urgencia === 'pago' ? 'text-green-300' : 'text-muted-foreground'}`}>
+        {vtItem && (
+          <p>VT: {fmt(vtDiario)}/dia × {vtDias} dias = {fmt(Number(vtItem.valor))}</p>
+        )}
+        {vrItem && (
+          <p>VR: {fmt(vrDiario)}/dia × {vrDias} dias = {fmt(Number(vrItem.valor))}</p>
+        )}
+        {vencimento && (
+          <p className="flex items-center gap-1">
+            {(urgencia === 'urgente' || urgencia === 'atrasado') && <StatusIcon urgencia={urgencia} />}
+            Vencimento: {new Date(vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const SUBCATEGORIA_ORDER = ['Adiantamento', 'Salário', 'Benefícios'];
 
 function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit: (l: any) => void; onMarcarPago: (l: any) => void }) {
+  const { data: colaboradores } = useColaboradores();
+
+  // Separate VT/VR from other items
+  const vtVrItems = items.filter(l => l.subcategoria === 'Vale Transporte (VT)' || l.subcategoria === 'Vale Refeição (VR)');
+  const otherItems = items.filter(l => l.subcategoria !== 'Vale Transporte (VT)' && l.subcategoria !== 'Vale Refeição (VR)');
+
+  // Group other items by subcategoria
   const grouped: Record<string, any[]> = {};
-  items.forEach(l => {
+  otherItems.forEach(l => {
     const sub = l.subcategoria || 'Outros Folha';
     if (!grouped[sub]) grouped[sub] = [];
     grouped[sub].push(l);
   });
+
+  // Build unified Benefícios group
+  if (vtVrItems.length > 0) {
+    grouped['Benefícios'] = vtVrItems; // raw items, we'll process them in render
+  }
 
   const sortedKeys = Object.keys(grouped).sort((a, b) => {
     const ia = SUBCATEGORIA_ORDER.indexOf(a);
@@ -39,46 +248,73 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
     return ia - ib;
   });
 
+  // Build beneficios unified rows
+  const buildBeneficiosRows = (vtVrRaw: any[]) => {
+    // Group by colaborador_id + competencia
+    const byColab: Record<string, { vt: any | null; vr: any | null }> = {};
+    vtVrRaw.forEach(l => {
+      const key = `${l.colaborador_id || 'none'}_${l.competencia_mes}_${l.competencia_ano}`;
+      if (!byColab[key]) byColab[key] = { vt: null, vr: null };
+      if (l.subcategoria === 'Vale Transporte (VT)') byColab[key].vt = l;
+      if (l.subcategoria === 'Vale Refeição (VR)') byColab[key].vr = l;
+    });
+    return Object.values(byColab);
+  };
+
   return (
     <Accordion type="multiple" className="space-y-1">
       {sortedKeys.map(sub => {
         const subItems = grouped[sub];
-        const subTotal = subItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
+        const isBeneficios = sub === 'Benefícios';
+
+        let subTotal: number;
+        let countPagos: number;
+        let countPendentes: number;
+
+        if (isBeneficios) {
+          subTotal = subItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
+          countPagos = subItems.filter((l: any) => l.status === 'pago').length;
+          countPendentes = subItems.length - countPagos;
+        } else {
+          subTotal = subItems.reduce((s: number, l: any) => s + Number(l.valor), 0);
+          countPagos = subItems.filter((l: any) => l.status === 'pago').length;
+          countPendentes = subItems.length - countPagos;
+        }
+
         return (
           <AccordionItem key={sub} value={sub} className="border rounded-md overflow-hidden">
             <AccordionTrigger className="px-3 py-2 hover:no-underline text-sm">
               <div className="flex items-center gap-3 w-full">
                 <span className="font-medium text-foreground">{sub}</span>
-                <span className="ml-auto mr-3 font-bold text-sm text-foreground">{fmt(subTotal)}</span>
-                <Badge variant="outline" className="text-[10px]">{subItems.length}</Badge>
+                <span className="ml-auto mr-2 font-bold text-sm text-foreground">{fmt(subTotal)}</span>
+                <SubGroupCounters items={subItems} />
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-3 pb-2">
-              <div className="divide-y divide-border">
-                {subItems.map((l: any) => (
-                  <div key={l.id} className="flex items-center justify-between py-2.5 gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{l.descricao}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {l.fornecedor && `${l.fornecedor} • `}
-                        {new Date(l.data_vencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    <span className="font-bold text-sm text-foreground whitespace-nowrap">{fmt(Number(l.valor))}</span>
-                    {getStatusBadge(l)}
-                    <div className="flex gap-1">
-                      {l.status === 'pendente' && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
-                          <CheckCircle className="h-3.5 w-3.5 text-primary" />
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {isBeneficios ? (
+                <div className="space-y-1.5">
+                  {buildBeneficiosRows(subItems).map((pair, idx) => {
+                    const colabId = pair.vt?.colaborador_id || pair.vr?.colaborador_id;
+                    const colab = colaboradores?.find(c => c.id === colabId) || null;
+                    return (
+                      <BeneficiosRow
+                        key={idx}
+                        vtItem={pair.vt}
+                        vrItem={pair.vr}
+                        colaborador={colab}
+                        onEdit={onEdit}
+                        onMarcarPago={onMarcarPago}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {sortByStatusThenDate(subItems).map((l: any) => (
+                    <LancamentoRow key={l.id} l={l} onEdit={onEdit} onMarcarPago={onMarcarPago} />
+                  ))}
+                </div>
+              )}
             </AccordionContent>
           </AccordionItem>
         );
