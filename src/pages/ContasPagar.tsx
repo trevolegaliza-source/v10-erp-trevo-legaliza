@@ -150,6 +150,9 @@ export default function ContasPagar() {
 
   return (
     <div className="space-y-6">
+      {/* Fluxo 15 dias */}
+      <FluxoProximos15Dias />
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
