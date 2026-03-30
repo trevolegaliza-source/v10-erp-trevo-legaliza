@@ -65,8 +65,19 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
     }
   }
 
-  // 3. VT
-  if (vt > 0) {
+  // 3. VT or Auxílio Combustível
+  const tipoTransporte = (colab as any).tipo_transporte || 'vt';
+  const auxilioCombustivelValor = Number((colab as any).auxilio_combustivel_valor) || 0;
+
+  if (tipoTransporte === 'auxilio_combustivel' && auxilioCombustivelValor > 0) {
+    entries.push({
+      descricao: `Auxílio Combustível - ${colab.nome}`,
+      valor: auxilioCombustivelValor,
+      data_vencimento: vencVtVr,
+      categoria: 'folha',
+      subcategoria: 'Vale Transporte (VT)',
+    });
+  } else if (vt > 0) {
     entries.push({
       descricao: `VT (${diasUteis}d) - ${colab.nome}`,
       valor: vt * diasUteis,
