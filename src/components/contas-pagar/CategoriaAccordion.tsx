@@ -526,6 +526,11 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
                   </span>
                   {getStatusBadge(l)}
                   <div className="flex gap-1">
+                    {(l.comprovante_url || l.url_comprovante) && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver comprovante" onClick={() => setComprovanteTarget(l)}>
+                        <Eye className="h-3.5 w-3.5 text-blue-500" />
+                      </Button>
+                    )}
                     {l.status === 'pago' && (
                       <Button variant="ghost" size="icon" className="h-7 w-7" title="Avisar colaborador" onClick={() => setAvisarTarget(l)}>
                         <MessageCircle className="h-3.5 w-3.5 text-green-600" />
