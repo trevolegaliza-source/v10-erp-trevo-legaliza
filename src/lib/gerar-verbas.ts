@@ -13,8 +13,8 @@ interface VerbaEntry {
   subcategoria: string;
 }
 
-function buildVerbas(colab: Colaborador, year: number, month: number): VerbaEntry[] {
-  const diasUteis = getBusinessDaysInMonth(year, month);
+function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisOverride?: number): VerbaEntry[] {
+  const diasUteis = diasUteisOverride ?? getBusinessDaysInMonth(year, month);
   const sal = Number(colab.salario_base);
   const vt = Number(colab.vt_diario);
   const vr = Number(colab.vr_diario);
