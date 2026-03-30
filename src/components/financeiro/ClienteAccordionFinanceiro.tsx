@@ -635,16 +635,33 @@ function VencidoItem({ cliente }: { cliente: ClienteFinanceiro }) {
 
   async function handleCopiarCobranca() {
     if (lancVencidos.length === 0) return;
+
+    // Fetch valores adicionais for all processes to include reimbursable taxes
+    const processoIds = [...new Set(lancVencidos.map(l => l.processo_id).filter(Boolean))];
+    let vaMap: Record<string, number> = {};
+    if (processoIds.length > 0) {
+      const { data: vas } = await supabase
+        .from('valores_adicionais')
+        .select('processo_id, valor')
+        .in('processo_id', processoIds);
+      if (vas) {
+        for (const va of vas) {
+          vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor;
+        }
+      }
+    }
+
     const primeiro = lancVencidos[0];
+    const valorPrimeiro = primeiro.valor + (vaMap[primeiro.processo_id] || 0);
     const adicionais = lancVencidos.slice(1).map(l => ({
       tipo: l.processo_tipo,
       razao_social: l.processo_razao_social,
-      valor: l.valor,
+      valor: l.valor + (vaMap[l.processo_id] || 0),
     }));
     const msg = gerarMensagemCobranca({
       tipo: primeiro.processo_tipo,
       razao_social: primeiro.processo_razao_social,
-      valor: primeiro.valor,
+      valor: valorPrimeiro,
       data_vencimento: primeiro.data_vencimento,
       diasAtraso: maiorAtraso,
       processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
