@@ -155,7 +155,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           lancamentos.push(l);
         }
       }
-      if (lErr) throw lErr;
       if (!lancamentos?.length) return [];
 
       const processoIds = [...new Set(lancamentos.map(l => l.processo_id).filter(Boolean))] as string[];
