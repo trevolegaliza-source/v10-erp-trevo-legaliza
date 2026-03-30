@@ -12,15 +12,26 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   year: number;
-  month: number; // 0-indexed
+  month: number; // 0-indexed (competência)
   colaboradores: Colaborador[];
   onConfirm: (diasUteis: number) => void;
   isPending: boolean;
 }
 
+// VT/VR is paid on the 1st of the month AFTER competência,
+// so business days should be calculated for the PAYMENT month.
+function getPaymentMonth(year: number, month: number) {
+  const nextMonth = month + 1;
+  return {
+    payYear: nextMonth > 11 ? year + 1 : year,
+    payMonth: nextMonth > 11 ? 0 : nextMonth,
+  };
+}
+
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function ConfirmarDiasUteisModal({ open, onOpenChange, year, month, colaboradores, onConfirm, isPending }: Props) {
+  const { payYear, payMonth } = getPaymentMonth(year, month);
   const [loading, setLoading] = useState(false);
   const [feriados, setFeriados] = useState<FeriadoNacional[]>([]);
   const [feriadosMes, setFeriadosMes] = useState<FeriadoNacional[]>([]);
@@ -31,7 +42,7 @@ export default function ConfirmarDiasUteisModal({ open, onOpenChange, year, mont
     if (!open) return;
     setLoading(true);
     setApiError(false);
-    fetchFeriadosNacionais(year).then(result => {
+    fetchFeriadosNacionais(payYear).then(result => {
       if (result.length === 0) {
         setApiError(true);
         setDiasUteis(22);
@@ -39,13 +50,13 @@ export default function ConfirmarDiasUteisModal({ open, onOpenChange, year, mont
         setFeriadosMes([]);
       } else {
         setFeriados(result);
-        const doMes = feriadosDoMes(result, year, month);
+        const doMes = feriadosDoMes(result, payYear, payMonth);
         setFeriadosMes(doMes);
-        setDiasUteis(calcularDiasUteis(year, month, result));
+        setDiasUteis(calcularDiasUteis(payYear, payMonth, result));
       }
       setLoading(false);
     });
-  }, [open, year, month]);
+  }, [open, payYear, payMonth]);
 
   const ativos = colaboradores.filter(c => c.status === 'ativo');
   const colabsComBeneficios = ativos.filter(c => Number(c.vt_diario) > 0 || Number(c.vr_diario) > 0);
@@ -60,8 +71,12 @@ export default function ConfirmarDiasUteisModal({ open, onOpenChange, year, mont
       <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-foreground">
-            Confirmar Dias Úteis · {MESES_PT[month]} {year}
+            Confirmar Dias Úteis · {MESES_PT[payMonth]} {payYear}
           </DialogTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            VT e VR de {MESES_PT[month]} serão pagos em 01/{String(payMonth + 1).padStart(2, '0')}/{payYear}.
+            Informe os dias úteis de {MESES_PT[payMonth]} para o cálculo.
+          </p>
         </DialogHeader>
 
         {loading ? (
@@ -150,14 +165,17 @@ export default function ConfirmarDiasUteisModal({ open, onOpenChange, year, mont
                       <div key={c.id} className="space-y-0.5">
                         {vt > 0 && (
                           <p className="text-xs text-foreground">
-                            VT · {c.nome}: {fmt(vt)} × {diasUteis} dias = <span className="font-semibold">{fmt(vt * diasUteis)}</span>
+                            VT · {c.nome}: {fmt(vt)} × {diasUteis} dias ({MESES_PT[payMonth]}) = <span className="font-semibold">{fmt(vt * diasUteis)}</span>
                           </p>
                         )}
                         {vr > 0 && (
                           <p className="text-xs text-foreground">
-                            VR · {c.nome}: {fmt(vr)} × {diasUteis} dias = <span className="font-semibold">{fmt(vr * diasUteis)}</span>
+                            VR · {c.nome}: {fmt(vr)} × {diasUteis} dias ({MESES_PT[payMonth]}) = <span className="font-semibold">{fmt(vr * diasUteis)}</span>
                           </p>
                         )}
+                        <p className="text-[10px] text-muted-foreground">
+                          Vencimento: 01/{String(payMonth + 1).padStart(2, '0')}/{payYear}
+                        </p>
                       </div>
                     );
                   })}

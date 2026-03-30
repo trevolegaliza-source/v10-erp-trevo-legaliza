@@ -5,6 +5,12 @@ import { toast } from 'sonner';
 
 const fmt = (d: Date) => d.toISOString().split('T')[0];
 
+/** Clamp day to the last day of the month to avoid rollover */
+function safeDate(year: number, month: number, day: number): Date {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, Math.min(day, lastDay));
+}
+
 interface VerbaEntry {
   descricao: string;
   valor: number;
@@ -27,7 +33,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
   const lastBizDay = getLastBusinessDay(year, month);
 
   // VT/VR: if custom day set, use it; otherwise 1st of NEXT month
-  const vencVtVr = diaVtVr > 0 ? fmt(new Date(year, month, diaVtVr)) : fmt(new Date(year, month + 1, 1));
+  const vencVtVr = diaVtVr > 0 ? fmt(safeDate(year, month, diaVtVr)) : fmt(new Date(year, month + 1, 1));
 
   const entries: VerbaEntry[] = [];
 
@@ -38,7 +44,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
       entries.push({
         descricao: `Adiantamento - ${colab.nome}`,
         valor: valorAdiant,
-        data_vencimento: fmt(new Date(year, month, diaAdiantamento)),
+        data_vencimento: fmt(safeDate(year, month, diaAdiantamento)),
         categoria: 'folha',
         subcategoria: 'Adiantamento',
       });
@@ -58,7 +64,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
       entries.push({
         descricao: label,
         valor: valorSalario,
-        data_vencimento: fmt(new Date(year, month, diaSalario)),
+        data_vencimento: fmt(safeDate(year, month, diaSalario)),
         categoria: 'folha',
         subcategoria: 'Salário',
       });
@@ -103,7 +109,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
     entries.push({
       descricao: `DAS - ${colab.nome}`,
       valor: das,
-      data_vencimento: fmt(new Date(year, month, diaDas)),
+      data_vencimento: fmt(safeDate(year, month, diaDas)),
       categoria: 'folha',
       subcategoria: 'DAS Colaborador',
     });
@@ -214,43 +220,75 @@ export function estimarCustoTotal(colab: Colaborador, diasUteis?: number): numbe
 
 /**
  * Generate all financial entries for a collaborator for a given month/year.
- * Returns count of newly created entries.
+ * Uses upsert logic: update existing pending, skip paid, insert new.
+ * Returns count of created/updated entries.
  */
 export async function gerarVerbasColaborador(colab: Colaborador, year: number, month: number, diasUteisOverride?: number): Promise<number> {
   const entries = buildVerbas(colab, year, month, diasUteisOverride);
   if (entries.length === 0) return 0;
 
-  // Delete existing PENDING entries for this collaborator/month
-  await (supabase as any)
+  // Fetch existing entries for this collaborator/month
+  const { data: existing } = await (supabase as any)
     .from('lancamentos')
-    .delete()
+    .select('id, subcategoria, status')
     .eq('tipo', 'pagar')
     .eq('colaborador_id', colab.id)
     .eq('competencia_mes', month + 1)
-    .eq('competencia_ano', year)
-    .eq('status', 'pendente');
+    .eq('competencia_ano', year);
 
-  const rows = entries.map(e => ({
-    tipo: 'pagar' as const,
-    descricao: e.descricao,
-    valor: e.valor,
-    categoria: e.categoria,
-    subcategoria: e.subcategoria,
-    status: 'pendente' as const,
-    data_vencimento: e.data_vencimento,
-    colaborador_id: colab.id,
-    fornecedor: colab.nome,
-    competencia_mes: month + 1,
-    competencia_ano: year,
-    etapa_financeiro: 'solicitacao_criada',
-  }));
+  const existingMap = new Map<string, { id: string; status: string }>();
+  (existing || []).forEach((e: any) => {
+    existingMap.set(e.subcategoria || '', e);
+  });
 
-  const { error } = await (supabase as any).from('lancamentos').insert(rows);
-  if (error) {
-    toast.error(`Erro ao gerar verbas de ${colab.nome}: ${error.message}`);
-    throw error;
+  let count = 0;
+
+  for (const e of entries) {
+    const found = existingMap.get(e.subcategoria);
+
+    if (found) {
+      if (found.status === 'pago') {
+        // Already paid — skip
+        continue;
+      }
+      // Update existing pending entry
+      await (supabase as any)
+        .from('lancamentos')
+        .update({
+          descricao: e.descricao,
+          valor: e.valor,
+          data_vencimento: e.data_vencimento,
+          categoria: e.categoria,
+          fornecedor: colab.nome,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', found.id);
+      count++;
+    } else {
+      // Insert new
+      const { error } = await (supabase as any).from('lancamentos').insert({
+        tipo: 'pagar' as const,
+        descricao: e.descricao,
+        valor: e.valor,
+        categoria: e.categoria,
+        subcategoria: e.subcategoria,
+        status: 'pendente' as const,
+        data_vencimento: e.data_vencimento,
+        colaborador_id: colab.id,
+        fornecedor: colab.nome,
+        competencia_mes: month + 1,
+        competencia_ano: year,
+        etapa_financeiro: 'solicitacao_criada',
+      });
+      if (error) {
+        toast.error(`Erro ao gerar verbas de ${colab.nome}: ${error.message}`);
+        throw error;
+      }
+      count++;
+    }
   }
-  return rows.length;
+
+  return count;
 }
 
 /**
