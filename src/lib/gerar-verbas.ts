@@ -1,14 +1,25 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Colaborador } from '@/hooks/useColaboradores';
 import { getBusinessDaysInMonth, getLastBusinessDay, calcularAdiantamento } from '@/lib/business-days';
+import { fetchFeriadosNacionais, proximoDiaUtil } from '@/lib/brasil-api';
+import type { FeriadoNacional } from '@/lib/brasil-api';
 import { toast } from 'sonner';
 
-const fmt = (d: Date) => d.toISOString().split('T')[0];
+const fmtDate = (d: Date) => d.toISOString().split('T')[0];
 
 /** Clamp day to the last day of the month to avoid rollover */
 function safeDate(year: number, month: number, day: number): Date {
   const lastDay = new Date(year, month + 1, 0).getDate();
   return new Date(year, month, Math.min(day, lastDay));
+}
+
+/**
+ * safeDate + proximoDiaUtil: clamp day then advance to next business day.
+ * feriados can span multiple years if dates cross year boundaries.
+ */
+function safeDateUtil(year: number, month: number, day: number, feriados: FeriadoNacional[]): Date {
+  const base = safeDate(year, month, day);
+  return proximoDiaUtil(base, feriados);
 }
 
 interface VerbaEntry {
@@ -19,7 +30,7 @@ interface VerbaEntry {
   subcategoria: string;
 }
 
-function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisOverride?: number): VerbaEntry[] {
+function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisOverride?: number, feriados?: FeriadoNacional[]): VerbaEntry[] {
   const diasUteis = diasUteisOverride ?? getBusinessDaysInMonth(year, month);
   const sal = Number(colab.salario_base);
   const vt = Number(colab.vt_diario);
@@ -32,8 +43,12 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
   const ultimoDia = new Date(year, month + 1, 0);
   const lastBizDay = getLastBusinessDay(year, month);
 
-  // VT/VR: if custom day set, use it; otherwise 1st of NEXT month
-  const vencVtVr = diaVtVr > 0 ? fmt(safeDate(year, month, diaVtVr)) : fmt(new Date(year, month + 1, 1));
+  // Feriados for applying proximoDiaUtil — empty array if not provided
+  const fer = feriados || [];
+
+  // VT/VR: if custom day set, use it; otherwise 1st of NEXT month — both go through proximoDiaUtil
+  const vencVtVrBase = diaVtVr > 0 ? safeDate(year, month, diaVtVr) : new Date(year, month + 1, 1);
+  const vencVtVr = fmtDate(proximoDiaUtil(vencVtVrBase, fer));
 
   const entries: VerbaEntry[] = [];
 
@@ -44,7 +59,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
       entries.push({
         descricao: `Adiantamento - ${colab.nome}`,
         valor: valorAdiant,
-        data_vencimento: fmt(safeDate(year, month, diaAdiantamento)),
+        data_vencimento: fmtDate(safeDateUtil(year, month, diaAdiantamento, fer)),
         categoria: 'folha',
         subcategoria: 'Adiantamento',
       });
@@ -64,7 +79,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
       entries.push({
         descricao: label,
         valor: valorSalario,
-        data_vencimento: fmt(safeDate(year, month, diaSalario)),
+        data_vencimento: fmtDate(safeDateUtil(year, month, diaSalario, fer)),
         categoria: 'folha',
         subcategoria: 'Salário',
       });
@@ -109,7 +124,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
     entries.push({
       descricao: `DAS - ${colab.nome}`,
       valor: das,
-      data_vencimento: fmt(safeDate(year, month, diaDas)),
+      data_vencimento: fmtDate(safeDateUtil(year, month, diaDas, fer)),
       categoria: 'folha',
       subcategoria: 'DAS Colaborador',
     });
@@ -128,7 +143,7 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
       entries.push({
         descricao: `FGTS - ${colab.nome}`,
         valor: sal * (fgtsPct / 100),
-        data_vencimento: fmt(new Date(fgtsYear, fgtsMonth, 7)),
+        data_vencimento: fmtDate(safeDateUtil(fgtsYear, fgtsMonth, 7, fer)),
         categoria: 'folha',
         subcategoria: 'FGTS',
       });
@@ -142,29 +157,29 @@ function buildVerbas(colab: Colaborador, year: number, month: number, diasUteisO
       entries.push({
         descricao: `INSS Patronal - ${colab.nome}`,
         valor: sal * (inssPct / 100),
-        data_vencimento: fmt(new Date(inssYear, inssMonth, 20)),
+        data_vencimento: fmtDate(safeDateUtil(inssYear, inssMonth, 20, fer)),
         categoria: 'impostos',
         subcategoria: 'INSS',
       });
     }
 
-    // 8. Provisão 13º
+    // 8. Provisão 13º — last business day of the month
     if (colab.provisionar_13 && sal > 0) {
       entries.push({
         descricao: `Provisão 13º - ${colab.nome}`,
         valor: sal / 12,
-        data_vencimento: fmt(ultimoDia),
+        data_vencimento: fmtDate(lastBizDay),
         categoria: 'folha',
         subcategoria: '13º Salário (Provisão)',
       });
     }
 
-    // 9. Provisão Férias
+    // 9. Provisão Férias — last business day of the month
     if (colab.provisionar_ferias && sal > 0) {
       entries.push({
         descricao: `Provisão Férias - ${colab.nome}`,
         valor: (sal + sal / 3) / 12,
-        data_vencimento: fmt(ultimoDia),
+        data_vencimento: fmtDate(lastBizDay),
         categoria: 'folha',
         subcategoria: 'Férias (Provisão)',
       });
@@ -223,8 +238,8 @@ export function estimarCustoTotal(colab: Colaborador, diasUteis?: number): numbe
  * Uses upsert logic: update existing pending, skip paid, insert new.
  * Returns count of created/updated entries.
  */
-export async function gerarVerbasColaborador(colab: Colaborador, year: number, month: number, diasUteisOverride?: number): Promise<number> {
-  const entries = buildVerbas(colab, year, month, diasUteisOverride);
+export async function gerarVerbasColaborador(colab: Colaborador, year: number, month: number, diasUteisOverride?: number, feriados?: FeriadoNacional[]): Promise<number> {
+  const entries = buildVerbas(colab, year, month, diasUteisOverride, feriados);
   if (entries.length === 0) return 0;
 
   // Fetch existing entries for this collaborator/month
@@ -293,16 +308,91 @@ export async function gerarVerbasColaborador(colab: Colaborador, year: number, m
 
 /**
  * Generate all verbas for all active collaborators for a given month.
+ * Fetches holidays for the competência year AND the next year (for cross-year dates like FGTS/INSS).
  */
 export async function gerarVerbasDoMes(colaboradores: Colaborador[], year: number, month: number, diasUteisOverride?: number) {
   const ativos = colaboradores.filter(c => c.status === 'ativo');
   await aplicarAumentos(ativos, year, month);
+
+  // Fetch holidays for current year and next year (some dates land in next year)
+  const [feriadosAno, feriadosProx] = await Promise.all([
+    fetchFeriadosNacionais(year),
+    month >= 10 ? fetchFeriadosNacionais(year + 1) : Promise.resolve([]),
+  ]);
+  const todosOsFeriados = [...feriadosAno, ...feriadosProx];
+
   let total = 0;
   for (const colab of ativos) {
-    const count = await gerarVerbasColaborador(colab, year, month, diasUteisOverride);
+    const count = await gerarVerbasColaborador(colab, year, month, diasUteisOverride, todosOsFeriados);
     total += count;
   }
   return total;
+}
+
+/**
+ * Fix existing records that have data_vencimento on weekends/holidays.
+ * Only updates pendente/atrasado records. Never touches pago.
+ * Returns count of corrected records.
+ */
+export async function corrigirDatasExistentes(): Promise<number> {
+  // Fetch all pending/overdue pagar records
+  const { data: records, error } = await (supabase as any)
+    .from('lancamentos')
+    .select('id, data_vencimento, status')
+    .eq('tipo', 'pagar')
+    .in('status', ['pendente', 'atrasado']);
+
+  if (error || !records || records.length === 0) return 0;
+
+  // Group by year to minimize API calls
+  const yearsNeeded = new Set<number>();
+  for (const r of records) {
+    const y = new Date(r.data_vencimento + 'T00:00:00').getFullYear();
+    yearsNeeded.add(y);
+  }
+
+  // Fetch holidays for all needed years
+  const feriadosByYear = new Map<number, FeriadoNacional[]>();
+  const fetches = Array.from(yearsNeeded).map(async (y) => {
+    const f = await fetchFeriadosNacionais(y);
+    feriadosByYear.set(y, f);
+  });
+  await Promise.all(fetches);
+
+  // Build combined feriados list
+  const allFeriados: FeriadoNacional[] = [];
+  feriadosByYear.forEach(f => allFeriados.push(...f));
+
+  let corrected = 0;
+
+  for (const r of records) {
+    const orig = new Date(r.data_vencimento + 'T00:00:00');
+    const dow = orig.getDay();
+    
+    // Check if it's on a weekend
+    const isoStr = r.data_vencimento; // already YYYY-MM-DD
+    const feriadoSet = new Set(allFeriados.map(f => f.date));
+    const isWeekend = dow === 0 || dow === 6;
+    const isHoliday = feriadoSet.has(isoStr);
+
+    if (!isWeekend && !isHoliday) continue;
+
+    const correctedDate = proximoDiaUtil(orig, allFeriados);
+    const newDateStr = fmtDate(correctedDate);
+
+    if (newDateStr !== r.data_vencimento) {
+      await (supabase as any)
+        .from('lancamentos')
+        .update({
+          data_vencimento: newDateStr,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', r.id);
+      corrected++;
+    }
+  }
+
+  return corrected;
 }
 
 export { buildVerbas };
