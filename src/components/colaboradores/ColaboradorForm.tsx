@@ -34,6 +34,8 @@ export interface ColaboradorFormData {
   dia_salario: string;
   dia_vt_vr: string;
   dia_das: string;
+  tipo_transporte: 'vt' | 'auxilio_combustivel';
+  auxilio_combustivel_valor: string;
   fgts_percentual: string;
   inss_patronal_percentual: string;
   provisionar_13: boolean;
