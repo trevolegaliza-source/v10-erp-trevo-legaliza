@@ -63,7 +63,7 @@ export default function ImportarFolhaModal({ open, onClose, onConfirm, mes, ano 
       tipo: 'pagar' as const,
       descricao: `${l.subcategoria} - ${l.colaboradorNome}`,
       valor: l.valor,
-      data_vencimento: `${ano}-${String(mes).padStart(2, '0')}-05`,
+      data_vencimento: l.dataVencimento,
       status: 'pendente' as const,
       categoria: 'folha',
       subcategoria: l.subcategoria,
