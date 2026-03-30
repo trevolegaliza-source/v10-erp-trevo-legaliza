@@ -329,10 +329,15 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     // Priority 2: Awaiting payment (sent to client)
     if (lancPendentes.some(l => l.etapa_financeiro === 'cobranca_enviada')) return 'aguardando';
 
-    // Priority 3: Extrato generated, awaiting sending (must have real extrato_id)
+    // Priority 3: If client still has lancamentos without extrato (solicitacao_criada),
+    // keep in "cobrar" so operator can generate extratos for remaining processes.
+    const temSemExtrato = lancPendentes.some(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada');
+    if (temSemExtrato) return 'cobrar';
+
+    // Priority 4: ALL pending lancamentos have extrato generated → awaiting sending
     if (lancPendentes.some(l => l.etapa_financeiro === 'cobranca_gerada' && l.extrato_id)) return 'enviados';
 
-    // Priority 4: Needs extrato
+    // Priority 5: Needs extrato
     return 'cobrar';
   }
 
