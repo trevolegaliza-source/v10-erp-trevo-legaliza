@@ -15,9 +15,9 @@ interface Props {
   auxilioCombustivelValor?: number;
 }
 
-export default function CustoResumoCard({ salario, vtDiario, vrDiario, das, regime, fgtsPct, inssPct, prov13, provFerias, diasUteis }: Props) {
+export default function CustoResumoCard({ salario, vtDiario, vrDiario, das, regime, fgtsPct, inssPct, prov13, provFerias, diasUteis, tipoTransporte = 'vt', auxilioCombustivelValor = 0 }: Props) {
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const vtMensal = vtDiario * diasUteis;
+  const vtMensal = tipoTransporte === 'auxilio_combustivel' ? auxilioCombustivelValor : vtDiario * diasUteis;
   const vrMensal = vrDiario * diasUteis;
   const fgts = regime === 'CLT' ? salario * (fgtsPct / 100) : 0;
   const inss = regime === 'CLT' ? salario * (inssPct / 100) : 0;
@@ -25,9 +25,10 @@ export default function CustoResumoCard({ salario, vtDiario, vrDiario, das, regi
   const pFer = regime === 'CLT' && provFerias ? (salario + salario / 3) / 12 : 0;
   const total = salario + vtMensal + vrMensal + das + fgts + inss + p13 + pFer;
 
+  const vtLabel = tipoTransporte === 'auxilio_combustivel' ? 'Aux. Combustível (fixo)' : `VT (${diasUteis} dias)`;
   const lines: { label: string; value: number; clt?: boolean }[] = [
     { label: 'Salário', value: salario },
-    { label: `VT (${diasUteis} dias)`, value: vtMensal },
+    { label: vtLabel, value: vtMensal },
     { label: `VR (${diasUteis} dias)`, value: vrMensal },
   ];
   if (das > 0) lines.push({ label: 'DAS', value: das });
