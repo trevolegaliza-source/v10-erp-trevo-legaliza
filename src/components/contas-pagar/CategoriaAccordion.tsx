@@ -358,6 +358,11 @@ function BeneficiosRow({
         vtItem={vtItem}
         vrItem={vrItem}
       />
+      <ComprovanteLightbox
+        open={!!showComprovante}
+        onClose={() => setShowComprovante(null)}
+        lancamento={showComprovante}
+      />
     </>
   );
 }
