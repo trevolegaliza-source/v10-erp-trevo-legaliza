@@ -123,17 +123,38 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const query = useQuery({
     queryKey: ['financeiro_clientes', dataInicio, dataFim],
     queryFn: async () => {
-      // Fetch ALL lancamentos a receber (including pago) within period
-      let q = supabase
+      // Fetch ALL pending lancamentos (no date filter) + paid ones within period
+      // This ensures processes with future vencimento dates (e.g. no_deferimento clients) are never hidden
+      const pendingQ = supabase
         .from('lancamentos')
         .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento')
         .eq('tipo', 'receber')
+        .neq('status', 'pago')
         .order('created_at', { ascending: false });
 
-      if (dataInicio) q = q.gte('data_vencimento', dataInicio);
-      if (dataFim) q = q.lte('data_vencimento', dataFim);
+      let pagosQ = supabase
+        .from('lancamentos')
+        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento')
+        .eq('tipo', 'receber')
+        .eq('status', 'pago')
+        .order('created_at', { ascending: false });
 
-      const { data: lancamentos, error: lErr } = await q;
+      if (dataInicio) pagosQ = pagosQ.gte('data_vencimento', dataInicio);
+      if (dataFim) pagosQ = pagosQ.lte('data_vencimento', dataFim);
+
+      const [pendingRes, pagosRes] = await Promise.all([pendingQ, pagosQ]);
+      if (pendingRes.error) throw pendingRes.error;
+      if (pagosRes.error) throw pagosRes.error;
+
+      // Deduplicate by id
+      const seenIds = new Set<string>();
+      const lancamentos: typeof pendingRes.data = [];
+      for (const l of [...(pendingRes.data || []), ...(pagosRes.data || [])]) {
+        if (!seenIds.has(l.id)) {
+          seenIds.add(l.id);
+          lancamentos.push(l);
+        }
+      }
       if (lErr) throw lErr;
       if (!lancamentos?.length) return [];
 
