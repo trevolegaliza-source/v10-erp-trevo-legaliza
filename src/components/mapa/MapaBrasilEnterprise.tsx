@@ -11,6 +11,8 @@ export interface EstadoData {
   processos: number;
 }
 
+export type HoverCallback = (uf: string | null) => void;
+
 interface Props {
   dadosEstados: EstadoData[];
   onEstadoClick?: (uf: string) => void;
