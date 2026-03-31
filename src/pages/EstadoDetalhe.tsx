@@ -222,6 +222,17 @@ export default function EstadoDetalhe() {
           ))}
         </TabsList>
 
+        {/* Tab: Mapa */}
+        <TabsContent value="mapa" className="mt-2">
+          <MapaEstadoMunicipios
+            uf={ufUpper}
+            clientesPorMunicipio={clientesMunicipio || {}}
+            onMunicipioClick={(nome) => {
+              toast.info(`${nome} — veja a tab Municípios para detalhes`);
+            }}
+          />
+        </TabsContent>
+
         {/* Tab: Órgãos e Contatos */}
         <TabsContent value="orgaos" className="space-y-4 mt-2">
           {Object.entries(TIPO_LABELS).map(([tipo, label]) => {
