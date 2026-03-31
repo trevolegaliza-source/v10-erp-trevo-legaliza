@@ -65,8 +65,7 @@ export default function Configuracoes() {
         <TabsList>
           <TabsTrigger value="aparencia" className="gap-1.5"><Palette className="h-3.5 w-3.5" />Aparência</TabsTrigger>
           <TabsTrigger value="pricing" className="gap-1.5"><DollarSign className="h-3.5 w-3.5" />Preços</TabsTrigger>
-          <TabsTrigger value="rbac" className="gap-1.5"><Shield className="h-3.5 w-3.5" />RBAC</TabsTrigger>
-          <TabsTrigger value="colaboradores" className="gap-1.5"><UserCog className="h-3.5 w-3.5" />Colaboradores</TabsTrigger>
+          <TabsTrigger value="rbac" className="gap-1.5"><Shield className="h-3.5 w-3.5" />Usuários</TabsTrigger>
           <TabsTrigger value="webhooks" className="gap-1.5"><Webhook className="h-3.5 w-3.5" />Webhooks</TabsTrigger>
         </TabsList>
 
