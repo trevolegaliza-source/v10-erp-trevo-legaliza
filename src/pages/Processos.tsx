@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { KANBAN_STAGES, PROCESS_TYPE_LABELS, type KanbanStage } from '@/types/process';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, GripVertical, LayoutGrid, List, MoreHorizontal, Receipt, EyeOff, Trash2, Pencil, Download } from 'lucide-react';
+import { Plus, Filter, GripVertical, LayoutGrid, List, MoreHorizontal, Receipt, EyeOff, Trash2, Pencil, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -21,8 +21,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
 import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 type ViewMode = 'kanban' | 'list';
+type GroupBy = 'none' | 'cliente' | 'mes' | 'etapa';
 
 function QuickActionsMenu({
   process,
