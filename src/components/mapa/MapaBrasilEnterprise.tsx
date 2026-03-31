@@ -450,7 +450,12 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   }
 
   return (
-    <div ref={containerRef} className="relative rounded-xl overflow-hidden" style={{ background: '#0b0e14' }}>
+    <div ref={containerRef} className="relative rounded-xl overflow-hidden" style={{ background: '#0b0e14' }}
+      onMouseLeave={() => {
+        if (tooltipRef.current) tooltipRef.current.style.display = 'none';
+        if (onHover) onHover(null);
+      }}
+    >
       {/* Grid background — pointer-events: none is CRITICAL */}
       <div className="absolute inset-0 opacity-5" style={{
         backgroundImage: 'radial-gradient(#30363d 1px, transparent 1px)',
