@@ -187,16 +187,16 @@ export default function EstadoDetalhe() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="orgaos">
+      <Tabs defaultValue="mapa">
         <TabsList className="geo-card border-none mb-4" style={{ background: '#161b22' }}>
-          {['orgaos', 'clientes', 'municipios', 'notas'].map(tab => (
+          {['mapa', 'orgaos', 'clientes', 'municipios', 'notas'].map(tab => (
             <TabsTrigger
               key={tab}
               value={tab}
               className="data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400"
               style={{ color: '#8b949e' }}
             >
-              {tab === 'orgaos' ? 'Órgãos e Contatos' : tab === 'clientes' ? 'Clientes' : tab === 'municipios' ? 'Municípios' : 'Notas'}
+              {tab === 'mapa' ? 'Mapa' : tab === 'orgaos' ? 'Órgãos e Contatos' : tab === 'clientes' ? 'Clientes' : tab === 'municipios' ? 'Municípios' : 'Notas'}
             </TabsTrigger>
           ))}
         </TabsList>
