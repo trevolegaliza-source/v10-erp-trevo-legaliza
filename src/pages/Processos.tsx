@@ -171,9 +171,74 @@ export default function Processos() {
     }
   }, [deleteConfirmId, deleteProcesso]);
 
-  const filtered = filterType === 'all'
-    ? (processos || [])
-    : (processos || []).filter((p) => p.tipo === filterType);
+  const filtered = useMemo(() => {
+    let result = filterType === 'all'
+      ? (processos || [])
+      : (processos || []).filter((p) => p.tipo === filterType);
+    
+    if (filterMonth !== 'all') {
+      const [fYear, fMonth] = filterMonth.split('-').map(Number);
+      result = result.filter(p => {
+        const d = new Date(p.created_at);
+        return d.getFullYear() === fYear && d.getMonth() + 1 === fMonth;
+      });
+    }
+    return result;
+  }, [processos, filterType, filterMonth]);
+
+  const monthOptions = useMemo(() => {
+    const months = new Set<string>();
+    (processos || []).forEach(p => {
+      const d = new Date(p.created_at);
+      months.add(`${d.getFullYear()}-${d.getMonth() + 1}`);
+    });
+    return Array.from(months).sort().reverse().map(m => {
+      const [y, mo] = m.split('-').map(Number);
+      const label = new Date(y, mo - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return { value: m, label: label.charAt(0).toUpperCase() + label.slice(1) };
+    });
+  }, [processos]);
+
+  const groupedData = useMemo(() => {
+    if (groupBy === 'none') return null;
+    const groups: Record<string, { label: string; processes: typeof filtered }> = {};
+    filtered.forEach(p => {
+      let key: string;
+      let label: string;
+      if (groupBy === 'cliente') {
+        key = p.cliente?.nome || 'Sem cliente';
+        label = (p.cliente?.apelido || p.cliente?.nome || 'Sem cliente').toUpperCase();
+      } else if (groupBy === 'mes') {
+        const d = new Date(p.created_at);
+        key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
+        label = label.charAt(0).toUpperCase() + label.slice(1);
+      } else {
+        key = p.etapa;
+        label = (KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa).toUpperCase();
+      }
+      if (!groups[key]) groups[key] = { label, processes: [] };
+      groups[key].processes.push(p);
+    });
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b, 'pt-BR'));
+  }, [filtered, groupBy]);
+
+  const toggleGroup = useCallback((key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+
+  // Auto-collapse when many groups
+  useMemo(() => {
+    if (groupedData && groupedData.length > 5) {
+      setCollapsedGroups(new Set(groupedData.map(([k]) => k)));
+    } else {
+      setCollapsedGroups(new Set());
+    }
+  }, [groupBy, filterMonth, filterType]);
 
   const selectedFinanceiroProcess = useMemo<ProcessoFinanceiro | null>(() => {
     if (!selectedProcessId) return null;
