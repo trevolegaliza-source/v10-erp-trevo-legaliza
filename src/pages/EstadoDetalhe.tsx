@@ -92,6 +92,7 @@ export default function EstadoDetalhe() {
   const [nota, setNota] = useState('');
   const [notaId, setNotaId] = useState<string | null>(null);
   const [buscaMunicipio, setBuscaMunicipio] = useState('');
+  const [activeTab, setActiveTab] = useState('mapa');
 
   useEffect(() => {
     if (data) {
@@ -208,7 +209,7 @@ export default function EstadoDetalhe() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="mapa">
+      <Tabs defaultValue="mapa" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="geo-card border-none mb-4" style={{ background: '#161b22' }}>
           {['mapa', 'orgaos', 'clientes', 'municipios', 'notas'].map(tab => (
             <TabsTrigger
@@ -228,7 +229,9 @@ export default function EstadoDetalhe() {
             uf={ufUpper}
             clientesPorMunicipio={clientesMunicipio || {}}
             onMunicipioClick={(nome) => {
-              toast.info(`${nome} — veja a tab Municípios para detalhes`);
+              setActiveTab('municipios');
+              setBuscaMunicipio(nome);
+              toast.success(`${nome} selecionado — veja detalhes abaixo`);
             }}
           />
         </TabsContent>
@@ -280,12 +283,27 @@ export default function EstadoDetalhe() {
                             {c.contato_interno && <p className="text-xs" style={{ color: '#8b949e' }}>👤 {c.contato_interno}</p>}
                             {c.observacoes && <p className="text-xs mt-1 italic" style={{ color: '#8b949e' }}>{c.observacoes}</p>}
                           </div>
-                          <div className="flex gap-1">
-                            <button onClick={() => openEdit(c)} className="p-1.5 rounded-md transition-colors hover:bg-white/5">
-                              <Pencil className="h-3 w-3" style={{ color: '#8b949e' }} />
+                          <div className="flex items-center gap-0.5">
+                            {c.site_url && (
+                              <a href={c.site_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Abrir site">
+                                <ExternalLink className="h-3.5 w-3.5" style={{ color: GREEN }} />
+                              </a>
+                            )}
+                            {c.telefone && (
+                              <a href={`tel:${c.telefone}`} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Ligar">
+                                <Phone className="h-3.5 w-3.5" style={{ color: '#8b949e' }} />
+                              </a>
+                            )}
+                            {c.email && (
+                              <button onClick={() => { navigator.clipboard.writeText(c.email!); toast.success('Email copiado!'); }} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Copiar email">
+                                <Mail className="h-3.5 w-3.5" style={{ color: '#8b949e' }} />
+                              </button>
+                            )}
+                            <button onClick={() => openEdit(c)} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Editar">
+                              <Pencil className="h-3.5 w-3.5" style={{ color: '#8b949e' }} />
                             </button>
-                            <button onClick={() => removerContato.mutate({ id: c.id, uf: ufUpper })} className="p-1.5 rounded-md transition-colors hover:bg-red-500/10">
-                              <Trash2 className="h-3 w-3" style={{ color: '#f87171' }} />
+                            <button onClick={() => removerContato.mutate({ id: c.id, uf: ufUpper })} className="p-1.5 rounded-md transition-colors hover:bg-red-500/10" title="Excluir">
+                              <Trash2 className="h-3.5 w-3.5" style={{ color: '#f87171' }} />
                             </button>
                           </div>
                         </div>
