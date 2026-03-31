@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Settings, ChevronLeft, ChevronRight, Users, CheckSquare, X } from 'lucide-react';
+import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -47,6 +48,7 @@ import { useQueryClient } from '@tanstack/react-query';
 const MESES_NAV = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 export default function ContasPagar() {
+  const { podeCriar, podeEditar, podeExcluir, podeAprovar } = usePermissions();
   const now = new Date();
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -242,12 +244,16 @@ export default function ContasPagar() {
               <CheckSquare className="h-4 w-4 mr-1" />Selecionar
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => setFolhaModal(true)}>
-            <Users className="h-4 w-4 mr-1" />Importar Folha
-          </Button>
-          <Button size="sm" onClick={() => { setEditDespesa(null); setDespesaModal(true); }}>
-            <Plus className="h-4 w-4 mr-1" />Nova Despesa
-          </Button>
+          {podeCriar('contas_pagar') && (
+            <Button size="sm" variant="outline" onClick={() => setFolhaModal(true)}>
+              <Users className="h-4 w-4 mr-1" />Importar Folha
+            </Button>
+          )}
+          {podeCriar('contas_pagar') && (
+            <Button size="sm" onClick={() => { setEditDespesa(null); setDespesaModal(true); }}>
+              <Plus className="h-4 w-4 mr-1" />Nova Despesa
+            </Button>
+          )}
         </div>
       </div>
 
@@ -270,20 +276,23 @@ export default function ContasPagar() {
         <TabsContent value="categoria">
           <CategoriaAccordion
             lancamentos={lancamentos}
-            onEdit={l => { setEditDespesa(l); setDespesaModal(true); }}
-            onMarcarPago={l => setPagoModal(l)}
+            onEdit={podeEditar('contas_pagar') ? (l => { setEditDespesa(l); setDespesaModal(true); }) : undefined}
+            onMarcarPago={podeAprovar('contas_pagar') ? (l => setPagoModal(l)) : undefined}
           />
         </TabsContent>
 
         <TabsContent value="lista">
           <ContasPagarLista
             lancamentos={lancamentos}
-            onEdit={l => { setEditDespesa(l); setDespesaModal(true); }}
-            onMarcarPago={l => setPagoModal(l)}
-            onDelete={handleDelete}
+            onEdit={podeEditar('contas_pagar') ? (l => { setEditDespesa(l); setDespesaModal(true); }) : (() => {})}
+            onMarcarPago={podeAprovar('contas_pagar') ? (l => setPagoModal(l)) : (() => {})}
+            onDelete={podeExcluir('contas_pagar') ? handleDelete : (() => {})}
             selectionMode={selectionMode}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
+            hideEdit={!podeEditar('contas_pagar')}
+            hideDelete={!podeExcluir('contas_pagar')}
+            hideApprove={!podeAprovar('contas_pagar')}
           />
         </TabsContent>
 

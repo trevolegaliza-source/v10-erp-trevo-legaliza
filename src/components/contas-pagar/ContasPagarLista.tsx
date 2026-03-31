@@ -18,6 +18,9 @@ interface Props {
   selectionMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
+  hideEdit?: boolean;
+  hideDelete?: boolean;
+  hideApprove?: boolean;
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -29,7 +32,7 @@ function getStatusBadge(l: any) {
   return <Badge className="bg-warning/15 text-warning border-0">Pendente</Badge>;
 }
 
-export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, onDelete, selectionMode, selectedIds, onToggleSelect }: Props) {
+export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, onDelete, selectionMode, selectedIds, onToggleSelect, hideEdit, hideDelete, hideApprove }: Props) {
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -136,17 +139,21 @@ export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, on
                   <TableCell>{getStatusBadge(l)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      {l.status === 'pendente' && (
+                      {!hideApprove && l.status === 'pendente' && (
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
                           <CheckCircle className="h-3.5 w-3.5 text-primary" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(l)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
+                      {!hideEdit && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {!hideDelete && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(l)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
