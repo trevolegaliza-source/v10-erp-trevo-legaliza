@@ -244,12 +244,16 @@ export default function ContasPagar() {
               <CheckSquare className="h-4 w-4 mr-1" />Selecionar
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => setFolhaModal(true)}>
-            <Users className="h-4 w-4 mr-1" />Importar Folha
-          </Button>
-          <Button size="sm" onClick={() => { setEditDespesa(null); setDespesaModal(true); }}>
-            <Plus className="h-4 w-4 mr-1" />Nova Despesa
-          </Button>
+          {podeCriar('contas_pagar') && (
+            <Button size="sm" variant="outline" onClick={() => setFolhaModal(true)}>
+              <Users className="h-4 w-4 mr-1" />Importar Folha
+            </Button>
+          )}
+          {podeCriar('contas_pagar') && (
+            <Button size="sm" onClick={() => { setEditDespesa(null); setDespesaModal(true); }}>
+              <Plus className="h-4 w-4 mr-1" />Nova Despesa
+            </Button>
+          )}
         </div>
       </div>
 
