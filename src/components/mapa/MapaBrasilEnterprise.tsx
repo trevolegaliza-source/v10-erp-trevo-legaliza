@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { useNavigate } from 'react-router-dom';
+import { geoCache } from '@/lib/geo-cache';
 
 export interface EstadoData {
   uf: string;
