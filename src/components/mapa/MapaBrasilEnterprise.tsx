@@ -343,6 +343,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
           .attr('stroke-width', 2)
           .attr('filter', 'url(#glow-hover)');
 
+        // Notify parent for dynamic KPIs
+        if (onHoverRef.current) onHoverRef.current(uf);
+
         if (tooltipRef.current && containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
           tooltipRef.current.style.display = 'block';
