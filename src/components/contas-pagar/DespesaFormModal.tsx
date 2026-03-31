@@ -15,6 +15,7 @@ import { STORAGE_BUCKETS } from '@/constants/storage';
 import { toast } from 'sonner';
 import { fetchFeriadosNacionais, proximoDiaUtil } from '@/lib/brasil-api';
 import type { FeriadoNacional } from '@/lib/brasil-api';
+import { useQueryClient } from '@tanstack/react-query';
 import * as LucideIcons from 'lucide-react';
 
 interface Props {
