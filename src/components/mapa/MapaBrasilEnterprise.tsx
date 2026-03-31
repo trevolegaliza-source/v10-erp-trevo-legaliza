@@ -64,7 +64,7 @@ function getColor(uf: string, dados: EstadoData[]): string {
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
+export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
