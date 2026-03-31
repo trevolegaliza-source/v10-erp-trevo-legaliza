@@ -69,7 +69,7 @@ function getMunNome(d: any): string {
   return d.properties?.name || d.properties?.nome || d.properties?.NM_MUN || 'Município';
 }
 
-export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover, clientesPorCidade }: Props) {
+export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover, clientesPorCidade, onActiveUFChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
