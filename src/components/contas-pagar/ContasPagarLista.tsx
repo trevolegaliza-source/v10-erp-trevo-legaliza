@@ -18,6 +18,9 @@ interface Props {
   selectionMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
+  hideEdit?: boolean;
+  hideDelete?: boolean;
+  hideApprove?: boolean;
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
