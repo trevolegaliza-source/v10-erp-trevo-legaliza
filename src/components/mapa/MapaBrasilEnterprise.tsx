@@ -433,10 +433,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   }, [geoData, dadosEstados, navigate, onEstadoClick, zoomToEstado]);
 
   const handleZoom = (factor: number) => {
-    if (!svgRef.current) return;
+    if (!svgRef.current || !zoomBehaviorRef.current) return;
     const svg = d3.select(svgRef.current);
-    const zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.5, 8]);
-    svg.transition().duration(300).call(zoom.scaleBy as any, factor);
+    svg.transition().duration(300).call(zoomBehaviorRef.current.scaleBy as any, factor);
   };
 
   if (loading) {
