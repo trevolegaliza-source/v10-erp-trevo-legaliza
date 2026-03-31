@@ -166,7 +166,6 @@ export function useMarcarPago() {
           }).in('id', vtVrIds);
           if (error) throw error;
         }
-        if (error) throw error;
       } else {
         const { error } = await supabase.from('lancamentos').update({
           status: 'pago' as any,
