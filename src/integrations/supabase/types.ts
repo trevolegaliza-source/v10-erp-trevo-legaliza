@@ -146,6 +146,7 @@ export type Database = {
           colaborador_id: string
           conclusao_trimestral: string | null
           created_at: string | null
+          empresa_id: string | null
           feedback: string | null
           id: string
           mes: number
@@ -156,6 +157,7 @@ export type Database = {
           colaborador_id: string
           conclusao_trimestral?: string | null
           created_at?: string | null
+          empresa_id?: string | null
           feedback?: string | null
           id?: string
           mes: number
@@ -166,6 +168,7 @@ export type Database = {
           colaborador_id?: string
           conclusao_trimestral?: string | null
           created_at?: string | null
+          empresa_id?: string | null
           feedback?: string | null
           id?: string
           mes?: number
@@ -347,6 +350,7 @@ export type Database = {
           data_inicio: string
           descricao: string
           dia_vencimento: number
+          empresa_id: string | null
           fornecedor: string | null
           id: string
           observacoes: string | null
@@ -363,6 +367,7 @@ export type Database = {
           data_inicio?: string
           descricao: string
           dia_vencimento?: number
+          empresa_id?: string | null
           fornecedor?: string | null
           id?: string
           observacoes?: string | null
@@ -379,6 +384,7 @@ export type Database = {
           data_inicio?: string
           descricao?: string
           dia_vencimento?: number
+          empresa_id?: string | null
           fornecedor?: string | null
           id?: string
           observacoes?: string | null
@@ -445,6 +451,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           data_envio: string | null
+          empresa_id: string | null
           enviado: boolean
           filename: string
           id: string
@@ -465,6 +472,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           data_envio?: string | null
+          empresa_id?: string | null
           enviado?: boolean
           filename: string
           id?: string
@@ -485,6 +493,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           data_envio?: string | null
+          empresa_id?: string | null
           enviado?: boolean
           filename?: string
           id?: string
@@ -818,6 +827,7 @@ export type Database = {
           cliente_id: string
           created_at: string | null
           descricao: string
+          empresa_id: string | null
           id: string
           processo_id: string | null
           saldo_anterior: number
@@ -829,6 +839,7 @@ export type Database = {
           cliente_id: string
           created_at?: string | null
           descricao: string
+          empresa_id?: string | null
           id?: string
           processo_id?: string | null
           saldo_anterior: number
@@ -840,6 +851,7 @@ export type Database = {
           cliente_id?: string
           created_at?: string | null
           descricao?: string
+          empresa_id?: string | null
           id?: string
           processo_id?: string | null
           saldo_anterior?: number
@@ -958,6 +970,7 @@ export type Database = {
           billing_trigger: string
           cliente_id: string
           created_at: string | null
+          empresa_id: string | null
           fixed_price: number
           id: string
           is_custom: boolean
@@ -971,6 +984,7 @@ export type Database = {
           billing_trigger?: string
           cliente_id: string
           created_at?: string | null
+          empresa_id?: string | null
           fixed_price?: number
           id?: string
           is_custom?: boolean
@@ -984,6 +998,7 @@ export type Database = {
           billing_trigger?: string
           cliente_id?: string
           created_at?: string | null
+          empresa_id?: string | null
           fixed_price?: number
           id?: string
           is_custom?: boolean
@@ -1056,6 +1071,7 @@ export type Database = {
           comprovante_url: string | null
           created_at: string | null
           descricao: string
+          empresa_id: string | null
           id: string
           processo_id: string
           updated_at: string | null
@@ -1066,6 +1082,7 @@ export type Database = {
           comprovante_url?: string | null
           created_at?: string | null
           descricao: string
+          empresa_id?: string | null
           id?: string
           processo_id: string
           updated_at?: string | null
@@ -1076,6 +1093,7 @@ export type Database = {
           comprovante_url?: string | null
           created_at?: string | null
           descricao?: string
+          empresa_id?: string | null
           id?: string
           processo_id?: string
           updated_at?: string | null
@@ -1094,6 +1112,7 @@ export type Database = {
       webhook_configs: {
         Row: {
           created_at: string | null
+          empresa_id: string | null
           id: string
           key: string
           updated_at: string | null
@@ -1101,6 +1120,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          empresa_id?: string | null
           id?: string
           key: string
           updated_at?: string | null
@@ -1108,6 +1128,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          empresa_id?: string | null
           id?: string
           key?: string
           updated_at?: string | null
