@@ -89,7 +89,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover, cli
   const navigate = useNavigate();
 
   useEffect(() => { onHoverRef.current = onHover; }, [onHover]);
-  useEffect(() => { activeUFRef.current = activeUF; }, [activeUF]);
+  useEffect(() => { activeUFRef.current = activeUF; onActiveUFChange?.(activeUF); }, [activeUF, onActiveUFChange]);
   useEffect(() => { clientesPorCidadeRef.current = clientesPorCidade; }, [clientesPorCidade]);
 
   // Municipalities with clients for sidebar during drill-down
