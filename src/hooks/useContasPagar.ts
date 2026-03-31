@@ -136,20 +136,36 @@ export function useMarcarPago() {
         .single();
       if (fetchError) throw fetchError;
 
-      const isVtVr = target.subcategoria === 'Vale Transporte (VT)' || target.subcategoria === 'Vale Refeição (VR)';
+      const sub = (target.subcategoria || '').toLowerCase();
+      const isVtVr = sub.includes('vt') || sub.includes('vr') || sub.includes('vale transporte') || sub.includes('vale refeição') || sub.includes('transporte') || sub.includes('refeição');
 
       if (isVtVr && target.colaborador_id && target.competencia_mes && target.competencia_ano) {
         // Mark both VT and VR for the same collaborator/month
-        const { error } = await supabase.from('lancamentos').update({
-          status: 'pago' as any,
-          data_pagamento,
-          comprovante_url: comprovante_url || null,
-          updated_at: new Date().toISOString(),
-        })
+        // First get all VT/VR ids for this collaborator/month
+        const { data: vtVrItems, error: fetchVtVrError } = await supabase
+          .from('lancamentos')
+          .select('id, subcategoria')
           .eq('colaborador_id', target.colaborador_id)
           .eq('competencia_mes', target.competencia_mes)
-          .eq('competencia_ano', target.competencia_ano)
-          .in('subcategoria', ['Vale Transporte (VT)', 'Vale Refeição (VR)']);
+          .eq('competencia_ano', target.competencia_ano);
+        if (fetchVtVrError) throw fetchVtVrError;
+
+        const vtVrIds = (vtVrItems || [])
+          .filter((item: any) => {
+            const s = (item.subcategoria || '').toLowerCase();
+            return s.includes('vt') || s.includes('vr') || s.includes('vale transporte') || s.includes('vale refeição') || s.includes('transporte') || s.includes('refeição');
+          })
+          .map((item: any) => item.id);
+
+        if (vtVrIds.length > 0) {
+          const { error } = await supabase.from('lancamentos').update({
+            status: 'pago' as any,
+            data_pagamento,
+            comprovante_url: comprovante_url || null,
+            updated_at: new Date().toISOString(),
+          }).in('id', vtVrIds);
+          if (error) throw error;
+        }
         if (error) throw error;
       } else {
         const { error } = await supabase.from('lancamentos').update({
