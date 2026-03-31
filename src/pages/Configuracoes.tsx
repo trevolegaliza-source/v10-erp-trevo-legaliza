@@ -139,59 +139,7 @@ export default function Configuracoes() {
         </TabsContent>
 
         <TabsContent value="rbac">
-          <Card className="border-border/60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base"><Shield className="h-4 w-4 text-primary" />Controle de Acesso (RBAC)</CardTitle>
-              <CardDescription>Níveis de acesso do sistema</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                { role: 'Master', desc: 'Acesso total a finanças, configurações e logs', color: 'bg-destructive/10 text-destructive' },
-                { role: 'Colaborador', desc: 'Gestão operacional do Kanban e anexos', color: 'bg-info/10 text-info' },
-                { role: 'Financeiro', desc: 'Acesso a contas a pagar/receber e relatórios', color: 'bg-warning/10 text-warning' },
-                { role: 'Operacional', desc: 'Visualização e movimentação de processos', color: 'bg-primary/10 text-primary' },
-                { role: 'Cliente', desc: 'Visualiza apenas seus processos e relatórios', color: 'bg-success/10 text-success' },
-              ].map((item) => (
-                <div key={item.role} className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <Badge className={`${item.color} border-0`}>{item.role}</Badge>
-                    <span className="text-sm text-muted-foreground">{item.desc}</span>
-                  </div>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs">Editar</Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="colaboradores">
-          <Card className="border-border/60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base"><UserCog className="h-4 w-4 text-primary" />Colaboradores</CardTitle>
-              <CardDescription>Gerencie funcionários e permissões</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                {[
-                  { name: 'Ana Silva', role: 'Operacional', email: 'ana@trevo.com' },
-                  { name: 'Carlos Oliveira', role: 'Financeiro', email: 'carlos@trevo.com' },
-                  { name: 'Bruno Santos', role: 'Operacional', email: 'bruno@trevo.com' },
-                ].map((colab) => (
-                  <div key={colab.email} className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium">{colab.name}</p>
-                      <p className="text-xs text-muted-foreground">{colab.email}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-[10px]">{colab.role}</Badge>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs">Editar</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Button size="sm"><Users className="h-4 w-4 mr-1" />Adicionar Colaborador</Button>
-            </CardContent>
-          </Card>
+          <GestaoUsuarios />
         </TabsContent>
 
         <TabsContent value="webhooks">
