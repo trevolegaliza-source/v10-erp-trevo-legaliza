@@ -208,6 +208,16 @@ export default function Dashboard() {
   const animRecebido = useCountUp(calc?.totalRecebido ?? 0);
   const animAtivos = useCountUp(calc?.processosAtivos ?? 0, 500);
 
+  // Show fallback for users with no permissions
+  if (!permsLoading && !podeVer('dashboard') && !isMaster()) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-3">
+        <h2 className="text-xl font-semibold text-foreground">Bem-vindo ao sistema.</h2>
+        <p className="text-muted-foreground">Aguarde seu administrador configurar seu acesso.</p>
+      </div>
+    );
+  }
+
   if (isLoading || !calc) {
     return (
       <div className="space-y-6">
