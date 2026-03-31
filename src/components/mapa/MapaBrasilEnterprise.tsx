@@ -169,9 +169,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
       })
       .on('mouseout', function () {
         d3.select(this)
-          .attr('fill', '#0d1117')
-          .attr('stroke', GREEN_BRIGHT)
-          .attr('stroke-width', 0.15 / parentScale)
+          .attr('fill', '#111820')
+          .attr('stroke', 'rgba(34, 197, 94, 0.3)')
+          .attr('stroke-width', 0.3 / parentScale)
           .attr('filter', 'none');
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
       })
