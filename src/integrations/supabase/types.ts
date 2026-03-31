@@ -985,6 +985,53 @@ export type Database = {
           },
         ]
       }
+      user_permissions: {
+        Row: {
+          created_at: string | null
+          empresa_id: string
+          id: string
+          modulo: string
+          pode_aprovar: boolean | null
+          pode_criar: boolean | null
+          pode_editar: boolean | null
+          pode_excluir: boolean | null
+          pode_ver: boolean | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          empresa_id: string
+          id?: string
+          modulo: string
+          pode_aprovar?: boolean | null
+          pode_criar?: boolean | null
+          pode_editar?: boolean | null
+          pode_excluir?: boolean | null
+          pode_ver?: boolean | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          empresa_id?: string
+          id?: string
+          modulo?: string
+          pode_aprovar?: boolean | null
+          pode_criar?: boolean | null
+          pode_editar?: boolean | null
+          pode_excluir?: boolean | null
+          pode_ver?: boolean | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       valores_adicionais: {
         Row: {
           anexo_url: string | null
@@ -1063,6 +1110,7 @@ export type Database = {
         Returns: number
       }
       calcular_vencimento: { Args: { p_cliente_id: string }; Returns: string }
+      get_user_empresa_id: { Args: never; Returns: string }
     }
     Enums: {
       status_financeiro: "pendente" | "pago" | "atrasado" | "cancelado"
