@@ -443,8 +443,13 @@ function DateGroupHeader({ dateStr, total, items, urgency }: { dateStr: string; 
   );
 }
 
+function isVtVr(l: any): boolean {
+  const sub = (l.subcategoria || '').toLowerCase();
+  return sub.includes('vt') || sub.includes('vr') || sub.includes('vale transporte') || sub.includes('vale refeição') || sub.includes('transporte') || sub.includes('refeição');
+}
+
 function getSubcatLabel(l: any): string {
-  if (l.subcategoria === 'Vale Transporte (VT)' || l.subcategoria === 'Vale Refeição (VR)') return 'BENEFÍCIOS';
+  if (isVtVr(l)) return 'BENEFÍCIOS';
   return (l.subcategoria || 'OUTROS').toUpperCase();
 }
 
@@ -490,8 +495,12 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
     vtVrRaw.forEach(l => {
       const key = l.colaborador_id || 'none';
       if (!byColab[key]) byColab[key] = { vt: null, vr: null };
-      if (l.subcategoria === 'Vale Transporte (VT)') byColab[key].vt = l;
-      if (l.subcategoria === 'Vale Refeição (VR)') byColab[key].vr = l;
+      const sub = (l.subcategoria || '').toLowerCase();
+      if (sub.includes('vt') || sub.includes('vale transporte') || sub.includes('transporte')) {
+        byColab[key].vt = l;
+      } else if (sub.includes('vr') || sub.includes('vale refeição') || sub.includes('refeição')) {
+        byColab[key].vr = l;
+      }
     });
     return Object.values(byColab);
   };
@@ -510,8 +519,8 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
     });
 
     // Separate VT/VR for unified display
-    const vtVrItems = sorted.filter(l => l.subcategoria === 'Vale Transporte (VT)' || l.subcategoria === 'Vale Refeição (VR)');
-    const regularItems = sorted.filter(l => l.subcategoria !== 'Vale Transporte (VT)' && l.subcategoria !== 'Vale Refeição (VR)');
+    const vtVrItems = sorted.filter(l => isVtVr(l));
+    const regularItems = sorted.filter(l => !isVtVr(l));
 
     // Determine where to insert beneficios rows (at the position of Benefícios in SUBCATEGORIA_ORDER)
     const beneficiosRows = vtVrItems.length > 0 ? buildBeneficiosRows(vtVrItems) : [];
