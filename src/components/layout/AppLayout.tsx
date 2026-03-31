@@ -68,8 +68,8 @@ export function AppLayout() {
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:flex flex-col">
-                <span className="text-xs font-medium leading-none">{userName}</span>
-                <span className="text-[10px] text-muted-foreground">Administrador</span>
+                <span className="text-xs font-medium leading-none">{displayName}</span>
+                <span className="text-[10px] text-muted-foreground">{roleLabel}</span>
               </div>
             </div>
           </div>
