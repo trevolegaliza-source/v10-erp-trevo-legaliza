@@ -50,7 +50,7 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, onMunicipi
     } catch (_) { /* ignore */ }
   }, []);
 
-  // Load municipality GeoJSON (in-memory cache, qualidade=minima for smaller payload)
+  // Load municipality GeoJSON from tbrugz/geodata-br (reliable, consistent format)
   useEffect(() => {
     const fetchMunicipios = async () => {
       setLoading(true);
@@ -63,12 +63,15 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, onMunicipi
         const codigoIBGE = UF_TO_IBGE[uf];
         if (!codigoIBGE) throw new Error('UF não encontrada');
 
-        const res = await fetch(
-          `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${codigoIBGE}?formato=application/vnd.geo+json&qualidade=intermediaria&intrarregiao=municipio`
-        );
-        if (!res.ok) throw new Error(`API IBGE erro: ${res.status}`);
+        const url = `https://raw.githubusercontent.com/tbrugz/geodata-br/master/geojson/geojs-${codigoIBGE}-mun.json`;
+        console.log('Carregando municípios de:', url);
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Erro ao carregar: ${res.status}`);
         const data = await res.json();
         if (!data.features?.length) throw new Error('Sem municípios');
+
+        console.log(`Carregados ${data.features.length} municípios para ${uf}`, data.features[0]?.properties);
 
         geoCache.set(cacheKey, data);
         setGeoData(data);
