@@ -2,177 +2,125 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEstadosResumo } from '@/hooks/useInteligenciaGeografica';
 import { UF_NOMES } from '@/constants/estados-brasil';
-import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MapPin, Users, Kanban, DollarSign, ChevronRight } from 'lucide-react';
-import BrazilSVG from '@/assets/brazil-map';
-import { useState } from 'react';
+import { MapaBrasilEnterprise, type EstadoData } from '@/components/mapa/MapaBrasilEnterprise';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-function getCorEstado(qtd: number): string {
-  if (qtd === 0) return 'hsl(var(--muted))';
-  if (qtd <= 2) return '#bbf7d0';
-  if (qtd <= 5) return '#4ade80';
-  if (qtd <= 10) return '#22c55e';
-  return '#15803d';
-}
 
 export default function InteligenciaGeografica() {
   const navigate = useNavigate();
   const { data: estadoData, isLoading } = useEstadosResumo();
-  const [tooltip, setTooltip] = useState<{ uf: string; x: number; y: number } | null>(null);
 
-  const ranking = useMemo(() => {
+  const estadosComDados: EstadoData[] = useMemo(() => {
     if (!estadoData) return [];
-    return Object.values(estadoData)
-      .sort((a, b) => b.qtdClientes - a.qtdClientes)
-      .filter(e => e.qtdClientes > 0);
+    return Object.keys(UF_NOMES).map(uf => ({
+      uf,
+      nome: UF_NOMES[uf],
+      clientes: estadoData[uf]?.qtdClientes || 0,
+      processos: estadoData[uf]?.qtdProcessos || 0,
+      receita: estadoData[uf]?.receita || 0,
+    }));
   }, [estadoData]);
 
+  const ranking = useMemo(() => {
+    return estadosComDados.filter(e => e.clientes > 0).sort((a, b) => b.clientes - a.clientes);
+  }, [estadosComDados]);
+
   const totals = useMemo(() => {
-    if (!estadoData) return { clientes: 0, processos: 0, estados: 0 };
+    if (!estadoData) return { clientes: 0, processos: 0, estados: 0, receita: 0 };
     const vals = Object.values(estadoData);
     return {
       clientes: vals.reduce((s, e) => s + e.qtdClientes, 0),
       processos: vals.reduce((s, e) => s + e.qtdProcessos, 0),
       estados: vals.filter(e => e.qtdClientes > 0).length,
+      receita: vals.reduce((s, e) => s + e.receita, 0),
     };
   }, [estadoData]);
-
-  const colors = useMemo(() => {
-    const c: Record<string, string> = {};
-    Object.keys(UF_NOMES).forEach(uf => {
-      c[uf] = getCorEstado(estadoData?.[uf]?.qtdClientes || 0);
-    });
-    return c;
-  }, [estadoData]);
-
-  const handleMouseEnter = (uf: string, e: React.MouseEvent) => {
-    const rect = (e.currentTarget as SVGElement).closest('svg')?.getBoundingClientRect();
-    if (!rect) return;
-    setTooltip({ uf, x: e.clientX - rect.left, y: e.clientY - rect.top });
-  };
 
   if (isLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-80" />
-        <div className="grid grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        <div className="grid grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
         <Skeleton className="h-96 rounded-xl" />
       </div>
     );
   }
 
+  const kpis = [
+    { label: 'Estados Ativos', valor: totals.estados, Icon: MapPin },
+    { label: 'Clientes', valor: totals.clientes, Icon: Users },
+    { label: 'Processos', valor: totals.processos, Icon: Kanban },
+    { label: 'Receita', valor: fmt(totals.receita), Icon: DollarSign },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="geo-container p-6 rounded-xl space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <MapPin className="h-6 w-6 text-primary" /> Inteligência Geográfica
+        <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: '#e6edf3' }}>
+          <MapPin className="h-6 w-6 geo-accent" /> Inteligência Geográfica
         </h1>
-        <p className="text-sm text-muted-foreground">CRM Territorial — Clientes, órgãos e contatos por estado</p>
+        <p className="text-sm geo-muted">CRM Territorial — Clientes, órgãos e contatos por estado</p>
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <MapPin className="h-4 w-4 text-primary" />
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">Estados ativos</span>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {kpis.map(kpi => (
+          <div key={kpi.label} className="geo-card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <kpi.Icon className="h-4 w-4 geo-accent" />
+              <span className="text-xs font-bold uppercase tracking-wider geo-muted">{kpi.label}</span>
+            </div>
+            <p className="text-2xl font-extrabold" style={{ color: '#e6edf3' }}>{kpi.valor}</p>
           </div>
-          <p className="text-2xl font-bold">{totals.estados}</p>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Users className="h-4 w-4 text-blue-500" />
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">Clientes</span>
-          </div>
-          <p className="text-2xl font-bold">{totals.clientes}</p>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Kanban className="h-4 w-4 text-amber-500" />
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">Processos</span>
-          </div>
-          <p className="text-2xl font-bold">{totals.processos}</p>
-        </Card>
+        ))}
       </div>
 
       {/* Map + Ranking */}
       <div className="flex flex-col lg:flex-row gap-6">
-        <Card className="flex-1 lg:flex-[7] p-4">
-          <div className="relative">
-            <BrazilSVG
-              colors={colors}
-              onStateMouseEnter={handleMouseEnter}
-              onStateMouseLeave={() => setTooltip(null)}
-              onStateClick={(uf) => navigate(`/inteligencia-geografica/${uf}`)}
-            />
-            {tooltip && estadoData && (
-              <div
-                className="absolute z-50 pointer-events-none px-3 py-2 rounded-lg border bg-popover text-popover-foreground shadow-md text-sm"
-                style={{ left: tooltip.x + 12, top: tooltip.y - 10 }}
-              >
-                <p className="font-semibold">{UF_NOMES[tooltip.uf]} ({tooltip.uf})</p>
-                <p className="text-xs text-muted-foreground">
-                  {estadoData[tooltip.uf]?.qtdClientes || 0} clientes · {estadoData[tooltip.uf]?.qtdProcessos || 0} processos
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {fmt(estadoData[tooltip.uf]?.receita || 0)}
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
+        <div className="flex-1 lg:flex-[7]">
+          <MapaBrasilEnterprise
+            dadosEstados={estadosComDados}
+            onEstadoClick={(uf) => navigate(`/inteligencia-geografica/${uf}`)}
+          />
+        </div>
 
-        <Card className="lg:flex-[3] p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Ranking por estado</h3>
+        <div className="geo-card p-4 lg:flex-[3]">
+          <h3 className="text-xs font-bold uppercase tracking-wider geo-accent mb-4">Ranking por Estado</h3>
           {ranking.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Nenhum cliente cadastrado</p>
+            <p className="text-sm geo-muted text-center py-4">Nenhum cliente cadastrado</p>
           ) : (
-            <div className="space-y-2">
-              {ranking.slice(0, 10).map((e, i) => (
+            <div className="space-y-1">
+              {ranking.slice(0, 12).map((e, i) => (
                 <div
                   key={e.uf}
-                  className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-2 px-2 py-1.5 rounded-lg transition-colors"
+                  className="flex items-center justify-between py-2 px-3 rounded-lg cursor-pointer transition-colors"
+                  style={{ color: '#e6edf3' }}
                   onClick={() => navigate(`/inteligencia-geografica/${e.uf}`)}
+                  onMouseEnter={(ev) => (ev.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
+                  onMouseLeave={(ev) => (ev.currentTarget.style.background = 'transparent')}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-muted-foreground w-5">{i + 1}.</span>
-                    <span className="text-sm font-medium">{e.uf}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold geo-muted w-5">{i + 1}.</span>
+                    <span className="font-bold text-sm">{e.uf}</span>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{e.qtdClientes} cli</span>
-                    <span className="font-medium text-foreground">{fmt(e.receita)}</span>
-                    <ChevronRight className="h-3 w-3" />
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="geo-muted">{e.clientes} cli</span>
+                    <span className="geo-accent font-bold">{fmt(e.receita)}</span>
+                    <ChevronRight className="h-3 w-3 geo-muted" />
                   </div>
                 </div>
               ))}
-              {ranking.length > 10 && (
-                <p className="text-xs text-muted-foreground text-center pt-2">+ {ranking.length - 10} estados</p>
+              {ranking.length > 12 && (
+                <p className="text-xs geo-muted text-center pt-2">+ {ranking.length - 12} estados</p>
               )}
             </div>
           )}
-        </Card>
-      </div>
-
-      {/* Legenda */}
-      <div className="flex flex-wrap gap-4 items-center">
-        <span className="text-xs text-muted-foreground uppercase tracking-wider">Legenda:</span>
-        {[
-          { label: '10+', color: '#15803d' },
-          { label: '6-10', color: '#22c55e' },
-          { label: '3-5', color: '#4ade80' },
-          { label: '1-2', color: '#bbf7d0' },
-          { label: '0', color: 'hsl(var(--muted))' },
-        ].map(item => (
-          <div key={item.label} className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm border border-border/40" style={{ backgroundColor: item.color }} />
-            <span className="text-xs text-muted-foreground">{item.label}</span>
-          </div>
-        ))}
+        </div>
       </div>
     </div>
   );
