@@ -36,27 +36,41 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, onMunicipi
 
   useEffect(() => { clientesRef.current = clientesPorMunicipio; }, [clientesPorMunicipio]);
 
-  // Load municipality GeoJSON
+  // Clean up old sessionStorage keys
+  useEffect(() => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.startsWith('mun_geo') || key.startsWith('municipios_geo'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => sessionStorage.removeItem(k));
+    } catch (_) { /* ignore */ }
+  }, []);
+
+  // Load municipality GeoJSON (in-memory cache, qualidade=minima for smaller payload)
   useEffect(() => {
     const fetchMunicipios = async () => {
       setLoading(true);
       setError(null);
       try {
-        const cacheKey = `mun_geo_v2_${uf}`;
-        const cached = sessionStorage.getItem(cacheKey);
-        if (cached) { setGeoData(JSON.parse(cached)); setLoading(false); return; }
+        const cacheKey = `municipios_${uf}`;
+        const cached = geoCache.get(cacheKey);
+        if (cached) { setGeoData(cached); setLoading(false); return; }
 
         const codigoIBGE = UF_TO_IBGE[uf];
         if (!codigoIBGE) throw new Error('UF não encontrada');
 
         const res = await fetch(
-          `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${codigoIBGE}?formato=application/vnd.geo+json&qualidade=intermediaria&intrarregiao=municipio`
+          `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${codigoIBGE}?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=municipio`
         );
         if (!res.ok) throw new Error(`API IBGE erro: ${res.status}`);
         const data = await res.json();
         if (!data.features?.length) throw new Error('Sem municípios');
 
-        sessionStorage.setItem(cacheKey, JSON.stringify(data));
+        geoCache.set(cacheKey, data);
         setGeoData(data);
       } catch (err: any) {
         console.error('Erro municípios:', err);

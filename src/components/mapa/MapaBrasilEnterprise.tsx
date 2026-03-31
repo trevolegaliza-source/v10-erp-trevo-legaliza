@@ -47,17 +47,31 @@ export function MapaBrasilEnterprise({ dadosEstados, onHover }: Props) {
 
   useEffect(() => { onHoverRef.current = onHover; }, [onHover]);
 
-  // Load GeoJSON once
+  // Clean up old sessionStorage keys that may have filled quota
+  useEffect(() => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.startsWith('brasil_geo') || key.startsWith('mun_geo'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(k => sessionStorage.removeItem(k));
+    } catch (_) { /* ignore */ }
+  }, []);
+
+  // Load GeoJSON once (in-memory cache)
   useEffect(() => {
     const fetchGeo = async () => {
       try {
-        const cached = sessionStorage.getItem('brasil_geo_v2');
-        if (cached) { setGeoData(JSON.parse(cached)); setLoading(false); return; }
+        const cached = geoCache.get('brasil_estados');
+        if (cached) { setGeoData(cached); setLoading(false); return; }
         const res = await fetch(
           'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson'
         );
         const data = await res.json();
-        sessionStorage.setItem('brasil_geo_v2', JSON.stringify(data));
+        geoCache.set('brasil_estados', data);
         setGeoData(data);
       } catch (err) { console.error('Erro ao carregar GeoJSON:', err); }
       finally { setLoading(false); }
