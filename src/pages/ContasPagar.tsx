@@ -276,20 +276,23 @@ export default function ContasPagar() {
         <TabsContent value="categoria">
           <CategoriaAccordion
             lancamentos={lancamentos}
-            onEdit={l => { setEditDespesa(l); setDespesaModal(true); }}
-            onMarcarPago={l => setPagoModal(l)}
+            onEdit={podeEditar('contas_pagar') ? (l => { setEditDespesa(l); setDespesaModal(true); }) : undefined}
+            onMarcarPago={podeAprovar('contas_pagar') ? (l => setPagoModal(l)) : undefined}
           />
         </TabsContent>
 
         <TabsContent value="lista">
           <ContasPagarLista
             lancamentos={lancamentos}
-            onEdit={l => { setEditDespesa(l); setDespesaModal(true); }}
-            onMarcarPago={l => setPagoModal(l)}
-            onDelete={handleDelete}
+            onEdit={podeEditar('contas_pagar') ? (l => { setEditDespesa(l); setDespesaModal(true); }) : (() => {})}
+            onMarcarPago={podeAprovar('contas_pagar') ? (l => setPagoModal(l)) : (() => {})}
+            onDelete={podeExcluir('contas_pagar') ? handleDelete : (() => {})}
             selectionMode={selectionMode}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
+            hideEdit={!podeEditar('contas_pagar')}
+            hideDelete={!podeExcluir('contas_pagar')}
+            hideApprove={!podeAprovar('contas_pagar')}
           />
         </TabsContent>
 
