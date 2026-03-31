@@ -141,8 +141,8 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
       .on('mouseover', function (event: any, d: any) {
         d3.select(this)
           .attr('fill', GREEN_BRIGHT)
-          .attr('stroke', GREEN_BRIGHT)
-          .attr('stroke-width', 1 / parentScale)
+          .attr('stroke', '#4ade80')
+          .attr('stroke-width', 0.8 / parentScale)
           .attr('filter', 'url(#glow-hover)');
 
         const nome = d.properties?.name || d.properties?.nome || d.properties?.NM_MUN || 'Município';
