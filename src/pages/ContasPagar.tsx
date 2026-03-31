@@ -48,6 +48,7 @@ import { useQueryClient } from '@tanstack/react-query';
 const MESES_NAV = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 export default function ContasPagar() {
+  const { podeCriar, podeEditar, podeExcluir, podeAprovar } = usePermissions();
   const now = new Date();
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1);
   const [viewYear, setViewYear] = useState(now.getFullYear());
