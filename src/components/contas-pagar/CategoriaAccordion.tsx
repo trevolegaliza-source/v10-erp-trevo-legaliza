@@ -519,8 +519,8 @@ function FolhaSubgrupos({ items, onEdit, onMarcarPago }: { items: any[]; onEdit:
     });
 
     // Separate VT/VR for unified display
-    const vtVrItems = sorted.filter(l => l.subcategoria === 'Vale Transporte (VT)' || l.subcategoria === 'Vale Refeição (VR)');
-    const regularItems = sorted.filter(l => l.subcategoria !== 'Vale Transporte (VT)' && l.subcategoria !== 'Vale Refeição (VR)');
+    const vtVrItems = sorted.filter(l => isVtVr(l));
+    const regularItems = sorted.filter(l => !isVtVr(l));
 
     // Determine where to insert beneficios rows (at the position of Benefícios in SUBCATEGORIA_ORDER)
     const beneficiosRows = vtVrItems.length > 0 ? buildBeneficiosRows(vtVrItems) : [];
