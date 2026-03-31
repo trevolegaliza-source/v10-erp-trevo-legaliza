@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { MapaEstadoMunicipios } from '@/components/mapa/MapaEstadoMunicipios';
+import { toast } from 'sonner';
 import { UF_NOMES } from '@/constants/estados-brasil';
 import {
   useEstadoDetalhe, useSalvarContato, useRemoverContato,
