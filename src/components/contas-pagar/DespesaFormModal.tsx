@@ -67,6 +67,7 @@ function calcularParcelas(
 }
 
 export default function DespesaFormModal({ open, onClose, onSave, editData, defaultMes, defaultAno }: Props) {
+  const queryClient = useQueryClient();
   const { data: colaboradores } = useColaboradores();
   const activeColabs = (colaboradores || []).filter(c => c.status === 'ativo');
 
