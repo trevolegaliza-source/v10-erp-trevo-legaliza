@@ -520,12 +520,18 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         ))}
       </div>
 
-      {/* Drill-down hint — GREEN */}
+      {/* Ver detalhes button */}
       {activeUF && !loadingMunicipios && (
-        <div className="absolute bottom-4 right-4 text-xs px-3 py-1.5 rounded-lg"
-          style={{ background: '#161b22', border: '1px solid #30363d', color: '#8b949e', pointerEvents: 'none' }}>
-          Clique novamente em <span style={{ color: GREEN_BRIGHT, fontWeight: 700 }}>{activeUF}</span> para abrir detalhes
-        </div>
+        <button
+          onClick={() => navigate(`/inteligencia-geografica/${activeUF}`)}
+          className="absolute top-4 right-16 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all hover:scale-105"
+          style={{
+            background: GREEN_BRIGHT, color: '#0b0e14',
+            boxShadow: '0 0 15px rgba(34, 197, 94, 0.3)', zIndex: 10,
+          }}
+        >
+          Ver detalhes de {UF_NOMES[activeUF]} →
+        </button>
       )}
     </div>
   );
