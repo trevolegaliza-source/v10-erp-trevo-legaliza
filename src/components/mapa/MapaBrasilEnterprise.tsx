@@ -278,15 +278,15 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
 
     const svg = d3.select(svgRef.current);
     const width = containerRef.current.clientWidth;
-    const height = Math.max(500, width * 0.85);
+    const height = Math.max(450, width * 0.7);
     dimensionsRef.current = { width, height };
 
     svg.attr('viewBox', `0 0 ${width} ${height}`);
     svg.selectAll('*').remove();
 
-    const projection = d3.geoMercator().fitSize([width * 0.95, height * 0.95], geoData);
-    const [tx, ty] = projection.translate();
-    projection.translate([tx + width * 0.025, ty + height * 0.025]);
+    const padding = 40;
+    const projection = d3.geoMercator()
+      .fitExtent([[padding, padding], [width - padding, height - padding]], geoData);
     projectionRef.current = projection;
 
     const path = d3.geoPath().projection(projection);
@@ -295,9 +295,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
     const g = svg.append('g') as d3.Selection<SVGGElement, unknown, null, undefined>;
     gRef.current = g;
 
-    // Zoom
+    // Zoom — allow zoom out to 0.5
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([1, 8])
+      .scaleExtent([0.5, 8])
       .on('zoom', (event) => g.attr('transform', event.transform));
     svg.call(zoom);
 
