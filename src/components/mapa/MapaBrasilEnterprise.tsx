@@ -78,6 +78,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   const pathRef = useRef<any>(null);
   const dimensionsRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const activeUFRef = useRef<string | null>(null);
+  const zoomBehaviorRef = useRef<any>(null);
   const onHoverRef = useRef<HoverCallback | undefined>(onHover);
   const navigate = useNavigate();
 
@@ -182,40 +183,46 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   }, []);
 
   const zoomToEstado = useCallback(async (uf: string, feature: any) => {
-    if (!svgRef.current || !gRef.current || !pathRef.current) return;
+    if (!svgRef.current || !gRef.current || !pathRef.current) {
+      console.error('SVG ou GeoData não disponível');
+      return;
+    }
 
-    const g = gRef.current;
-    const pathGenerator = pathRef.current;
-    const { width, height } = dimensionsRef.current;
-
-    const [[x0, y0], [x1, y1]] = pathGenerator.bounds(feature);
-    const dx = x1 - x0;
-    const dy = y1 - y0;
-    const x = (x0 + x1) / 2;
-    const y = (y0 + y1) / 2;
-    const scale = Math.max(1, Math.min(8, 0.9 / Math.max(dx / width, dy / height)));
-    const translate = [width / 2 - scale * x, height / 2 - scale * y];
-
-    g.transition()
-      .duration(750)
-      .attr('transform', `translate(${translate[0]},${translate[1]}) scale(${scale})`);
-
-    g.selectAll('path.estado')
-      .transition()
-      .duration(750)
-      .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 0.15 : 0.08);
-
-    g.selectAll('text.estado-label')
-      .transition()
-      .duration(750)
-      .attr('opacity', 0);
-
-    setActiveUF(uf);
-    setSearchQuery('');
-
-    setLoadingMunicipios(true);
     try {
-      const cacheKey = `municipios_geo_${uf}`;
+      const g = gRef.current;
+      const pathGenerator = pathRef.current;
+      const { width, height } = dimensionsRef.current;
+
+      const [[x0, y0], [x1, y1]] = pathGenerator.bounds(feature);
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const cx = (x0 + x1) / 2;
+      const cy = (y0 + y1) / 2;
+      const scale = Math.max(1, Math.min(8, 0.85 / Math.max(dx / width, dy / height)));
+      const tx = width / 2 - scale * cx;
+      const ty = height / 2 - scale * cy;
+
+      g.selectAll('path.estado')
+        .transition()
+        .duration(750)
+        .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 0.15 : 0.08);
+
+      g.selectAll('text.estado-label')
+        .transition()
+        .duration(750)
+        .attr('opacity', 0);
+
+      g.transition()
+        .duration(750)
+        .attr('transform', `translate(${tx},${ty}) scale(${scale})`);
+
+      activeUFRef.current = uf;
+      setActiveUF(uf);
+      setSearchQuery('');
+
+      setLoadingMunicipios(true);
+
+      const cacheKey = `mun_geo_${uf}`;
       const cached = sessionStorage.getItem(cacheKey);
       let municipiosData;
 
@@ -223,19 +230,46 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         municipiosData = JSON.parse(cached);
       } else {
         const codigoIBGE = UF_TO_IBGE[uf];
-        if (!codigoIBGE) throw new Error('UF não encontrada');
-        const res = await fetch(
-          `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${codigoIBGE}?formato=application/vnd.geo+json&qualidade=intermediaria&intrarregiao=municipio`
-        );
+        if (!codigoIBGE) {
+          console.error('Código IBGE não encontrado para', uf);
+          setLoadingMunicipios(false);
+          return;
+        }
+
+        const url = `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${codigoIBGE}?formato=application/vnd.geo+json&qualidade=intermediaria&intrarregiao=municipio`;
+        console.log('Carregando municípios:', url);
+
+        const res = await fetch(url);
+        if (!res.ok) {
+          console.error('Erro na API IBGE:', res.status, res.statusText);
+          setLoadingMunicipios(false);
+          return;
+        }
+
         municipiosData = await res.json();
+
+        if (!municipiosData.features || municipiosData.features.length === 0) {
+          console.error('GeoJSON sem features para', uf);
+          setLoadingMunicipios(false);
+          return;
+        }
+
         sessionStorage.setItem(cacheKey, JSON.stringify(municipiosData));
       }
 
-      renderMunicipios(g, municipiosData, pathGenerator, scale);
+      console.log('Municípios carregados:', municipiosData.features?.length);
+
+      // Wait for zoom animation before rendering municipalities
+      setTimeout(() => {
+        renderMunicipios(g, municipiosData, pathGenerator, scale);
+        setLoadingMunicipios(false);
+      }, 800);
+
     } catch (err) {
-      console.error('Erro ao carregar municípios:', err);
-    } finally {
+      console.error('Erro no drill-down:', err);
       setLoadingMunicipios(false);
+      activeUFRef.current = null;
+      setActiveUF(null);
     }
   }, [renderMunicipios]);
 
@@ -295,11 +329,30 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
     const g = svg.append('g') as d3.Selection<SVGGElement, unknown, null, undefined>;
     gRef.current = g;
 
-    // Zoom — allow zoom out to 0.5
+    // Zoom — block wheel scroll, allow only drag/touch/programmatic
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 8])
+      .filter((event: any) => {
+        if (event.type === 'wheel') return false;
+        return true;
+      })
       .on('zoom', (event) => g.attr('transform', event.transform));
     svg.call(zoom);
+    zoomBehaviorRef.current = zoom;
+
+    // Hide tooltip when mouse leaves SVG entirely
+    svg.on('mouseleave', () => {
+      if (tooltipRef.current) tooltipRef.current.style.display = 'none';
+      if (onHoverRef.current) onHoverRef.current(null);
+      g.selectAll('path.estado')
+        .attr('fill', (d: any) => getColor(getUfFromFeature(d), dadosEstados))
+        .attr('stroke', '#30363d')
+        .attr('stroke-width', 0.5)
+        .attr('filter', (d: any) => {
+          const e = dadosEstados.find(dd => dd.uf === getUfFromFeature(d));
+          return e && e.clientes > 0 ? 'url(#glow-active)' : 'none';
+        });
+    });
 
     // Filters — GREEN glow
     const defs = svg.append('defs');
@@ -381,17 +434,28 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         if (onHoverRef.current) onHoverRef.current(null);
       })
       .on('click', function (event: any, d: any) {
+        event.preventDefault();
         event.stopPropagation();
         const uf = getUfFromFeature(d);
         if (!uf) return;
-        // If already drilled into this UF, navigate to detail page
+        console.log('Click no estado:', uf, 'activeUF:', activeUFRef.current);
+
         if (activeUFRef.current === uf) {
+          // Second click: navigate to detail page
           if (clickCb) clickCb(uf);
           else navFn(`/inteligencia-geografica/${uf}`);
-        } else {
-          // First click: zoom + drill-down
-          zoomFn(uf, d);
+          return;
         }
+
+        if (activeUFRef.current && activeUFRef.current !== uf) {
+          // Already drilled into another state: reset first
+          voltarParaBrasil();
+          setTimeout(() => zoomFn(uf, d), 800);
+          return;
+        }
+
+        // First click: drill-down
+        zoomFn(uf, d);
       });
 
     // Labels
@@ -413,10 +477,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   }, [geoData, dadosEstados, navigate, onEstadoClick, zoomToEstado]);
 
   const handleZoom = (factor: number) => {
-    if (!svgRef.current) return;
+    if (!svgRef.current || !zoomBehaviorRef.current) return;
     const svg = d3.select(svgRef.current);
-    const zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.5, 8]);
-    svg.transition().duration(300).call(zoom.scaleBy as any, factor);
+    svg.transition().duration(300).call(zoomBehaviorRef.current.scaleBy as any, factor);
   };
 
   if (loading) {
@@ -431,7 +494,12 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   }
 
   return (
-    <div ref={containerRef} className="relative rounded-xl overflow-hidden" style={{ background: '#0b0e14' }}>
+    <div ref={containerRef} className="relative rounded-xl overflow-hidden" style={{ background: '#0b0e14' }}
+      onMouseLeave={() => {
+        if (tooltipRef.current) tooltipRef.current.style.display = 'none';
+        if (onHover) onHover(null);
+      }}
+    >
       {/* Grid background — pointer-events: none is CRITICAL */}
       <div className="absolute inset-0 opacity-5" style={{
         backgroundImage: 'radial-gradient(#30363d 1px, transparent 1px)',
