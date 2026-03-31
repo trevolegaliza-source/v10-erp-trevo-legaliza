@@ -11,9 +11,12 @@ export interface EstadoData {
   processos: number;
 }
 
+export type HoverCallback = (uf: string | null) => void;
+
 interface Props {
   dadosEstados: EstadoData[];
   onEstadoClick?: (uf: string) => void;
+  onHover?: HoverCallback;
 }
 
 const UF_NOMES: Record<string, string> = {
@@ -61,7 +64,7 @@ function getColor(uf: string, dados: EstadoData[]): string {
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
+export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -75,7 +78,10 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
   const pathRef = useRef<any>(null);
   const dimensionsRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const activeUFRef = useRef<string | null>(null);
+  const onHoverRef = useRef<HoverCallback | undefined>(onHover);
   const navigate = useNavigate();
+
+  useEffect(() => { onHoverRef.current = onHover; }, [onHover]);
 
   // Keep ref in sync so D3 closures always see current value
   useEffect(() => { activeUFRef.current = activeUF; }, [activeUF]);
@@ -120,9 +126,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
       .append('path')
       .attr('class', 'municipio')
       .attr('d', pathGenerator as any)
-      .attr('fill', '#1a2332')
-      .attr('stroke', '#30363d')
-      .attr('stroke-width', 0.3 / parentScale)
+      .attr('fill', '#0d1117')
+      .attr('stroke', GREEN_BRIGHT)
+      .attr('stroke-width', 0.15 / parentScale)
       .attr('cursor', 'pointer')
       .attr('opacity', 0)
       .transition()
@@ -163,9 +169,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
       })
       .on('mouseout', function () {
         d3.select(this)
-          .attr('fill', '#1a2332')
-          .attr('stroke', '#30363d')
-          .attr('stroke-width', 0.3 / parentScale)
+          .attr('fill', '#0d1117')
+          .attr('stroke', GREEN_BRIGHT)
+          .attr('stroke-width', 0.15 / parentScale)
           .attr('filter', 'none');
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
       })
@@ -256,7 +262,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
     g.selectAll('path.municipio')
       .attr('fill', function (d: any) {
         const nome = (d.properties?.name || d.properties?.nome || '').toLowerCase();
-        if (!query) return '#1a2332';
+        if (!query) return '#0d1117';
         return nome.includes(query) ? GREEN_BRIGHT : '#0d1117';
       })
       .attr('opacity', function (d: any) {
@@ -272,15 +278,15 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
 
     const svg = d3.select(svgRef.current);
     const width = containerRef.current.clientWidth;
-    const height = Math.max(500, width * 0.85);
+    const height = Math.max(450, width * 0.7);
     dimensionsRef.current = { width, height };
 
     svg.attr('viewBox', `0 0 ${width} ${height}`);
     svg.selectAll('*').remove();
 
-    const projection = d3.geoMercator().fitSize([width * 0.95, height * 0.95], geoData);
-    const [tx, ty] = projection.translate();
-    projection.translate([tx + width * 0.025, ty + height * 0.025]);
+    const padding = 40;
+    const projection = d3.geoMercator()
+      .fitExtent([[padding, padding], [width - padding, height - padding]], geoData);
     projectionRef.current = projection;
 
     const path = d3.geoPath().projection(projection);
@@ -289,9 +295,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
     const g = svg.append('g') as d3.Selection<SVGGElement, unknown, null, undefined>;
     gRef.current = g;
 
-    // Zoom
+    // Zoom — allow zoom out to 0.5
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([1, 8])
+      .scaleExtent([0.5, 8])
       .on('zoom', (event) => g.attr('transform', event.transform));
     svg.call(zoom);
 
@@ -337,6 +343,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
           .attr('stroke-width', 2)
           .attr('filter', 'url(#glow-hover)');
 
+        // Notify parent for dynamic KPIs
+        if (onHoverRef.current) onHoverRef.current(uf);
+
         if (tooltipRef.current && containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
           tooltipRef.current.style.display = 'block';
@@ -368,6 +377,8 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
           .attr('stroke-width', 0.5)
           .attr('filter', e && e.clientes > 0 ? 'url(#glow-active)' : 'none');
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
+        // Clear hover
+        if (onHoverRef.current) onHoverRef.current(null);
       })
       .on('click', function (event: any, d: any) {
         event.stopPropagation();
@@ -404,7 +415,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
   const handleZoom = (factor: number) => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
-    const zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([1, 8]);
+    const zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.5, 8]);
     svg.transition().duration(300).call(zoom.scaleBy as any, factor);
   };
 
