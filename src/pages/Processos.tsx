@@ -151,6 +151,9 @@ export default function Processos() {
   const deleteProcesso = useDeleteProcesso();
   const [filterType, setFilterType] = useState<string>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const [groupBy, setGroupBy] = useState<GroupBy>('cliente');
+  const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [valoresOpen, setValoresOpen] = useState(false);
