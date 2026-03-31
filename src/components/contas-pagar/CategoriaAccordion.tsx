@@ -443,8 +443,13 @@ function DateGroupHeader({ dateStr, total, items, urgency }: { dateStr: string; 
   );
 }
 
+function isVtVr(l: any): boolean {
+  const sub = (l.subcategoria || '').toLowerCase();
+  return sub.includes('vt') || sub.includes('vr') || sub.includes('vale transporte') || sub.includes('vale refeição') || sub.includes('transporte') || sub.includes('refeição');
+}
+
 function getSubcatLabel(l: any): string {
-  if (l.subcategoria === 'Vale Transporte (VT)' || l.subcategoria === 'Vale Refeição (VR)') return 'BENEFÍCIOS';
+  if (isVtVr(l)) return 'BENEFÍCIOS';
   return (l.subcategoria || 'OUTROS').toUpperCase();
 }
 
