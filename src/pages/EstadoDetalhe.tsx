@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { MapaEstadoMunicipios } from '@/components/mapa/MapaEstadoMunicipios';
+import { toast } from 'sonner';
 import { UF_NOMES } from '@/constants/estados-brasil';
 import {
   useEstadoDetalhe, useSalvarContato, useRemoverContato,
@@ -61,6 +65,27 @@ export default function EstadoDetalhe() {
   const salvarContato = useSalvarContato();
   const removerContato = useRemoverContato();
   const salvarNota = useSalvarNotaEstado();
+
+  // Clients grouped by municipality for the map
+  const { data: clientesMunicipio } = useQuery({
+    queryKey: ['clientes_municipio_mapa', ufUpper],
+    queryFn: async () => {
+      const { data: clientes } = await supabase
+        .from('clientes')
+        .select('cidade')
+        .eq('estado', ufUpper)
+        .eq('is_archived', false);
+      const map: Record<string, number> = {};
+      (clientes || []).forEach((c: any) => {
+        if (c.cidade) {
+          const key = c.cidade.toUpperCase();
+          map[key] = (map[key] || 0) + 1;
+        }
+      });
+      return map;
+    },
+    enabled: !!ufUpper,
+  });
 
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<Partial<ContatoEstado>>(emptyForm());
@@ -183,19 +208,30 @@ export default function EstadoDetalhe() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="orgaos">
+      <Tabs defaultValue="mapa">
         <TabsList className="geo-card border-none mb-4" style={{ background: '#161b22' }}>
-          {['orgaos', 'clientes', 'municipios', 'notas'].map(tab => (
+          {['mapa', 'orgaos', 'clientes', 'municipios', 'notas'].map(tab => (
             <TabsTrigger
               key={tab}
               value={tab}
               className="data-[state=active]:bg-green-500/20 data-[state=active]:text-green-400"
               style={{ color: '#8b949e' }}
             >
-              {tab === 'orgaos' ? 'Órgãos e Contatos' : tab === 'clientes' ? 'Clientes' : tab === 'municipios' ? 'Municípios' : 'Notas'}
+              {tab === 'mapa' ? 'Mapa' : tab === 'orgaos' ? 'Órgãos e Contatos' : tab === 'clientes' ? 'Clientes' : tab === 'municipios' ? 'Municípios' : 'Notas'}
             </TabsTrigger>
           ))}
         </TabsList>
+
+        {/* Tab: Mapa */}
+        <TabsContent value="mapa" className="mt-2">
+          <MapaEstadoMunicipios
+            uf={ufUpper}
+            clientesPorMunicipio={clientesMunicipio || {}}
+            onMunicipioClick={(nome) => {
+              toast.info(`${nome} — veja a tab Municípios para detalhes`);
+            }}
+          />
+        </TabsContent>
 
         {/* Tab: Órgãos e Contatos */}
         <TabsContent value="orgaos" className="space-y-4 mt-2">
