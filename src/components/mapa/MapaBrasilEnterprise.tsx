@@ -18,6 +18,7 @@ interface Props {
   onEstadoClick?: (uf: string) => void;
   onHover?: HoverCallback;
   clientesPorCidade?: Record<string, number>; // "UF-CIDADE" => count
+  onActiveUFChange?: (uf: string | null) => void;
 }
 
 const UF_NOMES: Record<string, string> = {
