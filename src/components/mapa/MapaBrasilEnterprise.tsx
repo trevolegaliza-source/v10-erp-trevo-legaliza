@@ -262,7 +262,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
     g.selectAll('path.municipio')
       .attr('fill', function (d: any) {
         const nome = (d.properties?.name || d.properties?.nome || '').toLowerCase();
-        if (!query) return '#1a2332';
+        if (!query) return '#0d1117';
         return nome.includes(query) ? GREEN_BRIGHT : '#0d1117';
       })
       .attr('opacity', function (d: any) {
