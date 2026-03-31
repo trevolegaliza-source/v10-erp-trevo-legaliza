@@ -10,13 +10,12 @@ function getSaudacao(): string {
   return 'Boa noite';
 }
 
-function getNomeUsuario(email: string | undefined): string {
+function getNomeUsuario(email: string | undefined, profileName?: string | null): string {
+  if (profileName) return profileName;
   if (!email) return '';
   const parte = email.split('@')[0];
   const nome = parte.charAt(0).toUpperCase() + parte.slice(1).replace(/[._-]/g, ' ');
-  // Capitalize each word
-  const nomeFormatado = nome.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-  return `${nomeFormatado} (CEO)`;
+  return nome.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 function abreviar(valor: number): string {
