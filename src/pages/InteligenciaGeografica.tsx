@@ -167,6 +167,7 @@ export default function InteligenciaGeografica() {
             onEstadoClick={(uf) => navigate(`/inteligencia-geografica/${uf}`)}
             onHover={handleHover}
             clientesPorCidade={clientesPorCidade}
+            onActiveUFChange={setActiveUF}
           />
         </div>
 
