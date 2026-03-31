@@ -14,6 +14,7 @@ export interface ContatoEstado {
   contato_interno: string | null;
   endereco: string | null;
   observacoes: string | null;
+  rating: number | null;
   created_at: string | null;
   updated_at: string | null;
 }
