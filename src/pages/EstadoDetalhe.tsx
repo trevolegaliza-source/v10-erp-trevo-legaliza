@@ -229,7 +229,9 @@ export default function EstadoDetalhe() {
             uf={ufUpper}
             clientesPorMunicipio={clientesMunicipio || {}}
             onMunicipioClick={(nome) => {
-              toast.info(`${nome} — veja a tab Municípios para detalhes`);
+              setActiveTab('municipios');
+              setBuscaMunicipio(nome);
+              toast.success(`${nome} selecionado — veja detalhes abaixo`);
             }}
           />
         </TabsContent>
