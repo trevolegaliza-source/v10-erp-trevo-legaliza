@@ -32,7 +32,7 @@ function getStatusBadge(l: any) {
   return <Badge className="bg-warning/15 text-warning border-0">Pendente</Badge>;
 }
 
-export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, onDelete, selectionMode, selectedIds, onToggleSelect }: Props) {
+export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, onDelete, selectionMode, selectedIds, onToggleSelect, hideEdit, hideDelete, hideApprove }: Props) {
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
