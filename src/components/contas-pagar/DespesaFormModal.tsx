@@ -206,12 +206,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
 
       setSaving(false);
       onClose();
-      // Force refetch by calling onSave with a dummy signal (won't insert again since we already inserted)
-      // Instead, we trigger query invalidation manually
-      const { useQueryClient } = await import('@tanstack/react-query');
-      // Can't use hook here, so we use the global approach:
-      // Actually let's just call window to dispatch a custom event
-      window.dispatchEvent(new CustomEvent('parcelas-created'));
+      queryClient.invalidateQueries({ queryKey: ['lancamentos_pagar'] });
+      queryClient.invalidateQueries({ queryKey: ['lancamentos_pagar_date'] });
       return;
     }
 
