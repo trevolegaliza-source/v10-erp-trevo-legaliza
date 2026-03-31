@@ -232,7 +232,7 @@ export default function Processos() {
   }, []);
 
   // Auto-collapse when many groups
-  useMemo(() => {
+  useEffect(() => {
     if (groupedData && groupedData.length > 5) {
       setCollapsedGroups(new Set(groupedData.map(([k]) => k)));
     } else {
