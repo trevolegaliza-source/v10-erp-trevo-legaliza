@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,12 +7,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Upload } from 'lucide-react';
+import { Upload, CreditCard } from 'lucide-react';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import { supabase } from '@/integrations/supabase/client';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import { toast } from 'sonner';
+import { fetchFeriadosNacionais, proximoDiaUtil } from '@/lib/brasil-api';
+import type { FeriadoNacional } from '@/lib/brasil-api';
+import { useQueryClient } from '@tanstack/react-query';
 import * as LucideIcons from 'lucide-react';
 
 interface Props {
@@ -24,7 +27,47 @@ interface Props {
   defaultAno: number;
 }
 
+interface ParcelaPreview {
+  num: number;
+  total: number;
+  valor: number;
+  dataVencimento: string;
+  dataFormatada: string;
+  competenciaMes: number;
+  competenciaAno: number;
+}
+
+function calcularParcelas(
+  valorParcela: number,
+  dataPrimeira: string,
+  numParcelas: number,
+  feriados: FeriadoNacional[],
+): ParcelaPreview[] {
+  if (!dataPrimeira || numParcelas < 1 || valorParcela <= 0) return [];
+  const parcelas: ParcelaPreview[] = [];
+  const base = new Date(dataPrimeira + 'T12:00:00');
+
+  for (let i = 0; i < numParcelas; i++) {
+    const d = new Date(base);
+    d.setMonth(d.getMonth() + i);
+    const adjusted = proximoDiaUtil(d, feriados);
+    const iso = `${adjusted.getFullYear()}-${String(adjusted.getMonth() + 1).padStart(2, '0')}-${String(adjusted.getDate()).padStart(2, '0')}`;
+    const fmt = `${String(adjusted.getDate()).padStart(2, '0')}/${String(adjusted.getMonth() + 1).padStart(2, '0')}/${adjusted.getFullYear()}`;
+    parcelas.push({
+      num: i + 1,
+      total: numParcelas,
+      valor: valorParcela,
+      dataVencimento: iso,
+      dataFormatada: fmt,
+      competenciaMes: adjusted.getMonth() + 1,
+      competenciaAno: adjusted.getFullYear(),
+    });
+  }
+  return parcelas;
+}
+
 export default function DespesaFormModal({ open, onClose, onSave, editData, defaultMes, defaultAno }: Props) {
+  const queryClient = useQueryClient();
   const { data: colaboradores } = useColaboradores();
   const activeColabs = (colaboradores || []).filter(c => c.status === 'ativo');
 
@@ -43,6 +86,29 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
   const [salvarRecorrente, setSalvarRecorrente] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Parcelamento
+  const [parcelado, setParcelado] = useState(false);
+  const [numParcelas, setNumParcelas] = useState(2);
+  const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState('');
+  const [feriados, setFeriados] = useState<FeriadoNacional[]>([]);
+
+  // Fetch feriados when parcelado is toggled on
+  useEffect(() => {
+    if (!parcelado) return;
+    const years = new Set<number>();
+    const now = new Date();
+    years.add(now.getFullYear());
+    years.add(now.getFullYear() + 1);
+    years.add(now.getFullYear() + 2);
+    Promise.all([...years].map(y => fetchFeriadosNacionais(y)))
+      .then(results => setFeriados(results.flat()));
+  }, [parcelado]);
+
+  const parcelas = useMemo(() => {
+    if (!parcelado || !valor || !dataPrimeiraParcela) return [];
+    return calcularParcelas(Number(valor), dataPrimeiraParcela, numParcelas, feriados);
+  }, [parcelado, valor, dataPrimeiraParcela, numParcelas, feriados]);
+
   useEffect(() => {
     if (editData) {
       setCategoria((editData.categoria || 'outros') as CategoriaKey);
@@ -57,6 +123,7 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
       setCompAno(editData.competencia_ano || defaultAno);
       setObservacoes(editData.observacoes_financeiro || '');
       setSalvarRecorrente(false);
+      setParcelado(false);
     } else {
       resetForm();
     }
@@ -76,11 +143,19 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
     setObservacoes('');
     setFile(null);
     setSalvarRecorrente(false);
+    setParcelado(false);
+    setNumParcelas(2);
+    setDataPrimeiraParcela('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!valor || !vencimento) return;
+    if (!valor) return;
+    if (parcelado && !editData) {
+      if (!dataPrimeiraParcela || numParcelas < 1) return;
+    } else {
+      if (!vencimento) return;
+    }
     setSaving(true);
 
     let comprovanteUrl: string | null = null;
@@ -100,6 +175,43 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
 
     const descFinal = `${subcategoria || categoria}${descricao ? ' - ' + descricao : ''}`;
 
+    // Parcelado mode: insert all parcelas directly
+    if (parcelado && !editData && parcelas.length > 0) {
+      const lancs = parcelas.map(p => ({
+        tipo: 'pagar' as const,
+        descricao: `${descFinal} · Parcela ${p.num}/${p.total}`,
+        valor: p.valor,
+        data_vencimento: p.dataVencimento,
+        status: 'pendente' as const,
+        categoria,
+        subcategoria: subcategoria || null,
+        fornecedor: fornecedor || null,
+        colaborador_id: vincularColab && colaboradorId ? colaboradorId : null,
+        competencia_mes: p.competenciaMes,
+        competencia_ano: p.competenciaAno,
+        etapa_financeiro: 'solicitacao_criada',
+        observacoes_financeiro: observacoes || null,
+        comprovante_url: comprovanteUrl || null,
+      }));
+
+      try {
+        const { error } = await supabase.from('lancamentos').insert(lancs as any);
+        if (error) throw error;
+        toast.success(`${lancs.length} parcelas lançadas com sucesso`);
+      } catch (err: any) {
+        toast.error('Erro ao criar parcelas: ' + err.message);
+        setSaving(false);
+        return;
+      }
+
+      setSaving(false);
+      onClose();
+      queryClient.invalidateQueries({ queryKey: ['lancamentos_pagar'] });
+      queryClient.invalidateQueries({ queryKey: ['lancamentos_pagar_date'] });
+      return;
+    }
+
+    // Normal single lancamento mode
     const lancamento: Record<string, any> = {
       tipo: 'pagar',
       descricao: descFinal,
@@ -141,6 +253,9 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
   };
 
   const subcategorias = CATEGORIAS_DESPESAS[categoria]?.subcategorias || [];
+
+  const formatCurrency = (v: number) =>
+    v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
@@ -192,21 +307,95 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
           {/* Valor + Vencimento */}
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label>Valor *</Label>
+              <Label>Valor {parcelado ? 'da Parcela' : ''} *</Label>
               <Input type="number" step="0.01" min="0" required value={valor} onChange={e => setValor(e.target.value)} placeholder="0,00" />
             </div>
-            <div className="grid gap-2">
-              <Label>Vencimento *</Label>
-              <Input type="date" required value={vencimento} onChange={e => {
-                setVencimento(e.target.value);
-                if (e.target.value) {
-                  const d = new Date(e.target.value);
-                  setCompMes(d.getMonth() + 1);
-                  setCompAno(d.getFullYear());
-                }
-              }} />
-            </div>
+            {!parcelado && (
+              <div className="grid gap-2">
+                <Label>Vencimento *</Label>
+                <Input type="date" required value={vencimento} onChange={e => {
+                  setVencimento(e.target.value);
+                  if (e.target.value) {
+                    const d = new Date(e.target.value);
+                    setCompMes(d.getMonth() + 1);
+                    setCompAno(d.getFullYear());
+                  }
+                }} />
+              </div>
+            )}
           </div>
+
+          {/* Toggle Parcelado */}
+          {!editData && (
+            <div className="rounded-lg border border-border/60 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  💳 Lançar como Parcelado
+                </Label>
+                <Switch
+                  checked={parcelado}
+                  onCheckedChange={c => {
+                    setParcelado(c);
+                    if (c) {
+                      setSalvarRecorrente(false);
+                      if (!dataPrimeiraParcela && vencimento) {
+                        setDataPrimeiraParcela(vencimento);
+                      }
+                    }
+                  }}
+                />
+              </div>
+              {parcelado && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label className="text-xs">Número de Parcelas *</Label>
+                      <Input
+                        type="number"
+                        min={2}
+                        max={60}
+                        value={numParcelas}
+                        onChange={e => setNumParcelas(Math.max(2, Number(e.target.value)))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label className="text-xs">Vencimento da 1ª Parcela *</Label>
+                      <Input
+                        type="date"
+                        required={parcelado}
+                        value={dataPrimeiraParcela}
+                        onChange={e => setDataPrimeiraParcela(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Prévia das parcelas */}
+                  {parcelas.length > 0 && (
+                    <div className="rounded-md bg-muted/50 p-3 space-y-1">
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">PRÉVIA DAS PARCELAS</p>
+                      {parcelas.slice(0, 3).map(p => (
+                        <div key={p.num} className="text-xs text-foreground flex justify-between">
+                          <span>Parcela {p.num}/{p.total}</span>
+                          <span>{formatCurrency(p.valor)}</span>
+                          <span>{p.dataFormatada}</span>
+                        </div>
+                      ))}
+                      {parcelas.length > 3 && (
+                        <p className="text-xs text-muted-foreground italic mt-1">
+                          ... e mais {parcelas.length - 3} parcela{parcelas.length - 3 > 1 ? 's' : ''}
+                        </p>
+                      )}
+                      <div className="border-t border-border/40 mt-2 pt-2 flex justify-between text-xs font-semibold">
+                        <span>TOTAL</span>
+                        <span>{formatCurrency(Number(valor) * numParcelas)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Fornecedor */}
           <div className="grid gap-2">
@@ -232,17 +421,19 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
             )}
           </div>
 
-          {/* Competência */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>Competência Mês</Label>
-              <Input type="number" min={1} max={12} value={compMes} onChange={e => setCompMes(Number(e.target.value))} />
+          {/* Competência - hide when parcelado since each parcela has its own */}
+          {!parcelado && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>Competência Mês</Label>
+                <Input type="number" min={1} max={12} value={compMes} onChange={e => setCompMes(Number(e.target.value))} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Competência Ano</Label>
+                <Input type="number" min={2020} max={2099} value={compAno} onChange={e => setCompAno(Number(e.target.value))} />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label>Competência Ano</Label>
-              <Input type="number" min={2020} max={2099} value={compAno} onChange={e => setCompAno(Number(e.target.value))} />
-            </div>
-          </div>
+          )}
 
           {/* Observações */}
           <div className="grid gap-2">
@@ -260,8 +451,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
             </label>
           </div>
 
-          {/* Checkbox recorrente */}
-          {!editData && (
+          {/* Checkbox recorrente - hidden when parcelado is active */}
+          {!editData && !parcelado && (
             <div className="flex items-center gap-2 rounded-lg border border-border/60 p-3">
               <Checkbox id="salvarRecorrente" checked={salvarRecorrente} onCheckedChange={c => setSalvarRecorrente(!!c)} />
               <label htmlFor="salvarRecorrente" className="text-sm cursor-pointer">Salvar também como Despesa Recorrente</label>
@@ -270,7 +461,15 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
 
           <DialogFooter>
             <Button variant="outline" type="button" onClick={onClose}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Salvando...' : editData ? 'Salvar Alterações' : 'Salvar Despesa'}</Button>
+            <Button type="submit" disabled={saving}>
+              {saving
+                ? 'Salvando...'
+                : parcelado && !editData
+                  ? `Lançar ${numParcelas} Parcelas`
+                  : editData
+                    ? 'Salvar Alterações'
+                    : 'Salvar Despesa'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
