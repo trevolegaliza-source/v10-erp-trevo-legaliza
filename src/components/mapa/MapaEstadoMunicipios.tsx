@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import { geoCache } from '@/lib/geo-cache';
 
 interface Props {
   uf: string;
