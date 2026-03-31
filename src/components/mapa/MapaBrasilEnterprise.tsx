@@ -434,17 +434,28 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         if (onHoverRef.current) onHoverRef.current(null);
       })
       .on('click', function (event: any, d: any) {
+        event.preventDefault();
         event.stopPropagation();
         const uf = getUfFromFeature(d);
         if (!uf) return;
-        // If already drilled into this UF, navigate to detail page
+        console.log('Click no estado:', uf, 'activeUF:', activeUFRef.current);
+
         if (activeUFRef.current === uf) {
+          // Second click: navigate to detail page
           if (clickCb) clickCb(uf);
           else navFn(`/inteligencia-geografica/${uf}`);
-        } else {
-          // First click: zoom + drill-down
-          zoomFn(uf, d);
+          return;
         }
+
+        if (activeUFRef.current && activeUFRef.current !== uf) {
+          // Already drilled into another state: reset first
+          voltarParaBrasil();
+          setTimeout(() => zoomFn(uf, d), 800);
+          return;
+        }
+
+        // First click: drill-down
+        zoomFn(uf, d);
       });
 
     // Labels
