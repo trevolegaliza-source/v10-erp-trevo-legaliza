@@ -78,6 +78,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   const pathRef = useRef<any>(null);
   const dimensionsRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const activeUFRef = useRef<string | null>(null);
+  const zoomBehaviorRef = useRef<any>(null);
   const onHoverRef = useRef<HoverCallback | undefined>(onHover);
   const navigate = useNavigate();
 
