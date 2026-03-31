@@ -183,40 +183,46 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   }, []);
 
   const zoomToEstado = useCallback(async (uf: string, feature: any) => {
-    if (!svgRef.current || !gRef.current || !pathRef.current) return;
+    if (!svgRef.current || !gRef.current || !pathRef.current) {
+      console.error('SVG ou GeoData não disponível');
+      return;
+    }
 
-    const g = gRef.current;
-    const pathGenerator = pathRef.current;
-    const { width, height } = dimensionsRef.current;
-
-    const [[x0, y0], [x1, y1]] = pathGenerator.bounds(feature);
-    const dx = x1 - x0;
-    const dy = y1 - y0;
-    const x = (x0 + x1) / 2;
-    const y = (y0 + y1) / 2;
-    const scale = Math.max(1, Math.min(8, 0.9 / Math.max(dx / width, dy / height)));
-    const translate = [width / 2 - scale * x, height / 2 - scale * y];
-
-    g.transition()
-      .duration(750)
-      .attr('transform', `translate(${translate[0]},${translate[1]}) scale(${scale})`);
-
-    g.selectAll('path.estado')
-      .transition()
-      .duration(750)
-      .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 0.15 : 0.08);
-
-    g.selectAll('text.estado-label')
-      .transition()
-      .duration(750)
-      .attr('opacity', 0);
-
-    setActiveUF(uf);
-    setSearchQuery('');
-
-    setLoadingMunicipios(true);
     try {
-      const cacheKey = `municipios_geo_${uf}`;
+      const g = gRef.current;
+      const pathGenerator = pathRef.current;
+      const { width, height } = dimensionsRef.current;
+
+      const [[x0, y0], [x1, y1]] = pathGenerator.bounds(feature);
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const cx = (x0 + x1) / 2;
+      const cy = (y0 + y1) / 2;
+      const scale = Math.max(1, Math.min(8, 0.85 / Math.max(dx / width, dy / height)));
+      const tx = width / 2 - scale * cx;
+      const ty = height / 2 - scale * cy;
+
+      g.selectAll('path.estado')
+        .transition()
+        .duration(750)
+        .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 0.15 : 0.08);
+
+      g.selectAll('text.estado-label')
+        .transition()
+        .duration(750)
+        .attr('opacity', 0);
+
+      g.transition()
+        .duration(750)
+        .attr('transform', `translate(${tx},${ty}) scale(${scale})`);
+
+      activeUFRef.current = uf;
+      setActiveUF(uf);
+      setSearchQuery('');
+
+      setLoadingMunicipios(true);
+
+      const cacheKey = `mun_geo_${uf}`;
       const cached = sessionStorage.getItem(cacheKey);
       let municipiosData;
 
@@ -224,19 +230,46 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         municipiosData = JSON.parse(cached);
       } else {
         const codigoIBGE = UF_TO_IBGE[uf];
-        if (!codigoIBGE) throw new Error('UF não encontrada');
-        const res = await fetch(
-          `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${codigoIBGE}?formato=application/vnd.geo+json&qualidade=intermediaria&intrarregiao=municipio`
-        );
+        if (!codigoIBGE) {
+          console.error('Código IBGE não encontrado para', uf);
+          setLoadingMunicipios(false);
+          return;
+        }
+
+        const url = `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${codigoIBGE}?formato=application/vnd.geo+json&qualidade=intermediaria&intrarregiao=municipio`;
+        console.log('Carregando municípios:', url);
+
+        const res = await fetch(url);
+        if (!res.ok) {
+          console.error('Erro na API IBGE:', res.status, res.statusText);
+          setLoadingMunicipios(false);
+          return;
+        }
+
         municipiosData = await res.json();
+
+        if (!municipiosData.features || municipiosData.features.length === 0) {
+          console.error('GeoJSON sem features para', uf);
+          setLoadingMunicipios(false);
+          return;
+        }
+
         sessionStorage.setItem(cacheKey, JSON.stringify(municipiosData));
       }
 
-      renderMunicipios(g, municipiosData, pathGenerator, scale);
+      console.log('Municípios carregados:', municipiosData.features?.length);
+
+      // Wait for zoom animation before rendering municipalities
+      setTimeout(() => {
+        renderMunicipios(g, municipiosData, pathGenerator, scale);
+        setLoadingMunicipios(false);
+      }, 800);
+
     } catch (err) {
-      console.error('Erro ao carregar municípios:', err);
-    } finally {
+      console.error('Erro no drill-down:', err);
       setLoadingMunicipios(false);
+      activeUFRef.current = null;
+      setActiveUF(null);
     }
   }, [renderMunicipios]);
 
