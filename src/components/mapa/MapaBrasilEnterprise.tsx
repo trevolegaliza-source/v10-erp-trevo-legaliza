@@ -126,14 +126,14 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
       .append('path')
       .attr('class', 'municipio')
       .attr('d', pathGenerator as any)
-      .attr('fill', '#0d1117')
-      .attr('stroke', GREEN_BRIGHT)
-      .attr('stroke-width', 0.15 / parentScale)
+      .attr('fill', '#111820')
+      .attr('stroke', 'rgba(34, 197, 94, 0.3)')
+      .attr('stroke-width', 0.3 / parentScale)
       .attr('cursor', 'pointer')
       .attr('opacity', 0)
       .transition()
-      .duration(500)
-      .delay((_d: any, i: number) => Math.min(i * 1.5, 600))
+      .duration(400)
+      .delay((_d: any, i: number) => Math.min(i * 3, 600))
       .attr('opacity', 1);
 
     // Re-select after transition for event binding
@@ -141,8 +141,8 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
       .on('mouseover', function (event: any, d: any) {
         d3.select(this)
           .attr('fill', GREEN_BRIGHT)
-          .attr('stroke', GREEN_BRIGHT)
-          .attr('stroke-width', 1 / parentScale)
+          .attr('stroke', '#4ade80')
+          .attr('stroke-width', 0.8 / parentScale)
           .attr('filter', 'url(#glow-hover)');
 
         const nome = d.properties?.name || d.properties?.nome || d.properties?.NM_MUN || 'Município';
@@ -169,9 +169,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
       })
       .on('mouseout', function () {
         d3.select(this)
-          .attr('fill', '#0d1117')
-          .attr('stroke', GREEN_BRIGHT)
-          .attr('stroke-width', 0.15 / parentScale)
+          .attr('fill', '#111820')
+          .attr('stroke', 'rgba(34, 197, 94, 0.3)')
+          .attr('stroke-width', 0.3 / parentScale)
           .attr('filter', 'none');
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
       })
@@ -203,12 +203,12 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
     g.selectAll('path.estado')
       .transition()
       .duration(750)
-      .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 1 : 0.15);
+      .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 0.15 : 0.08);
 
     g.selectAll('text.estado-label')
       .transition()
       .duration(750)
-      .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 1 : 0.1);
+      .attr('opacity', 0);
 
     setActiveUF(uf);
     setSearchQuery('');
@@ -520,12 +520,18 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         ))}
       </div>
 
-      {/* Drill-down hint — GREEN */}
+      {/* Ver detalhes button */}
       {activeUF && !loadingMunicipios && (
-        <div className="absolute bottom-4 right-4 text-xs px-3 py-1.5 rounded-lg"
-          style={{ background: '#161b22', border: '1px solid #30363d', color: '#8b949e', pointerEvents: 'none' }}>
-          Clique novamente em <span style={{ color: GREEN_BRIGHT, fontWeight: 700 }}>{activeUF}</span> para abrir detalhes
-        </div>
+        <button
+          onClick={() => navigate(`/inteligencia-geografica/${activeUF}`)}
+          className="absolute top-4 right-16 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all hover:scale-105"
+          style={{
+            background: GREEN_BRIGHT, color: '#0b0e14',
+            boxShadow: '0 0 15px rgba(34, 197, 94, 0.3)', zIndex: 10,
+          }}
+        >
+          Ver detalhes de {UF_NOMES[activeUF]} →
+        </button>
       )}
     </div>
   );
