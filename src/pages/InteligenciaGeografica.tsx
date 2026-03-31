@@ -67,7 +67,7 @@ export default function InteligenciaGeografica() {
         <p className="text-sm geo-muted">CRM Territorial — Clientes, órgãos e contatos por estado</p>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs — GREEN accents */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {kpis.map(kpi => (
           <div key={kpi.label} className="geo-card p-4">
