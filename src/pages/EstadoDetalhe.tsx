@@ -92,6 +92,7 @@ export default function EstadoDetalhe() {
   const [nota, setNota] = useState('');
   const [notaId, setNotaId] = useState<string | null>(null);
   const [buscaMunicipio, setBuscaMunicipio] = useState('');
+  const [activeTab, setActiveTab] = useState('mapa');
 
   useEffect(() => {
     if (data) {
