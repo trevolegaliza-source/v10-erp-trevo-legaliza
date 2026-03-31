@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardData, useCountUp } from '@/hooks/useDashboardData';
 import { getNomeUsuario, getSaudacao } from '@/hooks/useDashboard';
+import { usePermissions } from '@/hooks/usePermissions';
+import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,6 +33,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data, isLoading } = useDashboardData();
+  const { podeVer, loading: permsLoading, isMaster } = usePermissions();
+  const [profileName, setProfileName] = useState<string | null>(null);
 
   const [diasAlertaPagar, setDiasAlertaPagar] = useState(() => {
     return parseInt(localStorage.getItem('trevo_dias_alerta_pagar') || '7');
@@ -38,6 +42,36 @@ export default function Dashboard() {
   useEffect(() => {
     localStorage.setItem('trevo_dias_alerta_pagar', String(diasAlertaPagar));
   }, [diasAlertaPagar]);
+
+  // Load profile name
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('nome').eq('id', user.id).single().then(({ data }) => {
+      if (data?.nome) setProfileName(data.nome);
+    });
+  }, [user]);
+
+  // Redirect non-dashboard users
+  useEffect(() => {
+    if (permsLoading) return;
+    if (podeVer('dashboard')) return;
+    const modules = [
+      { mod: 'processos', path: '/processos' },
+      { mod: 'clientes', path: '/clientes' },
+      { mod: 'orcamentos', path: '/orcamentos' },
+      { mod: 'financeiro', path: '/financeiro' },
+      { mod: 'contas_pagar', path: '/contas-pagar' },
+      { mod: 'colaboradores', path: '/colaboradores' },
+      { mod: 'documentos', path: '/documentos' },
+      { mod: 'intel_geografica', path: '/inteligencia-geografica' },
+      { mod: 'configuracoes', path: '/configuracoes' },
+    ];
+    const first = modules.find(m => podeVer(m.mod));
+    if (first) {
+      navigate(first.path, { replace: true });
+    }
+  }, [permsLoading, podeVer, navigate]);
+
 
   const calc = useMemo(() => {
     if (!data) return null;
@@ -174,6 +208,16 @@ export default function Dashboard() {
   const animRecebido = useCountUp(calc?.totalRecebido ?? 0);
   const animAtivos = useCountUp(calc?.processosAtivos ?? 0, 500);
 
+  // Show fallback for users with no permissions
+  if (!permsLoading && !podeVer('dashboard') && !isMaster()) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-3">
+        <h2 className="text-xl font-semibold text-foreground">Bem-vindo ao sistema.</h2>
+        <p className="text-muted-foreground">Aguarde seu administrador configurar seu acesso.</p>
+      </div>
+    );
+  }
+
   if (isLoading || !calc) {
     return (
       <div className="space-y-6">
@@ -195,7 +239,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="dashboard-section">
         <h1 className="text-2xl font-bold text-foreground">
-          {getSaudacao()}, {getNomeUsuario(user?.email)} <span className="animate-trevo-wave">🍀</span>
+          {getSaudacao()}, {getNomeUsuario(user?.email, profileName)} <span className="animate-trevo-wave">🍀</span>
         </h1>
         <p className="text-sm text-muted-foreground">
           {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}

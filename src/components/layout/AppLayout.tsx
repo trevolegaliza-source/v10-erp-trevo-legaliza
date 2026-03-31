@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
 import { Search, Sun, Moon } from 'lucide-react';
@@ -7,18 +8,29 @@ import { NotificationPopover } from '@/components/NotificationPopover';
 import { CommandPalette } from '@/components/CommandPalette';
 import { useTheme } from 'next-themes';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export function AppLayout() {
   const { theme, setTheme } = useTheme();
   const { user } = useAuth();
+  const { role } = usePermissions();
+  const [profileName, setProfileName] = useState<string | null>(null);
 
-  const initials = user?.email
-    ? user.email.split('@')[0].slice(0, 2).toUpperCase()
-    : 'ML';
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('nome').eq('id', user.id).single().then(({ data }) => {
+      if (data?.nome) setProfileName(data.nome);
+    });
+  }, [user]);
 
-  const userName = user?.email
+  const displayName = profileName || (user?.email
     ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1).replace(/[._-]/g, ' ')
-    : 'Master';
+    : 'Usuário');
+
+  const initials = (displayName || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  const roleLabel = role === 'master' ? 'Administrador' : role === 'financeiro' ? 'Financeiro' : role === 'operacional' ? 'Operacional' : role === 'visualizador' ? 'Visualizador' : '';
 
   return (
     <div className="min-h-screen bg-background">
@@ -56,8 +68,8 @@ export function AppLayout() {
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:flex flex-col">
-                <span className="text-xs font-medium leading-none">{userName}</span>
-                <span className="text-[10px] text-muted-foreground">Administrador</span>
+                <span className="text-xs font-medium leading-none">{displayName}</span>
+                <span className="text-[10px] text-muted-foreground">{roleLabel}</span>
               </div>
             </div>
           </div>

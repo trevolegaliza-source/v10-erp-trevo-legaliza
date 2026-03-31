@@ -1,8 +1,8 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { KANBAN_STAGES, PROCESS_TYPE_LABELS, type KanbanStage } from '@/types/process';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, GripVertical, LayoutGrid, List, MoreHorizontal, Receipt, EyeOff, Trash2, Pencil, Download } from 'lucide-react';
+import { Plus, Filter, GripVertical, LayoutGrid, List, MoreHorizontal, Receipt, EyeOff, Trash2, Pencil, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -21,8 +21,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { toast } from 'sonner';
 import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 type ViewMode = 'kanban' | 'list';
+type GroupBy = 'none' | 'cliente' | 'mes' | 'etapa';
 
 function QuickActionsMenu({
   process,
@@ -149,6 +151,9 @@ export default function Processos() {
   const deleteProcesso = useDeleteProcesso();
   const [filterType, setFilterType] = useState<string>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const [groupBy, setGroupBy] = useState<GroupBy>('cliente');
+  const [filterMonth, setFilterMonth] = useState<string>('all');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [valoresOpen, setValoresOpen] = useState(false);
@@ -166,9 +171,74 @@ export default function Processos() {
     }
   }, [deleteConfirmId, deleteProcesso]);
 
-  const filtered = filterType === 'all'
-    ? (processos || [])
-    : (processos || []).filter((p) => p.tipo === filterType);
+  const filtered = useMemo(() => {
+    let result = filterType === 'all'
+      ? (processos || [])
+      : (processos || []).filter((p) => p.tipo === filterType);
+    
+    if (filterMonth !== 'all') {
+      const [fYear, fMonth] = filterMonth.split('-').map(Number);
+      result = result.filter(p => {
+        const d = new Date(p.created_at);
+        return d.getFullYear() === fYear && d.getMonth() + 1 === fMonth;
+      });
+    }
+    return result;
+  }, [processos, filterType, filterMonth]);
+
+  const monthOptions = useMemo(() => {
+    const months = new Set<string>();
+    (processos || []).forEach(p => {
+      const d = new Date(p.created_at);
+      months.add(`${d.getFullYear()}-${d.getMonth() + 1}`);
+    });
+    return Array.from(months).sort().reverse().map(m => {
+      const [y, mo] = m.split('-').map(Number);
+      const label = new Date(y, mo - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return { value: m, label: label.charAt(0).toUpperCase() + label.slice(1) };
+    });
+  }, [processos]);
+
+  const groupedData = useMemo(() => {
+    if (groupBy === 'none') return null;
+    const groups: Record<string, { label: string; processes: typeof filtered }> = {};
+    filtered.forEach(p => {
+      let key: string;
+      let label: string;
+      if (groupBy === 'cliente') {
+        key = p.cliente?.nome || 'Sem cliente';
+        label = (p.cliente?.apelido || p.cliente?.nome || 'Sem cliente').toUpperCase();
+      } else if (groupBy === 'mes') {
+        const d = new Date(p.created_at);
+        key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
+        label = label.charAt(0).toUpperCase() + label.slice(1);
+      } else {
+        key = p.etapa;
+        label = (KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa).toUpperCase();
+      }
+      if (!groups[key]) groups[key] = { label, processes: [] };
+      groups[key].processes.push(p);
+    });
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b, 'pt-BR'));
+  }, [filtered, groupBy]);
+
+  const toggleGroup = useCallback((key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+
+  // Auto-collapse when many groups
+  useEffect(() => {
+    if (groupedData && groupedData.length > 5) {
+      setCollapsedGroups(new Set(groupedData.map(([k]) => k)));
+    } else {
+      setCollapsedGroups(new Set());
+    }
+  }, [groupBy, filterMonth, filterType]);
 
   const selectedFinanceiroProcess = useMemo<ProcessoFinanceiro | null>(() => {
     if (!selectedProcessId) return null;
@@ -335,64 +405,159 @@ export default function Processos() {
             </div>
           </DragDropContext>
         ) : (
-          <div className="rounded-xl border border-border/60 overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-semibold">Razão Social</TableHead>
-                  <TableHead className="text-xs font-semibold">Cliente</TableHead>
-                  <TableHead className="text-xs font-semibold">Tipo</TableHead>
-                  <TableHead className="text-xs font-semibold">Etapa</TableHead>
-                  <TableHead className="text-xs font-semibold">Prioridade</TableHead>
-                  <TableHead className="text-right text-xs font-semibold">Valor</TableHead>
-                  <TableHead className="text-center text-xs font-semibold">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((proc) => (
-                  <TableRow
-                    key={proc.id}
-                    className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
-                    onDoubleClick={() => openEditModal(proc)}
-                  >
-                    <TableCell className="font-medium text-foreground">{proc.razao_social}</TableCell>
-                    <TableCell className="text-sm text-foreground">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                        {(() => {
-                          const m = proc.notas?.match(/\[AVULSO:(.+?)\]/);
-                          return m ? m[1] : (PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo);
-                        })()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-foreground">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
-                    <TableCell>
-                      {proc.prioridade === 'urgente' ? (
-                        <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Normal</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right text-sm font-semibold text-foreground">
-                      {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <QuickActionsMenu process={proc} onDelete={handleDeleteRequest} onEdit={openEditModal} onHonorarioExtra={openHonorarioExtra} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      Nenhum processo encontrado
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            <p className="text-[11px] text-muted-foreground px-4 py-2 border-t border-border/30">
-              💡 Dê um duplo-clique em qualquer processo para abrir a edição completa
-            </p>
+          <div className="space-y-3">
+            {/* Grouping controls */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground uppercase">Agrupar por:</span>
+                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
+                  <SelectTrigger className="w-40 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cliente">Cliente</SelectItem>
+                    <SelectItem value="mes">Mês de criação</SelectItem>
+                    <SelectItem value="etapa">Etapa</SelectItem>
+                    <SelectItem value="none">Sem agrupamento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Select value={filterMonth} onValueChange={setFilterMonth}>
+                <SelectTrigger className="w-44 h-8 text-xs">
+                  <SelectValue placeholder="Todos os meses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os meses</SelectItem>
+                  {monthOptions.map(m => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Grouped or flat list */}
+            <div className="rounded-xl border border-border/60 overflow-hidden">
+              {groupedData ? (
+                <>
+                  {groupedData.map(([key, group]) => {
+                    const isCollapsed = collapsedGroups.has(key);
+                    return (
+                      <div key={key}>
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border/40 hover:bg-muted/70 transition-colors"
+                          onClick={() => toggleGroup(key)}
+                        >
+                          <div className="flex items-center gap-2">
+                            {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                            <span className="text-xs font-bold text-foreground uppercase tracking-wide">{group.label}</span>
+                            <Badge variant="outline" className="text-[10px] border-border/60">{group.processes.length} {group.processes.length === 1 ? 'processo' : 'processos'}</Badge>
+                          </div>
+                        </button>
+                        {!isCollapsed && (
+                          <Table>
+                            <TableBody>
+                              {group.processes.map((proc) => (
+                                <TableRow
+                                  key={proc.id}
+                                  className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
+                                  onDoubleClick={() => openEditModal(proc)}
+                                >
+                                  <TableCell className="font-medium text-foreground">{proc.razao_social}</TableCell>
+                                  <TableCell className="text-sm text-foreground">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                                      {(() => {
+                                        const m = proc.notas?.match(/\[AVULSO:(.+?)\]/);
+                                        return m ? m[1] : (PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo);
+                                      })()}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-sm text-foreground">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
+                                  <TableCell>
+                                    {proc.prioridade === 'urgente' ? (
+                                      <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">Normal</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm font-semibold text-foreground">
+                                    {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <QuickActionsMenu process={proc} onDelete={handleDeleteRequest} onEdit={openEditModal} onHonorarioExtra={openHonorarioExtra} />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {groupedData.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground text-sm">Nenhum processo encontrado</div>
+                  )}
+                </>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-xs font-semibold">Razão Social</TableHead>
+                      <TableHead className="text-xs font-semibold">Cliente</TableHead>
+                      <TableHead className="text-xs font-semibold">Tipo</TableHead>
+                      <TableHead className="text-xs font-semibold">Etapa</TableHead>
+                      <TableHead className="text-xs font-semibold">Prioridade</TableHead>
+                      <TableHead className="text-right text-xs font-semibold">Valor</TableHead>
+                      <TableHead className="text-center text-xs font-semibold">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((proc) => (
+                      <TableRow
+                        key={proc.id}
+                        className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
+                        onDoubleClick={() => openEditModal(proc)}
+                      >
+                        <TableCell className="font-medium text-foreground">{proc.razao_social}</TableCell>
+                        <TableCell className="text-sm text-foreground">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                            {(() => {
+                              const m = proc.notas?.match(/\[AVULSO:(.+?)\]/);
+                              return m ? m[1] : (PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo);
+                            })()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-foreground">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
+                        <TableCell>
+                          {proc.prioridade === 'urgente' ? (
+                            <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Normal</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-semibold text-foreground">
+                          {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <QuickActionsMenu process={proc} onDelete={handleDeleteRequest} onEdit={openEditModal} onHonorarioExtra={openHonorarioExtra} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filtered.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          Nenhum processo encontrado
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+              <p className="text-[11px] text-muted-foreground px-4 py-2 border-t border-border/30">
+                💡 Dê um duplo-clique em qualquer processo para abrir a edição completa
+              </p>
+            </div>
           </div>
         )}
       </div>

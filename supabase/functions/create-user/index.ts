@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Verify caller is master
+    // Verify caller is master and get their empresa_id
     const { data: callerProfile } = await adminClient
       .from("profiles")
       .select("role, empresa_id")
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create user via admin API
+    // Create user via admin API — pass master's empresa_id in metadata
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password,
