@@ -39,7 +39,7 @@ export default function Login() {
             />
           </div>
           <p className="text-sm text-muted-foreground">
-            {isSignUp ? 'Crie sua conta' : 'Sistema de Gestão Societária'}
+            Sistema de Gestão Societária
           </p>
         </CardHeader>
         <CardContent>
