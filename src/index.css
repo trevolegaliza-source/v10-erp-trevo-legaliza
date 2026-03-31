@@ -243,4 +243,21 @@
     color: hsl(var(--primary));
     border-left: 3px solid hsl(var(--primary));
   }
+
+  /* Inteligência Geográfica — Cyber Dark Mode */
+  .geo-container {
+    background: #0b0e14;
+    color: #e6edf3;
+  }
+  .geo-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+  }
+  .geo-card:hover {
+    border-color: #00d2ff;
+    box-shadow: 0 0 20px rgba(0, 210, 255, 0.08);
+  }
+  .geo-accent { color: #00d2ff; }
+  .geo-muted { color: #8b949e; }
 }
