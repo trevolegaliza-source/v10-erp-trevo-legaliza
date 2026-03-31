@@ -295,11 +295,30 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
     const g = svg.append('g') as d3.Selection<SVGGElement, unknown, null, undefined>;
     gRef.current = g;
 
-    // Zoom — allow zoom out to 0.5
+    // Zoom — block wheel scroll, allow only drag/touch/programmatic
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 8])
+      .filter((event: any) => {
+        if (event.type === 'wheel') return false;
+        return true;
+      })
       .on('zoom', (event) => g.attr('transform', event.transform));
     svg.call(zoom);
+    zoomBehaviorRef.current = zoom;
+
+    // Hide tooltip when mouse leaves SVG entirely
+    svg.on('mouseleave', () => {
+      if (tooltipRef.current) tooltipRef.current.style.display = 'none';
+      if (onHoverRef.current) onHoverRef.current(null);
+      g.selectAll('path.estado')
+        .attr('fill', (d: any) => getColor(getUfFromFeature(d), dadosEstados))
+        .attr('stroke', '#30363d')
+        .attr('stroke-width', 0.5)
+        .attr('filter', (d: any) => {
+          const e = dadosEstados.find(dd => dd.uf === getUfFromFeature(d));
+          return e && e.clientes > 0 ? 'url(#glow-active)' : 'none';
+        });
+    });
 
     // Filters — GREEN glow
     const defs = svg.append('defs');
