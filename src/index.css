@@ -255,9 +255,9 @@
     border-radius: 12px;
   }
   .geo-card:hover {
-    border-color: #00d2ff;
-    box-shadow: 0 0 20px rgba(0, 210, 255, 0.08);
+    border-color: #22c55e;
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.08);
   }
-  .geo-accent { color: #00d2ff; }
+  .geo-accent { color: #22c55e; }
   .geo-muted { color: #8b949e; }
 }

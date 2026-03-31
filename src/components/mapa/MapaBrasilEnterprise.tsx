@@ -43,13 +43,20 @@ function getUfFromFeature(d: any): string {
   return d.properties?.sigla || d.properties?.UF || d.properties?.uf || '';
 }
 
+// GREEN PALETTE
+const GREEN_BRIGHT = '#22c55e';
+const GREEN_STRONG = '#16a34a';
+const GREEN_MEDIUM = '#15803d';
+const GREEN_DARK = '#14532d';
+const GREEN_GLOW_RGBA = 'rgba(34, 197, 94, 0.15)';
+
 function getColor(uf: string, dados: EstadoData[]): string {
   const e = dados.find(d => d.uf === uf);
   if (!e || e.clientes === 0) return '#161b22';
-  if (e.clientes >= 10) return '#00d2ff';
-  if (e.clientes >= 6) return '#00a8cc';
-  if (e.clientes >= 3) return '#007a99';
-  return '#004d66';
+  if (e.clientes >= 10) return GREEN_BRIGHT;
+  if (e.clientes >= 6) return GREEN_STRONG;
+  if (e.clientes >= 3) return GREEN_MEDIUM;
+  return GREEN_DARK;
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -67,7 +74,11 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
   const projectionRef = useRef<any>(null);
   const pathRef = useRef<any>(null);
   const dimensionsRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
+  const activeUFRef = useRef<string | null>(null);
   const navigate = useNavigate();
+
+  // Keep ref in sync so D3 closures always see current value
+  useEffect(() => { activeUFRef.current = activeUF; }, [activeUF]);
 
   // Load GeoJSON once
   useEffect(() => {
@@ -123,8 +134,8 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
     municipiosGroup.selectAll('path.municipio')
       .on('mouseover', function (event: any, d: any) {
         d3.select(this)
-          .attr('fill', '#00d2ff')
-          .attr('stroke', '#00d2ff')
+          .attr('fill', GREEN_BRIGHT)
+          .attr('stroke', GREEN_BRIGHT)
           .attr('stroke-width', 1 / parentScale)
           .attr('filter', 'url(#glow-hover)');
 
@@ -137,7 +148,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
           tooltipRef.current.style.left = (event.clientX - rect.left + 16) + 'px';
           tooltipRef.current.style.top = (event.clientY - rect.top - 10) + 'px';
           tooltipRef.current.innerHTML = `
-            <div style="font-size:13px;font-weight:800;color:#00d2ff;margin-bottom:4px">${nome}</div>
+            <div style="font-size:13px;font-weight:800;color:${GREEN_BRIGHT};margin-bottom:4px">${nome}</div>
             <div style="font-size:10px;color:#484f58">Código IBGE: ${codMun}</div>
             <div style="margin-top:6px;font-size:10px;color:#484f58">Clique para ver detalhes →</div>
           `;
@@ -171,7 +182,6 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
     const pathGenerator = pathRef.current;
     const { width, height } = dimensionsRef.current;
 
-    // Compute zoom transform
     const [[x0, y0], [x1, y1]] = pathGenerator.bounds(feature);
     const dx = x1 - x0;
     const dy = y1 - y0;
@@ -180,18 +190,15 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
     const scale = Math.max(1, Math.min(8, 0.9 / Math.max(dx / width, dy / height)));
     const translate = [width / 2 - scale * x, height / 2 - scale * y];
 
-    // Animate zoom
     g.transition()
       .duration(750)
       .attr('transform', `translate(${translate[0]},${translate[1]}) scale(${scale})`);
 
-    // Dim other states
     g.selectAll('path.estado')
       .transition()
       .duration(750)
       .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 1 : 0.15);
 
-    // Dim labels too
     g.selectAll('text.estado-label')
       .transition()
       .duration(750)
@@ -200,7 +207,6 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
     setActiveUF(uf);
     setSearchQuery('');
 
-    // Fetch municipios
     setLoadingMunicipios(true);
     try {
       const cacheKey = `municipios_geo_${uf}`;
@@ -251,7 +257,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
       .attr('fill', function (d: any) {
         const nome = (d.properties?.name || d.properties?.nome || '').toLowerCase();
         if (!query) return '#1a2332';
-        return nome.includes(query) ? '#00d2ff' : '#0d1117';
+        return nome.includes(query) ? GREEN_BRIGHT : '#0d1117';
       })
       .attr('opacity', function (d: any) {
         const nome = (d.properties?.name || d.properties?.nome || '').toLowerCase();
@@ -289,7 +295,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
       .on('zoom', (event) => g.attr('transform', event.transform));
     svg.call(zoom);
 
-    // Filters
+    // Filters — GREEN glow
     const defs = svg.append('defs');
     const makeGlow = (id: string, stdDev: number) => {
       const f = defs.append('filter').attr('id', id)
@@ -301,6 +307,11 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
     };
     makeGlow('glow-hover', 6);
     makeGlow('glow-active', 3);
+
+    // Capture navigate and callbacks in closure-safe way
+    const navFn = navigate;
+    const clickCb = onEstadoClick;
+    const zoomFn = zoomToEstado;
 
     // States
     g.selectAll('path.estado')
@@ -321,8 +332,8 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
         const uf = getUfFromFeature(d);
         const dados = dadosEstados.find(dd => dd.uf === uf);
         d3.select(this)
-          .attr('fill', '#00d2ff')
-          .attr('stroke', '#00d2ff')
+          .attr('fill', GREEN_BRIGHT)
+          .attr('stroke', GREEN_BRIGHT)
           .attr('stroke-width', 2)
           .attr('filter', 'url(#glow-hover)');
 
@@ -332,11 +343,11 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
           tooltipRef.current.style.left = (event.clientX - rect.left + 16) + 'px';
           tooltipRef.current.style.top = (event.clientY - rect.top - 10) + 'px';
           tooltipRef.current.innerHTML = `
-            <div style="font-size:14px;font-weight:800;color:#00d2ff;margin-bottom:6px">${UF_NOMES[uf] || uf}</div>
+            <div style="font-size:14px;font-weight:800;color:${GREEN_BRIGHT};margin-bottom:6px">${UF_NOMES[uf] || uf}</div>
             <div style="font-size:11px;color:#8b949e;line-height:2">
               <div style="display:flex;justify-content:space-between;gap:20px"><span>Clientes</span><span style="color:#e6edf3;font-weight:700">${dados?.clientes || 0}</span></div>
               <div style="display:flex;justify-content:space-between;gap:20px"><span>Processos</span><span style="color:#e6edf3;font-weight:700">${dados?.processos || 0}</span></div>
-              <div style="display:flex;justify-content:space-between;gap:20px"><span>Receita</span><span style="color:#00d2ff;font-weight:700">${fmt(dados?.receita || 0)}</span></div>
+              <div style="display:flex;justify-content:space-between;gap:20px"><span>Receita</span><span style="color:${GREEN_BRIGHT};font-weight:700">${fmt(dados?.receita || 0)}</span></div>
             </div>
             <div style="margin-top:8px;font-size:10px;color:#484f58;text-align:center">Clique para explorar →</div>
           `;
@@ -358,16 +369,17 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
           .attr('filter', e && e.clientes > 0 ? 'url(#glow-active)' : 'none');
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
       })
-      .on('click', function (_event: any, d: any) {
+      .on('click', function (event: any, d: any) {
+        event.stopPropagation();
         const uf = getUfFromFeature(d);
         if (!uf) return;
         // If already drilled into this UF, navigate to detail page
-        if (activeUF === uf) {
-          if (onEstadoClick) onEstadoClick(uf);
-          else navigate(`/inteligencia-geografica/${uf}`);
+        if (activeUFRef.current === uf) {
+          if (clickCb) clickCb(uf);
+          else navFn(`/inteligencia-geografica/${uf}`);
         } else {
           // First click: zoom + drill-down
-          zoomToEstado(uf, d);
+          zoomFn(uf, d);
         }
       });
 
@@ -387,7 +399,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
       .attr('pointer-events', 'none')
       .text((d: any) => getUfFromFeature(d));
 
-  }, [geoData, dadosEstados, navigate, onEstadoClick, activeUF, zoomToEstado]);
+  }, [geoData, dadosEstados, navigate, onEstadoClick, zoomToEstado]);
 
   const handleZoom = (factor: number) => {
     if (!svgRef.current) return;
@@ -400,7 +412,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
     return (
       <div className="flex items-center justify-center h-96" style={{ background: '#0b0e14' }}>
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: '#00d2ff', borderTopColor: 'transparent' }} />
+          <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: GREEN_BRIGHT, borderTopColor: 'transparent' }} />
           <p className="text-sm" style={{ color: '#8b949e' }}>Carregando mapa...</p>
         </div>
       </div>
@@ -409,10 +421,11 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
 
   return (
     <div ref={containerRef} className="relative rounded-xl overflow-hidden" style={{ background: '#0b0e14' }}>
-      {/* Grid background */}
+      {/* Grid background — pointer-events: none is CRITICAL */}
       <div className="absolute inset-0 opacity-5" style={{
         backgroundImage: 'radial-gradient(#30363d 1px, transparent 1px)',
         backgroundSize: '20px 20px',
+        pointerEvents: 'none',
       }} />
 
       <svg ref={svgRef} width="100%" style={{ display: 'block' }} />
@@ -421,18 +434,18 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
       <div ref={tooltipRef} style={{
         display: 'none', position: 'absolute', zIndex: 50,
         background: '#161b22', border: '1px solid #30363d', borderRadius: '12px',
-        padding: '14px 18px', boxShadow: '0 8px 32px rgba(0,210,255,0.15), 0 0 0 1px rgba(0,210,255,0.1)',
+        padding: '14px 18px', boxShadow: `0 8px 32px ${GREEN_GLOW_RGBA}, 0 0 0 1px rgba(34,197,94,0.1)`,
         minWidth: '180px', pointerEvents: 'none',
       }} />
 
-      {/* Back button */}
+      {/* Back button — GREEN */}
       {activeUF && (
         <button
           onClick={voltarParaBrasil}
           className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all hover:scale-105"
           style={{
-            background: '#161b22', border: '1px solid #00d2ff', color: '#00d2ff',
-            boxShadow: '0 0 15px rgba(0,210,255,0.2)', zIndex: 10,
+            background: '#161b22', border: `1px solid ${GREEN_BRIGHT}`, color: GREEN_BRIGHT,
+            boxShadow: `0 0 15px rgba(34,197,94,0.2)`, zIndex: 10,
           }}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -440,7 +453,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
         </button>
       )}
 
-      {/* Search bar (drill-down mode) */}
+      {/* Search bar (drill-down mode) — GREEN focus */}
       {activeUF && !loadingMunicipios && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 w-72" style={{ zIndex: 10 }}>
           <div className="relative">
@@ -455,28 +468,28 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
                 background: '#161b22', border: '1px solid #30363d',
                 color: '#e6edf3', outline: 'none',
               }}
-              onFocus={(e) => (e.target.style.borderColor = '#00d2ff')}
+              onFocus={(e) => (e.target.style.borderColor = GREEN_BRIGHT)}
               onBlur={(e) => (e.target.style.borderColor = '#30363d')}
             />
           </div>
         </div>
       )}
 
-      {/* Loading municipios */}
+      {/* Loading municipios — GREEN spinner */}
       {loadingMunicipios && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-lg"
           style={{ background: '#161b22', border: '1px solid #30363d', zIndex: 10 }}>
-          <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#00d2ff', borderTopColor: 'transparent' }} />
+          <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: GREEN_BRIGHT, borderTopColor: 'transparent' }} />
           <span className="text-xs" style={{ color: '#8b949e' }}>Carregando municípios...</span>
         </div>
       )}
 
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 flex items-center gap-3" style={{ color: '#8b949e', fontSize: '10px' }}>
+      {/* Legend — GREEN palette */}
+      <div className="absolute bottom-4 left-4 flex items-center gap-3" style={{ color: '#8b949e', fontSize: '10px', pointerEvents: 'none' }}>
         <span className="uppercase tracking-wider font-bold" style={{ color: '#484f58' }}>Legenda:</span>
         {[
-          { c: '#00d2ff', l: '10+' }, { c: '#00a8cc', l: '6-10' },
-          { c: '#007a99', l: '3-5' }, { c: '#004d66', l: '1-2' },
+          { c: GREEN_BRIGHT, l: '10+' }, { c: GREEN_STRONG, l: '6-10' },
+          { c: GREEN_MEDIUM, l: '3-5' }, { c: GREEN_DARK, l: '1-2' },
           { c: '#161b22', l: '0', border: true },
         ].map(i => (
           <span key={i.l} className="flex items-center gap-1">
@@ -487,7 +500,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
       </div>
 
       {/* Zoom buttons */}
-      <div className="absolute top-4 right-4 flex flex-col gap-1">
+      <div className="absolute top-4 right-4 flex flex-col gap-1" style={{ pointerEvents: 'auto' }}>
         {[{ label: '+', f: 1.5 }, { label: '−', f: 0.67 }].map(z => (
           <button key={z.label} onClick={() => handleZoom(z.f)}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors hover:text-white"
@@ -496,11 +509,11 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick }: Props) {
         ))}
       </div>
 
-      {/* Drill-down hint */}
+      {/* Drill-down hint — GREEN */}
       {activeUF && !loadingMunicipios && (
         <div className="absolute bottom-4 right-4 text-xs px-3 py-1.5 rounded-lg"
-          style={{ background: '#161b22', border: '1px solid #30363d', color: '#8b949e' }}>
-          Clique novamente em <span style={{ color: '#00d2ff', fontWeight: 700 }}>{activeUF}</span> para abrir detalhes
+          style={{ background: '#161b22', border: '1px solid #30363d', color: '#8b949e', pointerEvents: 'none' }}>
+          Clique novamente em <span style={{ color: GREEN_BRIGHT, fontWeight: 700 }}>{activeUF}</span> para abrir detalhes
         </div>
       )}
     </div>
