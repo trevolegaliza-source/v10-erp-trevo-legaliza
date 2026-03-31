@@ -377,6 +377,8 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
           .attr('stroke-width', 0.5)
           .attr('filter', e && e.clientes > 0 ? 'url(#glow-active)' : 'none');
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
+        // Clear hover
+        if (onHoverRef.current) onHoverRef.current(null);
       })
       .on('click', function (event: any, d: any) {
         event.stopPropagation();
