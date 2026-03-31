@@ -902,6 +902,39 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          email: string | null
+          empresa_id: string
+          id: string
+          nome: string | null
+          role: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          empresa_id?: string
+          id: string
+          nome?: string | null
+          role?: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          email?: string | null
+          empresa_id?: string
+          id?: string
+          nome?: string | null
+          role?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       service_negotiations: {
         Row: {
           billing_trigger: string
