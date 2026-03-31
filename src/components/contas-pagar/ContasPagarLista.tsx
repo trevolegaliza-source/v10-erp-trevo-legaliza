@@ -139,17 +139,21 @@ export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, on
                   <TableCell>{getStatusBadge(l)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      {l.status === 'pendente' && (
+                      {!hideApprove && l.status === 'pendente' && (
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
                           <CheckCircle className="h-3.5 w-3.5 text-primary" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(l)}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
+                      {!hideEdit && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                      {!hideDelete && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(l)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
