@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEstadosResumo } from '@/hooks/useInteligenciaGeografica';
 import { UF_NOMES } from '@/constants/estados-brasil';
@@ -11,6 +11,11 @@ const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 export default function InteligenciaGeografica() {
   const navigate = useNavigate();
   const { data: estadoData, isLoading } = useEstadosResumo();
+  const [hoveredUF, setHoveredUF] = useState<string | null>(null);
+
+  const handleHover = useCallback((uf: string | null) => {
+    setHoveredUF(uf);
+  }, []);
 
   const estadosComDados: EstadoData[] = useMemo(() => {
     if (!estadoData) return [];
@@ -38,6 +43,11 @@ export default function InteligenciaGeografica() {
     };
   }, [estadoData]);
 
+  // Dynamic KPI data based on hover
+  const dadosExibidos = hoveredUF
+    ? estadosComDados.find(d => d.uf === hoveredUF)
+    : null;
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -51,11 +61,30 @@ export default function InteligenciaGeografica() {
   }
 
   const kpis = [
-    { label: 'Estados Ativos', valor: totals.estados, Icon: MapPin },
-    { label: 'Clientes', valor: totals.clientes, Icon: Users },
-    { label: 'Processos', valor: totals.processos, Icon: Kanban },
-    { label: 'Receita', valor: fmt(totals.receita), Icon: DollarSign },
+    {
+      label: hoveredUF ? 'Estado' : 'Estados Ativos',
+      valor: hoveredUF ? hoveredUF : totals.estados,
+      Icon: MapPin,
+    },
+    {
+      label: 'Clientes',
+      valor: dadosExibidos ? dadosExibidos.clientes : totals.clientes,
+      Icon: Users,
+    },
+    {
+      label: 'Processos',
+      valor: dadosExibidos ? dadosExibidos.processos : totals.processos,
+      Icon: Kanban,
+    },
+    {
+      label: 'Receita',
+      valor: fmt(dadosExibidos ? dadosExibidos.receita : totals.receita),
+      Icon: DollarSign,
+      isReceita: true,
+    },
   ];
+
+  const kpiSubLabel = hoveredUF ? (UF_NOMES[hoveredUF] || hoveredUF) : 'Total Brasil';
 
   return (
     <div className="geo-container p-6 rounded-xl space-y-6">
@@ -67,17 +96,34 @@ export default function InteligenciaGeografica() {
         <p className="text-sm geo-muted">CRM Territorial — Clientes, órgãos e contatos por estado</p>
       </div>
 
-      {/* KPIs — GREEN accents */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {kpis.map(kpi => (
-          <div key={kpi.label} className="geo-card p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <kpi.Icon className="h-4 w-4 geo-accent" />
-              <span className="text-xs font-bold uppercase tracking-wider geo-muted">{kpi.label}</span>
+      {/* KPIs — dynamic on hover */}
+      <div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {kpis.map(kpi => (
+            <div key={kpi.label} className="geo-card p-4 transition-all duration-300">
+              <div className="flex items-center gap-2 mb-2">
+                <kpi.Icon className="h-4 w-4 geo-accent" />
+                <span className="text-xs font-bold uppercase tracking-wider geo-muted">{kpi.label}</span>
+              </div>
+              <p className={`text-2xl font-extrabold ${kpi.isReceita ? 'geo-accent' : ''}`} style={kpi.isReceita ? undefined : { color: '#e6edf3' }}>
+                {kpi.valor}
+              </p>
+              <p className="text-[10px] geo-muted mt-1">{kpiSubLabel}</p>
             </div>
-            <p className="text-2xl font-extrabold" style={{ color: '#e6edf3' }}>{kpi.valor}</p>
+          ))}
+        </div>
+
+        {/* Link to state details when hovering */}
+        {hoveredUF && (
+          <div className="flex justify-center mt-2">
+            <button
+              onClick={() => navigate(`/inteligencia-geografica/${hoveredUF}`)}
+              className="text-xs geo-accent hover:underline transition-all"
+            >
+              Ver detalhes de {UF_NOMES[hoveredUF]} →
+            </button>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Map + Ranking */}
@@ -86,6 +132,7 @@ export default function InteligenciaGeografica() {
           <MapaBrasilEnterprise
             dadosEstados={estadosComDados}
             onEstadoClick={(uf) => navigate(`/inteligencia-geografica/${uf}`)}
+            onHover={handleHover}
           />
         </div>
 
