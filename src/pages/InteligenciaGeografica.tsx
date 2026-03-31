@@ -112,14 +112,16 @@ export default function InteligenciaGeografica() {
           ))}
         </div>
 
-        {hoveredUF && (
-          <div className="flex justify-center mt-2">
+        <div className="h-8 flex items-center justify-center">
+          {hoveredUF ? (
             <button onClick={() => navigate(`/inteligencia-geografica/${hoveredUF}`)}
-              className="text-xs geo-accent hover:underline transition-all">
+              className="text-xs geo-accent hover:underline transition-opacity duration-200">
               Ver detalhes de {UF_NOMES[hoveredUF]} →
             </button>
-          </div>
-        )}
+          ) : (
+            <span className="text-xs" style={{ color: '#484f58' }}>Passe o mouse sobre um estado</span>
+          )}
+        </div>
       </div>
 
       {/* Map + Ranking */}

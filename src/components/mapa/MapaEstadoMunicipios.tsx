@@ -64,7 +64,7 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, onMunicipi
         if (!codigoIBGE) throw new Error('UF não encontrada');
 
         const res = await fetch(
-          `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${codigoIBGE}?formato=application/vnd.geo+json&qualidade=minima&intrarregiao=municipio`
+          `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${codigoIBGE}?formato=application/vnd.geo+json&qualidade=intermediaria&intrarregiao=municipio`
         );
         if (!res.ok) throw new Error(`API IBGE erro: ${res.status}`);
         const data = await res.json();
