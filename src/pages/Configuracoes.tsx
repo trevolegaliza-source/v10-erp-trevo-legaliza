@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Shield, Users, Webhook, DollarSign, UserCog, Loader2, CheckCircle2, Palette, Sun, Moon, Monitor } from 'lucide-react';
+import GestaoUsuarios from '@/components/configuracoes/GestaoUsuarios';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
