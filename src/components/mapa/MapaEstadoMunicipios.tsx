@@ -153,6 +153,14 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
     svg.call(zoom as any);
     zoomRef.current = zoom;
 
+    // Store current scale for pin scaling
+    svg.on('zoom.pinscale', null);
+    zoom.on('zoom.pinscale', (event: any) => {
+      const k = event.transform.k;
+      g.selectAll('.pin').attr('r', 5 / k).attr('stroke-width', 1.5 / k);
+      g.selectAll('.pins-layer text').attr('font-size', (7 / k) + 'px');
+    });
+
     // Municipalities
     g.selectAll('path.municipio')
       .data(geoData.features)
