@@ -415,7 +415,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   const handleZoom = (factor: number) => {
     if (!svgRef.current) return;
     const svg = d3.select(svgRef.current);
-    const zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([1, 8]);
+    const zoom = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.5, 8]);
     svg.transition().duration(300).call(zoom.scaleBy as any, factor);
   };
 
