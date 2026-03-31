@@ -208,7 +208,7 @@ export default function EstadoDetalhe() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="mapa">
+      <Tabs defaultValue="mapa" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="geo-card border-none mb-4" style={{ background: '#161b22' }}>
           {['mapa', 'orgaos', 'clientes', 'municipios', 'notas'].map(tab => (
             <TabsTrigger
