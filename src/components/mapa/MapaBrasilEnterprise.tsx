@@ -203,7 +203,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
     g.selectAll('path.estado')
       .transition()
       .duration(750)
-      .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 1 : 0.15);
+      .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 0.15 : 0.08);
 
     g.selectAll('text.estado-label')
       .transition()
