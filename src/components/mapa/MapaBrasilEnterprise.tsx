@@ -78,7 +78,10 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   const pathRef = useRef<any>(null);
   const dimensionsRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const activeUFRef = useRef<string | null>(null);
+  const onHoverRef = useRef<HoverCallback | undefined>(onHover);
   const navigate = useNavigate();
+
+  useEffect(() => { onHoverRef.current = onHover; }, [onHover]);
 
   // Keep ref in sync so D3 closures always see current value
   useEffect(() => { activeUFRef.current = activeUF; }, [activeUF]);
