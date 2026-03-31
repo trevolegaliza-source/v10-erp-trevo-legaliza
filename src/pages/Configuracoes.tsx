@@ -14,6 +14,7 @@ import { useTheme } from 'next-themes';
 import { usePermissions } from '@/hooks/usePermissions';
 
 export default function Configuracoes() {
+  const { isMaster } = usePermissions();
   const { theme, setTheme } = useTheme();
   const [webhookNovo, setWebhookNovo] = useState('');
   const [webhookQsa, setWebhookQsa] = useState('');
