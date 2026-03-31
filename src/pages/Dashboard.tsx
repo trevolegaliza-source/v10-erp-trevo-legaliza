@@ -238,7 +238,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="dashboard-section">
         <h1 className="text-2xl font-bold text-foreground">
-          {getSaudacao()}, {getNomeUsuario(user?.email)} <span className="animate-trevo-wave">🍀</span>
+          {getSaudacao()}, {getNomeUsuario(user?.email, profileName)} <span className="animate-trevo-wave">🍀</span>
         </h1>
         <p className="text-sm text-muted-foreground">
           {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
