@@ -11,6 +11,7 @@ import GestaoUsuarios from '@/components/configuracoes/GestaoUsuarios';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
+import { usePermissions } from '@/hooks/usePermissions';
 
 export default function Configuracoes() {
   const { theme, setTheme } = useTheme();
