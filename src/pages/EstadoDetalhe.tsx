@@ -66,6 +66,27 @@ export default function EstadoDetalhe() {
   const removerContato = useRemoverContato();
   const salvarNota = useSalvarNotaEstado();
 
+  // Clients grouped by municipality for the map
+  const { data: clientesMunicipio } = useQuery({
+    queryKey: ['clientes_municipio_mapa', ufUpper],
+    queryFn: async () => {
+      const { data: clientes } = await supabase
+        .from('clientes')
+        .select('cidade')
+        .eq('estado', ufUpper)
+        .eq('is_archived', false);
+      const map: Record<string, number> = {};
+      (clientes || []).forEach((c: any) => {
+        if (c.cidade) {
+          const key = c.cidade.toUpperCase();
+          map[key] = (map[key] || 0) + 1;
+        }
+      });
+      return map;
+    },
+    enabled: !!ufUpper,
+  });
+
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<Partial<ContatoEstado>>(emptyForm());
   const [nota, setNota] = useState('');
