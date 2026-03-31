@@ -289,7 +289,7 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
             tooltipRef.current.style.display = 'block';
             tooltipRef.current.style.left = (event.clientX - rect.left + 16) + 'px';
             tooltipRef.current.style.top = (event.clientY - rect.top - 10) + 'px';
-            tooltipRef.current.innerHTML = `
+              tooltipRef.current.innerHTML = `
               <div style="font-size:13px;font-weight:800;color:${color};margin-bottom:4px;">
                 ${PIN_EMOJIS[contato.tipo] || '📌'} ${contato.nome}
               </div>
@@ -297,6 +297,7 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
                 ${contato.municipio ? `<div>📍 ${contato.municipio}</div>` : '<div>📍 Sede estadual</div>'}
                 ${contato.telefone ? `<div>📞 ${contato.telefone}</div>` : ''}
                 ${contato.email ? `<div>✉️ ${contato.email}</div>` : ''}
+                ${contato.observacoes ? `<div style="margin-top:4px;color:#6b7280;font-style:italic;">📝 ${contato.observacoes}</div>` : ''}
                 <div style="margin-top:4px;">${stars}</div>
               </div>`;
           }
