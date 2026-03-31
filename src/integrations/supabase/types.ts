@@ -31,6 +31,7 @@ export type Database = {
           dia_cobranca: number | null
           dia_vencimento_mensal: number | null
           email: string | null
+          empresa_id: string | null
           estado: string | null
           franquia_processos: number | null
           id: string
@@ -71,6 +72,7 @@ export type Database = {
           dia_cobranca?: number | null
           dia_vencimento_mensal?: number | null
           email?: string | null
+          empresa_id?: string | null
           estado?: string | null
           franquia_processos?: number | null
           id?: string
@@ -111,6 +113,7 @@ export type Database = {
           dia_cobranca?: number | null
           dia_vencimento_mensal?: number | null
           email?: string | null
+          empresa_id?: string | null
           estado?: string | null
           franquia_processos?: number | null
           id?: string
@@ -194,6 +197,7 @@ export type Database = {
           dia_salario: number | null
           dia_vt_vr: number | null
           email: string | null
+          empresa_id: string | null
           fgts_percentual: number | null
           id: string
           inss_patronal_percentual: number | null
@@ -228,6 +232,7 @@ export type Database = {
           dia_salario?: number | null
           dia_vt_vr?: number | null
           email?: string | null
+          empresa_id?: string | null
           fgts_percentual?: number | null
           id?: string
           inss_patronal_percentual?: number | null
@@ -262,6 +267,7 @@ export type Database = {
           dia_salario?: number | null
           dia_vt_vr?: number | null
           email?: string | null
+          empresa_id?: string | null
           fgts_percentual?: number | null
           id?: string
           inss_patronal_percentual?: number | null
@@ -393,6 +399,7 @@ export type Database = {
       documentos: {
         Row: {
           created_at: string | null
+          empresa_id: string | null
           id: string
           observacao: string | null
           processo_id: string
@@ -402,6 +409,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          empresa_id?: string | null
           id?: string
           observacao?: string | null
           processo_id: string
@@ -411,6 +419,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          empresa_id?: string | null
           id?: string
           observacao?: string | null
           processo_id?: string
@@ -516,6 +525,7 @@ export type Database = {
           data_vencimento: string
           descricao: string
           despesa_recorrente_id: string | null
+          empresa_id: string | null
           etapa_financeiro: string
           extrato_id: string | null
           fornecedor: string | null
@@ -551,6 +561,7 @@ export type Database = {
           data_vencimento: string
           descricao: string
           despesa_recorrente_id?: string | null
+          empresa_id?: string | null
           etapa_financeiro?: string
           extrato_id?: string | null
           fornecedor?: string | null
@@ -586,6 +597,7 @@ export type Database = {
           data_vencimento?: string
           descricao?: string
           despesa_recorrente_id?: string | null
+          empresa_id?: string | null
           etapa_financeiro?: string
           extrato_id?: string | null
           fornecedor?: string | null
@@ -674,6 +686,7 @@ export type Database = {
           desconto_progressivo_ativo: boolean | null
           desconto_progressivo_limite: number | null
           desconto_progressivo_pct: number | null
+          empresa_id: string | null
           escopo: Json
           id: string
           naturezas: Json
@@ -707,6 +720,7 @@ export type Database = {
           desconto_progressivo_ativo?: boolean | null
           desconto_progressivo_limite?: number | null
           desconto_progressivo_pct?: number | null
+          empresa_id?: string | null
           escopo?: Json
           id?: string
           naturezas?: Json
@@ -740,6 +754,7 @@ export type Database = {
           desconto_progressivo_ativo?: boolean | null
           desconto_progressivo_limite?: number | null
           desconto_progressivo_pct?: number | null
+          empresa_id?: string | null
           escopo?: Json
           id?: string
           naturezas?: Json
@@ -853,6 +868,7 @@ export type Database = {
         Row: {
           cliente_id: string
           created_at: string | null
+          empresa_id: string | null
           etapa: string
           id: string
           is_archived: boolean | null
@@ -867,6 +883,7 @@ export type Database = {
         Insert: {
           cliente_id: string
           created_at?: string | null
+          empresa_id?: string | null
           etapa?: string
           id?: string
           is_archived?: boolean | null
@@ -881,6 +898,7 @@ export type Database = {
         Update: {
           cliente_id?: string
           created_at?: string | null
+          empresa_id?: string | null
           etapa?: string
           id?: string
           is_archived?: boolean | null
