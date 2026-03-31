@@ -73,39 +73,53 @@ export function AppSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto scrollbar-thin">
-        {visibleItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          const badgeCount = item.badgeKey && counts ? counts[item.badgeKey] : 0;
-          const variant = item.badgeKey ? badgeVariants[item.badgeKey] : 'default';
-
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                isActive
-                  ? 'sidebar-item-active'
-                  : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <item.icon className={cn('h-4.5 w-4.5 shrink-0 transition-all', isActive && 'icon-glow text-primary')} />
+        {permsLoading ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5">
+              <div className="h-4.5 w-4.5 shrink-0 rounded bg-sidebar-foreground/10 animate-pulse" />
               {!collapsed && (
-                <>
-                  <span className="flex-1 truncate">{item.label}</span>
-                  {badgeCount > 0 && (
-                    <span className={cn(
-                      'ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full',
-                      badgeColors[variant]
-                    )}>
-                      {badgeCount}
-                    </span>
-                  )}
-                </>
+                <div
+                  className="h-3.5 rounded bg-sidebar-foreground/10 animate-pulse"
+                  style={{ width: `${[70, 50, 80, 40, 65, 55][i]}%` }}
+                />
               )}
-            </Link>
-          );
-        })}
+            </div>
+          ))
+        ) : (
+          visibleItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            const badgeCount = item.badgeKey && counts ? counts[item.badgeKey] : 0;
+            const variant = item.badgeKey ? badgeVariants[item.badgeKey] : 'default';
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                  isActive
+                    ? 'sidebar-item-active'
+                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+                )}
+              >
+                <item.icon className={cn('h-4.5 w-4.5 shrink-0 transition-all', isActive && 'icon-glow text-primary')} />
+                {!collapsed && (
+                  <>
+                    <span className="flex-1 truncate">{item.label}</span>
+                    {badgeCount > 0 && (
+                      <span className={cn(
+                        'ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full',
+                        badgeColors[variant]
+                      )}>
+                        {badgeCount}
+                      </span>
+                    )}
+                  </>
+                )}
+              </Link>
+            );
+          })
+        )}
       </nav>
 
       {/* User & Actions */}
