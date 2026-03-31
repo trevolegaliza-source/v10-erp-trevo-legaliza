@@ -405,64 +405,159 @@ export default function Processos() {
             </div>
           </DragDropContext>
         ) : (
-          <div className="rounded-xl border border-border/60 overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-semibold">Razão Social</TableHead>
-                  <TableHead className="text-xs font-semibold">Cliente</TableHead>
-                  <TableHead className="text-xs font-semibold">Tipo</TableHead>
-                  <TableHead className="text-xs font-semibold">Etapa</TableHead>
-                  <TableHead className="text-xs font-semibold">Prioridade</TableHead>
-                  <TableHead className="text-right text-xs font-semibold">Valor</TableHead>
-                  <TableHead className="text-center text-xs font-semibold">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((proc) => (
-                  <TableRow
-                    key={proc.id}
-                    className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
-                    onDoubleClick={() => openEditModal(proc)}
-                  >
-                    <TableCell className="font-medium text-foreground">{proc.razao_social}</TableCell>
-                    <TableCell className="text-sm text-foreground">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-                        {(() => {
-                          const m = proc.notas?.match(/\[AVULSO:(.+?)\]/);
-                          return m ? m[1] : (PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo);
-                        })()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-foreground">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
-                    <TableCell>
-                      {proc.prioridade === 'urgente' ? (
-                        <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Normal</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right text-sm font-semibold text-foreground">
-                      {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <QuickActionsMenu process={proc} onDelete={handleDeleteRequest} onEdit={openEditModal} onHonorarioExtra={openHonorarioExtra} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      Nenhum processo encontrado
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            <p className="text-[11px] text-muted-foreground px-4 py-2 border-t border-border/30">
-              💡 Dê um duplo-clique em qualquer processo para abrir a edição completa
-            </p>
+          <div className="space-y-3">
+            {/* Grouping controls */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground uppercase">Agrupar por:</span>
+                <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
+                  <SelectTrigger className="w-40 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cliente">Cliente</SelectItem>
+                    <SelectItem value="mes">Mês de criação</SelectItem>
+                    <SelectItem value="etapa">Etapa</SelectItem>
+                    <SelectItem value="none">Sem agrupamento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Select value={filterMonth} onValueChange={setFilterMonth}>
+                <SelectTrigger className="w-44 h-8 text-xs">
+                  <SelectValue placeholder="Todos os meses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os meses</SelectItem>
+                  {monthOptions.map(m => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Grouped or flat list */}
+            <div className="rounded-xl border border-border/60 overflow-hidden">
+              {groupedData ? (
+                <>
+                  {groupedData.map(([key, group]) => {
+                    const isCollapsed = collapsedGroups.has(key);
+                    return (
+                      <div key={key}>
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border/40 hover:bg-muted/70 transition-colors"
+                          onClick={() => toggleGroup(key)}
+                        >
+                          <div className="flex items-center gap-2">
+                            {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                            <span className="text-xs font-bold text-foreground uppercase tracking-wide">{group.label}</span>
+                            <Badge variant="outline" className="text-[10px] border-border/60">{group.processes.length} {group.processes.length === 1 ? 'processo' : 'processos'}</Badge>
+                          </div>
+                        </button>
+                        {!isCollapsed && (
+                          <Table>
+                            <TableBody>
+                              {group.processes.map((proc) => (
+                                <TableRow
+                                  key={proc.id}
+                                  className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
+                                  onDoubleClick={() => openEditModal(proc)}
+                                >
+                                  <TableCell className="font-medium text-foreground">{proc.razao_social}</TableCell>
+                                  <TableCell className="text-sm text-foreground">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                                      {(() => {
+                                        const m = proc.notas?.match(/\[AVULSO:(.+?)\]/);
+                                        return m ? m[1] : (PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo);
+                                      })()}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-sm text-foreground">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
+                                  <TableCell>
+                                    {proc.prioridade === 'urgente' ? (
+                                      <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">Normal</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right text-sm font-semibold text-foreground">
+                                    {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <QuickActionsMenu process={proc} onDelete={handleDeleteRequest} onEdit={openEditModal} onHonorarioExtra={openHonorarioExtra} />
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {groupedData.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground text-sm">Nenhum processo encontrado</div>
+                  )}
+                </>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-xs font-semibold">Razão Social</TableHead>
+                      <TableHead className="text-xs font-semibold">Cliente</TableHead>
+                      <TableHead className="text-xs font-semibold">Tipo</TableHead>
+                      <TableHead className="text-xs font-semibold">Etapa</TableHead>
+                      <TableHead className="text-xs font-semibold">Prioridade</TableHead>
+                      <TableHead className="text-right text-xs font-semibold">Valor</TableHead>
+                      <TableHead className="text-center text-xs font-semibold">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((proc) => (
+                      <TableRow
+                        key={proc.id}
+                        className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
+                        onDoubleClick={() => openEditModal(proc)}
+                      >
+                        <TableCell className="font-medium text-foreground">{proc.razao_social}</TableCell>
+                        <TableCell className="text-sm text-foreground">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                            {(() => {
+                              const m = proc.notas?.match(/\[AVULSO:(.+?)\]/);
+                              return m ? m[1] : (PROCESS_TYPE_LABELS[proc.tipo] || proc.tipo);
+                            })()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-foreground">{KANBAN_STAGES.find(s => s.key === proc.etapa)?.label || proc.etapa}</TableCell>
+                        <TableCell>
+                          {proc.prioridade === 'urgente' ? (
+                            <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Normal</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-semibold text-foreground">
+                          {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <QuickActionsMenu process={proc} onDelete={handleDeleteRequest} onEdit={openEditModal} onHonorarioExtra={openHonorarioExtra} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filtered.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          Nenhum processo encontrado
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+              <p className="text-[11px] text-muted-foreground px-4 py-2 border-t border-border/30">
+                💡 Dê um duplo-clique em qualquer processo para abrir a edição completa
+              </p>
+            </div>
           </div>
         )}
       </div>
