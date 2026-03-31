@@ -12,19 +12,12 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) toast.error(error.message);
-      else toast.success('Conta criada! Você já está logado.');
-    } else {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) toast.error(error.message);
-    }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) toast.error(error.message);
     setLoading(false);
   };
 
@@ -46,7 +39,7 @@ export default function Login() {
             />
           </div>
           <p className="text-sm text-muted-foreground">
-            {isSignUp ? 'Crie sua conta' : 'Sistema de Gestão Societária'}
+            Sistema de Gestão Societária
           </p>
         </CardHeader>
         <CardContent>
@@ -75,10 +68,7 @@ export default function Login() {
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <LogIn className="h-4 w-4 mr-2" />}
-              {isSignUp ? 'Criar Conta' : 'Entrar'}
-            </Button>
-            <Button type="button" variant="link" className="w-full text-xs" onClick={() => setIsSignUp(!isSignUp)}>
-              {isSignUp ? 'Já tem conta? Faça login' : 'Primeiro acesso? Crie sua conta'}
+              Entrar
             </Button>
           </form>
           <p className="text-[10px] text-muted-foreground text-center mt-6">
