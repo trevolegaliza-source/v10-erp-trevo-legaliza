@@ -493,12 +493,10 @@ export default function EstadoDetalhe() {
                 </SelectContent>
               </Select>
             </div>
-            {(form.tipo === 'prefeitura' || form.tipo === 'cartorio' || form.tipo === 'outro') && (
-              <div>
-                <Label style={{ color: '#8b949e' }}>Município</Label>
-                <Input value={form.municipio || ''} onChange={e => setForm(p => ({ ...p, municipio: e.target.value || null }))} placeholder="Nome do município" style={inputStyle} />
-              </div>
-            )}
+            <div>
+              <Label style={{ color: '#8b949e' }}>Município</Label>
+              <Input value={form.municipio || ''} onChange={e => setForm(p => ({ ...p, municipio: e.target.value || null }))} placeholder="Nome do município (opcional)" style={inputStyle} />
+            </div>
             <div>
               <Label style={{ color: '#8b949e' }}>Nome *</Label>
               <Input value={form.nome || ''} onChange={e => setForm(p => ({ ...p, nome: e.target.value }))} placeholder="Nome do órgão" style={inputStyle} />
