@@ -1,39 +1,28 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Kanban,
-  Users,
-  DollarSign,
-  FileText,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  PlusCircle,
-  ArrowUpCircle,
-  LogOut,
-  UsersRound,
-  Receipt,
-  MapPin,
+  LayoutDashboard, Kanban, Users, DollarSign, FileText, Settings,
+  ChevronLeft, ChevronRight, PlusCircle, ArrowUpCircle, LogOut, UsersRound, Receipt, MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSidebarCounts } from '@/hooks/useSidebarCounts';
+import { usePermissions } from '@/hooks/usePermissions';
 import logoTrevo from '@/assets/logo-trevo.png';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard, badgeKey: null },
-  { path: '/cadastro-rapido', label: 'Cadastro Rápido', icon: PlusCircle, badgeKey: null },
-  { path: '/processos', label: 'Processos', icon: Kanban, badgeKey: 'processosAtivos' as const },
-  { path: '/clientes', label: 'Clientes', icon: Users, badgeKey: null },
-  { path: '/orcamentos', label: 'Orçamentos', icon: Receipt, badgeKey: 'orcamentosPendentes' as const },
-  { path: '/financeiro', label: 'Financeiro', icon: DollarSign, badgeKey: 'pendentesFinanceiro' as const },
-  { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle, badgeKey: null },
-  { path: '/colaboradores', label: 'Colaboradores', icon: UsersRound, badgeKey: null },
-  { path: '/documentos', label: 'Documentos', icon: FileText, badgeKey: 'docsPendentes' as const },
-  { path: '/inteligencia-geografica', label: 'Intel. Geográfica', icon: MapPin, badgeKey: null },
-  { path: '/configuracoes', label: 'Configurações', icon: Settings, badgeKey: null },
+  { path: '/', label: 'Dashboard', icon: LayoutDashboard, badgeKey: null, modulo: 'dashboard' },
+  { path: '/cadastro-rapido', label: 'Cadastro Rápido', icon: PlusCircle, badgeKey: null, modulo: 'processos' },
+  { path: '/processos', label: 'Processos', icon: Kanban, badgeKey: 'processosAtivos' as const, modulo: 'processos' },
+  { path: '/clientes', label: 'Clientes', icon: Users, badgeKey: null, modulo: 'clientes' },
+  { path: '/orcamentos', label: 'Orçamentos', icon: Receipt, badgeKey: 'orcamentosPendentes' as const, modulo: 'orcamentos' },
+  { path: '/financeiro', label: 'Financeiro', icon: DollarSign, badgeKey: 'pendentesFinanceiro' as const, modulo: 'financeiro' },
+  { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle, badgeKey: null, modulo: 'contas_pagar' },
+  { path: '/colaboradores', label: 'Colaboradores', icon: UsersRound, badgeKey: null, modulo: 'colaboradores' },
+  { path: '/documentos', label: 'Documentos', icon: FileText, badgeKey: 'docsPendentes' as const, modulo: 'documentos' },
+  { path: '/inteligencia-geografica', label: 'Intel. Geográfica', icon: MapPin, badgeKey: null, modulo: 'intel_geografica' },
+  { path: '/configuracoes', label: 'Configurações', icon: Settings, badgeKey: null, modulo: 'configuracoes' },
 ];
 
 type BadgeVariant = 'default' | 'warning' | 'info';
@@ -56,6 +45,9 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { signOut, user } = useAuth();
   const { data: counts } = useSidebarCounts();
+  const { podeVer, loading: permsLoading } = usePermissions();
+
+  const visibleItems = navItems.filter(item => podeVer(item.modulo));
 
   return (
     <aside
@@ -81,7 +73,7 @@ export function AppSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 px-2 py-4 overflow-y-auto scrollbar-thin">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = location.pathname === item.path;
           const badgeCount = item.badgeKey && counts ? counts[item.badgeKey] : 0;
           const variant = item.badgeKey ? badgeVariants[item.badgeKey] : 'default';
