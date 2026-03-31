@@ -126,14 +126,14 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
       .append('path')
       .attr('class', 'municipio')
       .attr('d', pathGenerator as any)
-      .attr('fill', '#0d1117')
-      .attr('stroke', GREEN_BRIGHT)
-      .attr('stroke-width', 0.15 / parentScale)
+      .attr('fill', '#111820')
+      .attr('stroke', 'rgba(34, 197, 94, 0.3)')
+      .attr('stroke-width', 0.3 / parentScale)
       .attr('cursor', 'pointer')
       .attr('opacity', 0)
       .transition()
-      .duration(500)
-      .delay((_d: any, i: number) => Math.min(i * 1.5, 600))
+      .duration(400)
+      .delay((_d: any, i: number) => Math.min(i * 3, 600))
       .attr('opacity', 1);
 
     // Re-select after transition for event binding
