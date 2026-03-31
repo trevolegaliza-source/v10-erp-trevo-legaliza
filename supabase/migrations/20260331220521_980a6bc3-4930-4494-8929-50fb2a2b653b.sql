@@ -1,0 +1,1 @@
+ALTER TABLE public.contatos_estado ADD COLUMN IF NOT EXISTS rating integer DEFAULT 0;

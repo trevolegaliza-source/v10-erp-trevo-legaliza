@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MapaEstadoMunicipios } from '@/components/mapa/MapaEstadoMunicipios';
+import { RatingStars } from '@/components/mapa/RatingStars';
 import { toast } from 'sonner';
 import { UF_NOMES } from '@/constants/estados-brasil';
 import {
@@ -10,9 +11,7 @@ import {
   useSalvarNotaEstado, useMunicipiosIBGE,
   type ContatoEstado,
 } from '@/hooks/useInteligenciaGeografica';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,15 +40,21 @@ const TIPO_ICONS: Record<string, typeof Building> = {
   outro: Globe,
 };
 
+const LEGENDA_ITENS = [
+  { tipo: 'junta_comercial', label: 'Junta Comercial', cor: '#f59e0b', emoji: '📍' },
+  { tipo: 'outro', label: 'Escritório Regional', cor: '#3b82f6', emoji: '🏢' },
+  { tipo: 'cartorio', label: 'Cartório', cor: '#8b5cf6', emoji: '⚖️' },
+  { tipo: 'conselho', label: 'Conselho de Classe', cor: '#ec4899', emoji: '🎓' },
+  { tipo: 'prefeitura', label: 'Prefeitura', cor: '#22c55e', emoji: '🏛️' },
+];
+
 const emptyForm = (): Partial<ContatoEstado> => ({
   tipo: 'junta_comercial', nome: '', municipio: null, site_url: null,
-  telefone: null, email: null, contato_interno: null, endereco: null, observacoes: null,
+  telefone: null, email: null, contato_interno: null, endereco: null, observacoes: null, rating: 0,
 });
 
 const GREEN = '#22c55e';
-const GREEN_GLOW = 'rgba(34, 197, 94, 0.15)';
 
-// Dark input style
 const inputStyle: React.CSSProperties = {
   background: '#0b0e14', border: '1px solid #30363d', color: '#e6edf3',
 };
@@ -57,6 +62,7 @@ const inputStyle: React.CSSProperties = {
 export default function EstadoDetalhe() {
   const { uf = '' } = useParams<{ uf: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const ufUpper = uf.toUpperCase();
   const nomeEstado = UF_NOMES[ufUpper] || ufUpper;
 
@@ -66,7 +72,6 @@ export default function EstadoDetalhe() {
   const removerContato = useRemoverContato();
   const salvarNota = useSalvarNotaEstado();
 
-  // Clients grouped by municipality for the map
   const { data: clientesMunicipio } = useQuery({
     queryKey: ['clientes_municipio_mapa', ufUpper],
     queryFn: async () => {
@@ -93,6 +98,9 @@ export default function EstadoDetalhe() {
   const [notaId, setNotaId] = useState<string | null>(null);
   const [buscaMunicipio, setBuscaMunicipio] = useState('');
   const [activeTab, setActiveTab] = useState('mapa');
+  const [legendaConfig, setLegendaConfig] = useState<Record<string, boolean>>({
+    junta_comercial: true, outro: true, cartorio: true, conselho: true, prefeitura: true,
+  });
 
   useEffect(() => {
     if (data) {
@@ -101,7 +109,6 @@ export default function EstadoDetalhe() {
     }
   }, [data]);
 
-  // Auto-save notes with debounce
   const [notaDirty, setNotaDirty] = useState(false);
   useEffect(() => {
     if (!notaDirty) return;
@@ -127,6 +134,18 @@ export default function EstadoDetalhe() {
     salvarContato.mutate({ ...form, uf: ufUpper, nome: form.nome!, tipo: form.tipo! } as any, {
       onSuccess: () => setModalOpen(false),
     });
+  };
+
+  const handleUpdateRating = async (contatoId: string, rating: number) => {
+    const { error } = await (supabase.from('contatos_estado' as any) as any)
+      .update({ rating })
+      .eq('id', contatoId);
+    if (error) {
+      toast.error('Erro ao atualizar avaliação');
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: ['estado_detalhe', ufUpper] });
+    toast.success(`Avaliação atualizada: ${rating}/5 ⭐`);
   };
 
   const contatosByTipo = useMemo(() => {
@@ -176,23 +195,26 @@ export default function EstadoDetalhe() {
 
   return (
     <div className="geo-container min-h-screen p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2">
         <button
           onClick={() => navigate('/inteligencia-geografica')}
-          className="geo-card p-2 transition-colors"
-          style={{ cursor: 'pointer' }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = GREEN)}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#30363d')}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/5"
+          style={{ color: GREEN, border: '1px solid rgba(34,197,94,0.2)' }}
         >
-          <ArrowLeft className="h-5 w-5" style={{ color: '#8b949e' }} />
+          <ArrowLeft className="h-4 w-4" />
+          Mapa do Brasil
         </button>
-        <div>
-          <h1 className="text-2xl font-extrabold" style={{ color: '#e6edf3' }}>{nomeEstado}</h1>
-          <p className="text-sm" style={{ color: '#8b949e' }}>
-            {ufUpper} · {qtdClientes} clientes · {qtdProcessos} processos · {fmt(receita)}
-          </p>
-        </div>
+        <span style={{ color: '#30363d' }}>/</span>
+        <span className="text-sm font-bold" style={{ color: '#e6edf3' }}>{nomeEstado}</span>
+      </div>
+
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-extrabold" style={{ color: '#e6edf3' }}>{nomeEstado}</h1>
+        <p className="text-sm" style={{ color: '#8b949e' }}>
+          {ufUpper} · {qtdClientes} clientes · {qtdProcessos} processos · {fmt(receita)}
+        </p>
       </div>
 
       {/* KPIs */}
@@ -224,16 +246,39 @@ export default function EstadoDetalhe() {
         </TabsList>
 
         {/* Tab: Mapa */}
-        <TabsContent value="mapa" className="mt-2">
+        <TabsContent value="mapa" className="mt-2 space-y-3">
           <MapaEstadoMunicipios
             uf={ufUpper}
             clientesPorMunicipio={clientesMunicipio || {}}
+            contatos={data?.contatos}
+            legendaConfig={legendaConfig}
             onMunicipioClick={(nome) => {
               setActiveTab('municipios');
               setBuscaMunicipio(nome);
               toast.success(`${nome} selecionado — veja detalhes abaixo`);
             }}
           />
+
+          {/* Interactive pin legend */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: '#484f58' }}>Pins:</span>
+            {LEGENDA_ITENS.map(item => (
+              <button
+                key={item.tipo}
+                onClick={() => setLegendaConfig(prev => ({ ...prev, [item.tipo]: !prev[item.tipo] }))}
+                className={`flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg transition-all ${
+                  legendaConfig[item.tipo] ? 'opacity-100' : 'opacity-30'
+                }`}
+                style={{
+                  border: `1px solid ${legendaConfig[item.tipo] ? item.cor + '66' : '#30363d'}`,
+                  color: legendaConfig[item.tipo] ? item.cor : '#484f58',
+                }}
+              >
+                <span>{item.emoji}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
         </TabsContent>
 
         {/* Tab: Órgãos e Contatos */}
@@ -266,11 +311,18 @@ export default function EstadoDetalhe() {
                     {contatos.map(c => (
                       <div key={c.id} className="p-3 rounded-lg" style={{ background: '#0b0e14' }}>
                         <div className="flex items-start justify-between">
-                          <div className="space-y-1">
-                            <p className="font-bold text-sm" style={{ color: '#e6edf3' }}>
-                              {c.nome}
-                              {c.municipio && <span className="font-normal text-xs ml-2" style={{ color: '#8b949e' }}>· {c.municipio}</span>}
-                            </p>
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-bold text-sm" style={{ color: '#e6edf3' }}>
+                                {c.nome}
+                                {c.municipio && <span className="font-normal text-xs ml-2" style={{ color: '#8b949e' }}>· {c.municipio}</span>}
+                              </p>
+                              <RatingStars
+                                rating={c.rating || 0}
+                                onChange={(novoRating) => handleUpdateRating(c.id, novoRating)}
+                                size={12}
+                              />
+                            </div>
                             <div className="flex flex-wrap gap-3 text-xs" style={{ color: '#8b949e' }}>
                               {c.telefone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{c.telefone}</span>}
                               {c.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" />{c.email}</span>}
@@ -423,7 +475,7 @@ export default function EstadoDetalhe() {
         </TabsContent>
       </Tabs>
 
-      {/* Modal de contato — DARK THEMED */}
+      {/* Modal de contato */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent style={{ background: '#161b22', borderColor: '#30363d', color: '#e6edf3' }}>
           <DialogHeader>
@@ -441,7 +493,7 @@ export default function EstadoDetalhe() {
                 </SelectContent>
               </Select>
             </div>
-            {(form.tipo === 'prefeitura' || form.tipo === 'cartorio') && (
+            {(form.tipo === 'prefeitura' || form.tipo === 'cartorio' || form.tipo === 'outro') && (
               <div>
                 <Label style={{ color: '#8b949e' }}>Município</Label>
                 <Input value={form.municipio || ''} onChange={e => setForm(p => ({ ...p, municipio: e.target.value || null }))} placeholder="Nome do município" style={inputStyle} />
@@ -450,6 +502,10 @@ export default function EstadoDetalhe() {
             <div>
               <Label style={{ color: '#8b949e' }}>Nome *</Label>
               <Input value={form.nome || ''} onChange={e => setForm(p => ({ ...p, nome: e.target.value }))} placeholder="Nome do órgão" style={inputStyle} />
+            </div>
+            <div>
+              <Label style={{ color: '#8b949e' }}>Avaliação</Label>
+              <RatingStars rating={form.rating || 0} onChange={(r) => setForm(p => ({ ...p, rating: r }))} size={18} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
