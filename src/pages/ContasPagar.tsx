@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Settings, ChevronLeft, ChevronRight, Users, CheckSquare, X } from 'lucide-react';
+import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
 import {
   AlertDialog,
