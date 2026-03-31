@@ -260,4 +260,13 @@
   }
   .geo-accent { color: #22c55e; }
   .geo-muted { color: #8b949e; }
+
+  /* Municipality pulse for municipalities with clients */
+  @keyframes municipioPulse {
+    0%, 100% { filter: none; }
+    50% { filter: drop-shadow(0 0 6px rgba(34, 197, 94, 0.5)); }
+  }
+  .municipio-ativo {
+    animation: municipioPulse 2s ease-in-out infinite;
+  }
 }

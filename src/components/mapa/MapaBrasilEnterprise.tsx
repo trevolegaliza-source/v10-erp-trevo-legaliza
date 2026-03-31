@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as d3 from 'd3';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search } from 'lucide-react';
@@ -17,6 +17,8 @@ interface Props {
   dadosEstados: EstadoData[];
   onEstadoClick?: (uf: string) => void;
   onHover?: HoverCallback;
+  clientesPorCidade?: Record<string, number>; // "UF-CIDADE" => count
+  onActiveUFChange?: (uf: string | null) => void;
 }
 
 const UF_NOMES: Record<string, string> = {
@@ -46,7 +48,6 @@ function getUfFromFeature(d: any): string {
   return d.properties?.sigla || d.properties?.UF || d.properties?.uf || '';
 }
 
-// GREEN PALETTE
 const GREEN_BRIGHT = '#22c55e';
 const GREEN_STRONG = '#16a34a';
 const GREEN_MEDIUM = '#15803d';
@@ -64,7 +65,11 @@ function getColor(uf: string, dados: EstadoData[]): string {
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: Props) {
+function getMunNome(d: any): string {
+  return d.properties?.name || d.properties?.nome || d.properties?.NM_MUN || 'Município';
+}
+
+export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover, clientesPorCidade, onActiveUFChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -73,63 +78,83 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   const [activeUF, setActiveUF] = useState<string | null>(null);
   const [loadingMunicipios, setLoadingMunicipios] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [municipiosGeo, setMunicipiosGeo] = useState<any>(null);
   const gRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
-  const projectionRef = useRef<any>(null);
   const pathRef = useRef<any>(null);
   const dimensionsRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const activeUFRef = useRef<string | null>(null);
   const zoomBehaviorRef = useRef<any>(null);
   const onHoverRef = useRef<HoverCallback | undefined>(onHover);
+  const clientesPorCidadeRef = useRef(clientesPorCidade);
   const navigate = useNavigate();
 
   useEffect(() => { onHoverRef.current = onHover; }, [onHover]);
+  useEffect(() => { activeUFRef.current = activeUF; onActiveUFChange?.(activeUF); }, [activeUF, onActiveUFChange]);
+  useEffect(() => { clientesPorCidadeRef.current = clientesPorCidade; }, [clientesPorCidade]);
 
-  // Keep ref in sync so D3 closures always see current value
-  useEffect(() => { activeUFRef.current = activeUF; }, [activeUF]);
+  // Municipalities with clients for sidebar during drill-down
+  const municipiosComClientes = useMemo(() => {
+    if (!activeUF || !clientesPorCidade) return [];
+    const prefix = `${activeUF}-`;
+    return Object.entries(clientesPorCidade)
+      .filter(([k]) => k.startsWith(prefix))
+      .map(([k, v]) => ({ municipio: k.slice(prefix.length), clientes: v }))
+      .sort((a, b) => b.clientes - a.clientes);
+  }, [activeUF, clientesPorCidade]);
+
+  // Total municipalities loaded
+  const totalMunicipios = municipiosGeo?.features?.length || 0;
 
   // Load GeoJSON once
   useEffect(() => {
     const fetchGeo = async () => {
       try {
         const cached = sessionStorage.getItem('brasil_geojson');
-        if (cached) {
-          setGeoData(JSON.parse(cached));
-          setLoading(false);
-          return;
-        }
+        if (cached) { setGeoData(JSON.parse(cached)); setLoading(false); return; }
         const res = await fetch(
           'https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson'
         );
         const data = await res.json();
         sessionStorage.setItem('brasil_geojson', JSON.stringify(data));
         setGeoData(data);
-      } catch (err) {
-        console.error('Erro ao carregar GeoJSON:', err);
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { console.error('Erro ao carregar GeoJSON:', err); }
+      finally { setLoading(false); }
     };
     fetchGeo();
+  }, []);
+
+  const getMunFill = useCallback((d: any, uf: string) => {
+    const nome = getMunNome(d).toUpperCase();
+    const key = `${uf}-${nome}`;
+    const count = clientesPorCidadeRef.current?.[key] || 0;
+    if (count > 0) return GREEN_BRIGHT;
+    return '#0d1117';
   }, []);
 
   const renderMunicipios = useCallback((
     g: d3.Selection<any, any, any, any>,
     municipiosData: any,
     pathGenerator: any,
-    parentScale: number
+    parentScale: number,
+    uf: string
   ) => {
     g.selectAll('.municipios-layer').remove();
-    const municipiosGroup = g.append('g').attr('class', 'municipios-layer');
+    const layer = g.append('g').attr('class', 'municipios-layer');
 
-    municipiosGroup.selectAll('path.municipio')
+    layer.selectAll('path.municipio')
       .data(municipiosData.features || [])
       .enter()
       .append('path')
-      .attr('class', 'municipio')
+      .attr('class', (d: any) => {
+        const nome = getMunNome(d).toUpperCase();
+        const key = `${uf}-${nome}`;
+        const hasClient = (clientesPorCidadeRef.current?.[key] || 0) > 0;
+        return `municipio${hasClient ? ' municipio-ativo' : ''}`;
+      })
       .attr('d', pathGenerator as any)
-      .attr('fill', '#111820')
-      .attr('stroke', 'rgba(34, 197, 94, 0.3)')
-      .attr('stroke-width', 0.3 / parentScale)
+      .attr('fill', (d: any) => getMunFill(d, uf))
+      .attr('stroke', '#1e3a2a')
+      .attr('stroke-width', 0.4 / parentScale)
       .attr('cursor', 'pointer')
       .attr('opacity', 0)
       .transition()
@@ -137,8 +162,8 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
       .delay((_d: any, i: number) => Math.min(i * 3, 600))
       .attr('opacity', 1);
 
-    // Re-select after transition for event binding
-    municipiosGroup.selectAll('path.municipio')
+    // Event binding after entering
+    layer.selectAll('path.municipio')
       .on('mouseover', function (event: any, d: any) {
         d3.select(this)
           .attr('fill', GREEN_BRIGHT)
@@ -146,8 +171,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
           .attr('stroke-width', 0.8 / parentScale)
           .attr('filter', 'url(#glow-hover)');
 
-        const nome = d.properties?.name || d.properties?.nome || d.properties?.NM_MUN || 'Município';
-        const codMun = d.properties?.codarea || d.properties?.CD_MUN || d.id || '';
+        const nome = getMunNome(d);
+        const key = `${uf}-${nome.toUpperCase()}`;
+        const qtd = clientesPorCidadeRef.current?.[key] || 0;
 
         if (tooltipRef.current && containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
@@ -155,9 +181,13 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
           tooltipRef.current.style.left = (event.clientX - rect.left + 16) + 'px';
           tooltipRef.current.style.top = (event.clientY - rect.top - 10) + 'px';
           tooltipRef.current.innerHTML = `
-            <div style="font-size:13px;font-weight:800;color:${GREEN_BRIGHT};margin-bottom:4px">${nome}</div>
-            <div style="font-size:10px;color:#484f58">Código IBGE: ${codMun}</div>
-            <div style="margin-top:6px;font-size:10px;color:#484f58">Clique para ver detalhes →</div>
+            <div style="font-size:14px;font-weight:800;color:${GREEN_BRIGHT};margin-bottom:6px">${nome}</div>
+            <div style="font-size:11px;color:#8b949e;line-height:1.8">
+              ${qtd > 0
+                ? `<div style="display:flex;justify-content:space-between;gap:20px"><span>Clientes</span><span style="color:${GREEN_BRIGHT};font-weight:700">${qtd}</span></div>`
+                : '<div style="color:#484f58">Sem clientes cadastrados</div>'
+              }
+            </div>
           `;
         }
       })
@@ -168,26 +198,18 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
           tooltipRef.current.style.top = (event.clientY - rect.top - 10) + 'px';
         }
       })
-      .on('mouseout', function () {
+      .on('mouseout', function (this: any, _event: any, d: any) {
         d3.select(this)
-          .attr('fill', '#111820')
-          .attr('stroke', 'rgba(34, 197, 94, 0.3)')
-          .attr('stroke-width', 0.3 / parentScale)
+          .attr('fill', getMunFill(d, uf))
+          .attr('stroke', '#1e3a2a')
+          .attr('stroke-width', 0.4 / parentScale)
           .attr('filter', 'none');
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
-      })
-      .on('click', function (_event: any, d: any) {
-        const nome = d.properties?.name || d.properties?.nome || d.properties?.NM_MUN || '';
-        console.log('Município clicado:', nome, d.properties);
       });
-  }, []);
+  }, [getMunFill]);
 
   const zoomToEstado = useCallback(async (uf: string, feature: any) => {
-    if (!svgRef.current || !gRef.current || !pathRef.current) {
-      console.error('SVG ou GeoData não disponível');
-      return;
-    }
-
+    if (!svgRef.current || !gRef.current || !pathRef.current) return;
     try {
       const g = gRef.current;
       const pathGenerator = pathRef.current;
@@ -202,24 +224,20 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
       const tx = width / 2 - scale * cx;
       const ty = height / 2 - scale * cy;
 
+      // Fade other states
       g.selectAll('path.estado')
-        .transition()
-        .duration(750)
-        .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 0.15 : 0.08);
+        .transition().duration(750)
+        .attr('opacity', (d: any) => getUfFromFeature(d) === uf ? 0.15 : 0.05);
 
       g.selectAll('text.estado-label')
-        .transition()
-        .duration(750)
-        .attr('opacity', 0);
+        .transition().duration(750).attr('opacity', 0);
 
-      g.transition()
-        .duration(750)
+      g.transition().duration(750)
         .attr('transform', `translate(${tx},${ty}) scale(${scale})`);
 
       activeUFRef.current = uf;
       setActiveUF(uf);
       setSearchQuery('');
-
       setLoadingMunicipios(true);
 
       const cacheKey = `mun_geo_${uf}`;
@@ -230,41 +248,21 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         municipiosData = JSON.parse(cached);
       } else {
         const codigoIBGE = UF_TO_IBGE[uf];
-        if (!codigoIBGE) {
-          console.error('Código IBGE não encontrado para', uf);
-          setLoadingMunicipios(false);
-          return;
-        }
-
+        if (!codigoIBGE) { setLoadingMunicipios(false); return; }
         const url = `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${codigoIBGE}?formato=application/vnd.geo+json&qualidade=intermediaria&intrarregiao=municipio`;
-        console.log('Carregando municípios:', url);
-
         const res = await fetch(url);
-        if (!res.ok) {
-          console.error('Erro na API IBGE:', res.status, res.statusText);
-          setLoadingMunicipios(false);
-          return;
-        }
-
+        if (!res.ok) { setLoadingMunicipios(false); return; }
         municipiosData = await res.json();
-
-        if (!municipiosData.features || municipiosData.features.length === 0) {
-          console.error('GeoJSON sem features para', uf);
-          setLoadingMunicipios(false);
-          return;
-        }
-
+        if (!municipiosData.features?.length) { setLoadingMunicipios(false); return; }
         sessionStorage.setItem(cacheKey, JSON.stringify(municipiosData));
       }
 
-      console.log('Municípios carregados:', municipiosData.features?.length);
+      setMunicipiosGeo(municipiosData);
 
-      // Wait for zoom animation before rendering municipalities
       setTimeout(() => {
-        renderMunicipios(g, municipiosData, pathGenerator, scale);
+        renderMunicipios(g, municipiosData, pathGenerator, scale, uf);
         setLoadingMunicipios(false);
       }, 800);
-
     } catch (err) {
       console.error('Erro no drill-down:', err);
       setLoadingMunicipios(false);
@@ -276,35 +274,34 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
   const voltarParaBrasil = useCallback(() => {
     if (!gRef.current) return;
     const g = gRef.current;
-
     g.transition().duration(750).attr('transform', 'translate(0,0) scale(1)');
     g.selectAll('path.estado').transition().duration(750).attr('opacity', 1);
     g.selectAll('text.estado-label').transition().duration(750).attr('opacity', 1);
     g.selectAll('.municipios-layer').transition().duration(300).attr('opacity', 0).remove();
-
+    activeUFRef.current = null;
     setActiveUF(null);
+    setMunicipiosGeo(null);
     setSearchQuery('');
     if (tooltipRef.current) tooltipRef.current.style.display = 'none';
   }, []);
 
-  // Handle search filtering
+  // Search filtering
   useEffect(() => {
     if (!activeUF || !gRef.current) return;
     const g = gRef.current;
     const query = searchQuery.toLowerCase();
-
     g.selectAll('path.municipio')
       .attr('fill', function (d: any) {
-        const nome = (d.properties?.name || d.properties?.nome || '').toLowerCase();
-        if (!query) return '#0d1117';
+        const nome = getMunNome(d).toLowerCase();
+        if (!query) return getMunFill(d, activeUF);
         return nome.includes(query) ? GREEN_BRIGHT : '#0d1117';
       })
       .attr('opacity', function (d: any) {
-        const nome = (d.properties?.name || d.properties?.nome || '').toLowerCase();
+        const nome = getMunNome(d).toLowerCase();
         if (!query) return 1;
         return nome.includes(query) ? 1 : 0.3;
       });
-  }, [searchQuery, activeUF]);
+  }, [searchQuery, activeUF, getMunFill]);
 
   // D3 render
   useEffect(() => {
@@ -314,47 +311,36 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
     const width = containerRef.current.clientWidth;
     const height = Math.max(450, width * 0.7);
     dimensionsRef.current = { width, height };
-
     svg.attr('viewBox', `0 0 ${width} ${height}`);
     svg.selectAll('*').remove();
 
     const padding = 40;
     const projection = d3.geoMercator()
       .fitExtent([[padding, padding], [width - padding, height - padding]], geoData);
-    projectionRef.current = projection;
-
     const path = d3.geoPath().projection(projection);
     pathRef.current = path;
 
     const g = svg.append('g') as d3.Selection<SVGGElement, unknown, null, undefined>;
     gRef.current = g;
 
-    // Zoom — block wheel scroll, allow only drag/touch/programmatic
+    // Zoom — block wheel scroll
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 8])
-      .filter((event: any) => {
-        if (event.type === 'wheel') return false;
-        return true;
-      })
+      .filter((event: any) => event.type !== 'wheel')
       .on('zoom', (event) => g.attr('transform', event.transform));
     svg.call(zoom);
     zoomBehaviorRef.current = zoom;
 
-    // Hide tooltip when mouse leaves SVG entirely
+    // mouseleave: ONLY hide tooltip, do NOT reset drill-down
     svg.on('mouseleave', () => {
       if (tooltipRef.current) tooltipRef.current.style.display = 'none';
-      if (onHoverRef.current) onHoverRef.current(null);
-      g.selectAll('path.estado')
-        .attr('fill', (d: any) => getColor(getUfFromFeature(d), dadosEstados))
-        .attr('stroke', '#30363d')
-        .attr('stroke-width', 0.5)
-        .attr('filter', (d: any) => {
-          const e = dadosEstados.find(dd => dd.uf === getUfFromFeature(d));
-          return e && e.clientes > 0 ? 'url(#glow-active)' : 'none';
-        });
+      // Only clear hover when NOT in drill-down
+      if (!activeUFRef.current && onHoverRef.current) {
+        onHoverRef.current(null);
+      }
     });
 
-    // Filters — GREEN glow
+    // Filters
     const defs = svg.append('defs');
     const makeGlow = (id: string, stdDev: number) => {
       const f = defs.append('filter').attr('id', id)
@@ -367,9 +353,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
     makeGlow('glow-hover', 6);
     makeGlow('glow-active', 3);
 
-    // Capture navigate and callbacks in closure-safe way
     const navFn = navigate;
-    const clickCb = onEstadoClick;
     const zoomFn = zoomToEstado;
 
     // States
@@ -388,6 +372,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         return e && e.clientes > 0 ? 'url(#glow-active)' : 'none';
       })
       .on('mouseover', function (event: any, d: any) {
+        // Don't show state hover when in drill-down mode
+        if (activeUFRef.current) return;
+
         const uf = getUfFromFeature(d);
         const dados = dadosEstados.find(dd => dd.uf === uf);
         d3.select(this)
@@ -396,7 +383,6 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
           .attr('stroke-width', 2)
           .attr('filter', 'url(#glow-hover)');
 
-        // Notify parent for dynamic KPIs
         if (onHoverRef.current) onHoverRef.current(uf);
 
         if (tooltipRef.current && containerRef.current) {
@@ -416,12 +402,14 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         }
       })
       .on('mousemove', function (event: any) {
+        if (activeUFRef.current) return;
         if (!tooltipRef.current || !containerRef.current) return;
         const rect = containerRef.current.getBoundingClientRect();
         tooltipRef.current.style.left = (event.clientX - rect.left + 16) + 'px';
         tooltipRef.current.style.top = (event.clientY - rect.top - 10) + 'px';
       })
       .on('mouseout', function (_event: any, d: any) {
+        if (activeUFRef.current) return;
         const uf = getUfFromFeature(d);
         const e = dadosEstados.find(dd => dd.uf === uf);
         d3.select(this)
@@ -430,7 +418,6 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
           .attr('stroke-width', 0.5)
           .attr('filter', e && e.clientes > 0 ? 'url(#glow-active)' : 'none');
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
-        // Clear hover
         if (onHoverRef.current) onHoverRef.current(null);
       })
       .on('click', function (event: any, d: any) {
@@ -438,23 +425,24 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         event.stopPropagation();
         const uf = getUfFromFeature(d);
         if (!uf) return;
-        console.log('Click no estado:', uf, 'activeUF:', activeUFRef.current);
 
         if (activeUFRef.current === uf) {
-          // Second click: navigate to detail page
-          if (clickCb) clickCb(uf);
-          else navFn(`/inteligencia-geografica/${uf}`);
+          navFn(`/inteligencia-geografica/${uf}`);
           return;
         }
-
         if (activeUFRef.current && activeUFRef.current !== uf) {
-          // Already drilled into another state: reset first
-          voltarParaBrasil();
-          setTimeout(() => zoomFn(uf, d), 800);
+          // Switch drill-down — need to reset and re-zoom
+          const gCurrent = gRef.current;
+          if (gCurrent) {
+            gCurrent.selectAll('.municipios-layer').remove();
+            gCurrent.selectAll('path.estado').transition().duration(300).attr('opacity', 1);
+            gCurrent.selectAll('text.estado-label').transition().duration(300).attr('opacity', 1);
+            gCurrent.transition().duration(300).attr('transform', 'translate(0,0) scale(1)');
+          }
+          activeUFRef.current = null;
+          setTimeout(() => zoomFn(uf, d), 350);
           return;
         }
-
-        // First click: drill-down
         zoomFn(uf, d);
       });
 
@@ -497,14 +485,36 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
     <div ref={containerRef} className="relative rounded-xl overflow-hidden" style={{ background: '#0b0e14' }}
       onMouseLeave={() => {
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
-        if (onHover) onHover(null);
+        // Do NOT reset drill-down on mouse leave
+        if (!activeUFRef.current && onHover) onHover(null);
       }}
     >
-      {/* Grid background — pointer-events: none is CRITICAL */}
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-2 px-4 pt-3 text-xs" style={{ color: '#8b949e', zIndex: 10, position: 'relative' }}>
+        <span
+          className={`cursor-pointer transition-colors ${!activeUF ? 'font-bold' : 'hover:text-green-400'}`}
+          style={!activeUF ? { color: GREEN_BRIGHT } : undefined}
+          onClick={() => { if (activeUF) voltarParaBrasil(); }}
+        >
+          🇧🇷 Brasil
+        </span>
+        {activeUF && (
+          <>
+            <span>/</span>
+            <span className="font-bold" style={{ color: GREEN_BRIGHT }}>
+              {UF_NOMES[activeUF]}
+            </span>
+            <span className="ml-2 px-2 py-0.5 rounded" style={{ background: '#161b22', border: '1px solid #30363d', fontSize: '10px' }}>
+              {totalMunicipios} municípios
+            </span>
+          </>
+        )}
+      </div>
+
+      {/* Grid background */}
       <div className="absolute inset-0 opacity-5" style={{
         backgroundImage: 'radial-gradient(#30363d 1px, transparent 1px)',
-        backgroundSize: '20px 20px',
-        pointerEvents: 'none',
+        backgroundSize: '20px 20px', pointerEvents: 'none',
       }} />
 
       <svg ref={svgRef} width="100%" style={{ display: 'block' }} />
@@ -517,36 +527,28 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         minWidth: '180px', pointerEvents: 'none',
       }} />
 
-      {/* Back button — GREEN */}
+      {/* Back button */}
       {activeUF && (
-        <button
-          onClick={voltarParaBrasil}
-          className="absolute top-4 left-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all hover:scale-105"
+        <button onClick={voltarParaBrasil}
+          className="absolute top-12 left-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all hover:scale-105"
           style={{
             background: '#161b22', border: `1px solid ${GREEN_BRIGHT}`, color: GREEN_BRIGHT,
             boxShadow: `0 0 15px rgba(34,197,94,0.2)`, zIndex: 10,
           }}
         >
-          <ArrowLeft className="h-4 w-4" />
-          Voltar para o Brasil
+          <ArrowLeft className="h-4 w-4" /> Voltar para o Brasil
         </button>
       )}
 
-      {/* Search bar (drill-down mode) — GREEN focus */}
+      {/* Search bar */}
       {activeUF && !loadingMunicipios && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-72" style={{ zIndex: 10 }}>
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 w-72" style={{ zIndex: 10 }}>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: '#484f58' }} />
-            <input
-              type="text"
-              placeholder={`Buscar município em ${UF_NOMES[activeUF]}...`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+            <input type="text" placeholder={`Buscar município em ${UF_NOMES[activeUF]}...`}
+              value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 rounded-lg text-sm"
-              style={{
-                background: '#161b22', border: '1px solid #30363d',
-                color: '#e6edf3', outline: 'none',
-              }}
+              style={{ background: '#161b22', border: '1px solid #30363d', color: '#e6edf3', outline: 'none' }}
               onFocus={(e) => (e.target.style.borderColor = GREEN_BRIGHT)}
               onBlur={(e) => (e.target.style.borderColor = '#30363d')}
             />
@@ -554,16 +556,16 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
         </div>
       )}
 
-      {/* Loading municipios — GREEN spinner */}
+      {/* Loading municipios */}
       {loadingMunicipios && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-lg"
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-lg"
           style={{ background: '#161b22', border: '1px solid #30363d', zIndex: 10 }}>
           <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: GREEN_BRIGHT, borderTopColor: 'transparent' }} />
           <span className="text-xs" style={{ color: '#8b949e' }}>Carregando municípios...</span>
         </div>
       )}
 
-      {/* Legend — GREEN palette */}
+      {/* Legend */}
       <div className="absolute bottom-4 left-4 flex items-center gap-3" style={{ color: '#8b949e', fontSize: '10px', pointerEvents: 'none' }}>
         <span className="uppercase tracking-wider font-bold" style={{ color: '#484f58' }}>Legenda:</span>
         {[
@@ -579,7 +581,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
       </div>
 
       {/* Zoom buttons */}
-      <div className="absolute top-4 right-4 flex flex-col gap-1" style={{ pointerEvents: 'auto' }}>
+      <div className="absolute top-12 right-4 flex flex-col gap-1" style={{ pointerEvents: 'auto' }}>
         {[{ label: '+', f: 1.5 }, { label: '−', f: 0.67 }].map(z => (
           <button key={z.label} onClick={() => handleZoom(z.f)}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors hover:text-white"
@@ -590,13 +592,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
 
       {/* Ver detalhes button */}
       {activeUF && !loadingMunicipios && (
-        <button
-          onClick={() => navigate(`/inteligencia-geografica/${activeUF}`)}
-          className="absolute top-4 right-16 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all hover:scale-105"
-          style={{
-            background: GREEN_BRIGHT, color: '#0b0e14',
-            boxShadow: '0 0 15px rgba(34, 197, 94, 0.3)', zIndex: 10,
-          }}
+        <button onClick={() => navigate(`/inteligencia-geografica/${activeUF}`)}
+          className="absolute top-12 right-16 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all hover:scale-105"
+          style={{ background: GREEN_BRIGHT, color: '#0b0e14', boxShadow: '0 0 15px rgba(34,197,94,0.3)', zIndex: 10 }}
         >
           Ver detalhes de {UF_NOMES[activeUF]} →
         </button>
@@ -604,3 +602,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onEstadoClick, onHover }: P
     </div>
   );
 }
+
+// Re-export for sidebar usage
+export { UF_NOMES as MAP_UF_NOMES };
+export type { Props as MapaBrasilEnterpriseProps };
