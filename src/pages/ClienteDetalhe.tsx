@@ -585,6 +585,33 @@ export default function ClienteDetalhe() {
     ? processos.filter(p => !DEFERIMENTO_STAGES.includes(p.etapa) && p.etapa !== 'arquivo' && !billedProcessIds.has(p.id))
     : [];
 
+  // Helper: check if a processo has been fully paid
+  const paidProcessIds = useMemo(() => {
+    const set = new Set<string>();
+    lancamentos.forEach(l => {
+      if (l.tipo === 'receber' && l.status === 'pago' && l.confirmado_recebimento && l.processo_id) {
+        set.add(l.processo_id);
+      }
+    });
+    return set;
+  }, [lancamentos]);
+
+  const isProcessoPago = (processoId: string) => paidProcessIds.has(processoId);
+
+  // Sort: pending first, paid last
+  const processosOrdenados = useMemo(() => {
+    return [...processos].sort((a, b) => {
+      const aPago = isProcessoPago(a.id);
+      const bPago = isProcessoPago(b.id);
+      if (aPago && !bPago) return 1;
+      if (!aPago && bPago) return -1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [processos, paidProcessIds]);
+
+  const processosPagosCount = processos.filter(p => isProcessoPago(p.id)).length;
+  const processosPendentesCount = processos.length - processosPagosCount;
+
   // CNPJ display - field is cnpj (14 digits), codigo_identificador is 6 digits
   const cnpjInfo = formatCNPJ((cliente as any).cnpj);
   const codigoDisplay = cliente.codigo_identificador || '—';
