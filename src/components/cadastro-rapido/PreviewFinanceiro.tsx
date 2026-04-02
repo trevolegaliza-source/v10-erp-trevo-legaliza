@@ -109,7 +109,9 @@ export function calcPreview(props: Props): PreviewResult {
 
 export default function PreviewFinanceiro(props: Props) {
   const { cliente, processosNoMes, filaLength, prioridade, mudancaUF, boasVindas, boasVindasPct, isAvulso, metodoPreco } = props;
+  const { podeVerValores } = usePermissions();
   const preview = calcPreview(props);
+  const vfmt = (v: number) => podeVerValores() ? fmt(v) : mask;
   const valorBase = Number(cliente.valor_base ?? 0);
   const isManual = metodoPreco === 'manual' || isAvulso;
   const isPrePago = cliente.tipo === 'PRE_PAGO';
