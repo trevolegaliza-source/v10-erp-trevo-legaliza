@@ -315,58 +315,70 @@ export default function Dashboard() {
       <div className="space-y-2 dashboard-section">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Ações urgentes</h3>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Alertar contas em</span>
-            <Input
-              type="number"
-              value={diasAlertaPagar}
-              onChange={(e) => setDiasAlertaPagar(parseInt(e.target.value) || 7)}
-              className="w-16 h-7 text-xs text-center"
-              min={1}
-              max={90}
-            />
-            <span className="text-xs text-muted-foreground">dias</span>
-          </div>
-        </div>
-        {alertas.length === 0 ? (
-          <Card className="p-4 border-green-500/30 bg-green-500/5">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                <Check className="h-4 w-4 text-green-500" />
-              </div>
-              <div>
-                <p className="font-medium text-green-500">Tudo em dia!</p>
-                <p className="text-xs text-muted-foreground">Nenhuma ação urgente no momento.</p>
-              </div>
+          {podeVer('contas_pagar') && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Alertar contas em</span>
+              <Input
+                type="number"
+                value={diasAlertaPagar}
+                onChange={(e) => setDiasAlertaPagar(parseInt(e.target.value) || 7)}
+                className="w-16 h-7 text-xs text-center"
+                min={1}
+                max={90}
+              />
+              <span className="text-xs text-muted-foreground">dias</span>
             </div>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {alertas.map(alerta => {
-              const colors = {
-                critical: { border: 'border-destructive/30 bg-destructive/5', circle: 'bg-destructive/20', icon: 'text-destructive' },
-                warning: { border: 'border-amber-500/30 bg-amber-500/5', circle: 'bg-amber-500/20', icon: 'text-amber-500' },
-                info: { border: 'border-blue-500/30 bg-blue-500/5', circle: 'bg-blue-500/20', icon: 'text-blue-500' },
-              }[alerta.severity];
-              return (
-                <Card key={alerta.id} className={`p-4 cursor-pointer hover:-translate-y-0.5 transition-all duration-200 ${colors.border}`} onClick={() => navigate(alerta.link)}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center ${colors.circle}`}>
-                        <alerta.icon className={`h-4 w-4 ${colors.icon}`} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{alerta.titulo}</p>
-                        <p className="text-xs text-muted-foreground">{alerta.descricao}</p>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+        {(() => {
+          const alertasFiltrados = alertas.filter(a => {
+            if (['vencidas', 'sem_extrato', 'nao_enviadas'].includes(a.id)) return podeVer('financeiro');
+            if (a.id.startsWith('contas_pagar')) return podeVer('contas_pagar');
+            return true;
+          });
+          if (alertasFiltrados.length === 0) {
+            return (
+              <Card className="p-4 border-green-500/30 bg-green-500/5">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <Check className="h-4 w-4 text-green-500" />
                   </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+                  <div>
+                    <p className="font-medium text-green-500">Tudo em dia!</p>
+                    <p className="text-xs text-muted-foreground">Nenhuma ação urgente no momento.</p>
+                  </div>
+                </div>
+              </Card>
+            );
+          }
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {alertasFiltrados.map(alerta => {
+                const colors = {
+                  critical: { border: 'border-destructive/30 bg-destructive/5', circle: 'bg-destructive/20', icon: 'text-destructive' },
+                  warning: { border: 'border-amber-500/30 bg-amber-500/5', circle: 'bg-amber-500/20', icon: 'text-amber-500' },
+                  info: { border: 'border-blue-500/30 bg-blue-500/5', circle: 'bg-blue-500/20', icon: 'text-blue-500' },
+                }[alerta.severity];
+                return (
+                  <Card key={alerta.id} className={`p-4 cursor-pointer hover:-translate-y-0.5 transition-all duration-200 ${colors.border}`} onClick={() => navigate(alerta.link)}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-8 w-8 rounded-full flex items-center justify-center ${colors.circle}`}>
+                          <alerta.icon className={`h-4 w-4 ${colors.icon}`} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{alerta.titulo}</p>
+                          <p className="text-xs text-muted-foreground">{alerta.descricao}</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* SEÇÃO 3: Pipeline */}
