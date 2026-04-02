@@ -1,10 +1,13 @@
 import { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEstadosResumo } from '@/hooks/useInteligenciaGeografica';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { UF_NOMES } from '@/constants/estados-brasil';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MapPin, Users, Kanban, DollarSign, ChevronRight } from 'lucide-react';
 import { MapaBrasilEnterprise, type EstadoData } from '@/components/mapa/MapaBrasilEnterprise';
+import { useTheme } from 'next-themes';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -12,6 +15,30 @@ export default function InteligenciaGeografica() {
   const navigate = useNavigate();
   const { data: estadoData, isLoading } = useEstadosResumo();
   const [hoveredUF, setHoveredUF] = useState<string | null>(null);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme !== 'light';
+
+  // Fetch average rating per state
+  const { data: ratingsPorEstado } = useQuery({
+    queryKey: ['ratings_por_estado'],
+    queryFn: async () => {
+      const { data } = await (supabase.from('contatos_estado' as any) as any)
+        .select('uf, rating');
+      const map: Record<string, { soma: number; count: number }> = {};
+      (data || []).forEach((c: any) => {
+        if (!c.uf || !c.rating) return;
+        if (!map[c.uf]) map[c.uf] = { soma: 0, count: 0 };
+        map[c.uf].soma += c.rating;
+        map[c.uf].count++;
+      });
+      const result: Record<string, number> = {};
+      for (const [uf, v] of Object.entries(map)) {
+        result[uf] = v.soma / v.count;
+      }
+      return result;
+    },
+    staleTime: 2 * 60 * 1000,
+  });
 
   const handleHover = useCallback((uf: string | null) => {
     setHoveredUF(uf);
@@ -47,9 +74,17 @@ export default function InteligenciaGeografica() {
     ? estadosComDados.find(d => d.uf === hoveredUF)
     : null;
 
+  // Theme-aware colors
+  const textColor = isDark ? '#e6edf3' : '#1e293b';
+  const mutedColor = isDark ? '#8b949e' : '#64748b';
+  const dimColor = isDark ? '#484f58' : '#94a3b8';
+  const cardBg = isDark ? '#161b22' : '#ffffff';
+  const cardBorder = isDark ? '#30363d' : '#e2e8f0';
+  const containerBg = isDark ? '#0b0e14' : '#f8fafc';
+
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" style={{ background: containerBg }}>
         <Skeleton className="h-8 w-80" />
         <div className="grid grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
@@ -86,28 +121,28 @@ export default function InteligenciaGeografica() {
   const kpiSubLabel = hoveredUF ? (UF_NOMES[hoveredUF] || hoveredUF) : 'Total Brasil';
 
   return (
-    <div className="geo-container p-6 rounded-xl space-y-6">
+    <div className="p-6 rounded-xl space-y-6" style={{ background: containerBg }}>
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: '#e6edf3' }}>
-          <MapPin className="h-6 w-6 geo-accent" /> Inteligência Geográfica
+        <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: textColor }}>
+          <MapPin className="h-6 w-6" style={{ color: GREEN_BRIGHT }} /> Inteligência Geográfica
         </h1>
-        <p className="text-sm geo-muted">CRM Territorial — Clientes, órgãos e contatos por estado</p>
+        <p className="text-sm" style={{ color: mutedColor }}>CRM Territorial — Clientes, órgãos e contatos por estado</p>
       </div>
 
       {/* KPIs */}
       <div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {kpis.map(kpi => (
-            <div key={kpi.label} className="geo-card p-4 transition-all duration-300">
+            <div key={kpi.label} className="p-4 transition-all duration-300 rounded-xl" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
               <div className="flex items-center gap-2 mb-2">
-                <kpi.Icon className="h-4 w-4 geo-accent" />
-                <span className="text-xs font-bold uppercase tracking-wider geo-muted">{kpi.label}</span>
+                <kpi.Icon className="h-4 w-4" style={{ color: GREEN_BRIGHT }} />
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: mutedColor }}>{kpi.label}</span>
               </div>
-              <p className={`text-2xl font-extrabold ${kpi.isReceita ? 'geo-accent' : ''}`} style={kpi.isReceita ? undefined : { color: '#e6edf3' }}>
+              <p className={`text-2xl font-extrabold`} style={{ color: kpi.isReceita ? GREEN_BRIGHT : textColor }}>
                 {kpi.valor}
               </p>
-              <p className="text-[10px] geo-muted mt-1">{kpiSubLabel}</p>
+              <p className="text-[10px] mt-1" style={{ color: mutedColor }}>{kpiSubLabel}</p>
             </div>
           ))}
         </div>
@@ -115,11 +150,11 @@ export default function InteligenciaGeografica() {
         <div className="h-8 flex items-center justify-center">
           {hoveredUF ? (
             <button onClick={() => navigate(`/inteligencia-geografica/${hoveredUF}`)}
-              className="text-xs geo-accent hover:underline transition-opacity duration-200">
+              className="text-xs hover:underline transition-opacity duration-200" style={{ color: GREEN_BRIGHT }}>
               Ver detalhes de {UF_NOMES[hoveredUF]} →
             </button>
           ) : (
-            <span className="text-xs" style={{ color: '#484f58' }}>Passe o mouse sobre um estado</span>
+            <span className="text-xs" style={{ color: dimColor }}>Passe o mouse sobre um estado</span>
           )}
         </div>
       </div>
@@ -134,33 +169,43 @@ export default function InteligenciaGeografica() {
         </div>
 
         {/* Ranking */}
-        <div className="geo-card p-4 lg:flex-[3]">
-          <h3 className="text-xs font-bold uppercase tracking-wider geo-accent mb-4">Ranking por Estado</h3>
+        <div className="p-4 lg:flex-[3] rounded-xl" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+          <h3 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: GREEN_BRIGHT }}>Ranking por Estado</h3>
           {ranking.length === 0 ? (
-            <p className="text-sm geo-muted text-center py-4">Nenhum cliente cadastrado</p>
+            <p className="text-sm text-center py-4" style={{ color: mutedColor }}>Nenhum cliente cadastrado</p>
           ) : (
             <div className="space-y-1">
-              {ranking.slice(0, 12).map((e, i) => (
-                <div key={e.uf}
-                  className="flex items-center justify-between py-2 px-3 rounded-lg cursor-pointer transition-colors"
-                  style={{ color: '#e6edf3' }}
-                  onClick={() => navigate(`/inteligencia-geografica/${e.uf}`)}
-                  onMouseEnter={(ev) => (ev.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
-                  onMouseLeave={(ev) => (ev.currentTarget.style.background = 'transparent')}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-bold geo-muted w-5">{i + 1}.</span>
-                    <span className="font-bold text-sm">{e.uf}</span>
+              {ranking.slice(0, 12).map((e, i) => {
+                const ratingMedio = ratingsPorEstado?.[e.uf] || 0;
+                return (
+                  <div key={e.uf}
+                    className="flex items-center justify-between py-2 px-3 rounded-lg cursor-pointer transition-colors"
+                    style={{ color: textColor }}
+                    onClick={() => navigate(`/inteligencia-geografica/${e.uf}`)}
+                    onMouseEnter={(ev) => (ev.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)')}
+                    onMouseLeave={(ev) => (ev.currentTarget.style.background = 'transparent')}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold w-5" style={{ color: mutedColor }}>{i + 1}.</span>
+                      <span className="font-bold text-sm">{e.uf}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-3 text-xs">
+                        <span style={{ color: mutedColor }}>{e.clientes} cli</span>
+                        <span className="font-bold" style={{ color: GREEN_BRIGHT }}>{fmt(e.receita)}</span>
+                        <ChevronRight className="h-3 w-3" style={{ color: mutedColor }} />
+                      </div>
+                      {ratingMedio > 0 && (
+                        <div className="text-[10px] mt-0.5" style={{ color: '#f59e0b' }}>
+                          {'⭐'.repeat(Math.round(ratingMedio))} {ratingMedio.toFixed(1)}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-xs">
-                    <span className="geo-muted">{e.clientes} cli</span>
-                    <span className="geo-accent font-bold">{fmt(e.receita)}</span>
-                    <ChevronRight className="h-3 w-3 geo-muted" />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {ranking.length > 12 && (
-                <p className="text-xs geo-muted text-center pt-2">+ {ranking.length - 12} estados</p>
+                <p className="text-xs text-center pt-2" style={{ color: mutedColor }}>+ {ranking.length - 12} estados</p>
               )}
             </div>
           )}
@@ -169,3 +214,5 @@ export default function InteligenciaGeografica() {
     </div>
   );
 }
+
+const GREEN_BRIGHT = '#22c55e';

@@ -15,6 +15,7 @@ export interface ContatoEstado {
   endereco: string | null;
   observacoes: string | null;
   rating: number | null;
+  pin_cor: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
