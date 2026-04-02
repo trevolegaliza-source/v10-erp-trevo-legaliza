@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Check, ListPlus } from 'lucide-react';
 import type { ClienteDB } from '@/types/financial';
 import { TIPO_PROCESSO_LABELS, type TipoProcesso } from '@/types/financial';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface ProcessoResumo {
   razaoSocial: string;
