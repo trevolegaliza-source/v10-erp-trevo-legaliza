@@ -54,6 +54,7 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [buscaMunicipio, setBuscaMunicipio] = useState('');
+  const [zoomLevel, setZoomLevel] = useState(1);
   const clientesRef = useRef(clientesPorMunicipio);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme !== 'light';
@@ -103,6 +104,15 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
     fetchMunicipios();
   }, [uf]);
 
+  // Prevent page scroll when wheeling inside SVG
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => { e.preventDefault(); };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
+
   const getMunFill = useCallback((d: any): string => {
     const nome = getMunNome(d).toUpperCase();
     const qtd = clientesRef.current[nome] || 0;
@@ -113,7 +123,7 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
     return munVazio;
   }, [isDark]);
 
-  // Render municipality map
+  // Render municipality map (base layer only)
   useEffect(() => {
     if (!geoData || !svgRef.current || !containerRef.current) return;
 
@@ -147,7 +157,7 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
 
     const g = svg.append('g');
 
-    // Zoom with scroll inside map
+    // Zoom
     const zoom = d3.zoom()
       .scaleExtent([0.5, 20])
       .filter((event: any) => {
@@ -157,6 +167,7 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
         const k = event.transform.k;
+        setZoomLevel(k);
 
         g.selectAll('.pin').attr('r', 5 / k).attr('stroke-width', 1.5 / k);
         g.selectAll('.pins-layer text').attr('font-size', (7 / k) + 'px');
@@ -164,13 +175,10 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
         // Municipality labels: visible at high zoom
         g.selectAll('text.mun-label')
           .attr('font-size', `${7 / k}px`)
-          .attr('opacity', k >= 3 ? 1 : 0);
+          .attr('opacity', k >= 3 ? Math.min(1, (k - 3) / 1.5) : 0);
       });
 
     svg.call(zoom as any);
-    svg.on('wheel.zoom', function (event: any) {
-      event.preventDefault();
-    }, { passive: false } as any);
     zoomRef.current = zoom;
 
     // Municipalities
@@ -229,8 +237,28 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
       .on('click', function (event: any, d: any) {
         event.stopPropagation();
         const nome = getMunNome(d);
+
+        // Highlight selected municipality
+        const currentK = d3.zoomTransform(svgRef.current!).k;
+        g.selectAll('path.municipio')
+          .attr('fill', (dd: any) => {
+            return getMunNome(dd) === nome ? GREEN_BRIGHT : getMunFill(dd);
+          })
+          .attr('stroke-width', (dd: any) => {
+            return getMunNome(dd) === nome ? 2 / currentK : 0.4 / currentK;
+          });
+
         if (onMunicipioClick) onMunicipioClick(nome);
       });
+
+    // Click on background clears selection
+    svg.on('click', () => {
+      const currentK = d3.zoomTransform(svgRef.current!).k;
+      g.selectAll('path.municipio')
+        .transition().duration(200)
+        .attr('fill', (d: any) => getMunFill(d))
+        .attr('stroke-width', 0.4 / currentK);
+    });
 
     // All municipality labels (hidden by default, visible on zoom >= 3)
     g.selectAll('text.mun-label')
@@ -251,7 +279,7 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
 
   }, [geoData, clientesPorMunicipio, getMunFill, onMunicipioClick, isDark]);
 
-  // Render pins layer
+  // Render pins layer (SEPARATE from base map — toggling pins won't reset zoom)
   useEffect(() => {
     if (!geoData || !svgRef.current || !pathGenRef.current) return;
     const svg = d3.select(svgRef.current);
@@ -267,6 +295,9 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
     const tooltipBg = isDark ? '#161b22' : '#ffffff';
     const tooltipBorder = isDark ? '#30363d' : '#e2e8f0';
     const pinBg = isDark ? '#0b0e14' : '#ffffff';
+
+    // Get current zoom scale to size pins correctly
+    const currentK = svgRef.current ? d3.zoomTransform(svgRef.current).k : 1;
 
     contatos.forEach(contato => {
       // Apply advanced filters
@@ -296,14 +327,15 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
       pinsGroup.append('circle')
         .attr('cx', centroid[0])
         .attr('cy', centroid[1])
-        .attr('r', 5)
+        .attr('r', 5 / currentK)
         .attr('fill', color)
         .attr('stroke', pinBg)
-        .attr('stroke-width', 1.5)
+        .attr('stroke-width', 1.5 / currentK)
         .attr('cursor', 'pointer')
         .attr('class', `pin pin-${contato.tipo}`)
         .on('mouseover', function (event: any) {
-          d3.select(this).attr('r', 7).attr('filter', 'url(#mun-glow)');
+          const k = d3.zoomTransform(svgRef.current!).k;
+          d3.select(this).attr('r', 7 / k).attr('filter', 'url(#mun-glow)');
           const stars = '⭐'.repeat(contato.rating || 0) + '☆'.repeat(5 - (contato.rating || 0));
           if (tooltipRef.current && containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
@@ -334,7 +366,8 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
           }
         })
         .on('mouseout', function () {
-          d3.select(this).attr('r', 5).attr('filter', 'none');
+          const k = d3.zoomTransform(svgRef.current!).k;
+          d3.select(this).attr('r', 5 / k).attr('filter', 'none');
           if (tooltipRef.current) tooltipRef.current.style.display = 'none';
         });
 
@@ -343,9 +376,9 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
         pinsGroup.append('text')
           .attr('class', 'pin-label')
           .attr('x', centroid[0])
-          .attr('y', centroid[1] - 10)
+          .attr('y', centroid[1] - 10 / currentK)
           .attr('text-anchor', 'middle')
-          .attr('font-size', '7px')
+          .attr('font-size', `${7 / currentK}px`)
           .attr('font-weight', '700')
           .attr('fill', color)
           .attr('pointer-events', 'none')
@@ -407,6 +440,10 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
     if (!svgRef.current || !zoomRef.current) return;
     d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 0.67);
   };
+  const handleZoomReset = () => {
+    if (!svgRef.current || !zoomRef.current) return;
+    d3.select(svgRef.current).transition().duration(500).call(zoomRef.current.transform, d3.zoomIdentity);
+  };
 
   const mapBg = isDark ? '#0b0e14' : '#f1f5f9';
   const inputBg = isDark ? '#161b22' : '#fff';
@@ -414,6 +451,8 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
   const inputColor = isDark ? '#e6edf3' : '#1e293b';
   const legendMuted = isDark ? '#8b949e' : '#64748b';
   const legendDim = isDark ? '#484f58' : '#94a3b8';
+  const btnBg = isDark ? '#161b22' : '#fff';
+  const btnBorder = isDark ? '#30363d' : '#e2e8f0';
 
   if (loading) return (
     <div className="flex items-center justify-center h-[500px] rounded-xl" style={{ background: mapBg }}>
@@ -455,10 +494,9 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
         ref={containerRef}
         className="relative rounded-xl overflow-hidden"
         style={{ background: mapBg }}
-        onWheel={(e) => e.stopPropagation()}
         onMouseLeave={() => { if (tooltipRef.current) tooltipRef.current.style.display = 'none'; }}
       >
-        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(#30363d 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: `radial-gradient(${isDark ? '#30363d' : '#cbd5e1'} 1px, transparent 1px)`, backgroundSize: '20px 20px', pointerEvents: 'none' }} />
         <svg ref={svgRef} width="100%" height="500" style={{ display: 'block' }} />
         <div ref={tooltipRef} style={{ display: 'none', position: 'absolute', zIndex: 50, background: isDark ? '#161b22' : '#fff', border: `1px solid ${isDark ? '#30363d' : '#e2e8f0'}`, borderRadius: '12px', padding: '14px 18px', boxShadow: '0 8px 32px rgba(34,197,94,0.15)', minWidth: '180px', pointerEvents: 'none' }} />
 
@@ -466,10 +504,17 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
         <div className="absolute top-4 right-4 flex flex-col gap-1 z-10">
           <button onClick={handleZoomIn}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors hover:border-green-500"
-            style={{ background: isDark ? '#161b22' : '#fff', border: `1px solid ${inputBorder}`, color: legendMuted }}>+</button>
+            style={{ background: btnBg, border: `1px solid ${btnBorder}`, color: legendMuted }}>+</button>
           <button onClick={handleZoomOut}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors hover:border-green-500"
-            style={{ background: isDark ? '#161b22' : '#fff', border: `1px solid ${inputBorder}`, color: legendMuted }}>−</button>
+            style={{ background: btnBg, border: `1px solid ${btnBorder}`, color: legendMuted }}>−</button>
+          <button onClick={handleZoomReset}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors hover:border-green-500"
+            style={{ background: btnBg, border: `1px solid ${btnBorder}`, color: legendMuted }}
+            title="Resetar zoom">↺</button>
+          <span className="text-[10px] mt-1 text-center block" style={{ color: legendDim }}>
+            {Math.round(zoomLevel * 100)}%
+          </span>
         </div>
 
         {/* Legend */}
