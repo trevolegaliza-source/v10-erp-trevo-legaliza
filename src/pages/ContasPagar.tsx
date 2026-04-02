@@ -300,13 +300,91 @@ export default function ContasPagar() {
         totalVencido={totalVencido}
       />
 
+      {/* Dias alerta control */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Alertar contas em</span>
+          <Input
+            type="number"
+            value={diasAlerta}
+            onChange={(e) => {
+              const v = parseInt(e.target.value) || 7;
+              setDiasAlerta(v);
+              localStorage.setItem('trevo_dias_alerta_pagar', String(v));
+            }}
+            className="w-16 h-8 text-center text-sm"
+            min={1} max={90}
+          />
+          <span className="text-sm text-muted-foreground">dias</span>
+        </div>
+      </div>
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={v => { setActiveTab(v); if (v !== 'lista') exitSelectionMode(); }} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="categoria">Visão por Categoria</TabsTrigger>
+          <TabsTrigger value="urgencia">Urgência</TabsTrigger>
+          <TabsTrigger value="categoria">Categoria</TabsTrigger>
           <TabsTrigger value="lista">Lista</TabsTrigger>
           <TabsTrigger value="recorrentes">Recorrentes</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="urgencia">
+          <div className="space-y-6">
+            {/* VENCIDAS */}
+            {urgencyGroups.vencidas.length > 0 && (
+              <UrgencySection
+                title={`⚠️ VENCIDAS (${urgencyGroups.vencidas.length})`}
+                items={urgencyGroups.vencidas}
+                variant="destructive"
+                onPagar={podeAprovar('contas_pagar') ? (l: any) => setPagoModal(l) : undefined}
+                onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
+                onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+              />
+            )}
+
+            {/* PRÓXIMAS */}
+            {urgencyGroups.proximas.length > 0 && (
+              <UrgencySection
+                title={`📅 PRÓXIMOS ${diasAlerta} DIAS (${urgencyGroups.proximas.length})`}
+                items={urgencyGroups.proximas}
+                variant="warning"
+                onPagar={podeAprovar('contas_pagar') ? (l: any) => setPagoModal(l) : undefined}
+                onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
+                onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+              />
+            )}
+
+            {/* DEMAIS */}
+            {urgencyGroups.futuras.length > 0 && (
+              <UrgencySection
+                title={`📋 DEMAIS DO MÊS (${urgencyGroups.futuras.length})`}
+                items={urgencyGroups.futuras}
+                variant="default"
+                onPagar={podeAprovar('contas_pagar') ? (l: any) => setPagoModal(l) : undefined}
+                onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
+                onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+              />
+            )}
+
+            {/* PAGAS */}
+            {urgencyGroups.pagas.length > 0 && (
+              <UrgencySection
+                title={`✅ PAGAS ESTE MÊS (${urgencyGroups.pagas.length})`}
+                items={urgencyGroups.pagas}
+                variant="success"
+                onPagar={undefined}
+                onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
+                onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+              />
+            )}
+
+            {lancamentos.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>Nenhuma despesa neste período</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
 
         <TabsContent value="categoria">
           <CategoriaAccordion
