@@ -20,6 +20,7 @@ interface UsePermissionsReturn {
   podeEditar: (modulo: string) => boolean;
   podeExcluir: (modulo: string) => boolean;
   podeAprovar: (modulo: string) => boolean;
+  podeVerValores: () => boolean;
   isMaster: () => boolean;
 }
 
