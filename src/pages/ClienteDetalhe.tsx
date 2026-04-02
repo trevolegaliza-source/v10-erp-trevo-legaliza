@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
+import { ValorProtegido } from '@/components/auth/ValorProtegido';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
