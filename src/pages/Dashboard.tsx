@@ -409,7 +409,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* SEÇÃO 4: Gráfico de Receita */}
+      {/* SEÇÃO 4: Gráfico de Receita - only for financeiro */}
+      {podeVer('financeiro') && (
       <div className="space-y-3 dashboard-section">
         <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Receita mensal</h3>
         <Card className="p-4">
