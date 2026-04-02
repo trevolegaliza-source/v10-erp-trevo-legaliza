@@ -1,4 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { ValorProtegido } from '@/components/auth/ValorProtegido';
+import { usePermissions } from '@/hooks/usePermissions';
 import { KANBAN_STAGES, PROCESS_TYPE_LABELS, type KanbanStage } from '@/types/process';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
