@@ -429,8 +429,10 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </Card>
       </div>
+      )}
 
       {/* SEÇÃO 5: Top Clientes + Próximos Vencimentos */}
+      {podeVer('financeiro') && (
       <div className="grid gap-6 lg:grid-cols-2 dashboard-section">
         {/* Top Clientes */}
         <Card className="p-4">
