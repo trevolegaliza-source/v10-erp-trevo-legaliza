@@ -126,7 +126,7 @@ function ProcessCard({
           )}
           {process.valor && (
             <p className="text-sm font-semibold text-foreground mt-1.5">
-              {Number(process.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              <ValorProtegido valor={Number(process.valor)} />
             </p>
           )}
           {(() => {
@@ -483,7 +483,7 @@ export default function Processos() {
                                     )}
                                   </TableCell>
                                   <TableCell className="text-right text-sm font-semibold text-foreground">
-                                    {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
+                                    {proc.valor ? <ValorProtegido valor={Number(proc.valor)} /> : '-'}
                                   </TableCell>
                                   <TableCell className="text-center">
                                     <QuickActionsMenu process={proc} onDelete={handleDeleteRequest} onEdit={openEditModal} onHonorarioExtra={openHonorarioExtra} />
@@ -539,7 +539,7 @@ export default function Processos() {
                           )}
                         </TableCell>
                         <TableCell className="text-right text-sm font-semibold text-foreground">
-                          {proc.valor ? Number(proc.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-'}
+                          {proc.valor ? <ValorProtegido valor={Number(proc.valor)} /> : '-'}
                         </TableCell>
                         <TableCell className="text-center">
                           <QuickActionsMenu process={proc} onDelete={handleDeleteRequest} onEdit={openEditModal} onHonorarioExtra={openHonorarioExtra} />
