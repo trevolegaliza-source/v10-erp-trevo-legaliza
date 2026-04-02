@@ -261,6 +261,23 @@
   .geo-accent { color: #22c55e; }
   .geo-muted { color: #8b949e; }
 
+  /* Inteligência Geográfica — Light Mode */
+  .light .geo-container {
+    background: #f8fafc;
+    color: #1e293b;
+  }
+  .light .geo-card {
+    background: #ffffff;
+    border-color: #e2e8f0;
+  }
+  .light .geo-card:hover {
+    border-color: #22c55e;
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.08);
+  }
+  .light .geo-accent { color: #16a34a; }
+  .light .geo-muted { color: #64748b; }
+  .light .geo-mapa-bg { background: #f1f5f9; }
+
   /* Municipality pulse for municipalities with clients */
   @keyframes municipioPulse {
     0%, 100% { filter: none; }
