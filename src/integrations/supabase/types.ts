@@ -302,6 +302,7 @@ export type Database = {
           municipio: string | null
           nome: string
           observacoes: string | null
+          pin_cor: string | null
           rating: number | null
           site_url: string | null
           telefone: string | null
@@ -318,6 +319,7 @@ export type Database = {
           municipio?: string | null
           nome: string
           observacoes?: string | null
+          pin_cor?: string | null
           rating?: number | null
           site_url?: string | null
           telefone?: string | null
@@ -334,6 +336,7 @@ export type Database = {
           municipio?: string | null
           nome?: string
           observacoes?: string | null
+          pin_cor?: string | null
           rating?: number | null
           site_url?: string | null
           telefone?: string | null
