@@ -296,8 +296,9 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
                 ${contato.municipio ? `<div>📍 ${contato.municipio}</div>` : '<div>📍 Sede estadual</div>'}
                 ${contato.telefone ? `<div>📞 ${contato.telefone}</div>` : ''}
                 ${contato.email ? `<div>✉️ ${contato.email}</div>` : ''}
-                ${contato.observacoes ? `<div style="margin-top:4px;color:#6b7280;font-style:italic;">📝 ${contato.observacoes}</div>` : ''}
+                ${contato.contato_interno ? `<div>👤 ${contato.contato_interno}</div>` : ''}
                 <div style="margin-top:4px;">${stars}</div>
+                ${contato.observacoes ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #30363d;color:#6b7280;font-size:10px;">💬 ${contato.observacoes}</div>` : ''}
               </div>`;
           }
         })
