@@ -20,6 +20,7 @@ interface UsePermissionsReturn {
   podeEditar: (modulo: string) => boolean;
   podeExcluir: (modulo: string) => boolean;
   podeAprovar: (modulo: string) => boolean;
+  podeVerValores: () => boolean;
   isMaster: () => boolean;
 }
 
@@ -79,6 +80,7 @@ export function usePermissions(): UsePermissionsReturn {
   const podeEditar = (modulo: string) => isMaster() || (perms[modulo]?.pode_editar ?? false);
   const podeExcluir = (modulo: string) => isMaster() || (perms[modulo]?.pode_excluir ?? false);
   const podeAprovar = (modulo: string) => isMaster() || (perms[modulo]?.pode_aprovar ?? false);
+  const podeVerValores = () => isMaster() || role === 'financeiro';
 
-  return { loading, role, podeVer, podeCriar, podeEditar, podeExcluir, podeAprovar, isMaster };
+  return { loading, role, podeVer, podeCriar, podeEditar, podeExcluir, podeAprovar, podeVerValores, isMaster };
 }

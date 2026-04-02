@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { RequirePermission } from "@/components/auth/RequirePermission";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Processos = lazy(() => import("./pages/Processos"));
@@ -59,23 +60,87 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 >
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/processos" element={<Processos />} />
-                  <Route path="/processos-ativos" element={<ProcessosAtivosDetalhe />} />
-                  <Route path="/faturamento" element={<FaturamentoDetalhe />} />
-                  <Route path="/clientes" element={<Clientes />} />
-                  <Route path="/clientes/:id" element={<ClienteDetalhe />} />
-                  <Route path="/orcamentos" element={<Orcamentos />} />
-                  <Route path="/orcamentos/novo" element={<OrcamentoNovo />} />
-                  <Route path="/cadastro-rapido" element={<CadastroRapido />} />
-                  <Route path="/financeiro" element={<Financeiro />} />
+                  <Route path="/" element={
+                    <RequirePermission modulo="dashboard">
+                      <Dashboard />
+                    </RequirePermission>
+                  } />
+                  <Route path="/processos" element={
+                    <RequirePermission modulo="processos">
+                      <Processos />
+                    </RequirePermission>
+                  } />
+                  <Route path="/processos-ativos" element={
+                    <RequirePermission modulo="processos">
+                      <ProcessosAtivosDetalhe />
+                    </RequirePermission>
+                  } />
+                  <Route path="/faturamento" element={
+                    <RequirePermission modulo="financeiro">
+                      <FaturamentoDetalhe />
+                    </RequirePermission>
+                  } />
+                  <Route path="/clientes" element={
+                    <RequirePermission modulo="clientes">
+                      <Clientes />
+                    </RequirePermission>
+                  } />
+                  <Route path="/clientes/:id" element={
+                    <RequirePermission modulo="clientes">
+                      <ClienteDetalhe />
+                    </RequirePermission>
+                  } />
+                  <Route path="/orcamentos" element={
+                    <RequirePermission modulo="orcamentos">
+                      <Orcamentos />
+                    </RequirePermission>
+                  } />
+                  <Route path="/orcamentos/novo" element={
+                    <RequirePermission modulo="orcamentos" acao="criar">
+                      <OrcamentoNovo />
+                    </RequirePermission>
+                  } />
+                  <Route path="/cadastro-rapido" element={
+                    <RequirePermission modulo="processos" acao="criar">
+                      <CadastroRapido />
+                    </RequirePermission>
+                  } />
+                  <Route path="/financeiro" element={
+                    <RequirePermission modulo="financeiro">
+                      <Financeiro />
+                    </RequirePermission>
+                  } />
                   <Route path="/contas-receber" element={<Navigate to="/financeiro" replace />} />
-                  <Route path="/contas-pagar" element={<ContasPagar />} />
-                  <Route path="/colaboradores" element={<Colaboradores />} />
-                  <Route path="/documentos" element={<Documentos />} />
-                  <Route path="/inteligencia-geografica" element={<InteligenciaGeografica />} />
-                  <Route path="/inteligencia-geografica/:uf" element={<EstadoDetalhe />} />
-                  <Route path="/configuracoes" element={<Configuracoes />} />
+                  <Route path="/contas-pagar" element={
+                    <RequirePermission modulo="contas_pagar">
+                      <ContasPagar />
+                    </RequirePermission>
+                  } />
+                  <Route path="/colaboradores" element={
+                    <RequirePermission modulo="colaboradores">
+                      <Colaboradores />
+                    </RequirePermission>
+                  } />
+                  <Route path="/documentos" element={
+                    <RequirePermission modulo="documentos">
+                      <Documentos />
+                    </RequirePermission>
+                  } />
+                  <Route path="/inteligencia-geografica" element={
+                    <RequirePermission modulo="intel_geografica">
+                      <InteligenciaGeografica />
+                    </RequirePermission>
+                  } />
+                  <Route path="/inteligencia-geografica/:uf" element={
+                    <RequirePermission modulo="intel_geografica">
+                      <EstadoDetalhe />
+                    </RequirePermission>
+                  } />
+                  <Route path="/configuracoes" element={
+                    <RequirePermission modulo="configuracoes">
+                      <Configuracoes />
+                    </RequirePermission>
+                  } />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
