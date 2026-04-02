@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
-import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown } from 'lucide-react';
-import { useFinanceiroClientes, type LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
+import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown } from 'lucide-react';
+import { useFinanceiroClientes, type LancamentoFinanceiro, isLancamentoVencidoReal } from '@/hooks/useFinanceiroClientes';
 import {
   ClientesFaturar,
   ClientesEnviar,
@@ -19,7 +20,8 @@ import { formatBRL } from '@/lib/pricing-engine';
 import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
 import { ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
 import { toast } from 'sonner';
-import { Skeleton } from '@/components/ui/skeleton';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 function toISO(d: Date) { return d.toISOString().split('T')[0]; }
 
@@ -67,40 +69,61 @@ export default function Financeiro() {
     isLoading,
   } = useFinanceiroClientes(dates.inicio, dates.fim);
 
-  const kpis = [
-    {
-      label: 'Faturado',
-      value: formatBRL(metricas.totalFaturado),
-      subValue: `${metricas.totalProcessos} processos`,
-      icon: DollarSign,
-      color: 'text-foreground',
-      bgColor: 'bg-muted',
+  // Fetch despesas pagas no período para KPI Resultado
+  const { data: despesasPagas = 0 } = useQuery({
+    queryKey: ['despesas_pagas_periodo', dates.inicio, dates.fim],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('lancamentos')
+        .select('valor')
+        .eq('tipo', 'pagar')
+        .eq('status', 'pago')
+        .gte('data_pagamento', dates.inicio)
+        .lte('data_pagamento', dates.fim);
+      return (data || []).reduce((s, l) => s + Number(l.valor), 0);
     },
-    {
-      label: 'Cobrado',
-      value: formatBRL(metricas.totalCobrado),
-      subValue: `${metricas.clientesCobrados} clientes`,
-      icon: Send,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
-    },
-    {
-      label: 'Pendente',
-      value: formatBRL(metricas.totalPendente),
-      subValue: `${metricas.clientesPendentes} clientes`,
-      icon: Clock,
-      color: 'text-amber-500',
-      bgColor: 'bg-amber-500/10',
-    },
-    {
-      label: 'Recebido',
-      value: formatBRL(metricas.totalRecebido),
-      subValue: `${metricas.taxaRecebimento}% do faturado`,
-      icon: CheckCircle,
-      color: 'text-emerald-500',
-      bgColor: 'bg-emerald-500/10',
-    },
-  ];
+    staleTime: 60_000,
+  });
+
+  // Inadimplente: cobrança enviada + vencida + não paga
+  const inadimplenciaCalc = useMemo(() => {
+    const allLanc = clientes.flatMap(c => c.lancamentos);
+    const inadimplentes = allLanc.filter(l => isLancamentoVencidoReal(l));
+    const total = inadimplentes.reduce((s, l) => s + l.valor, 0);
+    const clienteIds = new Set(
+      clientes
+        .filter(c => c.lancamentos.some(l => isLancamentoVencidoReal(l)))
+        .map(c => c.cliente_id)
+    );
+    return { total, qtdClientes: clienteIds.size };
+  }, [clientes]);
+
+  const resultado = metricas.totalRecebido - despesasPagas;
+
+  // Resumo do mês
+  const resumoMes = useMemo(() => {
+    const now = new Date();
+    const mesNome = format(
+      periodo === 'mes_anterior' ? subMonths(now, 1) : now,
+      'MMMM yyyy',
+      { locale: ptBR }
+    );
+    const qtdClientes = new Set(clientes.map(c => c.cliente_id)).size;
+    const qtdProcessos = metricas.totalProcessos;
+    const qtdSemExtrato = clientes.reduce((s, c) => s + c.qtd_sem_extrato, 0);
+    const faltaCobrar = metricas.totalFaturado - metricas.totalCobrado;
+    const faltaReceber = metricas.totalCobrado - metricas.totalRecebido;
+
+    return {
+      mesNome: mesNome.charAt(0).toUpperCase() + mesNome.slice(1),
+      qtdClientes,
+      qtdProcessos,
+      qtdSemExtrato,
+      qtdInadimplentes: inadimplenciaCalc.qtdClientes,
+      faltaCobrar: Math.max(0, faltaCobrar),
+      faltaReceber: Math.max(0, faltaReceber),
+    };
+  }, [clientes, metricas, inadimplenciaCalc, periodo]);
 
   // Tab "Todos" - flat list
   const todosLancamentos = useMemo(() => {
@@ -179,21 +202,132 @@ export default function Financeiro() {
         <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">Carregando...</div>
       ) : (
         <>
-          {/* KPIs */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {kpis.map(kpi => (
-              <Card key={kpi.label} className="border-border/60">
-                <CardContent className="p-5">
-                  <div className={`rounded-lg ${kpi.bgColor} p-2 w-fit`}>
-                    <kpi.icon className={`h-4.5 w-4.5 ${kpi.color}`} />
-                  </div>
-                  <p className={`text-2xl font-bold mt-3 ${kpi.color}`}>{kpi.value}</p>
-                  <p className="text-xs text-muted-foreground">{kpi.subValue}</p>
-                  <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">{kpi.label}</p>
-                </CardContent>
-              </Card>
-            ))}
+          {/* 5 KPIs */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {/* Faturado */}
+            <Card className="border-border/60">
+              <CardContent className="p-5">
+                <div className="rounded-lg bg-muted p-2 w-fit">
+                  <DollarSign className="h-4.5 w-4.5 text-foreground" />
+                </div>
+                <p className="text-2xl font-bold mt-3">{formatBRL(metricas.totalFaturado)}</p>
+                <p className="text-xs text-muted-foreground">{metricas.totalProcessos} processos</p>
+                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Faturado</p>
+              </CardContent>
+            </Card>
+
+            {/* Cobrado — clickable */}
+            <Card
+              className="border-border/60 cursor-pointer hover:border-blue-500/50 transition-colors"
+              onClick={() => setActiveTab('enviados')}
+            >
+              <CardContent className="p-5">
+                <div className="rounded-lg bg-blue-500/10 p-2 w-fit">
+                  <Send className="h-4.5 w-4.5 text-blue-500" />
+                </div>
+                <p className="text-2xl font-bold mt-3 text-blue-500">{formatBRL(metricas.totalCobrado)}</p>
+                <p className="text-xs text-muted-foreground">{metricas.clientesCobrados} clientes</p>
+                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Cobrado</p>
+              </CardContent>
+            </Card>
+
+            {/* Recebido — clickable + progress bar */}
+            <Card
+              className="border-border/60 cursor-pointer hover:border-emerald-500/50 transition-colors"
+              onClick={() => setActiveTab('pagos')}
+            >
+              <CardContent className="p-5">
+                <div className="rounded-lg bg-emerald-500/10 p-2 w-fit">
+                  <CheckCircle className="h-4.5 w-4.5 text-emerald-500" />
+                </div>
+                <p className="text-2xl font-bold mt-3 text-emerald-500">{formatBRL(metricas.totalRecebido)}</p>
+                <div className="w-full bg-muted rounded-full h-1.5 mt-2">
+                  <div
+                    className="bg-emerald-500 h-1.5 rounded-full transition-all"
+                    style={{ width: `${metricas.taxaRecebimento}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{metricas.taxaRecebimento}% do faturado</p>
+                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Recebido</p>
+              </CardContent>
+            </Card>
+
+            {/* Inadimplente — clickable + red highlight */}
+            <Card
+              className={`border-border/60 cursor-pointer transition-colors ${
+                inadimplenciaCalc.total > 0
+                  ? 'border-red-500/30 bg-red-500/5 hover:border-red-500/50'
+                  : 'hover:border-border'
+              }`}
+              onClick={() => setActiveTab('vencidos')}
+            >
+              <CardContent className="p-5">
+                <div className="rounded-lg bg-red-500/10 p-2 w-fit">
+                  <AlertTriangle className="h-4.5 w-4.5 text-red-500" />
+                </div>
+                <p className={`text-2xl font-bold mt-3 ${inadimplenciaCalc.total > 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                  {formatBRL(inadimplenciaCalc.total)}
+                </p>
+                <p className="text-xs text-red-400">{inadimplenciaCalc.qtdClientes} clientes</p>
+                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Inadimplente</p>
+              </CardContent>
+            </Card>
+
+            {/* Resultado */}
+            <Card className="border-border/60">
+              <CardContent className="p-5">
+                <div className={`rounded-lg p-2 w-fit ${resultado >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+                  {resultado >= 0 ? <TrendingUp className="h-4.5 w-4.5 text-emerald-500" /> : <TrendingDown className="h-4.5 w-4.5 text-red-500" />}
+                </div>
+                <p className={`text-2xl font-bold mt-3 ${resultado >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  {formatBRL(resultado)}
+                </p>
+                <p className="text-xs text-muted-foreground">Receita - Despesas</p>
+                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Resultado</p>
+              </CardContent>
+            </Card>
           </div>
+
+          {/* Resumo do Mês */}
+          <Card className="bg-muted/30 border-border/60">
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Resumo de {resumoMes.mesNome}</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {resumoMes.qtdClientes} clientes · {resumoMes.qtdProcessos} processos
+                    {resumoMes.qtdSemExtrato > 0 && (
+                      <span className="text-amber-500"> · {resumoMes.qtdSemExtrato} sem extrato</span>
+                    )}
+                    {resumoMes.qtdInadimplentes > 0 && (
+                      <span className="text-red-500"> · {resumoMes.qtdInadimplentes} inadimplentes</span>
+                    )}
+                    {resumoMes.qtdSemExtrato === 0 && resumoMes.qtdInadimplentes === 0 && (
+                      <span className="text-emerald-500"> · Tudo em dia ✓</span>
+                    )}
+                  </p>
+                </div>
+                <div className="flex gap-6 text-right flex-wrap">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Faturado</p>
+                    <p className="text-sm font-bold">{formatBRL(metricas.totalFaturado)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Recebido</p>
+                    <p className="text-sm font-bold text-emerald-500">{formatBRL(metricas.totalRecebido)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Falta cobrar</p>
+                    <p className="text-sm font-bold text-amber-500">{formatBRL(resumoMes.faltaCobrar)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Falta receber</p>
+                    <p className="text-sm font-bold text-red-500">{formatBRL(resumoMes.faltaReceber)}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -222,6 +356,9 @@ export default function Financeiro() {
               <TabsTrigger value="pagos" className="gap-1.5">
                 <CheckCircle className="h-3.5 w-3.5" />
                 Pagos
+                {clientesPagos.length > 0 && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 min-w-[18px] text-emerald-500 border-emerald-500/30">{clientesPagos.length}</Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="vencidos" className="gap-1.5">
                 <AlertTriangle className="h-3.5 w-3.5" />
@@ -256,7 +393,6 @@ export default function Financeiro() {
                         const diaFatura = c.cliente_dia_vencimento_mensal || 0;
                         const hoje = new Date().getDate();
                         const diaInicioJanela = Math.max(1, diaFatura - 5);
-                        // If we're past the billing day, calculate days until next month's window
                         const diasAteCobranca = hoje > diaFatura
                           ? (new Date(new Date().getFullYear(), new Date().getMonth() + 1, diaInicioJanela).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24) | 0
                           : Math.max(1, diaInicioJanela - hoje);
