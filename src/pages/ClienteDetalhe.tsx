@@ -925,7 +925,14 @@ export default function ClienteDetalhe() {
 
           <Card className="border-border/60">
             <CardHeader className="flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base">Histórico de Processos ({totalProcessos})</CardTitle>
+              <CardTitle className="text-base">
+                Histórico de Processos ({totalProcessos})
+                {processosPagosCount > 0 && (
+                  <span className="text-xs text-muted-foreground font-normal ml-2">
+                    · {processosPagosCount} pagos · {processosPendentesCount} pendentes
+                  </span>
+                )}
+              </CardTitle>
               <div className="flex items-center gap-2">
                 {selectedProcessosTab.size > 0 && (
                   <Button
