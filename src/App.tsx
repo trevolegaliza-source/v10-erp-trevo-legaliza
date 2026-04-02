@@ -22,6 +22,7 @@ const CadastroRapido = lazy(() => import("./pages/CadastroRapido"));
 const Documentos = lazy(() => import("./pages/Documentos"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const Orcamentos = lazy(() => import("./pages/Orcamentos"));
+const OrcamentoNovo = lazy(() => import("./pages/OrcamentoNovo"));
 const InteligenciaGeografica = lazy(() => import("./pages/InteligenciaGeografica"));
 const EstadoDetalhe = lazy(() => import("./pages/EstadoDetalhe"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -65,6 +66,7 @@ const App = () => (
                   <Route path="/clientes" element={<Clientes />} />
                   <Route path="/clientes/:id" element={<ClienteDetalhe />} />
                   <Route path="/orcamentos" element={<Orcamentos />} />
+                  <Route path="/orcamentos/novo" element={<OrcamentoNovo />} />
                   <Route path="/cadastro-rapido" element={<CadastroRapido />} />
                   <Route path="/financeiro" element={<Financeiro />} />
                   <Route path="/contas-receber" element={<Navigate to="/financeiro" replace />} />
