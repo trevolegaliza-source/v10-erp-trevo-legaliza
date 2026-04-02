@@ -70,7 +70,7 @@ export default function StepValor({ form, onChange, isFirstProcess, isAvulso, cl
             <SelectContent>
               {negotiations.map(n => (
                 <SelectItem key={n.id} value={n.id}>
-                  {n.service_name} — {fmt((n as any).valor_prepago > 0 ? (n as any).valor_prepago : n.fixed_price)}
+                  {n.service_name} — {vfmt((n as any).valor_prepago > 0 ? (n as any).valor_prepago : n.fixed_price)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -86,9 +86,9 @@ export default function StepValor({ form, onChange, isFirstProcess, isAvulso, cl
                 <span className="font-semibold text-sm">Saldo Insuficiente</span>
               </div>
               <div className="text-xs space-y-1">
-                <p>Valor do serviço: {fmt(valorPreview)}</p>
-                <p>Saldo atual: {fmt(saldoPrepago)}</p>
-                <p className="text-destructive font-medium">Diferença: {fmt(valorPreview - saldoPrepago)}</p>
+                <p>Valor do serviço: {vfmt(valorPreview)}</p>
+                <p>Saldo atual: {vfmt(saldoPrepago)}</p>
+                <p className="text-destructive font-medium">Diferença: {vfmt(valorPreview - saldoPrepago)}</p>
               </div>
               <p className="text-xs text-muted-foreground">O cliente precisa realizar uma recarga para prosseguir.</p>
             </div>
