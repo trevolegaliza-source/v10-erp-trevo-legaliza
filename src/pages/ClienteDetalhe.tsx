@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil, List } from 'lucide-react';
+import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil, List, Check } from 'lucide-react';
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { formatCEP, buscarCEP, buscarCoordenadas } from '@/lib/cep';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -546,6 +546,33 @@ export default function ClienteDetalhe() {
     setShowDeletePassword(true);
   };
 
+  // Helper: check if a processo has been fully paid (must be before early returns)
+  const paidProcessIds = useMemo(() => {
+    const set = new Set<string>();
+    lancamentos.forEach(l => {
+      if (l.tipo === 'receber' && l.status === 'pago' && l.confirmado_recebimento && l.processo_id) {
+        set.add(l.processo_id);
+      }
+    });
+    return set;
+  }, [lancamentos]);
+
+  const isProcessoPago = (processoId: string) => paidProcessIds.has(processoId);
+
+  // Sort: pending first, paid last
+  const processosOrdenados = useMemo(() => {
+    return [...processos].sort((a, b) => {
+      const aPago = paidProcessIds.has(a.id);
+      const bPago = paidProcessIds.has(b.id);
+      if (aPago && !bPago) return 1;
+      if (!aPago && bPago) return -1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [processos, paidProcessIds]);
+
+  const processosPagosCount = processos.filter(p => paidProcessIds.has(p.id)).length;
+  const processosPendentesCount = processos.length - processosPagosCount;
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -898,7 +925,14 @@ export default function ClienteDetalhe() {
 
           <Card className="border-border/60">
             <CardHeader className="flex-row items-center justify-between pb-3">
-              <CardTitle className="text-base">Histórico de Processos ({totalProcessos})</CardTitle>
+              <CardTitle className="text-base">
+                Histórico de Processos ({totalProcessos})
+                {processosPagosCount > 0 && (
+                  <span className="text-xs text-muted-foreground font-normal ml-2">
+                    · {processosPagosCount} pagos · {processosPendentesCount} pendentes
+                  </span>
+                )}
+              </CardTitle>
               <div className="flex items-center gap-2">
                 {selectedProcessosTab.size > 0 && (
                   <Button
@@ -968,10 +1002,12 @@ export default function ClienteDetalhe() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {processos.map(p => (
+                    {processosOrdenados.map(p => {
+                      const pago = isProcessoPago(p.id);
+                      return (
                       <TableRow
                         key={p.id}
-                        className="cursor-pointer hover:bg-muted/30"
+                        className={cn("cursor-pointer hover:bg-muted/30", pago && "opacity-50")}
                         onDoubleClick={() => {
                           const fin: ProcessoFinanceiro = {
                             ...p,
@@ -992,24 +1028,33 @@ export default function ClienteDetalhe() {
                             }}
                           />
                         </TableCell>
-                        <TableCell className="font-medium">{p.razao_social}</TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {pago && <Check className="h-4 w-4 text-green-500 flex-shrink-0" />}
+                            <span className={pago ? 'line-through text-muted-foreground' : ''}>{p.razao_social}</span>
+                          </div>
+                        </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
+                          <Badge variant="outline" className={cn("text-[10px] border-primary/30 text-primary", pago && "opacity-50")}>
                             {TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm">{KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa}</TableCell>
-                        <TableCell>
-                          {p.prioridade === 'urgente'
-                            ? <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
-                            : <span className="text-xs text-muted-foreground">Normal</span>}
+                        <TableCell className={cn("text-sm", pago && "text-muted-foreground")}>
+                          {pago ? 'Concluído' : (KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa)}
                         </TableCell>
-                        <TableCell className="text-sm">{new Date(p.created_at).toLocaleDateString('pt-BR')}</TableCell>
-                        <TableCell className="text-right text-sm font-medium">
+                        <TableCell>
+                          {!pago && p.prioridade === 'urgente'
+                            ? <Badge className="text-[10px] bg-destructive/10 text-destructive border-0">Urgente</Badge>
+                            : <span className={cn("text-xs", pago ? "text-muted-foreground" : "text-muted-foreground")}>Normal</span>}
+                        </TableCell>
+                        <TableCell className={cn("text-sm", pago && "text-muted-foreground")}>{new Date(p.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                        <TableCell className={cn("text-right text-sm", pago ? "line-through text-green-500/50" : "font-medium")}>
                           {p.valor ? Number(p.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}
+                          {pago && <span className="ml-2 text-xs text-green-500 no-underline inline-block">✓ Pago</span>}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               ) : (
