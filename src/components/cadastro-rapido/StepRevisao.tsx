@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Check, ListPlus } from 'lucide-react';
 import type { ClienteDB } from '@/types/financial';
 import { TIPO_PROCESSO_LABELS, type TipoProcesso } from '@/types/financial';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface ProcessoResumo {
   razaoSocial: string;
@@ -44,6 +45,8 @@ export default function StepRevisao({
   isSaving,
   filaLength,
 }: Props) {
+  const { podeVerValores } = usePermissions();
+  const vfmt = (v: number) => podeVerValores() ? fmt(v) : '•••••';
   const tipoLabel = TIPO_PROCESSO_LABELS[processo.tipo as TipoProcesso] || processo.tipo;
   const valorBase = Number(cliente.valor_base ?? 0);
   const isManual = processo.metodoPreco === 'manual' || processo.tipo === 'avulso';
@@ -89,12 +92,12 @@ export default function StepRevisao({
             <>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Valor Base</span>
-                <span>{fmt(valorBase)}</span>
+                <span>{vfmt(valorBase)}</span>
               </div>
               {descontoAplicado > 0 && (
                 <div className="flex justify-between text-info">
                   <span>Desconto (slot {slotNumero})</span>
-                  <span>-{fmt(descontoAplicado)}</span>
+                  <span>-{vfmt(descontoAplicado)}</span>
                 </div>
               )}
               {processo.prioridade === 'urgente' && (
@@ -114,13 +117,13 @@ export default function StepRevisao({
           {isManual && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Valor Manual</span>
-              <span>{fmt(valorCalculado)}</span>
+              <span>{vfmt(valorCalculado)}</span>
             </div>
           )}
           <div className="h-px bg-border" />
           <div className="flex justify-between text-base font-bold">
             <span>VALOR FINAL</span>
-            <span className="text-primary">{fmt(valorCalculado)}</span>
+            <span className="text-primary">{vfmt(valorCalculado)}</span>
           </div>
         </div>
 

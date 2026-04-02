@@ -2,8 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calculator } from 'lucide-react';
 import type { ClienteDB } from '@/types/financial';
 import { calcularDescontoProgressivo } from '@/hooks/useFinanceiro';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const mask = '•••••';
 
 interface Props {
   cliente: ClienteDB;
@@ -107,7 +109,9 @@ export function calcPreview(props: Props): PreviewResult {
 
 export default function PreviewFinanceiro(props: Props) {
   const { cliente, processosNoMes, filaLength, prioridade, mudancaUF, boasVindas, boasVindasPct, isAvulso, metodoPreco } = props;
+  const { podeVerValores } = usePermissions();
   const preview = calcPreview(props);
+  const vfmt = (v: number) => podeVerValores() ? fmt(v) : mask;
   const valorBase = Number(cliente.valor_base ?? 0);
   const isManual = metodoPreco === 'manual' || isAvulso;
   const isPrePago = cliente.tipo === 'PRE_PAGO';
@@ -144,17 +148,17 @@ export default function PreviewFinanceiro(props: Props) {
           <>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Serviço</span>
-              <span className="font-medium">{fmt(preview.valorFinal)}</span>
+              <span className="font-medium">{vfmt(preview.valorFinal)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Saldo Atual</span>
-              <span className="font-medium">{fmt(saldo)}</span>
+              <span className="font-medium">{vfmt(saldo)}</span>
             </div>
             <div className="h-px bg-border" />
             <div className="flex justify-between font-bold">
               <span>Saldo Após</span>
               <span className={saldo - preview.valorFinal >= 0 ? 'text-success' : 'text-destructive'}>
-                {fmt(saldo - preview.valorFinal)} {saldo - preview.valorFinal >= 0 ? '✅' : '❌'}
+                {vfmt(saldo - preview.valorFinal)} {saldo - preview.valorFinal >= 0 ? '✅' : '❌'}
               </span>
             </div>
           </>
@@ -195,7 +199,7 @@ export default function PreviewFinanceiro(props: Props) {
               <>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Valor Base</span>
-                  <span>{fmt(valorBase)}</span>
+                  <span>{vfmt(valorBase)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Slot nº</span>
@@ -204,7 +208,7 @@ export default function PreviewFinanceiro(props: Props) {
                 {preview.descontoAplicado > 0 && (
                   <div className="flex justify-between text-info">
                     <span>Desc. Progressivo</span>
-                    <span>-{fmt(preview.descontoAplicado)}</span>
+                    <span>-{vfmt(preview.descontoAplicado)}</span>
                   </div>
                 )}
               </>
@@ -225,7 +229,7 @@ export default function PreviewFinanceiro(props: Props) {
             {boasVindas && (
               <div className="flex justify-between text-success">
                 <span>Boas-vindas (-{boasVindasPct}%)</span>
-                <span>{boasVindasDesconto > 0 ? `-${fmt(boasVindasDesconto)}` : 'incluído'}</span>
+                <span>{boasVindasDesconto > 0 ? `-${vfmt(boasVindasDesconto)}` : 'incluído'}</span>
               </div>
             )}
 
@@ -233,7 +237,7 @@ export default function PreviewFinanceiro(props: Props) {
 
             <div className="flex justify-between text-base font-bold">
               <span>VALOR FINAL</span>
-              <span className="text-primary">{fmt(preview.valorFinal)}</span>
+              <span className="text-primary">{vfmt(preview.valorFinal)}</span>
             </div>
           </>
         )}
@@ -251,7 +255,7 @@ export default function PreviewFinanceiro(props: Props) {
                       : 'bg-muted text-muted-foreground'
                   }`}
                 >
-                  {p.slot}º {fmt(p.valor)}
+                  {p.slot}º {vfmt(p.valor)}
                 </span>
               ))}
             </div>

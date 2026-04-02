@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
+import { ValorProtegido } from '@/components/auth/ValorProtegido';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
@@ -665,13 +667,13 @@ export default function ClienteDetalhe() {
         <Card className="border-border/60">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Faturado</p>
-            <p className="text-2xl font-bold">{totalFaturado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-2xl font-bold"><ValorProtegido valor={totalFaturado} /></p>
           </CardContent>
         </Card>
         <Card className="border-border/60">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Pendente</p>
-            <p className="text-2xl font-bold text-warning">{totalPendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            <p className="text-2xl font-bold text-warning"><ValorProtegido valor={totalPendente} /></p>
           </CardContent>
         </Card>
       </div>
@@ -731,7 +733,7 @@ export default function ClienteDetalhe() {
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).mensalidade ?? ''} onChange={e => setEditForm(f => ({ ...f, mensalidade: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{formatCurrencyOrZero((cliente as any).mensalidade)}</p>
+                        <p className="font-medium"><ValorProtegido valor={Number((cliente as any).mensalidade ?? 0)} /></p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
@@ -755,7 +757,7 @@ export default function ClienteDetalhe() {
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{formatCurrencyOrZero((cliente as any).valor_base)}</p>
+                        <p className="font-medium"><ValorProtegido valor={Number((cliente as any).valor_base ?? 0)} /></p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
@@ -777,7 +779,7 @@ export default function ClienteDetalhe() {
                     <div className="col-span-2 rounded-lg border border-primary/30 bg-primary/5 p-4">
                       <p className="text-xs text-muted-foreground">Saldo Atual</p>
                       <p className={`text-2xl font-bold ${Number((cliente as any).saldo_prepago ?? 0) >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                        {formatCurrencyOrZero((cliente as any).saldo_prepago)}
+                        <ValorProtegido valor={Number((cliente as any).saldo_prepago ?? 0)} className={`text-2xl font-bold ${Number((cliente as any).saldo_prepago ?? 0) >= 0 ? 'text-primary' : 'text-destructive'}`} />
                       </p>
                       {(cliente as any).data_ultima_recarga && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -842,7 +844,7 @@ export default function ClienteDetalhe() {
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).valor_base ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_base: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{formatCurrencyOrZero((cliente as any).valor_base)}</p>
+                        <p className="font-medium"><ValorProtegido valor={Number((cliente as any).valor_base ?? 0)} /></p>
                       )}
                     </div>
                     <div className="grid gap-1.5">
@@ -858,7 +860,7 @@ export default function ClienteDetalhe() {
                       {editing ? (
                         <Input type="number" step="0.01" value={(editForm as any).valor_limite_desconto ?? ''} onChange={e => setEditForm(f => ({ ...f, valor_limite_desconto: e.target.value ? Number(e.target.value) : null }))} placeholder="0,00" />
                       ) : (
-                        <p className="font-medium">{formatCurrencyOrZero((cliente as any).valor_limite_desconto)}</p>
+                        <p className="font-medium"><ValorProtegido valor={Number((cliente as any).valor_limite_desconto ?? 0)} /></p>
                       )}
                     </div>
                   </>
@@ -1024,8 +1026,8 @@ export default function ClienteDetalhe() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Faturas e Fechamentos</CardTitle>
                 <div className="flex gap-2 text-xs">
-                  <Badge className="bg-success/10 text-success border-0">Pago: {totalPago.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</Badge>
-                  <Badge className="bg-warning/10 text-warning border-0">Pendente: {totalPendente.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</Badge>
+                  <Badge className="bg-success/10 text-success border-0">Pago: <ValorProtegido valor={totalPago} /></Badge>
+                  <Badge className="bg-warning/10 text-warning border-0">Pendente: <ValorProtegido valor={totalPendente} /></Badge>
                 </div>
               </div>
             </CardHeader>
