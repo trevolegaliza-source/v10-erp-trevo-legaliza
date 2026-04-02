@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -37,7 +38,8 @@ interface Props {
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function StepValor({ form, onChange, isFirstProcess, isAvulso, clienteTipo, negotiations, saldoPrepago, valorPreview, franquiaProcessos, processosNoMes, onBack, onNext }: Props) {
-  const { podeVerValores } = (await import('@/hooks/usePermissions')).usePermissions ? { podeVerValores: () => true } : { podeVerValores: () => true };
+  const { podeVerValores } = usePermissions();
+  const vfmt = (v: number) => podeVerValores() ? fmt(v) : '•••••';
   const update = (field: keyof ValorFormData, value: any) => onChange({ ...form, [field]: value });
   const isPrePago = clienteTipo === 'PRE_PAGO';
   const isMensalista = clienteTipo === 'MENSALISTA';
