@@ -148,18 +148,17 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
       })
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
+        const k = event.transform.k;
+        // Scale pins inversely to zoom
+        g.selectAll('.pin').attr('r', 5 / k).attr('stroke-width', 1.5 / k);
+        g.selectAll('.pins-layer text').attr('font-size', (7 / k) + 'px');
+        // Scale municipality borders and labels
+        g.selectAll('path.municipio').attr('stroke-width', 0.4 / k);
+        g.selectAll('text.mun-label').attr('font-size', (7 / k) + 'px');
       });
 
     svg.call(zoom as any);
     zoomRef.current = zoom;
-
-    // Store current scale for pin scaling
-    svg.on('zoom.pinscale', null);
-    zoom.on('zoom.pinscale', (event: any) => {
-      const k = event.transform.k;
-      g.selectAll('.pin').attr('r', 5 / k).attr('stroke-width', 1.5 / k);
-      g.selectAll('.pins-layer text').attr('font-size', (7 / k) + 'px');
-    });
 
     // Municipalities
     g.selectAll('path.municipio')
@@ -297,8 +296,9 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
                 ${contato.municipio ? `<div>📍 ${contato.municipio}</div>` : '<div>📍 Sede estadual</div>'}
                 ${contato.telefone ? `<div>📞 ${contato.telefone}</div>` : ''}
                 ${contato.email ? `<div>✉️ ${contato.email}</div>` : ''}
-                ${contato.observacoes ? `<div style="margin-top:4px;color:#6b7280;font-style:italic;">📝 ${contato.observacoes}</div>` : ''}
+                ${contato.contato_interno ? `<div>👤 ${contato.contato_interno}</div>` : ''}
                 <div style="margin-top:4px;">${stars}</div>
+                ${contato.observacoes ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #30363d;color:#6b7280;font-size:10px;">💬 ${contato.observacoes}</div>` : ''}
               </div>`;
           }
         })

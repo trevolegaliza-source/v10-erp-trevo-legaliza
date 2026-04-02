@@ -333,7 +333,11 @@ export default function EstadoDetalhe() {
                               )}
                             </div>
                             {c.contato_interno && <p className="text-xs" style={{ color: '#8b949e' }}>👤 {c.contato_interno}</p>}
-                            {c.observacoes && <p className="text-xs mt-1 italic" style={{ color: '#8b949e' }}>{c.observacoes}</p>}
+                            {c.observacoes && (
+                              <div className="mt-2 p-2 rounded text-xs" style={{ background: '#0b0e1499', color: '#8b949e', borderLeft: '2px solid rgba(34,197,94,0.2)' }}>
+                                💬 {c.observacoes}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-0.5">
                             {c.site_url && (
