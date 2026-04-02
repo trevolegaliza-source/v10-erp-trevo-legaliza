@@ -1,8 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Settings, ChevronLeft, ChevronRight, Users, CheckSquare, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Plus, Settings, ChevronLeft, ChevronRight, Users, CheckSquare, X, Check, MoreHorizontal, AlertTriangle, Clock, CheckCircle } from 'lucide-react';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
 import {
@@ -44,8 +48,11 @@ import {
 } from '@/hooks/useContasPagar';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
+import * as LucideIcons from 'lucide-react';
 
 const MESES_NAV = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function ContasPagar() {
   const { podeCriar, podeEditar, podeExcluir, podeAprovar } = usePermissions();
@@ -108,7 +115,8 @@ export default function ContasPagar() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState('categoria');
+  const [activeTab, setActiveTab] = useState('urgencia');
+  const [diasAlerta, setDiasAlerta] = useState(() => parseInt(localStorage.getItem('trevo_dias_alerta_pagar') || '7'));
 
   const selectableIds = useMemo(() => {
     return lancamentos.filter(l => l.status !== 'pago').map(l => l.id);
@@ -158,6 +166,33 @@ export default function ContasPagar() {
   const totalPago = lancamentos.filter(l => l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
   const totalPendente = lancamentos.filter(l => l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
   const totalVencido = lancamentos.filter(l => l.status === 'pendente' && l.data_vencimento < hoje).reduce((s, l) => s + Number(l.valor), 0);
+
+  // Urgency groups
+  const urgencyGroups = useMemo(() => {
+    const hojeDate = new Date(); hojeDate.setHours(0, 0, 0, 0);
+    const limiteAlerta = new Date(hojeDate);
+    limiteAlerta.setDate(limiteAlerta.getDate() + diasAlerta);
+
+    const vencidas = lancamentos.filter(l => {
+      const v = new Date(l.data_vencimento + 'T00:00:00');
+      return l.status !== 'pago' && v < hojeDate;
+    }).sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento));
+
+    const proximas = lancamentos.filter(l => {
+      const v = new Date(l.data_vencimento + 'T00:00:00');
+      return l.status !== 'pago' && v >= hojeDate && v <= limiteAlerta;
+    }).sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento));
+
+    const futuras = lancamentos.filter(l => {
+      const v = new Date(l.data_vencimento + 'T00:00:00');
+      return l.status !== 'pago' && v > limiteAlerta;
+    }).sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento));
+
+    const pagas = lancamentos.filter(l => l.status === 'pago')
+      .sort((a, b) => (b.data_pagamento || '').localeCompare(a.data_pagamento || ''));
+
+    return { vencidas, proximas, futuras, pagas };
+  }, [lancamentos, diasAlerta]);
 
   // Navigation
   const prevMonth = () => {
@@ -265,13 +300,91 @@ export default function ContasPagar() {
         totalVencido={totalVencido}
       />
 
+      {/* Dias alerta control */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Alertar contas em</span>
+          <Input
+            type="number"
+            value={diasAlerta}
+            onChange={(e) => {
+              const v = parseInt(e.target.value) || 7;
+              setDiasAlerta(v);
+              localStorage.setItem('trevo_dias_alerta_pagar', String(v));
+            }}
+            className="w-16 h-8 text-center text-sm"
+            min={1} max={90}
+          />
+          <span className="text-sm text-muted-foreground">dias</span>
+        </div>
+      </div>
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={v => { setActiveTab(v); if (v !== 'lista') exitSelectionMode(); }} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="categoria">Visão por Categoria</TabsTrigger>
+          <TabsTrigger value="urgencia">Urgência</TabsTrigger>
+          <TabsTrigger value="categoria">Categoria</TabsTrigger>
           <TabsTrigger value="lista">Lista</TabsTrigger>
           <TabsTrigger value="recorrentes">Recorrentes</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="urgencia">
+          <div className="space-y-6">
+            {/* VENCIDAS */}
+            {urgencyGroups.vencidas.length > 0 && (
+              <UrgencySection
+                title={`⚠️ VENCIDAS (${urgencyGroups.vencidas.length})`}
+                items={urgencyGroups.vencidas}
+                variant="destructive"
+                onPagar={podeAprovar('contas_pagar') ? (l: any) => setPagoModal(l) : undefined}
+                onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
+                onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+              />
+            )}
+
+            {/* PRÓXIMAS */}
+            {urgencyGroups.proximas.length > 0 && (
+              <UrgencySection
+                title={`📅 PRÓXIMOS ${diasAlerta} DIAS (${urgencyGroups.proximas.length})`}
+                items={urgencyGroups.proximas}
+                variant="warning"
+                onPagar={podeAprovar('contas_pagar') ? (l: any) => setPagoModal(l) : undefined}
+                onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
+                onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+              />
+            )}
+
+            {/* DEMAIS */}
+            {urgencyGroups.futuras.length > 0 && (
+              <UrgencySection
+                title={`📋 DEMAIS DO MÊS (${urgencyGroups.futuras.length})`}
+                items={urgencyGroups.futuras}
+                variant="default"
+                onPagar={podeAprovar('contas_pagar') ? (l: any) => setPagoModal(l) : undefined}
+                onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
+                onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+              />
+            )}
+
+            {/* PAGAS */}
+            {urgencyGroups.pagas.length > 0 && (
+              <UrgencySection
+                title={`✅ PAGAS ESTE MÊS (${urgencyGroups.pagas.length})`}
+                items={urgencyGroups.pagas}
+                variant="success"
+                onPagar={undefined}
+                onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
+                onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+              />
+            )}
+
+            {lancamentos.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>Nenhuma despesa neste período</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
 
         <TabsContent value="categoria">
           <CategoriaAccordion
@@ -394,6 +507,95 @@ export default function ContasPagar() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// Urgency-grouped section component
+function UrgencySection({ title, items, variant, onPagar, onEdit, onDelete }: {
+  title: string;
+  items: any[];
+  variant: 'destructive' | 'warning' | 'default' | 'success';
+  onPagar?: (l: any) => void;
+  onEdit?: (l: any) => void;
+  onDelete?: (l: any) => void;
+}) {
+  const borderClass = {
+    destructive: 'border-destructive/30',
+    warning: 'border-warning/30',
+    default: 'border-border',
+    success: 'border-primary/30',
+  }[variant];
+
+  const bgClass = {
+    destructive: 'bg-destructive/5',
+    warning: 'bg-warning/5',
+    default: '',
+    success: 'bg-primary/5',
+  }[variant];
+
+  const catEmojis: Record<string, string> = {
+    folha: '💰', infraestrutura: '🏢', software: '💻', impostos: '📋',
+    servicos: '🔧', marketing: '📢', outros: '📌',
+  };
+
+  return (
+    <div>
+      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">{title}</h3>
+      <div className="space-y-1.5">
+        {items.map(l => {
+          const hojeDate = new Date(); hojeDate.setHours(0, 0, 0, 0);
+          const venc = new Date(l.data_vencimento + 'T00:00:00');
+          const diasAte = Math.ceil((venc.getTime() - hojeDate.getTime()) / 86400000);
+          const pago = l.status === 'pago';
+
+          return (
+            <div key={l.id} className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${borderClass} ${bgClass}`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-base">{catEmojis[l.categoria] || '📌'}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{l.subcategoria || l.descricao}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {pago
+                      ? `Pago em ${l.data_pagamento ? new Date(l.data_pagamento + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}`
+                      : diasAte < 0
+                        ? `Venceu há ${Math.abs(diasAte)} dia${Math.abs(diasAte) > 1 ? 's' : ''} (${venc.toLocaleDateString('pt-BR')})`
+                        : diasAte === 0
+                          ? `Vence HOJE`
+                          : `Vence em ${diasAte} dia${diasAte > 1 ? 's' : ''} (${venc.toLocaleDateString('pt-BR')})`
+                    }
+                  </p>
+                  {l.observacoes_financeiro && <p className="text-xs text-muted-foreground mt-0.5">💬 {l.observacoes_financeiro}</p>}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <span className={`text-sm font-bold ${
+                  pago ? 'text-primary' : variant === 'destructive' ? 'text-destructive' : 'text-foreground'
+                }`}>
+                  {fmt(Number(l.valor))}
+                </span>
+
+                {onPagar && !pago && (
+                  <Button size="sm" variant="outline" onClick={() => onPagar(l)} className="h-7 text-xs">
+                    <Check className="h-3 w-3 mr-1" /> Pagar
+                  </Button>
+                )}
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {onEdit && <DropdownMenuItem onClick={() => onEdit(l)}>Editar</DropdownMenuItem>}
+                    {onDelete && <DropdownMenuItem onClick={() => onDelete(l)} className="text-destructive">Excluir</DropdownMenuItem>}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
