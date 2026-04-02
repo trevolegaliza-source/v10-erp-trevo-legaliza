@@ -1157,6 +1157,7 @@ export type Database = {
       calcular_vencimento: { Args: { p_cliente_id: string }; Returns: string }
       get_empresa_id: { Args: never; Returns: string }
       get_user_empresa_id: { Args: never; Returns: string }
+      get_user_role: { Args: never; Returns: string }
     }
     Enums: {
       status_financeiro: "pendente" | "pago" | "atrasado" | "cancelado"
