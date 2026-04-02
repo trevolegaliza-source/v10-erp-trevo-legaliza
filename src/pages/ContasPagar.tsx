@@ -115,7 +115,8 @@ export default function ContasPagar() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState('categoria');
+  const [activeTab, setActiveTab] = useState('urgencia');
+  const [diasAlerta, setDiasAlerta] = useState(() => parseInt(localStorage.getItem('trevo_dias_alerta_pagar') || '7'));
 
   const selectableIds = useMemo(() => {
     return lancamentos.filter(l => l.status !== 'pago').map(l => l.id);
