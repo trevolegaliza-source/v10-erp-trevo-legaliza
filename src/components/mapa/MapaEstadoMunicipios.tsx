@@ -148,18 +148,17 @@ export function MapaEstadoMunicipios({ uf, clientesPorMunicipio = {}, contatos, 
       })
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
+        const k = event.transform.k;
+        // Scale pins inversely to zoom
+        g.selectAll('.pin').attr('r', 5 / k).attr('stroke-width', 1.5 / k);
+        g.selectAll('.pins-layer text').attr('font-size', (7 / k) + 'px');
+        // Scale municipality borders and labels
+        g.selectAll('path.municipio').attr('stroke-width', 0.4 / k);
+        g.selectAll('text.mun-label').attr('font-size', (7 / k) + 'px');
       });
 
     svg.call(zoom as any);
     zoomRef.current = zoom;
-
-    // Store current scale for pin scaling
-    svg.on('zoom.pinscale', null);
-    zoom.on('zoom.pinscale', (event: any) => {
-      const k = event.transform.k;
-      g.selectAll('.pin').attr('r', 5 / k).attr('stroke-width', 1.5 / k);
-      g.selectAll('.pins-layer text').attr('font-size', (7 / k) + 'px');
-    });
 
     // Municipalities
     g.selectAll('path.municipio')
