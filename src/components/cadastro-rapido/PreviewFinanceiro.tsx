@@ -2,8 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calculator } from 'lucide-react';
 import type { ClienteDB } from '@/types/financial';
 import { calcularDescontoProgressivo } from '@/hooks/useFinanceiro';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const mask = '•••••';
 
 interface Props {
   cliente: ClienteDB;
