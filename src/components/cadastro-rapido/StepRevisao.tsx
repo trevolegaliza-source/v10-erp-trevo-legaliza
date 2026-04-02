@@ -45,6 +45,8 @@ export default function StepRevisao({
   isSaving,
   filaLength,
 }: Props) {
+  const { podeVerValores } = usePermissions();
+  const vfmt = (v: number) => podeVerValores() ? fmt(v) : '•••••';
   const tipoLabel = TIPO_PROCESSO_LABELS[processo.tipo as TipoProcesso] || processo.tipo;
   const valorBase = Number(cliente.valor_base ?? 0);
   const isManual = processo.metodoPreco === 'manual' || processo.tipo === 'avulso';
