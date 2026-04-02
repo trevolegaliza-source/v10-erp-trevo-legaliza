@@ -167,6 +167,33 @@ export default function ContasPagar() {
   const totalPendente = lancamentos.filter(l => l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
   const totalVencido = lancamentos.filter(l => l.status === 'pendente' && l.data_vencimento < hoje).reduce((s, l) => s + Number(l.valor), 0);
 
+  // Urgency groups
+  const urgencyGroups = useMemo(() => {
+    const hojeDate = new Date(); hojeDate.setHours(0, 0, 0, 0);
+    const limiteAlerta = new Date(hojeDate);
+    limiteAlerta.setDate(limiteAlerta.getDate() + diasAlerta);
+
+    const vencidas = lancamentos.filter(l => {
+      const v = new Date(l.data_vencimento + 'T00:00:00');
+      return l.status !== 'pago' && v < hojeDate;
+    }).sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento));
+
+    const proximas = lancamentos.filter(l => {
+      const v = new Date(l.data_vencimento + 'T00:00:00');
+      return l.status !== 'pago' && v >= hojeDate && v <= limiteAlerta;
+    }).sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento));
+
+    const futuras = lancamentos.filter(l => {
+      const v = new Date(l.data_vencimento + 'T00:00:00');
+      return l.status !== 'pago' && v > limiteAlerta;
+    }).sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento));
+
+    const pagas = lancamentos.filter(l => l.status === 'pago')
+      .sort((a, b) => (b.data_pagamento || '').localeCompare(a.data_pagamento || ''));
+
+    return { vencidas, proximas, futuras, pagas };
+  }, [lancamentos, diasAlerta]);
+
   // Navigation
   const prevMonth = () => {
     if (viewMonth === 1) { setViewMonth(12); setViewYear(y => y - 1); }
