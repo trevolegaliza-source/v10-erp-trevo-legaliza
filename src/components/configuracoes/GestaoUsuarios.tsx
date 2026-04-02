@@ -58,9 +58,9 @@ const ROLES = [
 const ROLE_PRESETS: Record<string, Record<string, boolean[]>> = {
   master: Object.fromEntries(MODULOS.map(m => [m.key, [true, true, true, true, true]])),
   financeiro: Object.fromEntries(MODULOS.map(m => [m.key,
-    ['contas_pagar'].includes(m.key) ? [true, true, true, false, true] :
-    ['colaboradores'].includes(m.key) ? [true, true, true, false, false] :
-    ['financeiro', 'dashboard'].includes(m.key) ? [true, false, false, false, false] :
+    ['financeiro', 'contas_pagar'].includes(m.key) ? [true, true, true, false, true] :
+    ['colaboradores'].includes(m.key) ? [true, false, false, false, false] :
+    ['dashboard', 'processos', 'clientes', 'orcamentos'].includes(m.key) ? [true, false, false, false, false] :
     [false, false, false, false, false]
   ])),
   operacional: Object.fromEntries(MODULOS.map(m => [m.key,
@@ -68,7 +68,10 @@ const ROLE_PRESETS: Record<string, Record<string, boolean[]>> = {
     ['dashboard'].includes(m.key) ? [true, false, false, false, false] :
     [false, false, false, false, false]
   ])),
-  visualizador: Object.fromEntries(MODULOS.map(m => [m.key, [true, false, false, false, false]])),
+  visualizador: Object.fromEntries(MODULOS.map(m => [m.key,
+    ['financeiro', 'contas_pagar', 'colaboradores', 'configuracoes'].includes(m.key) ? [false, false, false, false, false] :
+    [true, false, false, false, false]
+  ])),
 };
 
 const PERM_LABELS = ['VER', 'CRIAR', 'EDITAR', 'EXCLUIR', 'APROVAR'];
