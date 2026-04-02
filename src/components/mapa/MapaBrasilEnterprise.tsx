@@ -43,6 +43,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onHover }: Props) {
   const zoomRef = useRef<any>(null);
   const [geoData, setGeoData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(1);
   const onHoverRef = useRef(onHover);
   const navigate = useNavigate();
   const { resolvedTheme } = useTheme();
@@ -82,11 +83,19 @@ export function MapaBrasilEnterprise({ dadosEstados, onHover }: Props) {
     fetchGeo();
   }, []);
 
+  // Prevent page scroll when wheeling inside SVG
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => { e.preventDefault(); };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
+
   // Render map
   useEffect(() => {
     if (!geoData || !svgRef.current || !containerRef.current) return;
 
-    const mapBg = isDark ? '#0b0e14' : '#f1f5f9';
     const estadoVazio = isDark ? '#161b22' : '#e2e8f0';
     const bordaEstado = isDark ? '#30363d' : '#cbd5e1';
     const labelColor = isDark ? '#8b949e' : '#64748b';
@@ -211,8 +220,9 @@ export function MapaBrasilEnterprise({ dadosEstados, onHover }: Props) {
       .attr('font-size', '9px')
       .attr('font-weight', '600')
       .attr('fill', labelColor)
-      .attr('pointer-events', 'none')
-      .text((d: any) => getUfFromFeature(d));
+      .attr('pointer-events', 'none');
+
+    g.selectAll('text.estado-sigla').text((d: any) => getUfFromFeature(d));
 
     // Full name labels (visible at medium+ zoom)
     g.selectAll('text.estado-nome')
@@ -230,7 +240,7 @@ export function MapaBrasilEnterprise({ dadosEstados, onHover }: Props) {
       .attr('opacity', 0)
       .text((d: any) => UF_NOMES[getUfFromFeature(d)] || '');
 
-    // Zoom with scroll inside map
+    // Zoom
     const zoom = d3.zoom()
       .scaleExtent([0.5, 20])
       .filter((event: any) => {
@@ -239,23 +249,19 @@ export function MapaBrasilEnterprise({ dadosEstados, onHover }: Props) {
       })
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
-        const scale = event.transform.k;
+        const k = event.transform.k;
+        setZoomLevel(k);
 
-        g.selectAll('path.estado').attr('stroke-width', 0.5 / scale);
+        g.selectAll('path.estado').attr('stroke-width', 0.5 / k);
         g.selectAll('text.estado-sigla')
-          .attr('font-size', `${9 / scale}px`)
-          .attr('opacity', scale < 3 ? 1 : 0);
+          .attr('font-size', `${9 / k}px`)
+          .attr('opacity', k < 3 ? 1 : 0);
         g.selectAll('text.estado-nome')
-          .attr('font-size', `${10 / scale}px`)
-          .attr('opacity', scale >= 2 ? 1 : 0);
+          .attr('font-size', `${10 / k}px`)
+          .attr('opacity', k >= 2 ? 1 : 0);
       });
 
     svg.call(zoom as any);
-    // Prevent page scroll when wheeling inside SVG
-    svg.on('wheel.zoom', function (event: any) {
-      event.preventDefault();
-    }, { passive: false } as any);
-
     zoomRef.current = zoom;
 
   }, [geoData, dadosEstados, navigate, isDark]);
@@ -268,9 +274,13 @@ export function MapaBrasilEnterprise({ dadosEstados, onHover }: Props) {
     if (!svgRef.current || !zoomRef.current) return;
     d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 0.67);
   };
+  const handleZoomReset = () => {
+    if (!svgRef.current || !zoomRef.current) return;
+    d3.select(svgRef.current).transition().duration(500).call(zoomRef.current.transform, d3.zoomIdentity);
+  };
 
   if (loading) return (
-    <div className="flex items-center justify-center h-[520px] rounded-xl geo-mapa-bg" style={{ background: isDark ? '#0b0e14' : '#f1f5f9' }}>
+    <div className="flex items-center justify-center h-[520px] rounded-xl" style={{ background: isDark ? '#0b0e14' : '#f1f5f9' }}>
       <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
@@ -278,19 +288,20 @@ export function MapaBrasilEnterprise({ dadosEstados, onHover }: Props) {
   const mapBg = isDark ? '#0b0e14' : '#f1f5f9';
   const legendMuted = isDark ? '#8b949e' : '#64748b';
   const legendDim = isDark ? '#484f58' : '#94a3b8';
+  const btnBg = isDark ? '#161b22' : '#fff';
+  const btnBorder = isDark ? '#30363d' : '#e2e8f0';
 
   return (
     <div
       ref={containerRef}
       className="relative rounded-xl overflow-hidden"
       style={{ background: mapBg }}
-      onWheel={(e) => e.stopPropagation()}
       onMouseLeave={() => {
         if (tooltipRef.current) tooltipRef.current.style.display = 'none';
         if (onHoverRef.current) onHoverRef.current(null);
       }}
     >
-      <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(#30363d 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+      <div className="absolute inset-0 opacity-5" style={{ backgroundImage: `radial-gradient(${isDark ? '#30363d' : '#cbd5e1'} 1px, transparent 1px)`, backgroundSize: '20px 20px', pointerEvents: 'none' }} />
       <svg ref={svgRef} width="100%" height="520" style={{ display: 'block' }} />
       <div ref={tooltipRef} style={{ display: 'none', position: 'absolute', zIndex: 50, background: isDark ? '#161b22' : '#fff', border: `1px solid ${isDark ? '#30363d' : '#e2e8f0'}`, borderRadius: '12px', padding: '14px 18px', boxShadow: '0 8px 32px rgba(34,197,94,0.15)', minWidth: '180px', pointerEvents: 'none' }} />
 
@@ -298,10 +309,17 @@ export function MapaBrasilEnterprise({ dadosEstados, onHover }: Props) {
       <div className="absolute top-4 right-4 flex flex-col gap-1 z-10">
         <button onClick={handleZoomIn}
           className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors hover:border-green-500"
-          style={{ background: isDark ? '#161b22' : '#fff', border: `1px solid ${isDark ? '#30363d' : '#e2e8f0'}`, color: legendMuted }}>+</button>
+          style={{ background: btnBg, border: `1px solid ${btnBorder}`, color: legendMuted }}>+</button>
         <button onClick={handleZoomOut}
           className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors hover:border-green-500"
-          style={{ background: isDark ? '#161b22' : '#fff', border: `1px solid ${isDark ? '#30363d' : '#e2e8f0'}`, color: legendMuted }}>−</button>
+          style={{ background: btnBg, border: `1px solid ${btnBorder}`, color: legendMuted }}>−</button>
+        <button onClick={handleZoomReset}
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors hover:border-green-500"
+          style={{ background: btnBg, border: `1px solid ${btnBorder}`, color: legendMuted }}
+          title="Resetar zoom">↺</button>
+        <span className="text-[10px] mt-1 text-center block" style={{ color: legendDim }}>
+          {Math.round(zoomLevel * 100)}%
+        </span>
       </div>
 
       <div className="absolute bottom-4 left-4 flex items-center gap-3" style={{ color: legendMuted, fontSize: '10px' }}>
