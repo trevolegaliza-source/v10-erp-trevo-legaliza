@@ -281,6 +281,7 @@ export default function CadastroRapido() {
           descricao_avulso: item.tipo === 'avulso' ? item.descricaoAvulso : undefined,
           desconto_boas_vindas: item.boasVindas ? Number(item.boasVindasPct) : undefined,
           mudanca_uf: item.mudancaUF,
+          data_entrada: item.dataEntrada,
         });
 
         saved.push({
