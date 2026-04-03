@@ -118,6 +118,7 @@ export default function ClienteDetalhe() {
     ja_pago: false,
     observacoes: '',
     motivo_manual: '',
+    data_entrada: new Date().toISOString().split('T')[0],
   });
   const isManualPrice = processoForm.definir_manual;
   const isNegotiatedService = !!processoForm.negotiated_service_id;
