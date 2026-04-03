@@ -1808,6 +1808,19 @@ export default function ClienteDetalhe() {
               </div>
             )}
 
+            {/* Data de Entrada */}
+            <div className="grid gap-1.5">
+              <Label>Data de Entrada do Processo</Label>
+              <Input
+                type="date"
+                value={processoForm.data_entrada}
+                onChange={e => setProcessoForm(f => ({ ...f, data_entrada: e.target.value }))}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Padrão: hoje. Altere para cadastrar processos retroativos.
+              </p>
+            </div>
+
             {/* Observações */}
             <div className="grid gap-1.5">
               <Label>Observações</Label>
