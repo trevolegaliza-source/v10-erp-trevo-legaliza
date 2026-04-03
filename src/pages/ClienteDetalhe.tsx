@@ -323,6 +323,9 @@ export default function ClienteDetalhe() {
         desconto_boas_vindas: boasVindasPctToSend,
         ja_pago: processoForm.ja_pago,
         data_entrada: processoForm.data_entrada,
+        dentro_do_plano: isMensalista ? processoForm.dentro_do_plano : undefined,
+        valor_avulso: !processoForm.dentro_do_plano ? processoForm.valor_avulso : 0,
+        justificativa_avulso: !processoForm.dentro_do_plano ? processoForm.justificativa_avulso : undefined,
       },
       {
         onSuccess: async () => {
