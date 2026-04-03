@@ -288,6 +288,9 @@ export default function CadastroRapido() {
           desconto_boas_vindas: item.boasVindas ? Number(item.boasVindasPct) : undefined,
           mudanca_uf: item.mudancaUF,
           data_entrada: item.dataEntrada,
+          dentro_do_plano: selectedCliente?.tipo === 'MENSALISTA' ? item.dentroDoPlano : undefined,
+          valor_avulso: !item.dentroDoPlano ? item.valorAvulso : 0,
+          justificativa_avulso: !item.dentroDoPlano ? item.justificativaAvulso : undefined,
         });
 
         saved.push({
