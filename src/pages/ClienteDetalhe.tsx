@@ -1047,9 +1047,21 @@ export default function ClienteDetalhe() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={cn("text-[10px] border-primary/30 text-primary", pago && "opacity-50")}>
-                            {TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo}
-                          </Badge>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Badge variant="outline" className={cn("text-[10px] border-primary/30 text-primary", pago && "opacity-50")}>
+                              {TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo}
+                            </Badge>
+                            {(p as any).dentro_do_plano === false && (
+                              <Badge variant="outline" className="text-amber-500 border-amber-500/30 text-[10px]">
+                                Avulso {(p as any).valor_avulso > 0 ? `R$ ${Number((p as any).valor_avulso).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}
+                              </Badge>
+                            )}
+                            {(p as any).dentro_do_plano === true && isMensalista && (
+                              <Badge variant="outline" className="text-green-500 border-green-500/30 text-[10px]">
+                                Plano
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className={cn("text-sm", pago && "text-muted-foreground")}>
                           {pago ? 'Concluído' : (KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa)}
