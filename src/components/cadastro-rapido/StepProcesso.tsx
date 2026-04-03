@@ -16,6 +16,9 @@ export interface ProcessoFormData {
   mudancaUF: boolean;
   descricaoAvulso: string;
   dataEntrada: string;
+  dentroDoPlano: boolean;
+  valorAvulso: number;
+  justificativaAvulso: string;
 }
 
 interface Props {
