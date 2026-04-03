@@ -155,7 +155,7 @@ export default function Dashboard() {
     ].map(f => ({ ...f, qtd: processos.filter(p => f.etapas.includes(p.etapa)).length }));
 
     // Gráfico 6 meses
-    const dadosMensais: { mes: string; recebido: number; pendente: number }[] = [];
+    const dadosMensais: { mes: string; recebido: number; pendente: number; vencido: number; total: number }[] = [];
     const agora = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
@@ -166,9 +166,18 @@ export default function Dashboard() {
         const ld = new Date(l.data_vencimento || l.created_at || '');
         return ld.getMonth() === mes && ld.getFullYear() === ano;
       });
-      const fat = lancMes.reduce((s, l) => s + Number(l.valor), 0);
       const rec = lancMes.filter(l => l.status === 'pago' && l.confirmado_recebimento === true).reduce((s, l) => s + Number(l.valor), 0);
-      dadosMensais.push({ mes: label, recebido: rec, pendente: fat - rec });
+      const venc = lancMes.filter(l => {
+        if (l.status === 'pago') return false;
+        const dv = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
+        return dv && dv < hoje;
+      }).reduce((s, l) => s + Number(l.valor), 0);
+      const pend = lancMes.filter(l => {
+        if (l.status === 'pago') return false;
+        const dv = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
+        return !dv || dv >= hoje;
+      }).reduce((s, l) => s + Number(l.valor), 0);
+      dadosMensais.push({ mes: label, recebido: rec, pendente: pend, vencido: venc, total: rec + pend + venc });
     }
 
     // Top clientes
