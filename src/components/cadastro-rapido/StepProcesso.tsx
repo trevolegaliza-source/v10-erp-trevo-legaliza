@@ -15,6 +15,7 @@ export interface ProcessoFormData {
   prioridade: 'normal' | 'urgente';
   mudancaUF: boolean;
   descricaoAvulso: string;
+  dataEntrada: string;
 }
 
 interface Props {
