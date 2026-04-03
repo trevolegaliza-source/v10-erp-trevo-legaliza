@@ -21,6 +21,9 @@ export interface ProcessoNaFila {
   observacoes: string;
   descricaoAvulso: string;
   dataEntrada: string;
+  dentroDoPlano: boolean;
+  valorAvulso: number;
+  justificativaAvulso: string;
   // calculated
   valorFinal: number;
   slotNumero: number;

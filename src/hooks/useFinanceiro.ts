@@ -245,9 +245,12 @@ export function useCreateProcesso() {
       notas?: string | null;
       ja_pago?: boolean;
       descricao_avulso?: string;
-      desconto_boas_vindas?: number; // percentage, e.g. 10
-      mudanca_uf?: boolean; // doubles the process for billing
-      data_entrada?: string; // YYYY-MM-DD, defaults to today
+      desconto_boas_vindas?: number;
+      mudanca_uf?: boolean;
+      data_entrada?: string;
+      dentro_do_plano?: boolean | null;
+      valor_avulso?: number;
+      justificativa_avulso?: string;
     }) => {
       const isAvulso = input.tipo === 'avulso';
       const isManualPrice = !!input.valor_manual && input.valor_manual > 0;
@@ -378,7 +381,10 @@ export function useCreateProcesso() {
           valor: valorFinal,
           notas: notasFinal || null,
           created_at: createdAt,
-        })
+          dentro_do_plano: input.dentro_do_plano ?? null,
+          valor_avulso: input.valor_avulso ?? 0,
+          justificativa_avulso: input.justificativa_avulso || null,
+        } as any)
         .select('*, cliente:clientes(*)')
         .single();
       if (error) throw error;
@@ -414,7 +420,22 @@ export function useCreateProcesso() {
         if (lancError) throw lancError;
       }
 
-      // If ja_pago, also mark processo as concluido
+      // Create separate lancamento for avulso honorário (fora do plano)
+      if (input.dentro_do_plano === false && input.valor_avulso && input.valor_avulso > 0) {
+        const lancDate = input.data_entrada || new Date().toISOString().split('T')[0];
+        await supabase.from('lancamentos').insert({
+          tipo: 'receber',
+          cliente_id: input.cliente_id,
+          processo_id: processo.id,
+          descricao: `Honorário avulso - ${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}${input.justificativa_avulso ? ` (${input.justificativa_avulso})` : ''}`,
+          valor: input.valor_avulso,
+          status: 'pendente',
+          data_vencimento: vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
+          created_at: createdAt,
+          etapa_financeiro: 'solicitacao_criada',
+        });
+      }
+
       if (input.ja_pago) {
         await supabase
           .from('processos')

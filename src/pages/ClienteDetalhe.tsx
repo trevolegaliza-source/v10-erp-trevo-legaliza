@@ -119,6 +119,9 @@ export default function ClienteDetalhe() {
     observacoes: '',
     motivo_manual: '',
     data_entrada: new Date().toISOString().split('T')[0],
+    dentro_do_plano: true,
+    valor_avulso: 0,
+    justificativa_avulso: '',
   });
   const isManualPrice = processoForm.definir_manual;
   const isNegotiatedService = !!processoForm.negotiated_service_id;
@@ -139,6 +142,9 @@ export default function ClienteDetalhe() {
     observacoes: '',
     motivo_manual: '',
     data_entrada: new Date().toISOString().split('T')[0],
+    dentro_do_plano: true,
+    valor_avulso: 0,
+    justificativa_avulso: '',
   };
 
   const handleNovoProcesso = async () => {
@@ -317,6 +323,9 @@ export default function ClienteDetalhe() {
         desconto_boas_vindas: boasVindasPctToSend,
         ja_pago: processoForm.ja_pago,
         data_entrada: processoForm.data_entrada,
+        dentro_do_plano: isMensalista ? processoForm.dentro_do_plano : undefined,
+        valor_avulso: !processoForm.dentro_do_plano ? processoForm.valor_avulso : 0,
+        justificativa_avulso: !processoForm.dentro_do_plano ? processoForm.justificativa_avulso : undefined,
       },
       {
         onSuccess: async () => {
@@ -1038,9 +1047,21 @@ export default function ClienteDetalhe() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={cn("text-[10px] border-primary/30 text-primary", pago && "opacity-50")}>
-                            {TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo}
-                          </Badge>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Badge variant="outline" className={cn("text-[10px] border-primary/30 text-primary", pago && "opacity-50")}>
+                              {TIPO_PROCESSO_LABELS[p.tipo as TipoProcesso] || p.tipo}
+                            </Badge>
+                            {(p as any).dentro_do_plano === false && (
+                              <Badge variant="outline" className="text-amber-500 border-amber-500/30 text-[10px]">
+                                Avulso {(p as any).valor_avulso > 0 ? `R$ ${Number((p as any).valor_avulso).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}
+                              </Badge>
+                            )}
+                            {(p as any).dentro_do_plano === true && isMensalista && (
+                              <Badge variant="outline" className="text-green-500 border-green-500/30 text-[10px]">
+                                Plano
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className={cn("text-sm", pago && "text-muted-foreground")}>
                           {pago ? 'Concluído' : (KANBAN_STAGES.find(s => s.key === p.etapa)?.label || p.etapa)}
@@ -1101,7 +1122,12 @@ export default function ClienteDetalhe() {
                   <TableBody>
                     {lancamentos.filter(l => l.tipo === 'receber').map(l => (
                       <TableRow key={l.id}>
-                        <TableCell className="font-medium text-sm">{l.descricao}</TableCell>
+                        <TableCell className="font-medium text-sm">
+                          {l.descricao}
+                          {l.descricao.includes('Honorário avulso') && (
+                            <Badge className="ml-2 bg-amber-500/10 text-amber-500 text-[10px] border-0">AVULSO</Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
                         <TableCell>
                           <Badge className={cn('text-[10px] border-0', STATUS_STYLES[l.status as StatusFinanceiro] || '')}>
@@ -1787,6 +1813,30 @@ export default function ClienteDetalhe() {
                 </div>
               )}
             </div>
+
+            {/* Dentro do Plano — somente mensalistas */}
+            {isMensalista && (
+              <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <Label className="text-sm font-medium">Este processo está no escopo do plano mensal?</Label>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant={processoForm.dentro_do_plano ? 'default' : 'outline'} onClick={() => setProcessoForm(f => ({ ...f, dentro_do_plano: true, valor_avulso: 0, justificativa_avulso: '' }))} className={processoForm.dentro_do_plano ? 'bg-green-600 hover:bg-green-700' : ''}>✅ Sim</Button>
+                    <Button type="button" size="sm" variant={!processoForm.dentro_do_plano ? 'default' : 'outline'} onClick={() => setProcessoForm(f => ({ ...f, dentro_do_plano: false }))} className={!processoForm.dentro_do_plano ? 'bg-amber-600 hover:bg-amber-700' : ''}>❌ Não</Button>
+                  </div>
+                </div>
+                {processoForm.dentro_do_plano && <p className="text-xs text-muted-foreground">Coberto pela mensalidade.</p>}
+                {!processoForm.dentro_do_plano && (
+                  <div className="space-y-2 mt-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+                    <Label className="text-sm text-amber-600 font-medium">💰 Honorário avulso</Label>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-muted-foreground">R$</span>
+                      <Input type="number" value={processoForm.valor_avulso || ''} onChange={e => setProcessoForm(f => ({ ...f, valor_avulso: parseFloat(e.target.value) || 0 }))} placeholder="0,00" className="w-40" step="0.01" />
+                    </div>
+                    <Input value={processoForm.justificativa_avulso} onChange={e => setProcessoForm(f => ({ ...f, justificativa_avulso: e.target.value }))} placeholder="Justificativa (opcional)" className="text-sm" />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Já Pago */}
             <div className="flex items-center gap-3 rounded-lg border border-border/60 p-3">

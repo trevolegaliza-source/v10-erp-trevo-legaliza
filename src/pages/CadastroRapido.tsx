@@ -25,6 +25,9 @@ const INITIAL_PROCESSO: ProcessoFormData = {
   mudancaUF: false,
   descricaoAvulso: '',
   dataEntrada: new Date().toISOString().split('T')[0],
+  dentroDoPlano: true,
+  valorAvulso: 0,
+  justificativaAvulso: '',
 };
 
 const INITIAL_VALOR: ValorFormData = {
@@ -193,6 +196,9 @@ export default function CadastroRapido() {
     observacoes: valorForm.observacoes,
     descricaoAvulso: processoForm.descricaoAvulso,
     dataEntrada: processoForm.dataEntrada,
+    dentroDoPlano: processoForm.dentroDoPlano,
+    valorAvulso: processoForm.valorAvulso,
+    justificativaAvulso: processoForm.justificativaAvulso,
     valorFinal: preview.valorFinal,
     slotNumero: preview.slotNumero,
     descontoAplicado: preview.descontoAplicado,
@@ -282,6 +288,9 @@ export default function CadastroRapido() {
           desconto_boas_vindas: item.boasVindas ? Number(item.boasVindasPct) : undefined,
           mudanca_uf: item.mudancaUF,
           data_entrada: item.dataEntrada,
+          dentro_do_plano: selectedCliente?.tipo === 'MENSALISTA' ? item.dentroDoPlano : undefined,
+          valor_avulso: !item.dentroDoPlano ? item.valorAvulso : 0,
+          justificativa_avulso: !item.dentroDoPlano ? item.justificativaAvulso : undefined,
         });
 
         saved.push({
@@ -352,6 +361,7 @@ export default function CadastroRapido() {
                 onChange={setProcessoForm}
                 negotiations={negotiations || []}
                 colaboradores={colaboradores || []}
+                clienteTipo={selectedCliente?.tipo}
                 onBack={() => goToStep(1)}
                 onNext={handleNextStep2}
               />

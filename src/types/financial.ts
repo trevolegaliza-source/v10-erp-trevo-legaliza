@@ -20,6 +20,10 @@ export interface ProcessoDB {
   created_at: string;
   updated_at: string;
   cliente?: ClienteDB;
+  dentro_do_plano?: boolean | null;
+  valor_avulso?: number | null;
+  justificativa_avulso?: string | null;
+  link_drive?: string | null;
 }
 
 export type EtapaFinanceiro =

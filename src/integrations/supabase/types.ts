@@ -886,10 +886,13 @@ export type Database = {
         Row: {
           cliente_id: string
           created_at: string | null
+          dentro_do_plano: boolean | null
           empresa_id: string | null
           etapa: string
           id: string
           is_archived: boolean | null
+          justificativa_avulso: string | null
+          link_drive: string | null
           notas: string | null
           prioridade: string
           razao_social: string
@@ -897,14 +900,18 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_processo"]
           updated_at: string | null
           valor: number | null
+          valor_avulso: number | null
         }
         Insert: {
           cliente_id: string
           created_at?: string | null
+          dentro_do_plano?: boolean | null
           empresa_id?: string | null
           etapa?: string
           id?: string
           is_archived?: boolean | null
+          justificativa_avulso?: string | null
+          link_drive?: string | null
           notas?: string | null
           prioridade?: string
           razao_social: string
@@ -912,14 +919,18 @@ export type Database = {
           tipo: Database["public"]["Enums"]["tipo_processo"]
           updated_at?: string | null
           valor?: number | null
+          valor_avulso?: number | null
         }
         Update: {
           cliente_id?: string
           created_at?: string | null
+          dentro_do_plano?: boolean | null
           empresa_id?: string | null
           etapa?: string
           id?: string
           is_archived?: boolean | null
+          justificativa_avulso?: string | null
+          link_drive?: string | null
           notas?: string | null
           prioridade?: string
           razao_social?: string
@@ -927,6 +938,7 @@ export type Database = {
           tipo?: Database["public"]["Enums"]["tipo_processo"]
           updated_at?: string | null
           valor?: number | null
+          valor_avulso?: number | null
         }
         Relationships: [
           {
