@@ -25,6 +25,9 @@ const INITIAL_PROCESSO: ProcessoFormData = {
   mudancaUF: false,
   descricaoAvulso: '',
   dataEntrada: new Date().toISOString().split('T')[0],
+  dentroDoPlano: true,
+  valorAvulso: 0,
+  justificativaAvulso: '',
 };
 
 const INITIAL_VALOR: ValorFormData = {

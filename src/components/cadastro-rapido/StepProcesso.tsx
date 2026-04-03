@@ -143,6 +143,74 @@ export default function StepProcesso({ form, onChange, negotiations, colaborador
         </div>
       )}
 
+      {/* Dentro do Plano — somente mensalistas */}
+      {isMensalista && (
+        <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <Label className="text-sm font-medium">Este processo está no escopo do plano mensal?</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={form.dentroDoPlano ? 'default' : 'outline'}
+                onClick={() => {
+                  onChange({ ...form, dentroDoPlano: true, valorAvulso: 0, justificativaAvulso: '' });
+                }}
+                className={form.dentroDoPlano ? 'bg-green-600 hover:bg-green-700' : ''}
+              >
+                ✅ Sim, dentro do plano
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={!form.dentroDoPlano ? 'default' : 'outline'}
+                onClick={() => onChange({ ...form, dentroDoPlano: false })}
+                className={!form.dentroDoPlano ? 'bg-amber-600 hover:bg-amber-700' : ''}
+              >
+                ❌ Não, fora do plano
+              </Button>
+            </div>
+          </div>
+
+          {form.dentroDoPlano && (
+            <p className="text-xs text-muted-foreground">
+              Processo coberto pela mensalidade. Contará no slot de desconto progressivo do mês.
+            </p>
+          )}
+
+          {!form.dentroDoPlano && (
+            <div className="space-y-2 mt-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+              <Label className="text-sm text-amber-600 font-medium">
+                💰 Honorário avulso (além da mensalidade)
+              </Label>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">R$</span>
+                <Input
+                  type="number"
+                  value={form.valorAvulso || ''}
+                  onChange={(e) => update('valorAvulso', parseFloat(e.target.value) || 0)}
+                  placeholder="0,00"
+                  className="w-40"
+                  step="0.01"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Este valor será cobrado SEPARADAMENTE da mensalidade do cliente.
+              </p>
+              <div>
+                <Label className="text-xs text-muted-foreground">Justificativa (opcional)</Label>
+                <Input
+                  value={form.justificativaAvulso}
+                  onChange={(e) => update('justificativaAvulso', e.target.value)}
+                  placeholder="Ex: Serviço fora do escopo contratado..."
+                  className="text-sm"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label>Data de Entrada do Processo</Label>
         <Input
