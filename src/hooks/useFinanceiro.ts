@@ -381,7 +381,10 @@ export function useCreateProcesso() {
           valor: valorFinal,
           notas: notasFinal || null,
           created_at: createdAt,
-        })
+          dentro_do_plano: input.dentro_do_plano ?? null,
+          valor_avulso: input.valor_avulso ?? 0,
+          justificativa_avulso: input.justificativa_avulso || null,
+        } as any)
         .select('*, cliente:clientes(*)')
         .single();
       if (error) throw error;
