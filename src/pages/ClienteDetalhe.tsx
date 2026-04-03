@@ -138,6 +138,7 @@ export default function ClienteDetalhe() {
     ja_pago: false,
     observacoes: '',
     motivo_manual: '',
+    data_entrada: new Date().toISOString().split('T')[0],
   };
 
   const handleNovoProcesso = async () => {
