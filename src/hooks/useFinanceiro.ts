@@ -420,7 +420,22 @@ export function useCreateProcesso() {
         if (lancError) throw lancError;
       }
 
-      // If ja_pago, also mark processo as concluido
+      // Create separate lancamento for avulso honorário (fora do plano)
+      if (input.dentro_do_plano === false && input.valor_avulso && input.valor_avulso > 0) {
+        const lancDate = input.data_entrada || new Date().toISOString().split('T')[0];
+        await supabase.from('lancamentos').insert({
+          tipo: 'receber',
+          cliente_id: input.cliente_id,
+          processo_id: processo.id,
+          descricao: `Honorário avulso - ${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}${input.justificativa_avulso ? ` (${input.justificativa_avulso})` : ''}`,
+          valor: input.valor_avulso,
+          status: 'pendente',
+          data_vencimento: vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
+          created_at: createdAt,
+          etapa_financeiro: 'solicitacao_criada',
+        });
+      }
+
       if (input.ja_pago) {
         await supabase
           .from('processos')
