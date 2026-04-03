@@ -138,6 +138,18 @@ export default function StepProcesso({ form, onChange, negotiations, colaborador
         </div>
       )}
 
+      <div className="space-y-2">
+        <Label>Data de Entrada do Processo</Label>
+        <Input
+          type="date"
+          value={form.dataEntrada}
+          onChange={e => update('dataEntrada', e.target.value)}
+        />
+        <p className="text-[10px] text-muted-foreground">
+          Padrão: hoje. Altere para cadastrar processos retroativos.
+        </p>
+      </div>
+
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Voltar
