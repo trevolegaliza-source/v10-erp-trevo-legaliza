@@ -192,6 +192,7 @@ export default function CadastroRapido() {
     jaPago: valorForm.jaPago,
     observacoes: valorForm.observacoes,
     descricaoAvulso: processoForm.descricaoAvulso,
+    dataEntrada: processoForm.dataEntrada,
     valorFinal: preview.valorFinal,
     slotNumero: preview.slotNumero,
     descontoAplicado: preview.descontoAplicado,
