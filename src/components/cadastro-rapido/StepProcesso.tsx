@@ -31,10 +31,11 @@ interface Props {
   onNext: () => void;
 }
 
-export default function StepProcesso({ form, onChange, negotiations, colaboradores, onBack, onNext }: Props) {
+export default function StepProcesso({ form, onChange, negotiations, colaboradores, clienteTipo, onBack, onNext }: Props) {
   const update = (field: keyof ProcessoFormData, value: any) => onChange({ ...form, [field]: value });
   const isAvulso = form.tipo === 'avulso';
   const isNeg = negotiations?.find(n => n.id === form.tipo);
+  const isMensalista = clienteTipo === 'MENSALISTA';
   const canAdvance = form.razaoSocial.trim() && form.tipo && (!isAvulso || form.descricaoAvulso.trim());
 
   return (
