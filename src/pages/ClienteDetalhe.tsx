@@ -142,6 +142,9 @@ export default function ClienteDetalhe() {
     observacoes: '',
     motivo_manual: '',
     data_entrada: new Date().toISOString().split('T')[0],
+    dentro_do_plano: true,
+    valor_avulso: 0,
+    justificativa_avulso: '',
   };
 
   const handleNovoProcesso = async () => {
