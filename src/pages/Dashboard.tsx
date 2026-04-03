@@ -423,19 +423,39 @@ export default function Dashboard() {
       <div className="space-y-3 dashboard-section">
         <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Receita mensal</h3>
         <Card className="p-4">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={dadosMensais} barGap={4}>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={dadosMensais}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis dataKey="mes" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} className="fill-muted-foreground" />
-              <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} className="fill-muted-foreground" tickFormatter={v => `R$ ${(v / 1000).toFixed(0)}k`} />
-              <Tooltip
-                formatter={(value: number, name: string) => [fmt(value), name === 'recebido' ? 'Recebido' : 'Pendente']}
-                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }}
-              />
-              <Bar dataKey="recebido" stackId="a" fill="hsl(var(--primary))" name="Recebido" />
-              <Bar dataKey="pendente" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Pendente" />
+              <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} className="fill-muted-foreground" tickFormatter={v => `R$ ${(v / 1000).toFixed(0)}k`} />
+              <Tooltip content={({ active, payload, label }) => {
+                if (!active || !payload?.length) return null;
+                const recebido = payload.find(p => p.dataKey === 'recebido')?.value as number || 0;
+                const pendente = payload.find(p => p.dataKey === 'pendente')?.value as number || 0;
+                const vencido = payload.find(p => p.dataKey === 'vencido')?.value as number || 0;
+                const total = recebido + pendente + vencido;
+                return (
+                  <div className="bg-popover border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
+                    <p className="font-bold text-sm mb-2 text-foreground">{label}</p>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between"><span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-green-500" />Recebido</span><span className="font-bold text-green-500">{fmt(recebido)}</span></div>
+                      <div className="flex justify-between"><span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500" />Pendente</span><span className="font-bold text-amber-500">{fmt(pendente)}</span></div>
+                      {vencido > 0 && <div className="flex justify-between"><span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-red-500" />Vencido</span><span className="font-bold text-red-500">{fmt(vencido)}</span></div>}
+                      <div className="flex justify-between pt-1.5 border-t border-border"><span className="font-bold text-foreground">Total</span><span className="font-bold text-foreground">{fmt(total)}</span></div>
+                    </div>
+                  </div>
+                );
+              }} />
+              <Bar dataKey="recebido" stackId="a" fill="#22c55e" name="Recebido" />
+              <Bar dataKey="pendente" stackId="a" fill="#f59e0b" name="Pendente" />
+              <Bar dataKey="vencido" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} name="Vencido" />
             </BarChart>
           </ResponsiveContainer>
+          <div className="flex items-center justify-center gap-5 mt-2">
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className="w-2 h-2 rounded-sm bg-green-500" />Recebido</span>
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className="w-2 h-2 rounded-sm bg-amber-500" />Pendente</span>
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><span className="w-2 h-2 rounded-sm bg-red-500" />Vencido</span>
+          </div>
         </Card>
       </div>
       )}
