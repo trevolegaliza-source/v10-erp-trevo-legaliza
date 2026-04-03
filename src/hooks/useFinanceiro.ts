@@ -398,7 +398,7 @@ export function useCreateProcesso() {
       const shouldCreateLancamento = input.ja_pago || momentoFat === 'na_solicitacao';
 
       if (shouldCreateLancamento) {
-        const today = new Date().toISOString().split('T')[0];
+        const lancDate = input.data_entrada || new Date().toISOString().split('T')[0];
         const { error: lancError } = await supabase.from('lancamentos').insert({
           tipo: 'receber',
           cliente_id: input.cliente_id,
