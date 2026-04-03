@@ -1809,6 +1809,30 @@ export default function ClienteDetalhe() {
               )}
             </div>
 
+            {/* Dentro do Plano — somente mensalistas */}
+            {isMensalista && (
+              <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <Label className="text-sm font-medium">Este processo está no escopo do plano mensal?</Label>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" variant={processoForm.dentro_do_plano ? 'default' : 'outline'} onClick={() => setProcessoForm(f => ({ ...f, dentro_do_plano: true, valor_avulso: 0, justificativa_avulso: '' }))} className={processoForm.dentro_do_plano ? 'bg-green-600 hover:bg-green-700' : ''}>✅ Sim</Button>
+                    <Button type="button" size="sm" variant={!processoForm.dentro_do_plano ? 'default' : 'outline'} onClick={() => setProcessoForm(f => ({ ...f, dentro_do_plano: false }))} className={!processoForm.dentro_do_plano ? 'bg-amber-600 hover:bg-amber-700' : ''}>❌ Não</Button>
+                  </div>
+                </div>
+                {processoForm.dentro_do_plano && <p className="text-xs text-muted-foreground">Coberto pela mensalidade.</p>}
+                {!processoForm.dentro_do_plano && (
+                  <div className="space-y-2 mt-2 p-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+                    <Label className="text-sm text-amber-600 font-medium">💰 Honorário avulso</Label>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-muted-foreground">R$</span>
+                      <Input type="number" value={processoForm.valor_avulso || ''} onChange={e => setProcessoForm(f => ({ ...f, valor_avulso: parseFloat(e.target.value) || 0 }))} placeholder="0,00" className="w-40" step="0.01" />
+                    </div>
+                    <Input value={processoForm.justificativa_avulso} onChange={e => setProcessoForm(f => ({ ...f, justificativa_avulso: e.target.value }))} placeholder="Justificativa (opcional)" className="text-sm" />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Já Pago */}
             <div className="flex items-center gap-3 rounded-lg border border-border/60 p-3">
               <Switch
