@@ -316,6 +316,7 @@ export default function ClienteDetalhe() {
         mudanca_uf: processoForm.mudanca_uf,
         desconto_boas_vindas: boasVindasPctToSend,
         ja_pago: processoForm.ja_pago,
+        data_entrada: processoForm.data_entrada,
       },
       {
         onSuccess: async () => {
