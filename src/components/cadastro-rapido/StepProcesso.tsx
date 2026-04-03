@@ -26,6 +26,7 @@ interface Props {
   onChange: (form: ProcessoFormData) => void;
   negotiations: ServiceNegotiation[];
   colaboradores: { id: string; nome: string }[];
+  clienteTipo?: string;
   onBack: () => void;
   onNext: () => void;
 }
