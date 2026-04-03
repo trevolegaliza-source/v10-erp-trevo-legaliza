@@ -1122,7 +1122,12 @@ export default function ClienteDetalhe() {
                   <TableBody>
                     {lancamentos.filter(l => l.tipo === 'receber').map(l => (
                       <TableRow key={l.id}>
-                        <TableCell className="font-medium text-sm">{l.descricao}</TableCell>
+                        <TableCell className="font-medium text-sm">
+                          {l.descricao}
+                          {l.descricao.includes('Honorário avulso') && (
+                            <Badge className="ml-2 bg-amber-500/10 text-amber-500 text-[10px] border-0">AVULSO</Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
                         <TableCell>
                           <Badge className={cn('text-[10px] border-0', STATUS_STYLES[l.status as StatusFinanceiro] || '')}>
