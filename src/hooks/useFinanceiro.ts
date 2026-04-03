@@ -247,6 +247,7 @@ export function useCreateProcesso() {
       descricao_avulso?: string;
       desconto_boas_vindas?: number; // percentage, e.g. 10
       mudanca_uf?: boolean; // doubles the process for billing
+      data_entrada?: string; // YYYY-MM-DD, defaults to today
     }) => {
       const isAvulso = input.tipo === 'avulso';
       const isManualPrice = !!input.valor_manual && input.valor_manual > 0;
