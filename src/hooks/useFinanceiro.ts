@@ -363,6 +363,10 @@ export function useCreateProcesso() {
         notasFinal = notasFinal ? `${notasFinal}\n${discountInfo}` : discountInfo;
       }
 
+      const createdAt = input.data_entrada
+        ? new Date(input.data_entrada + 'T12:00:00').toISOString()
+        : new Date().toISOString();
+
       const { data: processo, error } = await supabase
         .from('processos')
         .insert({
@@ -373,6 +377,7 @@ export function useCreateProcesso() {
           responsavel: input.responsavel || null,
           valor: valorFinal,
           notas: notasFinal || null,
+          created_at: createdAt,
         })
         .select('*, cliente:clientes(*)')
         .single();
