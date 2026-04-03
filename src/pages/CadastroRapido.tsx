@@ -355,6 +355,7 @@ export default function CadastroRapido() {
                 onChange={setProcessoForm}
                 negotiations={negotiations || []}
                 colaboradores={colaboradores || []}
+                clienteTipo={selectedCliente?.tipo}
                 onBack={() => goToStep(1)}
                 onNext={handleNextStep2}
               />
