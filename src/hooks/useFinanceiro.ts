@@ -267,14 +267,16 @@ export function useCreateProcesso() {
       const descontoPercent = Number(cliente.desconto_progressivo ?? 0);
       const valorLimite = cliente.valor_limite_desconto != null ? Number(cliente.valor_limite_desconto) : null;
 
-      // Count same-month processes for this client
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      // Count same-month processes for this client based on data_entrada (or today)
+      const refDate = input.data_entrada ? new Date(input.data_entrada + 'T12:00:00') : new Date();
+      const startOfMonth = new Date(refDate.getFullYear(), refDate.getMonth(), 1).toISOString();
+      const endOfMonth = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 1).toISOString();
       const { count: processosNoMes } = await supabase
         .from('processos')
         .select('id', { count: 'exact', head: true })
         .eq('cliente_id', input.cliente_id)
-        .gte('created_at', startOfMonth);
+        .gte('created_at', startOfMonth)
+        .lt('created_at', endOfMonth);
 
       const monthCount = processosNoMes ?? 0;
 
