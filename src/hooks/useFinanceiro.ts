@@ -406,8 +406,9 @@ export function useCreateProcesso() {
           descricao: descParts.join(' '),
           valor: valorFinal,
           status: input.ja_pago ? 'pago' : 'pendente',
-          data_vencimento: input.ja_pago ? today : (vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0]),
-          data_pagamento: input.ja_pago ? today : null,
+          data_vencimento: input.ja_pago ? lancDate : (vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0]),
+          data_pagamento: input.ja_pago ? lancDate : null,
+          created_at: createdAt,
           etapa_financeiro: input.ja_pago ? 'honorario_pago' : 'solicitacao_criada',
         });
         if (lancError) throw lancError;
