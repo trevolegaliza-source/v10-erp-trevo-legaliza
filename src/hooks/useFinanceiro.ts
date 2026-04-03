@@ -247,6 +247,7 @@ export function useCreateProcesso() {
       descricao_avulso?: string;
       desconto_boas_vindas?: number; // percentage, e.g. 10
       mudanca_uf?: boolean; // doubles the process for billing
+      data_entrada?: string; // YYYY-MM-DD, defaults to today
     }) => {
       const isAvulso = input.tipo === 'avulso';
       const isManualPrice = !!input.valor_manual && input.valor_manual > 0;
@@ -266,14 +267,16 @@ export function useCreateProcesso() {
       const descontoPercent = Number(cliente.desconto_progressivo ?? 0);
       const valorLimite = cliente.valor_limite_desconto != null ? Number(cliente.valor_limite_desconto) : null;
 
-      // Count same-month processes for this client
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      // Count same-month processes for this client based on data_entrada (or today)
+      const refDate = input.data_entrada ? new Date(input.data_entrada + 'T12:00:00') : new Date();
+      const startOfMonth = new Date(refDate.getFullYear(), refDate.getMonth(), 1).toISOString();
+      const endOfMonth = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 1).toISOString();
       const { count: processosNoMes } = await supabase
         .from('processos')
         .select('id', { count: 'exact', head: true })
         .eq('cliente_id', input.cliente_id)
-        .gte('created_at', startOfMonth);
+        .gte('created_at', startOfMonth)
+        .lt('created_at', endOfMonth);
 
       const monthCount = processosNoMes ?? 0;
 
@@ -360,6 +363,10 @@ export function useCreateProcesso() {
         notasFinal = notasFinal ? `${notasFinal}\n${discountInfo}` : discountInfo;
       }
 
+      const createdAt = input.data_entrada
+        ? new Date(input.data_entrada + 'T12:00:00').toISOString()
+        : new Date().toISOString();
+
       const { data: processo, error } = await supabase
         .from('processos')
         .insert({
@@ -370,6 +377,7 @@ export function useCreateProcesso() {
           responsavel: input.responsavel || null,
           valor: valorFinal,
           notas: notasFinal || null,
+          created_at: createdAt,
         })
         .select('*, cliente:clientes(*)')
         .single();
@@ -390,7 +398,7 @@ export function useCreateProcesso() {
       const shouldCreateLancamento = input.ja_pago || momentoFat === 'na_solicitacao';
 
       if (shouldCreateLancamento) {
-        const today = new Date().toISOString().split('T')[0];
+        const lancDate = input.data_entrada || new Date().toISOString().split('T')[0];
         const { error: lancError } = await supabase.from('lancamentos').insert({
           tipo: 'receber',
           cliente_id: input.cliente_id,
@@ -398,8 +406,9 @@ export function useCreateProcesso() {
           descricao: descParts.join(' '),
           valor: valorFinal,
           status: input.ja_pago ? 'pago' : 'pendente',
-          data_vencimento: input.ja_pago ? today : (vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0]),
-          data_pagamento: input.ja_pago ? today : null,
+          data_vencimento: input.ja_pago ? lancDate : (vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0]),
+          data_pagamento: input.ja_pago ? lancDate : null,
+          created_at: createdAt,
           etapa_financeiro: input.ja_pago ? 'honorario_pago' : 'solicitacao_criada',
         });
         if (lancError) throw lancError;

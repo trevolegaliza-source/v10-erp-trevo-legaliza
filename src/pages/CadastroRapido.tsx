@@ -24,6 +24,7 @@ const INITIAL_PROCESSO: ProcessoFormData = {
   prioridade: 'normal',
   mudancaUF: false,
   descricaoAvulso: '',
+  dataEntrada: new Date().toISOString().split('T')[0],
 };
 
 const INITIAL_VALOR: ValorFormData = {
@@ -191,6 +192,7 @@ export default function CadastroRapido() {
     jaPago: valorForm.jaPago,
     observacoes: valorForm.observacoes,
     descricaoAvulso: processoForm.descricaoAvulso,
+    dataEntrada: processoForm.dataEntrada,
     valorFinal: preview.valorFinal,
     slotNumero: preview.slotNumero,
     descontoAplicado: preview.descontoAplicado,
@@ -279,6 +281,7 @@ export default function CadastroRapido() {
           descricao_avulso: item.tipo === 'avulso' ? item.descricaoAvulso : undefined,
           desconto_boas_vindas: item.boasVindas ? Number(item.boasVindasPct) : undefined,
           mudanca_uf: item.mudancaUF,
+          data_entrada: item.dataEntrada,
         });
 
         saved.push({

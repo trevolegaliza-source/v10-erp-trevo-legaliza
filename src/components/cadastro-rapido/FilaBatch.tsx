@@ -20,6 +20,7 @@ export interface ProcessoNaFila {
   jaPago: boolean;
   observacoes: string;
   descricaoAvulso: string;
+  dataEntrada: string;
   // calculated
   valorFinal: number;
   slotNumero: number;

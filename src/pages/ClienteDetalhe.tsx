@@ -118,6 +118,7 @@ export default function ClienteDetalhe() {
     ja_pago: false,
     observacoes: '',
     motivo_manual: '',
+    data_entrada: new Date().toISOString().split('T')[0],
   });
   const isManualPrice = processoForm.definir_manual;
   const isNegotiatedService = !!processoForm.negotiated_service_id;
@@ -137,6 +138,7 @@ export default function ClienteDetalhe() {
     ja_pago: false,
     observacoes: '',
     motivo_manual: '',
+    data_entrada: new Date().toISOString().split('T')[0],
   };
 
   const handleNovoProcesso = async () => {
@@ -314,6 +316,7 @@ export default function ClienteDetalhe() {
         mudanca_uf: processoForm.mudanca_uf,
         desconto_boas_vindas: boasVindasPctToSend,
         ja_pago: processoForm.ja_pago,
+        data_entrada: processoForm.data_entrada,
       },
       {
         onSuccess: async () => {
@@ -1804,6 +1807,19 @@ export default function ClienteDetalhe() {
                 <p className="text-sm font-medium flex items-center gap-2">🎉 Desconto de boas-vindas: {boasVindasPct}%</p>
               </div>
             )}
+
+            {/* Data de Entrada */}
+            <div className="grid gap-1.5">
+              <Label>Data de Entrada do Processo</Label>
+              <Input
+                type="date"
+                value={processoForm.data_entrada}
+                onChange={e => setProcessoForm(f => ({ ...f, data_entrada: e.target.value }))}
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Padrão: hoje. Altere para cadastrar processos retroativos.
+              </p>
+            </div>
 
             {/* Observações */}
             <div className="grid gap-1.5">
