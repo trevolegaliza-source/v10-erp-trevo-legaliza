@@ -137,6 +137,11 @@ const App = () => (
                       <EstadoDetalhe />
                     </RequirePermission>
                   } />
+                  <Route path="/catalogo" element={
+                    <RequirePermission modulo="configuracoes">
+                      <Catalogo />
+                    </RequirePermission>
+                  } />
                   <Route path="/configuracoes" element={
                     <RequirePermission modulo="configuracoes">
                       <Configuracoes />
