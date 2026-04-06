@@ -26,6 +26,7 @@ const Orcamentos = lazy(() => import("./pages/Orcamentos"));
 const OrcamentoNovo = lazy(() => import("./pages/OrcamentoNovo"));
 const InteligenciaGeografica = lazy(() => import("./pages/InteligenciaGeografica"));
 const EstadoDetalhe = lazy(() => import("./pages/EstadoDetalhe"));
+const Catalogo = lazy(() => import("./pages/Catalogo"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
