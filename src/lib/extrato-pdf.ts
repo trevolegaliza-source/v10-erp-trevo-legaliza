@@ -112,7 +112,7 @@ const GLOBAL_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body, div, span, p, td, th { font-family: 'DM Sans', sans-serif; color: hsl(var(--ink)); }
   body { background: hsl(var(--surface-soft)); }
-  .page { width: 794px; min-height: 1123px; background: hsl(var(--surface)); position: relative; overflow: hidden; }
+  .page { width: 794px; height: 1123px; background: hsl(var(--surface)); position: relative; overflow: hidden; }
   .page-inner { padding: 22px 34px 126px; }
   .top-accent { width: 100%; height: 6px; background: linear-gradient(90deg, hsl(var(--trevo)) 0%, hsl(89 80% 55%) 100%); }
   .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 34px 16px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
