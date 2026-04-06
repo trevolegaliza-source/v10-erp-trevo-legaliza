@@ -112,7 +112,7 @@ const GLOBAL_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body, div, span, p, td, th { font-family: 'DM Sans', sans-serif; color: hsl(var(--ink)); }
   body { background: hsl(var(--surface-soft)); }
-  .page { width: 794px; min-height: 1123px; background: hsl(var(--surface)); position: relative; overflow: hidden; }
+  .page { width: 794px; height: 1123px; background: hsl(var(--surface)); position: relative; overflow: hidden; }
   .page-inner { padding: 22px 34px 126px; }
   .top-accent { width: 100%; height: 6px; background: linear-gradient(90deg, hsl(var(--trevo)) 0%, hsl(89 80% 55%) 100%); }
   .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 34px 16px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
@@ -601,7 +601,7 @@ function buildPage1HTML(
   const maiorData = datasSelecionadas.length > 0 ? new Date(Math.max(...datasSelecionadas.map((date) => date.getTime()))) : emissaoDate;
   const periodoTexto = `${menorData.toLocaleDateString('pt-BR')} até ${maiorData.toLocaleDateString('pt-BR')}`;
 
-  const previewCount = detailPageCount > 0 ? Math.min(selected.length, 6) : selected.length;
+  const previewCount = detailPageCount > 0 ? Math.min(selected.length, 4) : Math.min(selected.length, 6);
   const hiddenCount = Math.max(selected.length - previewCount, 0);
 
   return `
@@ -790,6 +790,7 @@ async function renderPageToCanvas(html: string, styles: string) {
   await new Promise((resolve) => setTimeout(resolve, 300));
 
   const pageEl = container.querySelector('.page') as HTMLElement;
+  window.scrollTo(0, 0);
   const canvas = await html2canvas(pageEl, {
     scale: 1,
     useCORS: true,
@@ -832,6 +833,24 @@ export interface ExtratoResult {
   processCount: number;
 }
 
+function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  const pdfHeight = doc.internal.pageSize.getHeight();
+  const imgData = canvas.toDataURL('image/jpeg', 0.85);
+
+  let imgWidth = pdfWidth;
+  let imgHeight = (canvas.height / canvas.width) * pdfWidth;
+
+  if (imgHeight > pdfHeight) {
+    const scaleFactor = pdfHeight / imgHeight;
+    imgWidth = pdfWidth * scaleFactor;
+    imgHeight = pdfHeight;
+  }
+
+  const offsetX = (pdfWidth - imgWidth) / 2;
+  doc.addImage(imgData, 'JPEG', offsetX, 0, imgWidth, imgHeight);
+}
+
 export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult> {
   const fontLink = document.createElement('link');
   fontLink.rel = 'stylesheet';
@@ -857,18 +876,16 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
   const totalPages = 1 + detailPageGroups.length + attachmentCount;
 
   const doc = new jsPDF('p', 'mm', 'a4');
-  const pdfWidth = doc.internal.pageSize.getWidth();
-  const pdfHeight = doc.internal.pageSize.getHeight();
 
   const page1Html = buildPage1HTML(data, steps, selected, logoDataUrl, totalPages, detailPageGroups.length);
   const page1Canvas = await renderPageToCanvas(page1Html, GLOBAL_STYLES);
-  doc.addImage(page1Canvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, pdfWidth, pdfHeight);
+  addCanvasToDoc(doc, page1Canvas);
 
   for (let index = 0; index < detailPageGroups.length; index += 1) {
     const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, index + 2, totalPages, detailPageGroups.length);
     const detailCanvas = await renderPageToCanvas(detailHtml, GLOBAL_STYLES);
     doc.addPage();
-    doc.addImage(detailCanvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, pdfWidth, pdfHeight);
+    addCanvasToDoc(doc, detailCanvas);
   }
 
   await renderAttachments(doc, data, totalPages, detailPageGroups.length + 2, logoDataUrl);
@@ -921,8 +938,6 @@ async function renderAttachments(
   startPageNumber: number,
   logoDataUrl: string | null,
 ) {
-  const pdfWidth = doc.internal.pageSize.getWidth();
-  const pdfHeight = doc.internal.pageSize.getHeight();
   const attachments: Array<{ label: string; url: string }> = [];
 
   for (const processo of data.processos) {
@@ -948,7 +963,7 @@ async function renderAttachments(
       const html = buildAttachmentPageHTML(attachment.label, imgData, logoDataUrl, pageNumber, totalPages);
       const canvas = await renderPageToCanvas(html, GLOBAL_STYLES);
       doc.addPage();
-      doc.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      addCanvasToDoc(doc, canvas);
       pageNumber += 1;
     } catch (error) {
       console.warn(`Erro ao renderizar anexo ${attachment.label}:`, error);
