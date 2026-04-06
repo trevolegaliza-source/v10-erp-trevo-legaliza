@@ -948,7 +948,7 @@ async function renderAttachments(
       const html = buildAttachmentPageHTML(attachment.label, imgData, logoDataUrl, pageNumber, totalPages);
       const canvas = await renderPageToCanvas(html, GLOBAL_STYLES);
       doc.addPage();
-      doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
+      doc.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, pdfWidth, pdfHeight);
       pageNumber += 1;
     } catch (error) {
       console.warn(`Erro ao renderizar anexo ${attachment.label}:`, error);
