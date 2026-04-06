@@ -267,6 +267,14 @@ function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
           )}
         </div>
       </AccordionContent>
+      {taxaProcessoId && (
+        <ValoresAdicionaisModal
+          open={taxaModalOpen}
+          onOpenChange={setTaxaModalOpen}
+          processoId={taxaProcessoId}
+          clienteApelido={taxaClienteApelido}
+        />
+      )}
     </AccordionItem>
   );
 }
