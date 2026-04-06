@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt } from 'lucide-react';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
+import DeferimentoModal from './DeferimentoModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,6 +107,13 @@ function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const [taxaModalOpen, setTaxaModalOpen] = useState(false);
   const [taxaProcessoId, setTaxaProcessoId] = useState<string>('');
   const [taxaClienteApelido, setTaxaClienteApelido] = useState<string>('');
+  const [deferimentoOpen, setDeferimentoOpen] = useState(false);
+  const [deferimentoProcessos, setDeferimentoProcessos] = useState<Array<{
+    processo_id: string;
+    razao_social: string;
+    tipo: string;
+    data_deferimento_atual: string | null;
+  }>>([]);
   const { salvarExtrato } = useExtratos();
   const qc = useQueryClient();
 
@@ -121,6 +129,48 @@ function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     const selecionados = lancSemExtrato.filter(l => selected.has(l.id));
     if (selecionados.length === 0) { toast.warning('Selecione ao menos um processo.'); return; }
 
+    // Verificar se cliente tem faturamento por deferimento
+    const { data: clienteCheck } = await supabase
+      .from('clientes')
+      .select('momento_faturamento, nome')
+      .eq('id', cliente.cliente_id)
+      .single();
+
+    if (clienteCheck?.momento_faturamento === 'no_deferimento') {
+      // Buscar dados dos processos para o modal
+      const processoIds = selecionados.map(l => l.processo_id).filter(Boolean);
+      const { data: processosData } = await supabase
+        .from('processos')
+        .select('id, razao_social, tipo, data_deferimento')
+        .in('id', processoIds);
+
+      setDeferimentoProcessos((processosData || []).map((p: any) => ({
+        processo_id: p.id,
+        razao_social: p.razao_social,
+        tipo: p.tipo,
+        data_deferimento_atual: p.data_deferimento || null,
+      })));
+      setDeferimentoOpen(true);
+      return;
+    }
+
+    // Fluxo normal (sem deferimento)
+    await executarGeracaoExtrato(selecionados);
+  }
+
+  async function handleDeferimentoConfirm(processoIdsDeferidos: string[]) {
+    setDeferimentoOpen(false);
+    const selecionadosDeferidos = lancSemExtrato.filter(
+      l => selected.has(l.id) && processoIdsDeferidos.includes(l.processo_id!)
+    );
+    if (selecionadosDeferidos.length === 0) {
+      toast.warning('Nenhum processo deferido selecionado.');
+      return;
+    }
+    await executarGeracaoExtrato(selecionadosDeferidos);
+  }
+
+  async function executarGeracaoExtrato(selecionados: typeof lancSemExtrato) {
     setGenerating(true);
     try {
       const { data: clienteData } = await supabase
@@ -275,6 +325,13 @@ function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
           clienteApelido={taxaClienteApelido}
         />
       )}
+      <DeferimentoModal
+        open={deferimentoOpen}
+        onOpenChange={setDeferimentoOpen}
+        clienteNome={cliente.cliente_apelido || cliente.cliente_nome}
+        processos={deferimentoProcessos}
+        onConfirm={handleDeferimentoConfirm}
+      />
     </AccordionItem>
   );
 }
