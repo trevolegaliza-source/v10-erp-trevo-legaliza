@@ -14,6 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
+      catalogo_precos_uf: {
+        Row: {
+          created_at: string | null
+          empresa_id: string | null
+          honorario_trevo: number
+          id: string
+          observacoes: string | null
+          prazo_estimado: string | null
+          servico_id: string
+          taxa_orgao: number
+          uf: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          empresa_id?: string | null
+          honorario_trevo?: number
+          id?: string
+          observacoes?: string | null
+          prazo_estimado?: string | null
+          servico_id: string
+          taxa_orgao?: number
+          uf: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          empresa_id?: string | null
+          honorario_trevo?: number
+          id?: string
+          observacoes?: string | null
+          prazo_estimado?: string | null
+          servico_id?: string
+          taxa_orgao?: number
+          uf?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalogo_precos_uf_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "catalogo_servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalogo_servicos: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          created_at: string | null
+          descricao: string | null
+          empresa_id: string | null
+          id: string
+          nome: string
+          prazo_estimado: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          categoria: string
+          created_at?: string | null
+          descricao?: string | null
+          empresa_id?: string | null
+          id?: string
+          nome: string
+          prazo_estimado?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          created_at?: string | null
+          descricao?: string | null
+          empresa_id?: string | null
+          id?: string
+          nome?: string
+          prazo_estimado?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           apelido: string | null
