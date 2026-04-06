@@ -388,7 +388,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const clientesEnviados = buildTabClientes('enviados');
   const clientesAguardando = buildTabClientes('aguardando');
   const clientesPagos = buildTabClientes('pagos');
-  const clientesVencidos = buildTabClientes('vencidos');
 
   const metricas = {
     totalFaturado,
