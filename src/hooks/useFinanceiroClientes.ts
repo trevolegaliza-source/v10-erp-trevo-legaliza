@@ -350,7 +350,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   function getLancamentoTab(l: LancamentoFinanceiro): string {
     if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return 'pagos';
-    if (isLancamentoVencidoReal(l)) return 'vencidos';
     if (l.etapa_financeiro === 'cobranca_enviada') return 'aguardando';
     if (l.etapa_financeiro === 'cobranca_gerada' && l.extrato_id) return 'enviados';
     return 'cobrar';
