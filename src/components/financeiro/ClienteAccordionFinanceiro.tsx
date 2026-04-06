@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
+import { isLancamentoVencidoReal } from '@/hooks/useFinanceiroClientes';
 import { useExtratos } from '@/hooks/useExtratos';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
 import { gerarMensagemCobranca } from '@/lib/mensagem-cobranca';
@@ -588,10 +589,21 @@ export function ClientesAguardando({ clientes }: { clientes: ClienteFinanceiro[]
 function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const [showPago, setShowPago] = useState(false);
   const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split('T')[0]);
+  const [loadingExtrato, setLoadingExtrato] = useState(false);
   const qc = useQueryClient();
 
   const vencimento = cliente.lancamentos[0]?.data_vencimento;
   const dias = vencimento ? diasParaVencer(vencimento) : 0;
+
+  const lancVencidos = cliente.lancamentos.filter(l => isLancamentoVencidoReal(l));
+  const temVencidos = lancVencidos.length > 0;
+  const maiorAtraso = temVencidos
+    ? Math.max(...lancVencidos.map(l => {
+        const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+        const venc = new Date(l.data_vencimento + 'T00:00:00');
+        return Math.floor((hoje.getTime() - venc.getTime()) / 86400000);
+      }))
+    : 0;
 
   async function confirmarPago() {
     const ids = cliente.lancamentos.map(l => l.id);
@@ -610,9 +622,70 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
     toast.success('Pagamento confirmado!');
   }
 
+  async function handleCopiarCobranca() {
+    const lancsParaMsg = temVencidos ? lancVencidos : cliente.lancamentos;
+    if (lancsParaMsg.length === 0) return;
+
+    const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))];
+    let vaMap: Record<string, number> = {};
+    if (processoIds.length > 0) {
+      const { data: vas } = await supabase
+        .from('valores_adicionais')
+        .select('processo_id, valor')
+        .in('processo_id', processoIds);
+      if (vas) {
+        for (const va of vas) {
+          vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor;
+        }
+      }
+    }
+
+    const primeiro = lancsParaMsg[0];
+    const valorPrimeiro = primeiro.valor + (vaMap[primeiro.processo_id] || 0);
+    const adicionais = lancsParaMsg.slice(1).map(l => ({
+      tipo: l.processo_tipo,
+      razao_social: l.processo_razao_social,
+      valor: l.valor + (vaMap[l.processo_id] || 0),
+    }));
+    const msg = gerarMensagemCobranca({
+      tipo: primeiro.processo_tipo,
+      razao_social: primeiro.processo_razao_social,
+      valor: valorPrimeiro,
+      data_vencimento: primeiro.data_vencimento,
+      diasAtraso: maiorAtraso,
+      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
+    });
+    await navigator.clipboard.writeText(msg);
+    toast.success(temVencidos ? 'Mensagem de recobrança copiada!' : 'Mensagem de cobrança copiada!');
+  }
+
+  async function handleBaixarExtrato() {
+    setLoadingExtrato(true);
+    try {
+      const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
+      const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
+      if (!extratoId) {
+        toast.error('Nenhum extrato encontrado para este cliente.');
+        return;
+      }
+      const { data: extrato } = await supabase
+        .from('extratos')
+        .select('cliente_id, filename')
+        .eq('id', extratoId)
+        .single();
+      if (!extrato) { toast.error('Extrato não encontrado.'); return; }
+      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
+      await downloadExtrato('documentos', path, (extrato as any).filename);
+    } catch (err) {
+      toast.error('Erro ao baixar extrato.');
+    } finally {
+      setLoadingExtrato(false);
+    }
+  }
+
   return (
     <>
-      <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
+      <AccordionItem value={cliente.cliente_id} className={cn("border rounded-lg bg-card", temVencidos && "border-destructive/30")}>
         <AccordionTrigger className="px-4 py-3 hover:no-underline">
           <div className="flex items-center gap-3 flex-1 text-left">
             <div className="flex-1 min-w-0">
@@ -621,21 +694,50 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 {fmt(cliente.total_faturado)} · Enviado · Vence {fmtDate(vencimento)}
               </p>
             </div>
-            <Badge variant="outline" className={cn('text-xs', dias < 0
-              ? 'bg-destructive/10 text-destructive border-destructive/30'
-              : dias <= 3
-                ? 'bg-warning/10 text-warning border-warning/30'
-                : 'bg-muted text-muted-foreground'
-            )}>
-              {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
-            </Badge>
+            {temVencidos ? (
+              <Badge className="bg-destructive/15 text-destructive border-0 text-xs">
+                Vencido há {maiorAtraso}d
+              </Badge>
+            ) : (
+              <Badge variant="outline" className={cn('text-xs', dias < 0
+                ? 'bg-destructive/10 text-destructive border-destructive/30'
+                : dias <= 3
+                  ? 'bg-warning/10 text-warning border-warning/30'
+                  : 'bg-muted text-muted-foreground'
+              )}>
+                {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
+              </Badge>
+            )}
             <MoverParaMenu cliente={cliente} />
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-4 pb-4">
           <div className="space-y-2">
-            {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
-            <div className="flex gap-2 mt-3">
+            {cliente.lancamentos.map(l => {
+              const isVenc = isLancamentoVencidoReal(l);
+              const dAtraso = isVenc ? Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(l.data_vencimento + 'T00:00:00').getTime()) / 86400000) : 0;
+              return (
+                <div key={l.id} className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <LancamentoRow lancamento={l} />
+                  </div>
+                  {isVenc && (
+                    <Badge className="bg-destructive/15 text-destructive border-0 text-[10px] shrink-0">
+                      Vencido {dAtraso}d
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+            <div className="flex gap-2 mt-3 flex-wrap">
+              <Button size="sm" variant="outline" onClick={handleCopiarCobranca}>
+                <Copy className="h-4 w-4 mr-1" /> {temVencidos ? 'Reenviar Cobrança' : 'Copiar WhatsApp'}
+              </Button>
+              {(cliente.lancamentos.some(l => l.extrato_id) || cliente.extrato_mais_recente) && (
+                <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato}>
+                  <Download className="h-4 w-4 mr-1" /> {loadingExtrato ? 'Baixando...' : 'Baixar Extrato'}
+                </Button>
+              )}
               <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                 <CheckCircle className="h-4 w-4 mr-1" /> Marcar como Pago
               </Button>
@@ -696,169 +798,6 @@ export function ClientesRecebidos({ clientes }: { clientes: ClienteFinanceiro[] 
   );
 }
 
-// ══════════ TAB: VENCIDOS ══════════
-export function ClientesVencidos({ clientes }: { clientes: ClienteFinanceiro[] }) {
-  if (clientes.length === 0) {
-    return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-          <CheckCircle className="h-10 w-10 text-emerald-500/40 mb-3" />
-          <p className="text-sm text-muted-foreground">Nenhuma cobrança vencida. Tudo em dia! ✓</p>
-        </CardContent>
-      </Card>
-    );
-  }
-  return (
-    <Accordion type="multiple" className="space-y-2">
-      {clientes.map(c => <VencidoItem key={c.cliente_id} cliente={c} />)}
-    </Accordion>
-  );
-}
-
-function VencidoItem({ cliente }: { cliente: ClienteFinanceiro }) {
-  const [showPago, setShowPago] = useState(false);
-  const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split('T')[0]);
-  const qc = useQueryClient();
-
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const lancVencidos = cliente.lancamentos.filter(l => {
-    if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return false;
-    if (l.status === 'atrasado' || l.etapa_financeiro === 'honorario_vencido') return true;
-    const venc = l.data_vencimento ? new Date(l.data_vencimento + 'T00:00:00') : null;
-    return venc ? venc < hoje : false;
-  });
-  const maiorAtraso = Math.max(...lancVencidos.map(l => diasAtraso(l.data_vencimento)), 0);
-
-  async function confirmarPago() {
-    const ids = cliente.lancamentos.map(l => l.id);
-    const { error } = await supabase
-      .from('lancamentos')
-      .update({ etapa_financeiro: 'honorario_pago', status: 'pago' as const, data_pagamento: dataPagamento, confirmado_recebimento: true })
-      .in('id', ids);
-    if (error) { toast.error(error.message); return; }
-    setShowPago(false);
-    invalidateFinanceiro(qc);
-    toast.success('Pagamento confirmado!');
-  }
-
-  const [loadingExtrato, setLoadingExtrato] = useState(false);
-
-  async function handleCopiarCobranca() {
-    if (lancVencidos.length === 0) return;
-
-    // Fetch valores adicionais for all processes to include reimbursable taxes
-    const processoIds = [...new Set(lancVencidos.map(l => l.processo_id).filter(Boolean))];
-    let vaMap: Record<string, number> = {};
-    if (processoIds.length > 0) {
-      const { data: vas } = await supabase
-        .from('valores_adicionais')
-        .select('processo_id, valor')
-        .in('processo_id', processoIds);
-      if (vas) {
-        for (const va of vas) {
-          vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor;
-        }
-      }
-    }
-
-    const primeiro = lancVencidos[0];
-    const valorPrimeiro = primeiro.valor + (vaMap[primeiro.processo_id] || 0);
-    const adicionais = lancVencidos.slice(1).map(l => ({
-      tipo: l.processo_tipo,
-      razao_social: l.processo_razao_social,
-      valor: l.valor + (vaMap[l.processo_id] || 0),
-    }));
-    const msg = gerarMensagemCobranca({
-      tipo: primeiro.processo_tipo,
-      razao_social: primeiro.processo_razao_social,
-      valor: valorPrimeiro,
-      data_vencimento: primeiro.data_vencimento,
-      diasAtraso: maiorAtraso,
-      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
-    });
-    await navigator.clipboard.writeText(msg);
-    toast.success('Mensagem de cobrança copiada!');
-  }
-
-  async function handleBaixarExtrato() {
-    setLoadingExtrato(true);
-    try {
-      const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
-      const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
-      if (!extratoId) {
-        toast.error('Nenhum extrato encontrado para este cliente.');
-        return;
-      }
-      const { data: extrato } = await supabase
-        .from('extratos')
-        .select('cliente_id, filename')
-        .eq('id', extratoId)
-        .single();
-      if (!extrato) { toast.error('Extrato não encontrado.'); return; }
-      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
-      await downloadExtrato('documentos', path, (extrato as any).filename);
-    } catch (err) {
-      toast.error('Erro ao baixar extrato.');
-    } finally {
-      setLoadingExtrato(false);
-    }
-  }
-
-  return (
-    <>
-      <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card border-destructive/30">
-        <AccordionTrigger className="px-4 py-3 hover:no-underline">
-          <div className="flex items-center gap-3 flex-1 text-left">
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
-              <p className="text-xs text-muted-foreground">{fmt(cliente.total_faturado)} · {lancVencidos.length} proc.</p>
-            </div>
-            <Badge variant="destructive" className="text-xs">
-              <AlertTriangle className="h-3 w-3 mr-1" /> Vencido há {maiorAtraso}d
-            </Badge>
-            <MoverParaMenu cliente={cliente} />
-          </div>
-        </AccordionTrigger>
-        <AccordionContent className="px-4 pb-4">
-          <div className="space-y-2">
-            {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
-            <div className="flex gap-2 mt-3 flex-wrap">
-              <Button size="sm" variant="outline" onClick={handleCopiarCobranca}>
-                <Copy className="h-4 w-4 mr-1" /> Reenviar Cobrança
-              </Button>
-              {(cliente.lancamentos.some(l => l.extrato_id) || cliente.extrato_mais_recente) && (
-                <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato}>
-                  <Download className="h-4 w-4 mr-1" /> {loadingExtrato ? 'Baixando...' : 'Baixar Extrato'}
-                </Button>
-              )}
-              <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                <CheckCircle className="h-4 w-4 mr-1" /> Marcar como Pago
-              </Button>
-            </div>
-          </div>
-        </AccordionContent>
-      </AccordionItem>
-
-      <Dialog open={showPago} onOpenChange={setShowPago}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader><DialogTitle>Confirmar Pagamento</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">{cliente.cliente_apelido || cliente.cliente_nome} — {fmt(cliente.total_faturado)}</p>
-            <div>
-              <label className="text-xs font-medium">Data do pagamento</label>
-              <Input type="date" value={dataPagamento} onChange={e => setDataPagamento(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPago(false)}>Cancelar</Button>
-            <Button onClick={confirmarPago} className="bg-emerald-600 hover:bg-emerald-700 text-white">Confirmar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
 
 // ══════════ MOVER PARA MENU ══════════
 function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {

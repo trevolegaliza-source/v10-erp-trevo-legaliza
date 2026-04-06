@@ -14,7 +14,6 @@ import {
   ClientesEnviar,
   ClientesAguardando,
   ClientesRecebidos,
-  ClientesVencidos,
 } from '@/components/financeiro/ClienteAccordionFinanceiro';
 import { formatBRL } from '@/lib/pricing-engine';
 import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
@@ -64,7 +63,6 @@ export default function Financeiro() {
     clientesEnviados,
     clientesAguardando,
     clientesPagos,
-    clientesVencidos,
     metricas,
     isLoading,
   } = useFinanceiroClientes(dates.inicio, dates.fim);
@@ -259,7 +257,7 @@ export default function Financeiro() {
                   ? 'border-red-500/30 bg-red-500/5 hover:border-red-500/50'
                   : 'hover:border-border'
               }`}
-              onClick={() => setActiveTab('vencidos')}
+              onClick={() => setActiveTab('aguardando')}
             >
               <CardContent className="p-5">
                 <div className="rounded-lg bg-red-500/10 p-2 w-fit">
@@ -360,13 +358,6 @@ export default function Financeiro() {
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0 min-w-[18px] text-emerald-500 border-emerald-500/30">{clientesPagos.length}</Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="vencidos" className="gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Vencidos
-                {clientesVencidos.length > 0 && (
-                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesVencidos.length}</Badge>
-                )}
-              </TabsTrigger>
               <TabsTrigger value="todos" className="gap-1.5">
                 <TrendingUp className="h-3.5 w-3.5" />
                 Todos
@@ -423,9 +414,6 @@ export default function Financeiro() {
             </TabsContent>
             <TabsContent value="pagos" className="mt-4">
               <ClientesPagos clientes={clientesPagos} />
-            </TabsContent>
-            <TabsContent value="vencidos" className="mt-4">
-              <ClientesVencidos clientes={clientesVencidos} />
             </TabsContent>
             <TabsContent value="todos" className="mt-4">
               <TabTodos

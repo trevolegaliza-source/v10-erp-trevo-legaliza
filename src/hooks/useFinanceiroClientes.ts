@@ -350,7 +350,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   function getLancamentoTab(l: LancamentoFinanceiro): string {
     if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return 'pagos';
-    if (isLancamentoVencidoReal(l)) return 'vencidos';
     if (l.etapa_financeiro === 'cobranca_enviada') return 'aguardando';
     if (l.etapa_financeiro === 'cobranca_gerada' && l.extrato_id) return 'enviados';
     return 'cobrar';
@@ -358,7 +357,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   // Build per-tab client views
   const tabMap: Record<string, Map<string, LancamentoFinanceiro[]>> = {
-    cobrar: new Map(), enviados: new Map(), aguardando: new Map(), pagos: new Map(), vencidos: new Map(),
+    cobrar: new Map(), enviados: new Map(), aguardando: new Map(), pagos: new Map(),
   };
 
   for (const c of clientes) {
@@ -389,7 +388,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const clientesEnviados = buildTabClientes('enviados');
   const clientesAguardando = buildTabClientes('aguardando');
   const clientesPagos = buildTabClientes('pagos');
-  const clientesVencidos = buildTabClientes('vencidos');
 
   const metricas = {
     totalFaturado,
@@ -403,8 +401,8 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     valorAguardandoEnvio: clientesEnviados.reduce((s, c) => s + c.total_pendente, 0),
     aguardandoPagamento: clientesAguardando.length,
     valorAguardandoPagamento: clientesAguardando.reduce((s, c) => s + c.total_pendente, 0),
-    vencidos: clientesVencidos.length,
-    valorVencido: clientesVencidos.reduce((s, c) => s + c.lancamentos.filter(l => isLancamentoVencidoReal(l)).reduce((ss, l) => ss + l.valor, 0), 0),
+    vencidos: clientesAguardando.filter(c => c.lancamentos.some(l => isLancamentoVencidoReal(l))).length,
+    valorVencido: clientesAguardando.reduce((s, c) => s + c.lancamentos.filter(l => isLancamentoVencidoReal(l)).reduce((ss, l) => ss + l.valor, 0), 0),
     totalProcessos: allLanc.length,
     clientesCobrados: clientes.filter(c => c.lancamentos.some(l => l.extrato_id != null || ['cobranca_gerada', 'cobranca_enviada', 'honorario_pago'].includes(l.etapa_financeiro))).length,
     clientesPendentes: clientes.filter(c => c.lancamentos.some(l => l.status !== 'pago')).length,
@@ -417,7 +415,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     clientesEnviados,
     clientesAguardando,
     clientesPagos,
-    clientesVencidos,
     metricas,
     isLoading: query.isLoading,
     isVencido: isLancamentoVencidoReal,
