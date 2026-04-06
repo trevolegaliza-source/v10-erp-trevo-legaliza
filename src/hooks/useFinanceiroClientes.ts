@@ -357,7 +357,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   // Build per-tab client views
   const tabMap: Record<string, Map<string, LancamentoFinanceiro[]>> = {
-    cobrar: new Map(), enviados: new Map(), aguardando: new Map(), pagos: new Map(), vencidos: new Map(),
+    cobrar: new Map(), enviados: new Map(), aguardando: new Map(), pagos: new Map(),
   };
 
   for (const c of clientes) {
