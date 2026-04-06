@@ -83,7 +83,7 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
 
       const [valoresAdicionais, allCompetencia] = await Promise.all([
         fetchValoresAdicionaisMulti(processosParaGerar.map(p => p.id)),
-        fetchCompetenciaProcessos(clienteId),
+        fetchCompetenciaProcessos(clienteId, processosParaGerar),
       ]);
 
       const result = await gerarExtratoPDF({
