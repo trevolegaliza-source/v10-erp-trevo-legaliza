@@ -925,21 +925,59 @@ export async function fetchValoresAdicionaisMulti(processoIds: string[]): Promis
   return map;
 }
 
-export async function fetchCompetenciaProcessos(clienteId: string): Promise<ProcessoFinanceiro[]> {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+export async function fetchCompetenciaProcessos(
+  clienteId: string,
+  processosSelecionados?: ProcessoFinanceiro[]
+): Promise<ProcessoFinanceiro[]> {
+  // Discover which months to fetch based on selected processes
+  const mesesUnicos = new Set<string>();
 
-  const { data, error } = await supabase
-    .from('processos')
-    .select('*, cliente:clientes(*)')
-    .eq('cliente_id', clienteId)
-    .gte('created_at', first)
-    .lte('created_at', last)
-    .order('created_at', { ascending: true });
-  if (error) throw error;
+  if (processosSelecionados && processosSelecionados.length > 0) {
+    processosSelecionados.forEach(p => {
+      const d = new Date(p.created_at);
+      mesesUnicos.add(`${d.getFullYear()}-${d.getMonth()}`);
+    });
+  } else {
+    // Fallback: current month
+    const now = new Date();
+    mesesUnicos.add(`${now.getFullYear()}-${now.getMonth()}`);
+  }
 
-  const ids = (data || []).map((p: any) => p.id);
+  let todosProcessos: any[] = [];
+
+  for (const mesKey of mesesUnicos) {
+    const [ano, mes] = mesKey.split('-').map(Number);
+    const first = new Date(ano, mes, 1).toISOString();
+    const last = new Date(ano, mes + 1, 0, 23, 59, 59).toISOString();
+
+    const { data, error } = await supabase
+      .from('processos')
+      .select('*, cliente:clientes(*)')
+      .eq('cliente_id', clienteId)
+      .gte('created_at', first)
+      .lte('created_at', last)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+
+    if (data) todosProcessos = [...todosProcessos, ...data];
+  }
+
+  // Deduplicate
+  const idsVistos = new Set<string>();
+  todosProcessos = todosProcessos.filter(p => {
+    if (idsVistos.has(p.id)) return false;
+    idsVistos.add(p.id);
+    return true;
+  });
+
+  // Sort by created_at across all months
+  todosProcessos.sort((a: any, b: any) =>
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  const ids = todosProcessos.map((p: any) => p.id);
+  if (ids.length === 0) return [];
+
   const { data: lancs } = await supabase
     .from('lancamentos')
     .select('*')
@@ -951,7 +989,7 @@ export async function fetchCompetenciaProcessos(clienteId: string): Promise<Proc
     if (!lancMap.has(l.processo_id)) lancMap.set(l.processo_id, l);
   });
 
-  return (data || []).map((p: any) => ({
+  return todosProcessos.map((p: any) => ({
     ...p,
     lancamento: lancMap.get(p.id) || null,
     etapa_financeiro: lancMap.get(p.id)?.etapa_financeiro || 'solicitacao_criada',
