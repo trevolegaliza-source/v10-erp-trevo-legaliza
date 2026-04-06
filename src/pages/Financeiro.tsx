@@ -358,13 +358,6 @@ export default function Financeiro() {
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0 min-w-[18px] text-emerald-500 border-emerald-500/30">{clientesPagos.length}</Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="vencidos" className="gap-1.5">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Vencidos
-                {clientesVencidos.length > 0 && (
-                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesVencidos.length}</Badge>
-                )}
-              </TabsTrigger>
               <TabsTrigger value="todos" className="gap-1.5">
                 <TrendingUp className="h-3.5 w-3.5" />
                 Todos
