@@ -868,7 +868,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
     const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, index + 2, totalPages, detailPageGroups.length);
     const detailCanvas = await renderPageToCanvas(detailHtml, GLOBAL_STYLES);
     doc.addPage();
-    doc.addImage(detailCanvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
+    doc.addImage(detailCanvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, pdfWidth, pdfHeight);
   }
 
   await renderAttachments(doc, data, totalPages, detailPageGroups.length + 2, logoDataUrl);
