@@ -1,17 +1,12 @@
-/**
- * Relatório de Performance Societária — TREVO ENGINE V16 (HTML2CANVAS)
- * Renders a pixel-perfect HTML template via html2canvas → jsPDF.
- */
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import type { ValorAdicional } from '@/hooks/useValoresAdicionais';
 import { supabase } from '@/integrations/supabase/client';
 
-// ═══ BRAND ═══
 const BRAND = {
   nome: 'TREVO LEGALIZA LTDA',
-  fantasia: 'Trevo Legaliza 🍀',
+  fantasia: 'Trevo Legaliza',
   cnpj: '39.969.412/0001-70',
   endereco: 'Rua Brasil, nº 1170, Rudge Ramos, SBC/SP',
   email: 'administrativo@trevolegaliza.com.br',
@@ -20,15 +15,45 @@ const BRAND = {
 
 const LOGO_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png';
 
-function fmt(v: number) {
-  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-function fmtDate(d: string | null | undefined) {
-  if (!d) return '-';
-  return new Date(d).toLocaleDateString('pt-BR');
+function fmt(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-// ═══ INTERFACES ═══
+function fmtDate(value: string | null | undefined) {
+  if (!value) return '-';
+  return new Date(value).toLocaleDateString('pt-BR');
+}
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function escapeHtml(value: string | null | undefined) {
+  return (value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function monthKeyFromDate(value: string | null | undefined) {
+  const date = value ? new Date(value) : new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatMonthLabel(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number);
+  return new Date(year, month - 1, 1)
+    .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+    .replace(/^./, (char) => char.toUpperCase());
+}
+
+function truncateText(value: string | null | undefined, max = 50) {
+  const safe = (value ?? '').trim();
+  return safe.length > max ? `${safe.slice(0, max - 1)}…` : safe;
+}
+
 export interface ExtratoData {
   processos: ProcessoFinanceiro[];
   allCompetencia: ProcessoFinanceiro[];
@@ -58,629 +83,711 @@ interface StepInfo {
   isMudancaUF: boolean;
   isManual: boolean;
   isUrgencia: boolean;
+  isBoasVindas: boolean;
   isCortesia: boolean;
   label: string;
   slotsUsados: number;
+  mes: string;
 }
 
-// ═══ JGVCO LOGIC ═══
+const GLOBAL_STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+  :root {
+    --trevo: 142 71% 45%;
+    --trevo-dark: 145 49% 12%;
+    --trevo-deep: 150 28% 9%;
+    --trevo-soft: 138 67% 96%;
+    --ink: 152 18% 12%;
+    --muted: 215 16% 47%;
+    --line: 214 32% 91%;
+    --surface: 0 0% 100%;
+    --surface-soft: 210 40% 98%;
+    --warning-bg: 48 100% 96%;
+    --warning-fg: 28 89% 32%;
+    --danger-bg: 0 86% 97%;
+    --danger-fg: 0 74% 42%;
+    --info-bg: 215 100% 97%;
+    --info-fg: 215 70% 40%;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  body, div, span, p, td, th { font-family: 'DM Sans', sans-serif; color: hsl(var(--ink)); }
+  body { background: hsl(var(--surface-soft)); }
+  .page { width: 794px; min-height: 1123px; background: hsl(var(--surface)); position: relative; overflow: hidden; }
+  .page-inner { padding: 22px 34px 126px; }
+  .top-accent { width: 100%; height: 6px; background: linear-gradient(90deg, hsl(var(--trevo)) 0%, hsl(89 80% 55%) 100%); }
+  .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 34px 16px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
+  .header-logo img { width: 190px; height: auto; object-fit: contain; display: block; }
+  .header-fallback { font-size: 14px; font-weight: 800; color: hsl(var(--trevo)); }
+  .header-right { text-align: right; }
+  .header-right .line1 { font-size: 10px; font-weight: 800; color: hsl(var(--ink)); text-transform: uppercase; letter-spacing: 0.8px; }
+  .header-right .line2 { font-size: 9px; color: hsl(var(--muted)); margin-top: 2px; }
+  .hero { margin-top: 18px; background: linear-gradient(135deg, hsl(var(--trevo-deep)) 0%, hsl(var(--trevo-dark)) 100%); border-radius: 24px; padding: 26px; position: relative; overflow: hidden; }
+  .hero::after { content: ''; position: absolute; right: -60px; bottom: -80px; width: 240px; height: 240px; border-radius: 999px; background: radial-gradient(circle, hsla(142, 71%, 45%, 0.32), transparent 70%); }
+  .hero > * { position: relative; z-index: 1; }
+  .eyebrow { font-size: 9px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: hsl(var(--trevo)); }
+  .hero-title { font-size: 30px; line-height: 1.08; font-weight: 800; color: hsl(0 0% 100%); margin-top: 8px; max-width: 82%; }
+  .hero-subtitle { font-size: 11px; line-height: 1.5; color: hsl(0 0% 100% / 0.74); margin-top: 8px; }
+  .hero-meta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px; background: hsl(0 0% 100% / 0.1); color: hsl(0 0% 100%); font-size: 9px; font-weight: 600; }
+  .pill.warning { background: hsl(var(--warning-bg)); color: hsl(var(--warning-fg)); }
+  .summary-grid { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .summary-card { border: 1px solid hsl(var(--line)); border-radius: 20px; padding: 18px; background: hsl(var(--surface)); min-height: 124px; }
+  .summary-card.total { background: linear-gradient(135deg, hsl(var(--trevo-deep)) 0%, hsl(var(--trevo-dark)) 100%); border-color: transparent; }
+  .summary-card.total .summary-label, .summary-card.total .summary-sub, .summary-card.total .summary-value { color: hsl(0 0% 100%); }
+  .summary-label { font-size: 9px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: hsl(var(--muted)); }
+  .summary-value { font-size: 28px; font-weight: 800; line-height: 1.1; color: hsl(var(--ink)); margin-top: 10px; }
+  .summary-sub { font-size: 10px; line-height: 1.5; color: hsl(var(--muted)); margin-top: 8px; }
+  .summary-split { display: grid; gap: 8px; margin-top: 10px; }
+  .summary-row { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; }
+  .summary-row strong { color: hsl(var(--ink)); }
+  .pix-box { margin-top: 12px; padding: 10px 12px; border-radius: 14px; background: hsl(var(--trevo-soft)); }
+  .pix-key { font-size: 14px; font-weight: 800; color: hsl(var(--trevo-dark)); margin-top: 4px; }
+  .section-card { margin-top: 16px; border: 1px solid hsl(var(--line)); border-radius: 22px; background: hsl(var(--surface)); padding: 18px 20px; }
+  .section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  .section-title { font-size: 18px; line-height: 1.15; font-weight: 800; color: hsl(var(--ink)); margin-top: 3px; }
+  .section-counter { flex-shrink: 0; padding: 8px 12px; border-radius: 999px; background: hsl(var(--trevo-soft)); color: hsl(var(--trevo-dark)); font-size: 10px; font-weight: 700; }
+  .process-row { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid hsl(214 32% 95%); }
+  .process-row:last-child { border-bottom: none; }
+  .process-left { display: flex; gap: 10px; flex: 1; min-width: 0; }
+  .process-slot { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; min-width: 36px; height: 28px; padding: 0 8px; border-radius: 10px; background: hsl(var(--trevo-soft)); color: hsl(var(--trevo-dark)); font-size: 10px; font-weight: 800; }
+  .process-copy { flex: 1; min-width: 0; }
+  .process-title { font-size: 11px; font-weight: 800; color: hsl(var(--ink)); line-height: 1.4; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .process-meta { font-size: 9px; color: hsl(var(--muted)); margin-top: 4px; }
+  .process-value { font-size: 15px; font-weight: 800; color: hsl(var(--trevo-deep)); text-align: right; white-space: nowrap; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 3px 8px; font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; }
+  .badge.manual { background: hsl(var(--warning-bg)); color: hsl(var(--warning-fg)); }
+  .badge.urgent { background: hsl(var(--danger-bg)); color: hsl(var(--danger-fg)); }
+  .badge.bv { background: hsl(var(--trevo-soft)); color: hsl(var(--trevo-dark)); }
+  .badge.info { background: hsl(var(--info-bg)); color: hsl(var(--info-fg)); }
+  .month-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 4px; }
+  .month-divider .line { flex: 1; height: 1px; background: hsl(var(--line)); }
+  .month-divider .text { font-size: 9px; font-weight: 700; color: hsl(var(--muted)); letter-spacing: 1.2px; text-transform: uppercase; }
+  .section-note { margin-top: 10px; font-size: 9px; color: hsl(var(--muted)); }
+  .next-card { margin-top: 16px; border-radius: 20px; border: 1px solid hsl(138 55% 84%); background: linear-gradient(135deg, hsl(var(--trevo-soft)) 0%, hsl(0 0% 100%) 100%); padding: 16px 18px; }
+  .next-card-title { font-size: 9px; font-weight: 800; color: hsl(var(--trevo)); letter-spacing: 1.2px; text-transform: uppercase; }
+  .next-card-main { font-size: 15px; line-height: 1.45; color: hsl(var(--trevo-dark)); margin-top: 6px; }
+  .next-card-sub { font-size: 9px; line-height: 1.5; color: hsl(var(--muted)); margin-top: 6px; }
+  .progress-card { margin-top: 16px; border-radius: 22px; border: 1px solid hsl(var(--line)); background: hsl(var(--surface)); padding: 18px 20px; }
+  .progress-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  .progress-table thead th { background: hsl(var(--trevo-deep)); color: hsl(0 0% 100%); font-size: 8px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; padding: 9px 10px; text-align: left; }
+  .progress-table td { font-size: 9px; padding: 8px 10px; border-bottom: 1px solid hsl(214 32% 94%); color: hsl(var(--ink)); }
+  .progress-table .value-cell { font-weight: 800; color: hsl(var(--trevo-dark)); }
+  .progress-table .desc-cell { color: hsl(var(--muted)); }
+  .progress-table .month-row td { background: hsl(var(--surface-soft)); color: hsl(var(--muted)); font-size: 8px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding-top: 10px; }
+  .progress-table .next-row td { background: hsl(var(--trevo-soft)); }
+  .progress-legal { font-size: 8.5px; line-height: 1.55; color: hsl(var(--muted)); margin-top: 10px; }
+  .detail-banner { margin-top: 18px; border-radius: 22px; background: linear-gradient(135deg, hsl(var(--trevo-deep)) 0%, hsl(var(--trevo-dark)) 100%); padding: 18px 22px; }
+  .detail-banner .section-title { color: hsl(0 0% 100%); }
+  .detail-banner .eyebrow { color: hsl(var(--trevo)); }
+  .detail-banner-meta { font-size: 9px; color: hsl(0 0% 100% / 0.72); margin-top: 6px; }
+  .detail-list { margin-top: 16px; display: grid; gap: 14px; }
+  .detail-card { border: 1px solid hsl(var(--line)); border-radius: 20px; overflow: hidden; background: hsl(var(--surface)); page-break-inside: avoid; }
+  .detail-card-head { display: flex; justify-content: space-between; gap: 12px; padding: 16px 18px; background: linear-gradient(135deg, hsl(var(--trevo-deep)) 0%, hsl(var(--trevo-dark)) 100%); }
+  .detail-left { display: flex; gap: 12px; flex: 1; min-width: 0; }
+  .detail-index { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; min-width: 42px; height: 36px; padding: 0 10px; border-radius: 12px; background: hsl(0 0% 100%); color: hsl(var(--trevo-dark)); font-size: 11px; font-weight: 800; }
+  .detail-title { font-size: 11px; line-height: 1.45; font-weight: 800; color: hsl(0 0% 100%); text-transform: uppercase; }
+  .detail-meta { font-size: 8.5px; line-height: 1.55; color: hsl(0 0% 100% / 0.72); margin-top: 5px; }
+  .detail-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .detail-value { text-align: right; min-width: 128px; }
+  .detail-value-main { font-size: 18px; font-weight: 800; color: hsl(0 0% 100%); }
+  .detail-value-sub { font-size: 8px; color: hsl(0 0% 100% / 0.72); margin-top: 4px; }
+  .detail-body { padding: 14px 18px 16px; }
+  .detail-body-row { display: flex; justify-content: space-between; gap: 12px; font-size: 10px; color: hsl(var(--muted)); margin-bottom: 10px; }
+  .detail-body-row strong { color: hsl(var(--ink)); }
+  .tax-table { width: 100%; border-collapse: collapse; border: 1px solid hsl(var(--line)); border-radius: 14px; overflow: hidden; }
+  .tax-table th { background: hsl(var(--surface-soft)); font-size: 8px; font-weight: 800; color: hsl(var(--muted)); letter-spacing: 0.6px; text-transform: uppercase; padding: 8px 10px; text-align: left; }
+  .tax-table th:last-child, .tax-table td:last-child { text-align: right; }
+  .tax-table td { font-size: 9px; padding: 8px 10px; border-top: 1px solid hsl(214 32% 94%); }
+  .tax-total { margin-top: 10px; display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 14px; background: hsl(var(--surface-soft)); font-size: 10px; }
+  .tax-total strong { color: hsl(var(--trevo-dark)); }
+  .transparency-note { margin-top: 12px; padding: 9px 12px; border-radius: 14px; background: hsl(var(--warning-bg)); color: hsl(var(--warning-fg)); font-size: 8.5px; line-height: 1.5; }
+  .footer-contact { position: absolute; left: 34px; right: 34px; bottom: 34px; border-top: 1px solid hsl(var(--line)); padding-top: 12px; display: flex; justify-content: space-between; gap: 16px; font-size: 8.5px; color: hsl(var(--muted)); }
+  .footer-contact strong { color: hsl(var(--ink)); }
+  .page-footer { position: absolute; left: 34px; right: 34px; bottom: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: hsl(var(--muted)); }
+`;
+
 function buildEscadinha(data: ExtratoData): StepInfo[] {
   const base = data.cliente.valor_base ?? 580;
   const descPct = data.cliente.desconto_progressivo ?? 0;
   const limite = data.cliente.valor_limite_desconto ?? 0;
-  const selectedIds = new Set(data.processos.map(p => p.id));
+  const selectedIds = new Set(data.processos.map((processo) => processo.id));
 
-  const sorted = [...data.allCompetencia].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
+  const unique = new Map<string, ProcessoFinanceiro>();
+  [...data.allCompetencia, ...data.processos].forEach((processo) => {
+    if (!unique.has(processo.id)) unique.set(processo.id, processo);
+  });
+
+  const porMes = new Map<string, ProcessoFinanceiro[]>();
+  unique.forEach((processo) => {
+    const key = monthKeyFromDate(processo.created_at);
+    if (!porMes.has(key)) porMes.set(key, []);
+    porMes.get(key)!.push(processo);
+  });
 
   const steps: StepInfo[] = [];
-  let slot = 0;
 
-  for (const p of sorted) {
-    const notasRaw = p.notas || '';
-    const notas = notasRaw.toLowerCase();
-    const isMudancaUF = notas.includes('mudança de uf') || notas.includes('mudanca de uf');
-    const isUrgencia = notas.includes('urgência') || notas.includes('urgencia');
-    const hasManualFlag = notas.includes('valor manual') || notas.includes('is_manual');
-    const hasBoasVindas = notas.includes('boas-vindas') || notas.includes('boas vindas');
-
-    const valorProcesso = p.valor != null ? Number(p.valor) : Number.NaN;
-    const valorLancamentoRaw = (p as any).lancamento?.valor;
-    const valorLancamento = valorLancamentoRaw != null ? Number(valorLancamentoRaw) : Number.NaN;
-    const valorReal = Number.isFinite(valorProcesso)
-      ? valorProcesso
-      : (Number.isFinite(valorLancamento) ? valorLancamento : 0);
-
-    // Mudança de UF: valor no banco JÁ é consolidado (soma dos 2 slots)
-    // Gera apenas 1 StepInfo, consome 2 slots na progressão
-    if (isMudancaUF) {
-      const startSlot = slot + 1;
-      slot += 2; // consome 2 posições
-      const valorFinal = Math.round((Number(valorReal) || 0) * 100) / 100;
-      steps.push({
-        index: startSlot,
-        processo: p,
-        valorBase: base,
-        desconto: 0,
-        valorFinal,
-        isSelected: selectedIds.has(p.id),
-        isMudancaUF: true,
-        isManual: true,
-        isUrgencia: false,
-        isCortesia: valorFinal === 0,
-        label: 'MUDANÇA DE UF',
-        slotsUsados: 2,
+  [...porMes.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .forEach(([mes, processosMes]) => {
+      processosMes.sort((a, b) => {
+        const timeA = new Date(a.created_at).getTime();
+        const timeB = new Date(b.created_at).getTime();
+        return timeA - timeB || a.id.localeCompare(b.id);
       });
-      continue;
-    }
 
-    // Processos normais: 1 slot
-    slot++;
-    let valorFinal: number;
-    let desconto = 0;
-    let isManual = false;
-    let label = '';
+      let slot = 0;
 
-    if (hasManualFlag || isUrgencia || hasBoasVindas) {
-      valorFinal = hasManualFlag ? (valorReal || 0) : valorReal;
-      desconto = 0;
-      isManual = true;
-      if (hasManualFlag) {
-        label = valorFinal === 0 ? 'CORTESIA' : 'VALOR MANUAL';
-      } else if (isUrgencia) {
-        label = 'MÉTODO TREVO / URGÊNCIA';
-      } else {
-        const pctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
-        label = pctMatch ? `BOAS-VINDAS ${pctMatch[1]}%` : 'BOAS-VINDAS';
-      }
-    } else if (valorReal > 0) {
-      valorFinal = valorReal;
-      desconto = base - valorFinal;
-    } else {
-      valorFinal = base;
-      if (descPct > 0 && slot > 1) {
-        for (let i = 1; i < slot; i++) {
-          valorFinal = valorFinal * (1 - descPct / 100);
+      processosMes.forEach((processo) => {
+        const notasRaw = processo.notas || '';
+        const notas = notasRaw.toLowerCase();
+        const isMudancaUF = notas.includes('mudança de uf') || notas.includes('mudanca de uf');
+        const isUrgencia = notas.includes('urgência') || notas.includes('urgencia');
+        const hasManualFlag = notas.includes('valor manual') || notas.includes('is_manual');
+        const hasBoasVindas = notas.includes('boas-vindas') || notas.includes('boas vindas');
+        const hasCortesia = notas.includes('cortesia');
+
+        const valorProcesso = processo.valor != null ? Number(processo.valor) : Number.NaN;
+        const valorLancamento = (processo as any).lancamento?.valor != null ? Number((processo as any).lancamento.valor) : Number.NaN;
+        const valorReal = Number.isFinite(valorProcesso)
+          ? valorProcesso
+          : (Number.isFinite(valorLancamento) ? valorLancamento : 0);
+
+        if (isMudancaUF) {
+          const startSlot = slot + 1;
+          slot += 2;
+          const valorFinal = round2(valorReal || 0);
+          steps.push({
+            index: startSlot,
+            processo,
+            valorBase: base,
+            desconto: 0,
+            valorFinal,
+            isSelected: selectedIds.has(processo.id),
+            isMudancaUF: true,
+            isManual: false,
+            isUrgencia: false,
+            isBoasVindas: false,
+            isCortesia: hasCortesia || valorFinal === 0,
+            label: 'MUDANÇA DE UF',
+            slotsUsados: 2,
+            mes,
+          });
+          return;
         }
-      }
-      if (limite > 0 && valorFinal < limite) valorFinal = limite;
-      desconto = base - valorFinal;
-    }
 
-    valorFinal = Math.round(valorFinal * 100) / 100;
+        slot += 1;
 
-    steps.push({
-      index: slot, processo: p, valorBase: isManual ? valorFinal : base,
-      desconto: Math.round(desconto * 100) / 100, valorFinal,
-      isSelected: selectedIds.has(p.id), isMudancaUF: false,
-      isManual, isUrgencia, isCortesia: valorFinal === 0 && isManual,
-      label, slotsUsados: 1,
+        if (hasManualFlag || hasBoasVindas || hasCortesia) {
+          const matchBoasVindas = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
+          const valorFinal = round2(hasCortesia ? 0 : valorReal);
+          steps.push({
+            index: slot,
+            processo,
+            valorBase: base,
+            desconto: 0,
+            valorFinal,
+            isSelected: selectedIds.has(processo.id),
+            isMudancaUF: false,
+            isManual: hasManualFlag || hasCortesia,
+            isUrgencia: false,
+            isBoasVindas: hasBoasVindas,
+            isCortesia: hasCortesia || valorFinal === 0,
+            label: hasCortesia
+              ? 'CORTESIA'
+              : hasManualFlag
+                ? 'VALOR MANUAL'
+                : (matchBoasVindas ? `BOAS-VINDAS ${matchBoasVindas[1]}%` : 'BOAS-VINDAS'),
+            slotsUsados: 1,
+            mes,
+          });
+          return;
+        }
+
+        let valorFinal = base;
+        let desconto = 0;
+        let label = '(base)';
+
+        if (slot > 1 && descPct > 0) {
+          const fator = Math.pow(1 - descPct / 100, slot - 1);
+          valorFinal = base * fator;
+          if (limite > 0 && valorFinal < limite) valorFinal = limite;
+          desconto = Math.round((1 - valorFinal / base) * 100);
+          label = `-${desconto}% sobre base`;
+        }
+
+        if (isUrgencia) {
+          valorFinal *= 1.5;
+          label += ' +50% URG';
+        }
+
+        steps.push({
+          index: slot,
+          processo,
+          valorBase: base,
+          desconto,
+          valorFinal: round2(valorFinal),
+          isSelected: selectedIds.has(processo.id),
+          isMudancaUF: false,
+          isManual: false,
+          isUrgencia,
+          isBoasVindas: false,
+          isCortesia: false,
+          label,
+          slotsUsados: 1,
+          mes,
+        });
+      });
     });
-  }
+
   return steps;
 }
 
-// ═══ HTML BUILDERS ═══
-const GLOBAL_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  body, div, span, p, td, th { font-family: 'DM Sans', sans-serif; }
-  .page { width: 794px; min-height: 1123px; background: #ffffff; position: relative; overflow: hidden; }
-  .stripe-top { width: 100%; height: 5px; background: #1a3a1a; }
-  .header { display: flex; justify-content: space-between; align-items: center; padding: 10px 30px; border-bottom: 1px solid #e2e8f0; background: #fff; }
-  .header-logo img { width: 208px; height: auto; object-fit: contain; display: block; }
-  .header-right { text-align: right; }
-  .header-right .line1 { font-size: 9px; font-weight: 700; color: #64748b; }
-  .header-right .line2 { font-size: 9px; font-weight: 500; color: #64748b; }
-  .gradient-bar { width: 100%; height: 3px; background: linear-gradient(90deg, #4C9F38 0%, #a3e635 100%); }
-  .client-block { background: #0f1f0f; padding: 20px 30px; }
-  .client-tag { font-size: 9px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
-  .client-name { font-size: 26px; font-weight: 800; color: #ffffff; line-height: 1.2; }
-  .client-cnpj { font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 4px; }
-  .client-contact { font-size: 8px; color: rgba(255,255,255,0.65); margin-top: 2px; }
-  .client-meta { font-size: 10px; color: #94a3b8; margin-top: 4px; }
-  .fin-section { padding: 22px 30px 0 30px; }
-  .total-card { background: linear-gradient(135deg, #0f1f0f, #1a3a1a); border-radius: 8px; padding: 20px; text-align: center; }
-  .total-tag { font-size: 8px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-  .total-label { font-size: 9px; font-weight: 700; color: #4ade80; text-transform: uppercase; }
-  .total-prefix { font-size: 15px; color: #94a3b8; font-weight: 500; }
-  .total-value { font-size: 42px; font-weight: 800; color: #ffffff; letter-spacing: -1px; line-height: 1.1; }
-  .total-ctx { font-size: 9px; color: #94a3b8; margin-top: 4px; }
-  .kpi-row { display: flex; gap: 12px; margin-top: 14px; }
-  .kpi-card { flex: 1; background: #f8fafc; border: 2px solid #e2e8f0; border-top: 4px solid #4C9F38; border-radius: 0 0 5px 5px; padding: 12px; min-height: 70px; display: flex; flex-direction: column; justify-content: center; }
-  .kpi-card.eco { background: #4C9F38; border-color: #4C9F38; }
-  .kpi-label { font-size: 6.5px; font-weight: 700; color: #4C9F38; text-transform: uppercase; }
-  .kpi-card.eco .kpi-label { color: #ffffff; }
-  .kpi-value { font-size: 11px; font-weight: 800; color: #1a1a2e; margin-top: 2px; }
-  .kpi-card.eco .kpi-value { color: #ffffff; }
-  .vol-block { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; margin-top: 12px; border-radius: 4px; }
-  .vol-text { font-size: 9px; color: #64748b; line-height: 1.5; }
-  .footer-contact { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 10px 30px; text-align: center; font-size: 9px; color: #94a3b8; position: absolute; bottom: 30px; left: 0; right: 0; }
-  .gradient-bottom { position: absolute; bottom: 20px; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #4C9F38 0%, #a3e635 100%); }
-  .page-footer { position: absolute; bottom: 4px; left: 30px; right: 30px; display: flex; justify-content: space-between; font-size: 8px; color: #94a3b8; }
-  .transparency-note { margin-top: 8px; padding: 7px 14px; background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 0 3px 3px 0; }
-  .transparency-note p { font-size: 9px; font-weight: 500; color: #78350f; font-style: italic; line-height: 1.4; }
-  /* Progression bar */
-  .prog-bar { display: flex; align-items: center; margin-top: 14px; margin-bottom: 12px; gap: 0; }
-  .prog-step { flex: 1; padding: 10px 14px; border-radius: 5px; text-align: center; position: relative; }
-  .prog-step.active { background: #1a3a1a; }
-  .prog-step.next { background: #f0fdf4; border: 2px dashed #86efac; }
-  .prog-step .ps-label { font-size: 8px; font-weight: 700; color: #ffffff; }
-  .prog-step.next .ps-label { color: #166534; }
-  .prog-step .ps-value { font-size: 12px; font-weight: 800; color: #4ade80; margin-top: 2px; }
-  .prog-step.next .ps-value { color: #166534; }
-  .prog-step .ps-desc { font-size: 7px; color: rgba(255,255,255,0.5); margin-top: 1px; }
-  .prog-step.next .ps-desc { color: #64748b; }
-  .prog-step .ps-next-label { font-size: 7px; font-weight: 700; color: #4C9F38; text-transform: uppercase; margin-top: 3px; }
-  .prog-step .ps-limit { display: inline-block; font-size: 6px; background: #f59e0b; color: white; padding: 1px 5px; border-radius: 2px; margin-top: 3px; }
-  .prog-arrow { width: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .prog-arrow svg { width: 10px; height: 10px; }
-  /* Page 2 */
-  .section-banner { background: #0f1f0f; padding: 12px 30px; }
-  .section-banner-text { font-size: 9px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; }
-  .process-card { background: #ffffff; border: 1px solid #e2e8f0; border-left: 3px solid #4C9F38; margin-bottom: 14px; overflow: hidden; border-radius: 4px; }
-  .process-header { background: #0f1f0f; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
-  .ph-left { display: flex; align-items: center; gap: 10px; flex: 1; }
-  .ph-badge { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: #ffffff; color: #4C9F38; border-radius: 6px; font-size: 10px; font-weight: 800; text-align: center; line-height: 1; flex-shrink: 0; padding: 0; margin: 0; }
-  .ph-info { flex: 1; }
-  .ph-title { font-size: 10px; font-weight: 700; color: #ffffff; text-transform: uppercase; }
-  .ph-date { font-size: 8px; color: rgba(255,255,255,0.5); margin-top: 2px; }
-  .ph-discount { font-size: 8px; color: #4ade80; margin-top: 1px; }
-  .ph-right { text-align: right; }
-  .ph-values-inline { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; }
-  .ph-value { font-size: 14px; font-weight: 800; color: #ffffff; }
-  .ph-base { font-size: 8px; color: rgba(255,255,255,0.4); }
-  .ph-base-strike { font-size: 10px; color: rgba(255,255,255,0.55); text-decoration: line-through; }
-  .cortesia-badge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 9999px; background: #dcfce7; color: #166534; font-size: 7px; font-weight: 700; letter-spacing: 0.3px; }
-  .boas-vindas-badge { display: inline-block; vertical-align: middle; background: #22c55e; color: #ffffff; padding: 2px 8px; border-radius: 2px; font-size: 6.5px; font-weight: 700; text-transform: uppercase; margin-left: 6px; line-height: 1; }
-  .boas-vindas-economia { font-size: 7px; color: #4ade80; margin-top: 2px; }
-  .manual-badge { display: inline-block; background: #f59e0b; color: #ffffff; font-size: 7px; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; margin-left: 6px; }
-  .tax-table { width: 100%; border-collapse: collapse; }
-  .tax-table th { background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase; padding: 5px 8px; text-align: left; }
-  .tax-table th:last-child { text-align: right; }
-  .tax-table td { font-size: 9px; padding: 5px 8px; border-bottom: 1px solid #f1f5f9; }
-  .tax-table tr:nth-child(even) td { background: #f8fafc; }
-  .tax-table .td-date { color: #64748b; }
-  .tax-table .td-desc { color: #334155; font-weight: 500; }
-  .tax-table .td-val { text-align: right; color: #1a1a2e; font-weight: 700; }
-  .tax-table .td-val .prefix { color: #64748b; }
-  .subtotal-row { background: #ffffff; border-left: 5px solid #4C9F38; border-top: 1px solid #e2e8f0; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
-  .subtotal-calc { font-size: 9px; font-weight: 500; color: #64748b; }
-  .subtotal-result { font-size: 13px; font-weight: 800; color: #0f1f0f; }
-  .prog-block { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #86efac; border-radius: 5px; padding: 12px; margin-top: 14px; }
-  .prog-title { font-size: 9px; font-weight: 700; color: #166534; text-transform: uppercase; margin-bottom: 8px; }
-  .prog-table { width: 100%; border-collapse: collapse; font-size: 9px; }
-  .prog-table th { background: #166534; color: white; font-weight: 700; padding: 5px 8px; font-size: 8px; text-align: center; }
-  .prog-table td { padding: 4px 8px; text-align: center; border: 1px solid #dcfce7; background: white; }
-  .prog-table tr:nth-child(even) td { background: #f0fdf4; }
-  .prog-table .val { font-weight: 700; color: #166534; }
-  .prog-table .desc { color: #166534; }
-  .prog-table .status { font-size: 8px; color: #64748b; }
-  .prog-table .limite td { background: #dcfce7; font-weight: 700; }
-  .prog-table .limite .status { color: #166534; }
-  .prog-legal { font-size: 8px; color: #166534; line-height: 1.4; margin-top: 8px; }
-  .total-geral-card { margin-top: 16px; background: linear-gradient(135deg, #0f1f0f, #1a3a1a); border-radius: 8px; padding: 18px; text-align: center; }
-  .tg-tag { font-size: 9px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; }
-  .tg-value { font-size: 42px; font-weight: 800; color: #ffffff; letter-spacing: -1px; margin-top: 4px; }
-  .tax-area { padding: 12px 16px; }
-`;
+function groupStepsByMonth(steps: StepInfo[]) {
+  const grouped = new Map<string, StepInfo[]>();
+  steps.forEach((step) => {
+    if (!grouped.has(step.mes)) grouped.set(step.mes, []);
+    grouped.get(step.mes)!.push(step);
+  });
+  return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
 
-function buildHeaderHTML(logoDataUrl: string | null): string {
+function calculateVencimento(cliente: ExtratoData['cliente'], emissionBase = new Date()) {
+  const emissao = new Date(emissionBase);
+  emissao.setHours(12, 0, 0, 0);
+
+  let vencimento = new Date(emissao);
+  if (cliente.dia_vencimento_mensal && cliente.dia_vencimento_mensal > 0) {
+    vencimento = new Date(emissao.getFullYear(), emissao.getMonth(), cliente.dia_vencimento_mensal, 12, 0, 0, 0);
+    if (vencimento.getTime() <= emissao.getTime()) vencimento.setMonth(vencimento.getMonth() + 1);
+  } else if (cliente.dia_cobranca && cliente.dia_cobranca > 0) {
+    vencimento.setDate(vencimento.getDate() + cliente.dia_cobranca);
+  } else {
+    vencimento.setDate(vencimento.getDate() + 2);
+  }
+
+  return vencimento;
+}
+
+function calculateNextStepValue(slotNumber: number, data: ExtratoData) {
+  const base = data.cliente.valor_base ?? 580;
+  const descPct = data.cliente.desconto_progressivo ?? 0;
+  const limite = data.cliente.valor_limite_desconto ?? 0;
+
+  if (slotNumber <= 1 || descPct <= 0) return round2(base);
+
+  let valorFinal = base * Math.pow(1 - descPct / 100, slotNumber - 1);
+  if (limite > 0 && valorFinal < limite) valorFinal = limite;
+  return round2(valorFinal);
+}
+
+function buildHeaderHTML(logoDataUrl: string | null) {
   const logoHtml = logoDataUrl
     ? `<div class="header-logo"><img src="${logoDataUrl}" alt="Trevo Legaliza" /></div>`
-    : `<div class="header-logo" style="font-size:12px;font-weight:800;color:#4C9F38;">Trevo Legaliza 🍀</div>`;
+    : `<div class="header-fallback">Trevo Legaliza</div>`;
+
   return `
-    <div class="stripe-top"></div>
-    <div class="header">
+    <div class="pdf-header">
       ${logoHtml}
       <div class="header-right">
         <div class="line1">${BRAND.nome}</div>
-        <div class="line2">CNPJ ${BRAND.cnpj} • Atuação Nacional</div>
+        <div class="line2">CNPJ ${BRAND.cnpj} · Atuação nacional</div>
       </div>
     </div>
-    <div class="gradient-bar"></div>
   `;
 }
 
-function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
-  const descPct = data.cliente.desconto_progressivo ?? 0;
-  if (descPct <= 0) return '';
-
-  const base = data.cliente.valor_base ?? 580;
-  const limite = data.cliente.valor_limite_desconto ?? 0;
-
-  // Show all steps + 1 "next" step (max last 4 steps)
-  const displaySteps = steps.slice(-4);
-
-  // Calculate next step value based on total slots consumed
-  const totalSlots = steps.reduce((sum, s) => sum + (s.slotsUsados || 1), 0);
-  let nextVal = base;
-  for (let i = 1; i <= totalSlots; i++) {
-    nextVal = nextVal * (1 - descPct / 100);
-  }
-  const limitReached = limite > 0 && nextVal <= limite;
-  if (limitReached) nextVal = limite;
-
-  // Responsive sizing
-  const totalDegraus = displaySteps.length + (limitReached ? 0 : 1);
-  const degrauWidth = totalDegraus <= 3 ? 180 : totalDegraus <= 5 ? 150 : totalDegraus <= 7 ? 120 : 100;
-  const fontSize = totalDegraus <= 3 ? '14px' : totalDegraus <= 5 ? '12px' : '11px';
-  const labelSize = totalDegraus <= 3 ? '9px' : totalDegraus <= 5 ? '8px' : '7px';
-
-  const arrowSvg = (color: string) => `<svg viewBox="0 0 10 10"><polygon points="0,0 10,5 0,10" fill="${color}"/></svg>`;
-
-  let html = '<div class="prog-bar" style="flex-wrap:wrap;justify-content:center;gap:4px;">';
-
-  displaySteps.forEach((s, i) => {
-    if (i > 0) html += `<div class="prog-arrow">${arrowSvg('#4C9F38')}</div>`;
-    const isLim = !s.isManual && !s.isUrgencia && limite > 0 && s.valorFinal <= limite;
-    const isBoasVindas = s.label && s.label.includes('BOAS-VINDAS');
-    const opacityStyle = s.isSelected ? '' : 'opacity:0.35;';
-    const cobradoIndicator = s.isSelected
-      ? `<div style="font-size:7px;color:#22c55e;font-weight:700;margin-top:3px;">● COBRADO</div>`
-      : '';
-
-    // Label for slot number
-    const slotLabel = s.isMudancaUF
-      ? `${s.index}º-${s.index + 1}º Processo`
-      : `${s.index}º Processo`;
-    const borderColor = s.isMudancaUF ? 'border:2px solid #3b82f6;' : '';
-
-    if (isBoasVindas) {
-      html += `
-        <div class="prog-step active" style="${opacityStyle}${borderColor}flex:0 0 auto;width:${degrauWidth}px;">
-          <div class="ps-label" style="font-size:${labelSize};">${slotLabel}</div>
-          <div style="font-size:7.5px;color:rgba(255,255,255,0.6);text-decoration:line-through;">${fmt(base)}</div>
-          <div class="ps-value" style="font-size:${fontSize};">${fmt(s.valorFinal)}</div>
-          <div style="font-size:6px;color:#4ade80;font-weight:700;">(${s.label})</div>
-          ${cobradoIndicator}
-        </div>
-      `;
-    } else {
-      const descLabel = s.isMudancaUF ? 'MUDANÇA DE UF (2 slots)' : (s.isManual ? s.label : (s.desconto > 0 ? `-${descPct}% sobre base` : '(base)'));
-      const descColor = s.isMudancaUF ? 'color:#60a5fa;' : '';
-      html += `
-        <div class="prog-step active" style="${opacityStyle}${borderColor}flex:0 0 auto;width:${degrauWidth}px;">
-          <div class="ps-label" style="font-size:${labelSize};">${slotLabel}</div>
-          <div class="ps-value" style="font-size:${fontSize};">${fmt(s.valorFinal)}</div>
-          <div class="ps-desc" style="font-size:${labelSize};${descColor}">${descLabel}</div>
-          ${isLim ? '<div class="ps-limit">LIMITE ATINGIDO</div>' : ''}
-          ${cobradoIndicator}
-        </div>
-      `;
-    }
-  });
-
-  if (!limitReached) {
-    html += `<div class="prog-arrow">${arrowSvg('#86efac')}</div>`;
-    html += `
-      <div class="prog-step next" style="flex:0 0 auto;width:${degrauWidth}px;">
-        <div class="ps-label" style="font-size:${labelSize};">${totalSlots + 1}º Processo</div>
-        <div class="ps-value" style="font-size:${fontSize};">${fmt(Math.round(nextVal * 100) / 100)}</div>
-        <div class="ps-desc" style="font-size:${labelSize};">-${descPct}% sobre base</div>
-        <div class="ps-next-label">SEU PRÓXIMO DESCONTO</div>
-      </div>
-    `;
-  }
-
-  html += '</div>';
-
-  // Add explanatory note when boas-vindas is present
-  const hasBoasVindas = steps.some(s => s.label && s.label.includes('BOAS-VINDAS'));
-  if (hasBoasVindas) {
-    html += `<div style="font-size:7px;color:#64748b;margin-top:4px;padding:4px 8px;background:#f8fafc;border-radius:3px;line-height:1.5;">
-      ℹ O desconto de boas-vindas aplica-se apenas ao primeiro processo. A partir do 2º processo, o desconto progressivo é calculado sobre o valor base de ${fmt(base)}.
-    </div>`;
-  }
-
-  return html;
+function buildFooterHTML(pageNumber: number, totalPages: number) {
+  return `
+    <div class="footer-contact">
+      <div><strong>${escapeHtml(BRAND.fantasia)}</strong> · CNPJ ${escapeHtml(BRAND.cnpj)}</div>
+      <div>${escapeHtml(BRAND.endereco)} · ${escapeHtml(BRAND.email)} · ${escapeHtml(BRAND.telefone)}</div>
+    </div>
+    <div class="page-footer">
+      <span>Trevo Legaliza</span>
+      <span>PÁGINA ${pageNumber} DE ${totalPages}</span>
+    </div>
+  `;
 }
 
-function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo[], logoDataUrl: string | null): string {
-  const now = new Date();
-  const emissao = now.toLocaleDateString('pt-BR');
+function buildStepBadges(step: StepInfo) {
+  const badges: string[] = [];
+  if (step.isManual && !step.isCortesia) badges.push('<span class="badge manual">Valor manual</span>');
+  if (step.isBoasVindas) badges.push('<span class="badge bv">Boas-vindas</span>');
+  if (step.isUrgencia) badges.push('<span class="badge urgent">Urgência +50%</span>');
+  if (step.isMudancaUF) badges.push('<span class="badge info">Mudança de UF</span>');
+  if (step.isCortesia) badges.push('<span class="badge bv">Cortesia</span>');
+  return badges.join('');
+}
 
-  // Calculate period from actual process dates (selected), not current month
-  const datasProcessos = selected.map(s => new Date(s.processo.created_at));
-  const menorData = datasProcessos.length > 0 ? new Date(Math.min(...datasProcessos.map(d => d.getTime()))) : now;
-  const maiorData = datasProcessos.length > 0 ? new Date(Math.max(...datasProcessos.map(d => d.getTime()))) : now;
+function getStepStatusText(step: StepInfo) {
+  if (step.isMudancaUF) return 'Mudança de UF';
+  if (step.isCortesia) return 'Cortesia';
+  if (step.isBoasVindas) return 'Boas-vindas';
+  if (step.isManual) return 'Valor manual';
+  if (step.isUrgencia) return 'Urgência +50%';
+  return '—';
+}
+
+function getStepDiscountText(step: StepInfo) {
+  return !step.isManual && !step.isMudancaUF && !step.isBoasVindas && step.desconto > 0 ? `-${step.desconto}%` : '—';
+}
+
+function buildSelectedProcessesHTML(selected: StepInfo[], maxVisible: number) {
+  const visible = selected.slice(0, maxVisible);
+  const groups = groupStepsByMonth(visible);
+
+  return groups.map(([monthKey, monthSteps], index) => `
+    ${index > 0 ? `<div class="month-divider"><div class="line"></div><div class="text">Processos de ${escapeHtml(formatMonthLabel(monthKey))}</div><div class="line"></div></div>` : ''}
+    ${monthSteps.map((step) => `
+      <div class="process-row">
+        <div class="process-left">
+          <div class="process-slot">${step.isMudancaUF ? `${step.index}º-${step.index + 1}º` : `${step.index}º`}</div>
+          <div class="process-copy">
+            <div class="process-title">
+              <span>${escapeHtml(`${String(step.processo.tipo).toUpperCase()} — ${truncateText(step.processo.razao_social, 46)}`)}</span>
+              ${buildStepBadges(step)}
+            </div>
+            <div class="process-meta">${fmtDate(step.processo.created_at)} · ${escapeHtml(step.label)}</div>
+          </div>
+        </div>
+        <div class="process-value">${fmt(step.valorFinal)}</div>
+      </div>
+    `).join('')}
+  `).join('');
+}
+
+function buildNextDiscountCardHTML(steps: StepInfo[], selected: StepInfo[], data: ExtratoData) {
+  const descPct = data.cliente.desconto_progressivo ?? 0;
+  const onlyManual = selected.length > 0 && selected.every((step) => step.isManual || step.isCortesia);
+  if (descPct <= 0 || onlyManual || steps.length === 0) return '';
+
+  const monthGroups = groupStepsByMonth(steps);
+  const [latestMonthKey, latestSteps] = monthGroups[monthGroups.length - 1];
+  const nextSlot = latestSteps.reduce((sum, step) => sum + step.slotsUsados, 0) + 1;
+  const nextValue = calculateNextStepValue(nextSlot, data);
+  const minimoTexto = data.cliente.valor_limite_desconto ? fmt(data.cliente.valor_limite_desconto) : 'não definido';
+
+  return `
+    <div class="next-card">
+      <div class="next-card-title">Seu próximo desconto</div>
+      <div class="next-card-main">
+        Envie o <strong>${nextSlot}º processo</strong> em ${escapeHtml(formatMonthLabel(latestMonthKey))} e pague apenas
+        <strong>${fmt(nextValue)}</strong>.
+      </div>
+      <div class="next-card-sub">
+        Desconto composto de ${descPct}% · Mínimo ${minimoTexto} · Reinicia na competência seguinte.
+      </div>
+    </div>
+  `;
+}
+
+function buildProgressionTableHTML(steps: StepInfo[], selected: StepInfo[], data: ExtratoData) {
+  const descPct = data.cliente.desconto_progressivo ?? 0;
+  if (descPct <= 0 || steps.length === 0) return '';
+
+  const selectedIds = new Set(selected.map((step) => step.processo.id));
+  const monthGroups = groupStepsByMonth(steps);
+  const latestMonthKey = monthGroups[monthGroups.length - 1]?.[0];
+
+  const rows = monthGroups.map(([monthKey, monthSteps]) => {
+    const monthRows = monthSteps.map((step) => `
+      <tr>
+        <td>${step.isMudancaUF ? `${step.index}º-${step.index + 1}º` : `${step.index}º`}</td>
+        <td class="value-cell">${fmt(step.valorFinal)}</td>
+        <td class="desc-cell">${escapeHtml(getStepDiscountText(step))}</td>
+        <td>${escapeHtml(getStepStatusText(step))}</td>
+        <td>${selectedIds.has(step.processo.id) ? 'COBRADO' : '—'}</td>
+      </tr>
+    `).join('');
+
+    const nextRow = monthKey === latestMonthKey
+      ? (() => {
+          const nextSlot = monthSteps.reduce((sum, step) => sum + step.slotsUsados, 0) + 1;
+          const nextValue = calculateNextStepValue(nextSlot, data);
+          return `
+            <tr class="next-row">
+              <td>${nextSlot}º</td>
+              <td class="value-cell">${fmt(nextValue)}</td>
+              <td class="desc-cell">-${descPct}%</td>
+              <td>Próximo da competência</td>
+              <td>PRÓXIMO</td>
+            </tr>
+          `;
+        })()
+      : '';
+
+    return `
+      <tr class="month-row"><td colspan="5">Processos de ${escapeHtml(formatMonthLabel(monthKey))}</td></tr>
+      ${monthRows}
+      ${nextRow}
+    `;
+  }).join('');
+
+  const legalText = `Regra: desconto progressivo de ${descPct}% por processo dentro da mesma competência mensal${
+    data.cliente.valor_limite_desconto ? `, respeitando o mínimo de ${fmt(data.cliente.valor_limite_desconto)}` : ''
+  }. No mês seguinte, a contagem reinicia no valor base.`;
+
+  return `
+    <div class="progress-card">
+      <div class="eyebrow">Progressão de incentivo por volume</div>
+      <div class="section-title">Escadinha aplicada nesta cobrança</div>
+      <table class="progress-table">
+        <thead>
+          <tr>
+            <th>Proc</th>
+            <th>Valor</th>
+            <th>Desc</th>
+            <th>Status</th>
+            <th>Extrato</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="progress-legal">${escapeHtml(legalText)}</div>
+    </div>
+  `;
+}
+
+function shouldCreateDetailPages(selected: StepInfo[], data: ExtratoData) {
+  return selected.length > 2 || selected.some((step) => (data.valoresAdicionais[step.processo.id] || []).length > 0);
+}
+
+function paginateDetailSteps(selected: StepInfo[], data: ExtratoData) {
+  const pages: StepInfo[][] = [];
+  let current: StepInfo[] = [];
+  let currentWeight = 0;
+  const pageCapacity = 5.8;
+
+  selected.forEach((step) => {
+    const taxas = data.valoresAdicionais[step.processo.id] || [];
+    const weight = 1.2 + Math.min(1.8, taxas.length * 0.38);
+
+    if (current.length > 0 && currentWeight + weight > pageCapacity) {
+      pages.push(current);
+      current = [step];
+      currentWeight = weight;
+      return;
+    }
+
+    current.push(step);
+    currentWeight += weight;
+  });
+
+  if (current.length > 0) pages.push(current);
+  return pages;
+}
+
+function buildPage1HTML(
+  data: ExtratoData,
+  steps: StepInfo[],
+  selected: StepInfo[],
+  logoDataUrl: string | null,
+  totalPages: number,
+  detailPageCount: number,
+) {
+  const emissaoDate = new Date();
+  const emissao = emissaoDate.toLocaleDateString('pt-BR');
+  const vencimento = calculateVencimento(data.cliente, emissaoDate).toLocaleDateString('pt-BR');
+  const selectedIds = new Set(selected.map((step) => step.processo.id));
+  const totalHon = selected.reduce((sum, step) => sum + step.valorFinal, 0);
+  const totalTaxas = Object.entries(data.valoresAdicionais)
+    .filter(([processoId]) => selectedIds.has(processoId))
+    .flatMap(([, valores]) => valores)
+    .reduce((sum, valorAdicional) => sum + Number(valorAdicional.valor), 0);
+  const totalGeral = totalHon + totalTaxas;
+
+  const datasSelecionadas = selected.map((step) => new Date(step.processo.created_at));
+  const menorData = datasSelecionadas.length > 0 ? new Date(Math.min(...datasSelecionadas.map((date) => date.getTime()))) : emissaoDate;
+  const maiorData = datasSelecionadas.length > 0 ? new Date(Math.max(...datasSelecionadas.map((date) => date.getTime()))) : emissaoDate;
   const periodoTexto = `${menorData.toLocaleDateString('pt-BR')} até ${maiorData.toLocaleDateString('pt-BR')}`;
 
-  const totalHon = selected.reduce((s, st) => s + st.valorFinal, 0);
-  // Only count taxas for selected processes
-  const selectedIds = new Set(selected.map(s => s.processo.id));
-  const totalTaxas = Object.entries(data.valoresAdicionais)
-    .filter(([pid]) => selectedIds.has(pid))
-    .flatMap(([, vas]) => vas)
-    .reduce((s, va) => s + Number(va.valor), 0);
-  const totalGeral = totalHon + totalTaxas;
-  // Economia only for selected steps
-  const economiaProgressivo = selected.filter(s => !s.isManual).reduce((s, st) => s + st.desconto, 0);
-  const base = data.cliente.valor_base ?? 580;
-  const economiaBoasVindas = selected.filter(s => s.label && s.label.includes('BOAS-VINDAS')).reduce((s, st) => s + (base - st.valorFinal), 0);
-  const economia = economiaProgressivo + economiaBoasVindas;
-  const descPct = data.cliente.desconto_progressivo ?? 0;
+  const previewCount = detailPageCount > 0 ? Math.min(selected.length, 6) : selected.length;
+  const hiddenCount = Math.max(selected.length - previewCount, 0);
 
   return `
     <div class="page" id="page1">
+      <div class="top-accent"></div>
       ${buildHeaderHTML(logoDataUrl)}
-      <div class="client-block">
-        <div class="client-tag">EXTRATO DE FATURAMENTO</div>
-        <div class="client-name">${data.cliente.nome}</div>
-        ${data.cliente.cnpj ? `<div class="client-cnpj">${data.cliente.cnpj}</div>` : ''}
-        ${data.cliente.nome_contador ? `<div class="client-contact">👤 ${data.cliente.nome_contador} (contador)</div>` : ''}
-        ${data.cliente.telefone ? `<div class="client-contact">📱 ${data.cliente.telefone}</div>` : ''}
-        ${data.cliente.email ? `<div class="client-contact">✉ ${data.cliente.email}</div>` : ''}
-        <div class="client-meta">Relatório de Performance: ${periodoTexto}</div>
-        <div class="client-meta">Emissão: ${emissao} • ${selected.length} processo(s) cobrado(s)</div>
-      </div>
-
-      <div class="fin-section">
-        <div class="total-card">
-          <div class="total-tag">HONORÁRIOS DOS SERVIÇOS SOCIETÁRIOS</div>
-          <div class="total-label">TOTAL</div>
-          ${economiaBoasVindas > 0 ? `<div style="font-size:11px;color:#94a3b8;text-decoration:line-through;margin-bottom:2px;">${fmt(totalGeral + economiaBoasVindas)}</div>` : ''}
-          <div class="total-value"><span class="total-prefix">R$ </span>${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-          ${economiaBoasVindas > 0 ? `<div style="font-size:9px;color:#4ade80;margin-top:8px;">↓ Desconto de boas-vindas aplicado no 1º processo</div>` : ''}
-          <div style="font-size:9px;color:#94a3b8;margin-top:4px;">${selected.length} processo(s) cobrado(s) neste período</div>
+      <div class="page-inner">
+        <div class="hero">
+          <div class="eyebrow">Extrato de faturamento</div>
+          <div class="hero-title">${escapeHtml(data.cliente.nome)}</div>
+          <div class="hero-subtitle">${escapeHtml([
+            data.cliente.cnpj,
+            data.cliente.nome_contador ? `${data.cliente.nome_contador} (contador)` : null,
+          ].filter(Boolean).join(' · '))}</div>
+          <div class="hero-meta-row">
+            <div class="pill">Período: ${escapeHtml(periodoTexto)}</div>
+            <div class="pill">Emissão: ${escapeHtml(emissao)}</div>
+            <div class="pill warning">Vencimento: ${escapeHtml(vencimento)}</div>
+          </div>
+          ${(data.cliente.telefone || data.cliente.email) ? `<div class="hero-subtitle">${escapeHtml([data.cliente.telefone, data.cliente.email].filter(Boolean).join(' · '))}</div>` : ''}
         </div>
 
-        <div class="kpi-row">
-          <div class="kpi-card">
-            <div class="kpi-label">SUBTOTAL HONORÁRIOS</div>
-            <div class="kpi-value">${fmt(totalHon)}</div>
+        <div class="summary-grid">
+          <div class="summary-card total">
+            <div class="summary-label">Total geral</div>
+            <div class="summary-value">${fmt(totalGeral)}</div>
+            <div class="summary-sub">${selected.length} processo(s) cobrado(s) · ${escapeHtml(periodoTexto)}</div>
           </div>
-          <div class="kpi-card">
-            <div class="kpi-label">SUBTOTAL TAXAS</div>
-            <div class="kpi-value">${fmt(totalTaxas)}</div>
+          <div class="summary-card">
+            <div class="summary-label">Honorários / Taxas</div>
+            <div class="summary-split">
+              <div class="summary-row"><span>Honorários</span><strong>${fmt(totalHon)}</strong></div>
+              <div class="summary-row"><span>Taxas</span><strong>${fmt(totalTaxas)}</strong></div>
+            </div>
+            <div class="summary-sub">Totais, contagem e período usam apenas os processos selecionados.</div>
           </div>
-          <div class="kpi-card eco">
-            <div class="kpi-label">ECONOMIA NO MÊS</div>
-            <div class="kpi-value">${economia > 0 ? fmt(economia) : 'N/A'}</div>
-          </div>
-        </div>
-
-        ${buildProgressionBar(steps, data)}
-
-        <div class="vol-block">
-          <div class="vol-text">Volume Acumulado (${periodoTexto}): ${data.allCompetencia.length} processo(s)</div>
-          <div class="vol-text">Valor Base: ${fmt(data.cliente.valor_base ?? 580)} • Desc. Contratual: ${descPct > 0 ? descPct + '% progressivo' : 'N/A'}</div>
-        </div>
-        ${(data.cliente.dia_vencimento_mensal && data.cliente.dia_vencimento_mensal > 0 && !data.cliente.dia_cobranca) ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:6px 10px;margin-top:8px;border-radius:0 3px 3px 0;"><span style="font-size:7px;color:#78350f;font-weight:600;">⚠ Vencimento fixo: dia ${data.cliente.dia_vencimento_mensal} de cada mês</span></div>` : ''}
-
-        <div style="background:#ffffff;border:2px solid #e2e8f0;border-top:4px solid #4C9F38;border-radius:0 0 6px 6px;padding:16px 20px;margin-top:14px;box-shadow:0 2px 6px rgba(0,0,0,0.04);display:flex;gap:18px;align-items:center;">
-          <div style="width:40px;height:40px;background:#f0fdf4;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">💠</div>
-          <div style="flex:1;">
-            <div style="font-size:9px;font-weight:700;color:#4C9F38;text-transform:uppercase;letter-spacing:1px;">PAGAMENTO VIA PIX (CHAVE CNPJ)</div>
-            <div style="font-size:14px;font-weight:800;color:#0f1f0f;letter-spacing:0.5px;margin-top:2px;">39.969.412/0001-70</div>
-            <div style="font-size:9px;font-weight:500;color:#64748b;margin-top:1px;">Banco C6 Bank</div>
-            <div style="height:1px;background:#e2e8f0;margin:6px 0;"></div>
-            <div style="font-size:8px;font-weight:400;color:#94a3b8;font-style:italic;">Caso prefira boleto bancário, favor solicitar ao nosso setor administrativo.</div>
+          <div class="summary-card">
+            <div class="summary-label">PIX (CNPJ)</div>
+            <div class="pix-box">
+              <div class="summary-sub">Banco C6 Bank</div>
+              <div class="pix-key">${escapeHtml(BRAND.cnpj)}</div>
+            </div>
+            <div class="summary-sub">Se preferir boleto bancário, solicite ao time administrativo.</div>
           </div>
         </div>
-      </div>
 
-      <div class="footer-contact">
-        ${BRAND.email} • ${BRAND.telefone} • trevolegaliza.com
-        ${totalTaxas > 0 ? `<div class="transparency-note"><p>Nota: Os comprovantes de pagamento originais de todas as taxas reembolsáveis estão disponíveis para conferência em nossa plataforma de gestão (Trello), dentro do card correspondente a cada processo.</p></div>` : ''}
+        <div class="section-card">
+          <div class="section-head">
+            <div>
+              <div class="eyebrow">Processos cobrados</div>
+              <div class="section-title">Resumo do extrato enviado</div>
+            </div>
+            <div class="section-counter">${selected.length} cobrado(s)</div>
+          </div>
+          ${buildSelectedProcessesHTML(selected, previewCount)}
+          ${hiddenCount > 0 ? `<div class="section-note">+ ${hiddenCount} processo(s) detalhado(s) nas próximas páginas.</div>` : ''}
+        </div>
+
+        ${buildNextDiscountCardHTML(steps, selected, data)}
+        ${buildProgressionTableHTML(steps, selected, data)}
+        ${totalTaxas > 0 ? '<div class="transparency-note">Os comprovantes originais das taxas reembolsáveis continuam disponíveis para conferência na plataforma interna.</div>' : ''}
       </div>
-      <div class="gradient-bottom"></div>
-      <div class="page-footer">
-        <span>${BRAND.fantasia} • ${BRAND.cnpj} • ${BRAND.endereco}</span>
-        <span>PÁGINA 1 DE {TOTAL_PAGES}</span>
-      </div>
+      ${buildFooterHTML(1, totalPages)}
     </div>
   `;
 }
 
-function buildPage2HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo[], logoDataUrl: string | null, totalPages: number): string {
-  const totalHon = selected.reduce((s, st) => s + st.valorFinal, 0);
-  const selectedIds = new Set(selected.map(s => s.processo.id));
-  const totalTaxas = Object.entries(data.valoresAdicionais)
-    .filter(([pid]) => selectedIds.has(pid))
-    .flatMap(([, vas]) => vas)
-    .reduce((s, va) => s + Number(va.valor), 0);
-  const totalGeral = totalHon + totalTaxas;
-  const descPct = data.cliente.desconto_progressivo ?? 0;
+function buildDetailPageHTML(
+  data: ExtratoData,
+  detailSteps: StepInfo[],
+  logoDataUrl: string | null,
+  pageNumber: number,
+  totalPages: number,
+  detailPageCount: number,
+) {
+  const detailCards = detailSteps.map((step) => {
+    const processo = step.processo;
+    const taxas = data.valoresAdicionais[processo.id] || [];
+    const totalTaxas = taxas.reduce((sum, valorAdicional) => sum + Number(valorAdicional.valor), 0);
+    const totalBloco = step.valorFinal + totalTaxas;
 
-  let processCardsHTML = '';
-  for (const step of selected) {
-    const p = step.processo;
-    const pTaxas = data.valoresAdicionais[p.id] || [];
-    const taxTotal = pTaxas.reduce((s, va) => s + Number(va.valor), 0);
-    const blockTotal = step.valorFinal + taxTotal;
+    const taxTable = taxas.length > 0 ? `
+      <table class="tax-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Taxa / reembolso</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${taxas.map((valorAdicional) => `
+            <tr>
+              <td>${fmtDate(valorAdicional.created_at)}</td>
+              <td>${escapeHtml(valorAdicional.descricao)}</td>
+              <td>${fmt(Number(valorAdicional.valor))}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <div class="tax-total">
+        <span>Honorários ${fmt(step.valorFinal)} + Taxas ${fmt(totalTaxas)}</span>
+        <strong>Total do processo ${fmt(totalBloco)}</strong>
+      </div>
+    ` : '';
 
-    const notas = (p.notas || '').toLowerCase();
-    const notasRaw = p.notas || '';
-    const hasCortesiaNasNotas = notas.includes('cortesia');
-    const hasBoasVindas = notas.includes('boas-vindas') || notas.includes('boas vindas');
-    const hasBoasVindas100 = hasBoasVindas && /100\s*%/.test(notas);
-    const isCortesia = step.valorFinal === 0 || hasCortesiaNasNotas || hasBoasVindas100;
-    const isBoasVindasDiscount = hasBoasVindas && !isCortesia;
-
-    // Extract boas-vindas percentage
-    const bvPctMatch = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
-    const bvPct = bvPctMatch ? Number(bvPctMatch[1]) : 0;
-    const valorOriginal = data.cliente.valor_base ?? 580;
-    const economiaBoasVindas = isBoasVindasDiscount ? (valorOriginal - step.valorFinal) : 0;
-
-    let discountLine = '';
-    if (!step.isManual && step.desconto > 0) {
-      discountLine = `<div class="ph-discount">Desc. progressivo: -${fmt(step.desconto)}</div>`;
-    }
-
-    let manualBadge = '';
-    if (step.isMudancaUF) {
-      manualBadge = `<span style="display:inline-block;background:#3b82f6;color:#fff;font-size:7px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:3px;margin-left:6px;">MUDANÇA DE UF</span>`;
-    } else if (step.isManual && step.label && !isBoasVindasDiscount && !isCortesia && step.valorFinal > 0) {
-      manualBadge = `<span class="manual-badge">${step.label}</span>`;
-    }
-    // Boas-vindas gets a green badge instead of orange manual badge
-    if (isBoasVindasDiscount) {
-      manualBadge = `<span class="boas-vindas-badge">BOAS-VINDAS: ${bvPct ? bvPct + '%' : ''}</span>`;
-    }
-
-    let baseRef = '';
-    if (!step.isManual && step.desconto > 0) {
-      baseRef = `<div class="ph-base">Base: ${fmt(step.valorBase)}</div>`;
-    }
-
-    const baseCortesia = step.valorBase > 0
-      ? step.valorBase
-      : ((data.cliente.valor_base ?? 0) > 0 ? Number(data.cliente.valor_base) : null);
-
-    let valorHeader = '';
-    let valorInfo = '';
-
-    if (isCortesia) {
-      valorHeader = `<div class="ph-values-inline">${baseCortesia != null ? `<span class="ph-base-strike">${fmt(baseCortesia)}</span>` : ''}<span class="ph-value">${fmt(step.valorFinal)}</span></div>`;
-      valorInfo = `<div class="cortesia-badge">CORTESIA</div>`;
-    } else if (isBoasVindasDiscount) {
-      // Show original strikethrough + final value + economia
-      valorHeader = `<div class="ph-values-inline"><span class="ph-base-strike">${fmt(valorOriginal)}</span><span class="ph-value">${fmt(step.valorFinal)}</span></div>`;
-      valorInfo = `<div class="boas-vindas-economia">Economia: ${fmt(economiaBoasVindas)}</div>`;
-    } else {
-      valorHeader = `<div class="ph-value">${fmt(step.valorFinal)}</div>`;
-      valorInfo = baseRef;
-    }
-
-    let taxTableHTML = '';
-    if (pTaxas.length > 0) {
-      const rows = pTaxas.map((va, i) => `
-        <tr>
-          <td class="td-date">${fmtDate(va.created_at)}</td>
-          <td class="td-desc">${va.descricao}</td>
-          <td class="td-val"><span class="prefix">R$ </span>${Number(va.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-        </tr>
-      `).join('');
-
-      taxTableHTML = `
-        <div class="tax-area">
-          <table class="tax-table">
-            <thead><tr><th>Data</th><th>Taxa / Reembolso</th><th>Valor</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-        <div class="subtotal-row">
-          <span class="subtotal-calc">${fmt(step.valorFinal)} (Hon.) + ${fmt(taxTotal)} (Taxas)</span>
-          <span class="subtotal-result">= ${fmt(blockTotal)}</span>
-        </div>
-      `;
-    }
-
-    processCardsHTML += `
-      <div class="process-card" style="page-break-inside: avoid;">
-        <div class="process-header">
-          <div class="ph-left">
-            <div class="ph-badge">${step.isMudancaUF ? `${step.index}º-${step.index + 1}º` : `${step.index}º`}</div>
-            <div class="ph-info">
-              <div class="ph-title">${p.tipo.toUpperCase()} — ${p.razao_social}${manualBadge}</div>
-              <div class="ph-date">${fmtDate(p.created_at)}${step.isMudancaUF ? ' • Consome 2 slots na progressão' : ''}</div>
-              ${discountLine}
+    return `
+      <div class="detail-card">
+        <div class="detail-card-head">
+          <div class="detail-left">
+            <div class="detail-index">${step.isMudancaUF ? `${step.index}º-${step.index + 1}º` : `${step.index}º`}</div>
+            <div>
+              <div class="detail-title">${escapeHtml(`${String(processo.tipo).toUpperCase()} — ${processo.razao_social}`)}</div>
+              <div class="detail-meta">${fmtDate(processo.created_at)} · ${escapeHtml(formatMonthLabel(step.mes))} · ${escapeHtml(step.label)}</div>
+              <div class="detail-badges">${buildStepBadges(step)}</div>
             </div>
           </div>
-          <div class="ph-right">
-            ${valorHeader}
-            ${valorInfo}
+          <div class="detail-value">
+            <div class="detail-value-main">${fmt(step.valorFinal)}</div>
+            <div class="detail-value-sub">Honorários</div>
           </div>
         </div>
-        ${taxTableHTML}
-      </div>
-    `;
-  }
-
-  // Progressão table
-  let progHTML = '';
-  if (descPct > 0 && steps.length > 0) {
-    const progRows = steps.map(s => {
-      let desc = '—';
-      const isLimite = !s.isManual && !s.isUrgencia && data.cliente.valor_limite_desconto && s.valorFinal <= (data.cliente.valor_limite_desconto ?? 0);
-      const status = s.isCortesia
-        ? 'CORTESIA'
-        : s.isMudancaUF
-          ? 'MUDANÇA DE UF (2 slots)'
-          : s.isUrgencia
-            ? 'URGÊNCIA'
-            : s.isManual
-              ? 'VALOR MANUAL'
-              : s.desconto > 0
-                ? (isLimite ? 'Limite atingido' : 'DESC. PROGRESSIVO')
-                : '—';
-      if (!s.isManual && s.desconto > 0) {
-        desc = `-${descPct}%`;
-      }
-      const cobradoLabel = s.isSelected
-        ? '<span style="color:#22c55e;font-weight:600;">✓ COBRADO</span>'
-        : '<span style="color:#9ca3af;">—</span>';
-      const rowStyle = s.isSelected ? 'background:#f0fdf4;' : 'opacity:0.6;';
-      const procLabel = s.isMudancaUF ? `${s.index}º-${s.index + 1}º` : `${s.index}º`;
-      return `<tr class="${isLimite ? 'limite' : ''}" style="${rowStyle}">
-        <td>${procLabel}</td>
-        <td class="val">${fmt(s.valorFinal)}</td>
-        <td class="desc">${desc}</td>
-        <td class="status">${status}</td>
-        <td>${cobradoLabel}</td>
-      </tr>`;
-    }).join('');
-
-    const legalText = `Regra: Desconto composto de ${descPct}% a cada processo na mesma competência mensal${
-      data.cliente.valor_limite_desconto ? `, limite mínimo ${fmt(data.cliente.valor_limite_desconto)}` : ''
-    }. No mês seguinte, retorna ao valor base.`;
-
-    progHTML = `
-      <div class="prog-block">
-        <div class="prog-title">PROGRESSÃO DE INCENTIVO POR VOLUME</div>
-        <table class="prog-table">
-          <thead><tr><th>Proc.</th><th>Valor</th><th>Desc.</th><th>Status</th><th>Extrato</th></tr></thead>
-          <tbody>${progRows}</tbody>
-        </table>
-        <div class="prog-legal">${legalText}</div>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="page" id="page2">
-      ${buildHeaderHTML(logoDataUrl)}
-      <div class="section-banner">
-        <div class="section-banner-text">DETALHAMENTO UNITÁRIO — HONORÁRIOS E TAXAS</div>
-      </div>
-
-      <div style="padding: 16px 30px;">
-        ${processCardsHTML}
-        ${progHTML}
-        <div class="total-geral-card">
-          <div class="tg-tag">TOTAL GERAL</div>
-          <div class="tg-value"><span class="total-prefix">R$ </span>${totalGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+        <div class="detail-body">
+          <div class="detail-body-row">
+            <span>Razão social</span>
+            <strong>${escapeHtml(processo.razao_social)}</strong>
+          </div>
+          <div class="detail-body-row">
+            <span>Status aplicado</span>
+            <strong>${escapeHtml(getStepStatusText(step))}</strong>
+          </div>
+          ${taxTable}
         </div>
       </div>
+    `;
+  }).join('');
 
-      ${totalTaxas > 0 ? `<div style="padding: 0 30px;">
-        <div class="transparency-note"><p>Nota: Os comprovantes de pagamento originais de todas as taxas reembolsáveis estão disponíveis para conferência em nossa plataforma de gestão (Trello), dentro do card correspondente a cada processo.</p></div>
-      </div>` : ''}
-      <div class="gradient-bottom"></div>
-      <div class="page-footer">
-        <span>${BRAND.fantasia} • ${BRAND.cnpj} • ${BRAND.endereco}</span>
-        <span>PÁGINA 2 DE ${totalPages}</span>
+  return `
+    <div class="page">
+      <div class="top-accent"></div>
+      ${buildHeaderHTML(logoDataUrl)}
+      <div class="page-inner">
+        <div class="detail-banner">
+          <div class="eyebrow">Detalhamento unitário</div>
+          <div class="section-title">Honorários e taxas por processo</div>
+          <div class="detail-banner-meta">Página ${pageNumber - 1} de ${detailPageCount} do detalhamento</div>
+        </div>
+        <div class="detail-list">${detailCards}</div>
       </div>
+      ${buildFooterHTML(pageNumber, totalPages)}
     </div>
   `;
 }
 
-// ═══ RENDER ENGINE ═══
-async function renderPageToCanvas(html: string, styles: string): Promise<HTMLCanvasElement> {
+function buildAttachmentPageHTML(label: string, imgData: string, logoDataUrl: string | null, pageNumber: number, totalPages: number) {
+  return `
+    <div class="page">
+      <div class="top-accent"></div>
+      ${buildHeaderHTML(logoDataUrl)}
+      <div class="page-inner">
+        <div class="detail-banner">
+          <div class="eyebrow">Anexo de comprovante</div>
+          <div class="section-title">${escapeHtml(label)}</div>
+          <div class="detail-banner-meta">Arquivo complementar do extrato</div>
+        </div>
+        <div style="margin-top:18px;border:1px solid hsl(var(--line));border-radius:22px;padding:18px;background:hsl(var(--surface));text-align:center;">
+          <img src="${imgData}" style="max-width:100%;max-height:760px;object-fit:contain;border-radius:12px;" />
+        </div>
+        <div class="transparency-note">Os comprovantes originais das taxas reembolsáveis continuam disponíveis para conferência na plataforma interna.</div>
+      </div>
+      ${buildFooterHTML(pageNumber, totalPages)}
+    </div>
+  `;
+}
+
+async function renderPageToCanvas(html: string, styles: string) {
   const container = document.createElement('div');
   container.style.position = 'absolute';
   container.style.left = '-9999px';
   container.style.top = '0';
-  container.style.width = '794px'; // A4 at 96dpi
+  container.style.width = '794px';
   container.innerHTML = `<style>${styles}</style>${html}`;
   document.body.appendChild(container);
 
-  // Wait for fonts and images to load
   await document.fonts.ready;
-  await new Promise(r => setTimeout(r, 300));
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
   const pageEl = container.querySelector('.page') as HTMLElement;
   const canvas = await html2canvas(pageEl, {
@@ -695,21 +802,26 @@ async function renderPageToCanvas(html: string, styles: string): Promise<HTMLCan
   return canvas;
 }
 
-// ═══ LOGO PRELOADER ═══
-let _logoData: string | null = null;
-async function preloadLogo(): Promise<string | null> {
-  if (_logoData) return _logoData;
+let cachedLogoData: string | null = null;
+
+async function preloadLogo() {
+  if (cachedLogoData) return cachedLogoData;
   try {
-    const r = await fetch(LOGO_URL, { mode: 'cors' });
-    if (!r.ok) return null;
-    const blob = await r.blob();
-    return new Promise(res => {
-      const fr = new FileReader();
-      fr.onloadend = () => { _logoData = fr.result as string; res(_logoData); };
-      fr.onerror = () => res(null);
-      fr.readAsDataURL(blob);
+    const response = await fetch(LOGO_URL, { mode: 'cors' });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        cachedLogoData = reader.result as string;
+        resolve(cachedLogoData);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
     });
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export interface ExtratoResult {
@@ -720,229 +832,178 @@ export interface ExtratoResult {
   processCount: number;
 }
 
-// ═══ MAIN EXPORT ═══
 export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult> {
-  // Ensure DM Sans is loaded
   const fontLink = document.createElement('link');
   fontLink.rel = 'stylesheet';
   fontLink.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap';
   document.head.appendChild(fontLink);
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((resolve) => setTimeout(resolve, 500));
   await document.fonts.ready;
 
   const logoDataUrl = await preloadLogo();
-
   const steps = buildEscadinha(data);
-  const selected = steps.filter(s => s.isSelected);
+  const selected = steps.filter((step) => step.isSelected);
 
-  // Calculate totals
-  const totalHonorarios = selected.reduce((s, st) => s + st.valorFinal, 0);
-  const selectedIds = new Set(selected.map(s => s.processo.id));
-  const totalTaxas = Object.entries(data.valoresAdicionais)
-    .filter(([pid]) => selectedIds.has(pid))
-    .flatMap(([, vas]) => vas)
-    .reduce((s, va) => s + Number(va.valor), 0);
-  const totalGeral = totalHonorarios + totalTaxas;
+  const selectedIds = new Set(selected.map((step) => step.processo.id));
+  const totalHonorarios = round2(selected.reduce((sum, step) => sum + step.valorFinal, 0));
+  const totalTaxas = round2(Object.entries(data.valoresAdicionais)
+    .filter(([processoId]) => selectedIds.has(processoId))
+    .flatMap(([, valores]) => valores)
+    .reduce((sum, valorAdicional) => sum + Number(valorAdicional.valor), 0));
+  const totalGeral = round2(totalHonorarios + totalTaxas);
 
-  // Determine total pages (2 base + attachments)
-  const attCount = countAttachments(data);
-  const totalPages = 2 + attCount;
+  const detailPageGroups = shouldCreateDetailPages(selected, data) ? paginateDetailSteps(selected, data) : [];
+  const attachmentCount = countAttachments(data);
+  const totalPages = 1 + detailPageGroups.length + attachmentCount;
 
-  // Page 1
-  const page1Html = buildPage1HTML(data, steps, selected, logoDataUrl).replace('{TOTAL_PAGES}', String(totalPages));
-  const canvas1 = await renderPageToCanvas(page1Html, GLOBAL_STYLES);
-
-  // Page 2
-  const page2Html = buildPage2HTML(data, steps, selected, logoDataUrl, totalPages);
-  const canvas2 = await renderPageToCanvas(page2Html, GLOBAL_STYLES);
-
-  // Create PDF
   const doc = new jsPDF('p', 'mm', 'a4');
-  const pdfW = doc.internal.pageSize.getWidth();
-  const pdfH = doc.internal.pageSize.getHeight();
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  const pdfHeight = doc.internal.pageSize.getHeight();
 
-  // Add page 1
-  const img1 = canvas1.toDataURL('image/png');
-  doc.addImage(img1, 'PNG', 0, 0, pdfW, pdfH);
+  const page1Html = buildPage1HTML(data, steps, selected, logoDataUrl, totalPages, detailPageGroups.length);
+  const page1Canvas = await renderPageToCanvas(page1Html, GLOBAL_STYLES);
+  doc.addImage(page1Canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
 
-  // Add page 2
-  doc.addPage();
-  const img2 = canvas2.toDataURL('image/png');
-  doc.addImage(img2, 'PNG', 0, 0, pdfW, pdfH);
+  for (let index = 0; index < detailPageGroups.length; index += 1) {
+    const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, index + 2, totalPages, detailPageGroups.length);
+    const detailCanvas = await renderPageToCanvas(detailHtml, GLOBAL_STYLES);
+    doc.addPage();
+    doc.addImage(detailCanvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
+  }
 
-  // Attachments
-  await renderAttachments(doc, data, totalPages);
+  await renderAttachments(doc, data, totalPages, detailPageGroups.length + 2, logoDataUrl);
 
   return {
     doc,
-    totalHonorarios: Math.round(totalHonorarios * 100) / 100,
-    totalTaxas: Math.round(totalTaxas * 100) / 100,
-    totalGeral: Math.round(totalGeral * 100) / 100,
+    totalHonorarios,
+    totalTaxas,
+    totalGeral,
     processCount: selected.length,
   };
 }
 
-function countAttachments(data: ExtratoData): number {
+function countAttachments(data: ExtratoData) {
   let count = 0;
-  for (const p of data.processos) {
-    const l = p.lancamento;
-    if (l?.boleto_url) count++;
-    if (l?.url_recibo_taxa) count++;
-    if (l?.comprovante_url) count++;
+
+  for (const processo of data.processos) {
+    const lancamento = processo.lancamento;
+    if (lancamento?.boleto_url) count += 1;
+    if (lancamento?.url_recibo_taxa) count += 1;
+    if (lancamento?.comprovante_url) count += 1;
   }
-  // Only count VAs for selected processes
-  for (const p of data.processos) {
-    const vas = data.valoresAdicionais[p.id] || [];
-    for (const va of vas) {
-      if (va.comprovante_url) count++;
-      if (va.anexo_url) count++;
-    }
+
+  for (const processo of data.processos) {
+    const valores = data.valoresAdicionais[processo.id] || [];
+    valores.forEach((valorAdicional) => {
+      if (valorAdicional.comprovante_url) count += 1;
+      if (valorAdicional.anexo_url) count += 1;
+    });
   }
+
   return count;
 }
 
-/**
- * Resolves a storage path or URL to a fetchable URL.
- * If the value looks like a full URL (http/https), returns as-is.
- * Otherwise treats it as a Supabase storage path and generates a signed URL.
- */
-async function resolveStorageUrl(pathOrUrl: string): Promise<string> {
-  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-    return pathOrUrl;
-  }
-  // It's a storage path — generate signed URL from the 'contratos' bucket
+async function resolveStorageUrl(pathOrUrl: string) {
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) return pathOrUrl;
+
   const { data, error } = await supabase.storage
     .from('contratos')
     .createSignedUrl(pathOrUrl, 3600);
-  if (error || !data?.signedUrl) {
-    console.error(`Erro ao gerar signed URL para ${pathOrUrl}:`, error);
-    throw new Error('Failed to generate signed URL');
-  }
+
+  if (error || !data?.signedUrl) throw new Error('Failed to generate signed URL');
   return data.signedUrl;
 }
 
-async function renderAttachments(doc: jsPDF, data: ExtratoData, totalPages: number) {
-  const pdfW = doc.internal.pageSize.getWidth();
-  const pdfH = doc.internal.pageSize.getHeight();
+async function renderAttachments(
+  doc: jsPDF,
+  data: ExtratoData,
+  totalPages: number,
+  startPageNumber: number,
+  logoDataUrl: string | null,
+) {
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  const pdfHeight = doc.internal.pageSize.getHeight();
+  const attachments: Array<{ label: string; url: string }> = [];
 
-  const atts: { label: string; url: string }[] = [];
-  for (const p of data.processos) {
-    const l = p.lancamento;
-    if (l?.boleto_url) atts.push({ label: `Boleto — ${p.razao_social}`, url: l.boleto_url });
-    if (l?.url_recibo_taxa) atts.push({ label: `Guia/Recibo Taxa — ${p.razao_social}`, url: l.url_recibo_taxa });
-    if (l?.comprovante_url) atts.push({ label: `Comprovante — ${p.razao_social}`, url: l.comprovante_url });
+  for (const processo of data.processos) {
+    const lancamento = processo.lancamento;
+    if (lancamento?.boleto_url) attachments.push({ label: `Boleto — ${processo.razao_social}`, url: lancamento.boleto_url });
+    if (lancamento?.url_recibo_taxa) attachments.push({ label: `Guia/Recibo Taxa — ${processo.razao_social}`, url: lancamento.url_recibo_taxa });
+    if (lancamento?.comprovante_url) attachments.push({ label: `Comprovante — ${processo.razao_social}`, url: lancamento.comprovante_url });
 
-    // Valores adicionais for this selected process
-    const vas = data.valoresAdicionais[p.id] || [];
-    for (const va of vas) {
-      if (va.comprovante_url) atts.push({ label: `Comprovante — ${va.descricao}`, url: va.comprovante_url });
-      if (va.anexo_url) atts.push({ label: `Anexo — ${va.descricao}`, url: va.anexo_url });
-    }
+    const valores = data.valoresAdicionais[processo.id] || [];
+    valores.forEach((valorAdicional) => {
+      if (valorAdicional.comprovante_url) attachments.push({ label: `Comprovante — ${valorAdicional.descricao}`, url: valorAdicional.comprovante_url });
+      if (valorAdicional.anexo_url) attachments.push({ label: `Anexo — ${valorAdicional.descricao}`, url: valorAdicional.anexo_url });
+    });
   }
 
-  console.log('ANEXOS ENCONTRADOS:', atts.length, atts.map(a => a.label));
-
-  let pageNum = 3;
-  for (const att of atts) {
+  let pageNumber = startPageNumber;
+  for (const attachment of attachments) {
     try {
-      // Resolve storage paths to signed URLs
-      const resolvedUrl = await resolveStorageUrl(att.url);
+      const resolvedUrl = await resolveStorageUrl(attachment.url);
       const imgData = await loadImageBase64(resolvedUrl);
-      if (!imgData) {
-        console.warn(`Pulando anexo sem imagem: ${att.label} (${att.url})`);
-        continue;
-      }
+      if (!imgData) continue;
 
-      const attHtml = `
-        <div class="page">
-          <div class="stripe-top"></div>
-          <div style="background:#0f1f0f;padding:10px 30px;">
-            <div style="font-size:8px;font-weight:700;color:#4ade80;text-transform:uppercase;letter-spacing:1px;">ANEXO DE COMPROVANTE</div>
-            <div style="font-size:11px;font-weight:700;color:#ffffff;margin-top:4px;">${att.label}</div>
-          </div>
-          <div class="gradient-bar"></div>
-          <div style="padding:16px 30px;text-align:center;">
-            <img src="${imgData}" style="max-width:100%;max-height:900px;object-fit:contain;" />
-          </div>
-          <div style="padding: 0 30px;">
-            <div class="transparency-note"><p>Nota: Os comprovantes de pagamento originais de todas as taxas reembolsáveis estão disponíveis para conferência em nossa plataforma de gestão (Trello), dentro do card correspondente a cada processo.</p></div>
-          </div>
-          <div class="gradient-bottom"></div>
-          <div class="page-footer">
-            <span>${BRAND.fantasia} • ${BRAND.cnpj} • ${BRAND.endereco}</span>
-            <span>PÁGINA ${pageNum} DE ${totalPages}</span>
-          </div>
-        </div>
-      `;
-
-      const canvas = await renderPageToCanvas(attHtml, GLOBAL_STYLES);
+      const html = buildAttachmentPageHTML(attachment.label, imgData, logoDataUrl, pageNumber, totalPages);
+      const canvas = await renderPageToCanvas(html, GLOBAL_STYLES);
       doc.addPage();
-      doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfW, pdfH);
-      pageNum++;
-    } catch (err) {
-      console.warn(`Erro ao renderizar anexo ${att.label}:`, err);
-      // Skip failed attachments
+      doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pageNumber += 1;
+    } catch (error) {
+      console.warn(`Erro ao renderizar anexo ${attachment.label}:`, error);
     }
   }
 }
 
-async function loadImageBase64(url: string): Promise<string | null> {
+async function loadImageBase64(url: string) {
   try {
-    const r = await fetch(url, { mode: 'cors' });
-    if (!r.ok) {
-      console.error(`Fetch falhou para ${url}: ${r.status}`);
-      return null;
-    }
-    const blob = await r.blob();
-    if (!blob.type.startsWith('image/') && !blob.type.startsWith('application/pdf')) {
-      console.error(`URL não retornou imagem válida: ${url}, tipo: ${blob.type}`);
-      return null;
-    }
-    return new Promise(res => {
-      const fr = new FileReader();
-      fr.onloadend = () => res(fr.result as string);
-      fr.onerror = () => {
-        console.error(`FileReader falhou para ${url}`);
-        res(null);
-      };
-      fr.readAsDataURL(blob);
+    const response = await fetch(url, { mode: 'cors' });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (!blob.type.startsWith('image/') && !blob.type.startsWith('application/pdf')) return null;
+
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
     });
-  } catch (err) {
-    console.error(`Erro ao carregar imagem ${url}:`, err);
+  } catch {
     return null;
   }
 }
 
-// ═══ DATA FETCHERS ═══
 export async function fetchValoresAdicionaisMulti(processoIds: string[]): Promise<Record<string, ValorAdicional[]>> {
   const { data, error } = await supabase
     .from('valores_adicionais')
     .select('*')
     .in('processo_id', processoIds)
     .order('created_at', { ascending: true });
+
   if (error) throw error;
+
   const map: Record<string, ValorAdicional[]> = {};
-  (data || []).forEach((va: any) => {
-    if (!map[va.processo_id]) map[va.processo_id] = [];
-    map[va.processo_id].push(va);
+  (data || []).forEach((valorAdicional: any) => {
+    if (!map[valorAdicional.processo_id]) map[valorAdicional.processo_id] = [];
+    map[valorAdicional.processo_id].push(valorAdicional);
   });
+
   return map;
 }
 
 export async function fetchCompetenciaProcessos(
   clienteId: string,
-  processosSelecionados?: ProcessoFinanceiro[]
+  processosSelecionados?: ProcessoFinanceiro[],
 ): Promise<ProcessoFinanceiro[]> {
-  // Discover which months to fetch based on selected processes
   const mesesUnicos = new Set<string>();
 
   if (processosSelecionados && processosSelecionados.length > 0) {
-    processosSelecionados.forEach(p => {
-      const d = new Date(p.created_at);
-      mesesUnicos.add(`${d.getFullYear()}-${d.getMonth()}`);
+    processosSelecionados.forEach((processo) => {
+      const dataProcesso = new Date(processo.created_at);
+      mesesUnicos.add(`${dataProcesso.getFullYear()}-${dataProcesso.getMonth()}`);
     });
   } else {
-    // Fallback: current month
     const now = new Date();
     mesesUnicos.add(`${now.getFullYear()}-${now.getMonth()}`);
   }
@@ -961,41 +1022,37 @@ export async function fetchCompetenciaProcessos(
       .gte('created_at', first)
       .lte('created_at', last)
       .order('created_at', { ascending: true });
-    if (error) throw error;
 
+    if (error) throw error;
     if (data) todosProcessos = [...todosProcessos, ...data];
   }
 
-  // Deduplicate
   const idsVistos = new Set<string>();
-  todosProcessos = todosProcessos.filter(p => {
-    if (idsVistos.has(p.id)) return false;
-    idsVistos.add(p.id);
+  todosProcessos = todosProcessos.filter((processo) => {
+    if (idsVistos.has(processo.id)) return false;
+    idsVistos.add(processo.id);
     return true;
   });
 
-  // Sort by created_at across all months
-  todosProcessos.sort((a: any, b: any) =>
-    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
+  todosProcessos.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-  const ids = todosProcessos.map((p: any) => p.id);
+  const ids = todosProcessos.map((processo: any) => processo.id);
   if (ids.length === 0) return [];
 
-  const { data: lancs } = await supabase
+  const { data: lancamentos } = await supabase
     .from('lancamentos')
     .select('*')
     .eq('tipo', 'receber')
     .in('processo_id', ids);
 
   const lancMap = new Map<string, any>();
-  (lancs || []).forEach((l: any) => {
-    if (!lancMap.has(l.processo_id)) lancMap.set(l.processo_id, l);
+  (lancamentos || []).forEach((lancamento: any) => {
+    if (!lancMap.has(lancamento.processo_id)) lancMap.set(lancamento.processo_id, lancamento);
   });
 
-  return todosProcessos.map((p: any) => ({
-    ...p,
-    lancamento: lancMap.get(p.id) || null,
-    etapa_financeiro: lancMap.get(p.id)?.etapa_financeiro || 'solicitacao_criada',
+  return todosProcessos.map((processo: any) => ({
+    ...processo,
+    lancamento: lancMap.get(processo.id) || null,
+    etapa_financeiro: lancMap.get(processo.id)?.etapa_financeiro || 'solicitacao_criada',
   }));
 }
