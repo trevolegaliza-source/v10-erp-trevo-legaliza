@@ -26,6 +26,7 @@ const Orcamentos = lazy(() => import("./pages/Orcamentos"));
 const OrcamentoNovo = lazy(() => import("./pages/OrcamentoNovo"));
 const InteligenciaGeografica = lazy(() => import("./pages/InteligenciaGeografica"));
 const EstadoDetalhe = lazy(() => import("./pages/EstadoDetalhe"));
+const Catalogo = lazy(() => import("./pages/Catalogo"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -134,6 +135,11 @@ const App = () => (
                   <Route path="/inteligencia-geografica/:uf" element={
                     <RequirePermission modulo="intel_geografica">
                       <EstadoDetalhe />
+                    </RequirePermission>
+                  } />
+                  <Route path="/catalogo" element={
+                    <RequirePermission modulo="configuracoes">
+                      <Catalogo />
                     </RequirePermission>
                   } />
                   <Route path="/configuracoes" element={
