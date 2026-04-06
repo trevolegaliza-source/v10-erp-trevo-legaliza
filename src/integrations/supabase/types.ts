@@ -886,6 +886,7 @@ export type Database = {
         Row: {
           cliente_id: string
           created_at: string | null
+          data_deferimento: string | null
           dentro_do_plano: boolean | null
           empresa_id: string | null
           etapa: string
@@ -905,6 +906,7 @@ export type Database = {
         Insert: {
           cliente_id: string
           created_at?: string | null
+          data_deferimento?: string | null
           dentro_do_plano?: boolean | null
           empresa_id?: string | null
           etapa?: string
@@ -924,6 +926,7 @@ export type Database = {
         Update: {
           cliente_id?: string
           created_at?: string | null
+          data_deferimento?: string | null
           dentro_do_plano?: boolean | null
           empresa_id?: string | null
           etapa?: string
