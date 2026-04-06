@@ -152,6 +152,10 @@ export const CATEGORIAS_SERVICO = [
   { value: 'licenca', label: 'Licenças e Alvarás' },
   { value: 'certidao', label: 'Certidões' },
   { value: 'regularizacao', label: 'Regularização' },
-  { value: 'consultoria', label: 'Consultoria' },
+  { value: 'registros_especiais', label: 'Registros Especiais' },
+  { value: 'marcas_patentes', label: 'Marcas e Patentes' },
+  { value: 'cartorario', label: 'Serviços Cartorários' },
+  { value: 'consultoria', label: 'Consultoria Societária' },
+  { value: 'recorrentes', label: 'Serviços Recorrentes' },
   { value: 'outros', label: 'Outros Serviços' },
 ] as const;
