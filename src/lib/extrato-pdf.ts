@@ -792,7 +792,7 @@ async function renderPageToCanvas(html: string, styles: string) {
   const pageEl = container.querySelector('.page') as HTMLElement;
   window.scrollTo(0, 0);
   const canvas = await html2canvas(pageEl, {
-    scale: 1,
+    scale: 2,
     useCORS: true,
     logging: false,
     backgroundColor: '#ffffff',
