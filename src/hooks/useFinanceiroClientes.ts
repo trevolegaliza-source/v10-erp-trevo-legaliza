@@ -74,12 +74,10 @@ export function clienteDeveAparecerEmCobrar(cliente: ClienteFinanceiro): { show:
   const hoje = new Date();
   const diaHoje = hoje.getDate();
 
-  // No deferimento: only show if there are post-deferimento processes without extrato
+  // No deferimento: sempre mostrar se tem lançamentos sem extrato.
+  // O controle de deferimento é feito no DeferimentoModal ao gerar o extrato.
   if (cliente.cliente_momento_faturamento === 'no_deferimento') {
-    const temDeferido = cliente.lancamentos.some(l =>
-      !l.extrato_id && ETAPAS_POS_DEFERIMENTO.includes(l.processo_etapa)
-    );
-    return { show: temDeferido, isFutura: false };
+    return { show: true, isFutura: false };
   }
 
   // Fatura mensal dia X (somente quando NÃO há dia_cobranca): show 5 days before
