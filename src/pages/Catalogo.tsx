@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, Pencil, DollarSign, Trash2, BookOpen, Loader2, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Plus, DollarSign, Trash2, BookOpen, Loader2, Save, ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
 import {
   useServicos,
   usePrecosUF,
@@ -19,8 +19,82 @@ import {
   CATEGORIAS_SERVICO,
   type ServicosCatalogo,
 } from '@/hooks/useCatalogo';
+import { CATALOG_HIERARCHY, type HierarchyGroup, type HierarchyChild } from '@/constants/catalogo-hierarchy';
 import { UFS_BRASIL, UF_NOMES } from '@/constants/estados-brasil';
 import { toast } from 'sonner';
+
+// ═══════════ CSS GLASSMORPHISM ═══════════
+const GLASS_CSS = `
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent 50%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-4px) scale(1.01);
+}
+.glass-card-glow {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+  top: -40px;
+  right: -40px;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+.glass-card:hover .glass-card-glow {
+  opacity: 0.7;
+}
+.breadcrumb-item {
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.breadcrumb-item:hover {
+  color: hsl(142 71% 45%);
+}
+.catalog-enter {
+  animation: catalogFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes catalogFadeIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.service-detail-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  transition: all 0.3s;
+}
+.service-detail-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+`;
 
 const CATEGORIA_COLORS: Record<string, string> = {
   abertura: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
@@ -42,167 +116,87 @@ function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-// ═══════════ CARD DE SERVIÇO ═══════════
-function ServicoCard({
-  servico,
-  isExpanded,
-  onToggle,
-  onPrecos,
-}: {
-  servico: ServicosCatalogo;
-  isExpanded: boolean;
-  onToggle: () => void;
-  onPrecos: () => void;
-}) {
-  const catLabel = CATEGORIAS_SERVICO.find(c => c.value === servico.categoria)?.label || servico.categoria;
-  const updateMut = useUpdateServico();
-  const deleteMut = useDeleteServico();
+// ═══════════ HELPERS ═══════════
+function getAllCategoriesForGroup(group: HierarchyGroup): string[] {
+  if (group.categories) return group.categories;
+  if (group.children) return group.children.flatMap(c => c.categories);
+  return [];
+}
 
-  const [editNome, setEditNome] = useState(servico.nome);
-  const [editDesc, setEditDesc] = useState(servico.descricao || '');
-  const [editPrazo, setEditPrazo] = useState(servico.prazo_estimado || '');
-  const [editCat, setEditCat] = useState(servico.categoria);
-
-  function handleSave() {
-    updateMut.mutate({
-      id: servico.id,
-      updates: {
-        nome: editNome,
-        descricao: editDesc || undefined,
-        prazo_estimado: editPrazo || undefined,
-        categoria: editCat,
-      },
-    });
-  }
-
-  function handleDelete() {
-    if (confirm('Tem certeza que deseja excluir este serviço e todos os preços associados?')) {
-      deleteMut.mutate(servico.id);
-    }
-  }
-
-  return (
-    <Card className={`transition-all ${isExpanded ? 'ring-1 ring-primary/30' : 'hover:shadow-sm hover:bg-muted/20'}`}>
-      <button
-        onClick={onToggle}
-        className="w-full text-left px-4 py-3 flex items-start justify-between gap-3"
-      >
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm">{servico.nome}</span>
-            <Badge variant="outline" className={`text-[10px] ${CATEGORIA_COLORS[servico.categoria] || ''}`}>
-              {catLabel}
-            </Badge>
-          </div>
-          {servico.descricao && !isExpanded && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{servico.descricao}</p>
-          )}
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            {servico.prazo_estimado && (
-              <Badge variant="outline" className="text-[10px] bg-muted/50">
-                Prazo: {servico.prazo_estimado}
-              </Badge>
-            )}
-            <Badge variant="outline" className={`text-[10px] ${servico.ativo ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-red-500/10 text-red-500'}`}>
-              {servico.ativo ? 'Ativo' : 'Inativo'}
-            </Badge>
-          </div>
-        </div>
-        {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0 mt-1" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />}
-      </button>
-
-      {isExpanded && (
-        <CardContent className="px-4 pb-4 pt-0 space-y-4">
-          <Separator />
-
-          {servico.descricao && (
-            <div className="text-xs text-muted-foreground whitespace-pre-line bg-muted/30 rounded-lg p-3 max-h-60 overflow-y-auto">
-              {servico.descricao}
-            </div>
-          )}
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground">Nome</label>
-              <Input value={editNome} onChange={e => setEditNome(e.target.value)} className="h-8 text-xs mt-1" />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground">Categoria</label>
-              <Select value={editCat} onValueChange={setEditCat}>
-                <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CATEGORIAS_SERVICO.map(c => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground">Prazo estimado</label>
-              <Input value={editPrazo} onChange={e => setEditPrazo(e.target.value)} className="h-8 text-xs mt-1" />
-            </div>
-          </div>
-          <div>
-            <label className="text-[11px] font-medium text-muted-foreground">Descrição</label>
-            <Textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={4} className="text-xs mt-1" />
-          </div>
-
-          <div className="flex items-center justify-between gap-2 pt-2">
-            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleteMut.isPending}>
-              <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
-            </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={onPrecos}>
-                <DollarSign className="h-3.5 w-3.5 mr-1" /> Preços por UF
-              </Button>
-              <Button size="sm" onClick={handleSave} disabled={updateMut.isPending}>
-                {updateMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
-                Salvar
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      )}
-    </Card>
-  );
+function countServicosForCategories(servicos: ServicosCatalogo[], categories: string[]): number {
+  return servicos.filter(s => categories.includes(s.categoria)).length;
 }
 
 // ═══════════ COMPONENTE PRINCIPAL ═══════════
 export default function Catalogo() {
   const { data: servicos = [], isLoading } = useServicos();
+  const [path, setPath] = useState<string[]>([]);
   const [search, setSearch] = useState('');
-  const [selectedCat, setSelectedCat] = useState<string>('todas');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [servicoModal, setServicoModal] = useState<ServicosCatalogo | null>(null);
   const [precosServicoId, setPrecosServicoId] = useState<string | null>(null);
+  const [animKey, setAnimKey] = useState(0);
 
-  const catCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    servicos.forEach(s => {
-      counts[s.categoria] = (counts[s.categoria] || 0) + 1;
-    });
-    return counts;
-  }, [servicos]);
+  function navigate(newPath: string[]) {
+    setPath(newPath);
+    setAnimKey(k => k + 1);
+  }
 
-  const filtered = useMemo(() => {
-    let list = servicos;
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(s =>
-        s.nome.toLowerCase().includes(q) ||
-        (s.descricao || '').toLowerCase().includes(q)
-      );
-    } else if (selectedCat !== 'todas') {
-      list = list.filter(s => s.categoria === selectedCat);
+  // Search results
+  const searchResults = useMemo(() => {
+    if (!search) return null;
+    const q = search.toLowerCase();
+    return servicos.filter(s =>
+      s.nome.toLowerCase().includes(q) ||
+      (s.descricao || '').toLowerCase().includes(q)
+    );
+  }, [servicos, search]);
+
+  // Resolve current level
+  const currentGroup = path.length >= 1 ? CATALOG_HIERARCHY.find(g => g.key === path[0]) : null;
+  const currentChild = path.length >= 2 && currentGroup?.children
+    ? currentGroup.children.find(c => c.key === path[1])
+    : null;
+  const currentServiceId = path.length >= 3 ? path[2] : null;
+
+  // Level 2: get services for current categories
+  const level2Categories = useMemo(() => {
+    if (path.length === 2 && currentChild) return currentChild.categories;
+    if (path.length === 1 && currentGroup && currentGroup.categories && !currentGroup.children) return currentGroup.categories;
+    return null;
+  }, [path, currentGroup, currentChild]);
+
+  const level2Services = useMemo(() => {
+    if (!level2Categories) return [];
+    return servicos.filter(s => level2Categories.includes(s.categoria));
+  }, [servicos, level2Categories]);
+
+  // Level 3: single service
+  const level3Service = currentServiceId ? servicos.find(s => s.id === currentServiceId) : null;
+
+  // Breadcrumb
+  const breadcrumbs = useMemo(() => {
+    const crumbs: { label: string; path: string[] }[] = [
+      { label: '🍀 Portfólio', path: [] },
+    ];
+    if (currentGroup) {
+      crumbs.push({ label: currentGroup.label, path: [currentGroup.key] });
     }
-    return list;
-  }, [servicos, search, selectedCat]);
+    if (currentChild) {
+      crumbs.push({ label: currentChild.label, path: [path[0], currentChild.key] });
+    }
+    if (level3Service) {
+      crumbs.push({ label: level3Service.nome, path: [...path] });
+    }
+    return crumbs;
+  }, [path, currentGroup, currentChild, level3Service]);
 
   const precosServico = servicos.find(s => s.id === precosServicoId);
 
   return (
     <div className="space-y-6">
+      <style dangerouslySetInnerHTML={{ __html: GLASS_CSS }} />
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -210,119 +204,112 @@ export default function Catalogo() {
             <BookOpen className="h-6 w-6" /> Portfólio de Serviços
           </h1>
           <p className="text-sm text-muted-foreground">
-            {servicos.length} serviços cadastrados · {CATEGORIAS_SERVICO.length} categorias
+            {servicos.length} serviços cadastrados · {CATALOG_HIERARCHY.length} áreas de atuação
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="h-4 w-4 mr-1" /> Novo Serviço
-        </Button>
-      </div>
-
-      {/* Mobile: busca + select categoria */}
-      <div className="md:hidden space-y-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar serviço..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9 h-9" />
-        </div>
-        <Select value={selectedCat} onValueChange={v => { setSelectedCat(v); setSearch(''); }}>
-          <SelectTrigger className="h-9">
-            <SelectValue placeholder="Categoria" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas ({servicos.length})</SelectItem>
-            {CATEGORIAS_SERVICO.map(c => (
-              <SelectItem key={c.value} value={c.value}>{c.label} ({catCounts[c.value] || 0})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Layout 2 colunas */}
-      <div className="flex gap-6">
-        {/* Sidebar categorias — desktop */}
-        <div className="hidden md:flex flex-col gap-1 w-60 shrink-0">
-          <div className="relative mb-3">
+        <div className="flex gap-2">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar serviço..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-9"
+              className="pl-9 h-9 w-64"
             />
           </div>
-
-          {search && (
-            <p className="text-xs text-muted-foreground mb-2 px-2">
-              {filtered.length} resultado(s) encontrado(s)
-            </p>
-          )}
-
-          <button
-            onClick={() => { setSelectedCat('todas'); setSearch(''); }}
-            className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-              selectedCat === 'todas' && !search
-                ? 'bg-primary/10 text-primary font-semibold border-l-2 border-primary'
-                : 'text-muted-foreground hover:bg-muted/50'
-            }`}
-          >
-            <span>Todos os serviços</span>
-            <Badge variant="outline" className="text-[10px] h-5">{servicos.length}</Badge>
-          </button>
-
-          <Separator className="my-2" />
-
-          {CATEGORIAS_SERVICO.map(cat => {
-            const count = catCounts[cat.value] || 0;
-            if (count === 0) return null;
-            return (
-              <button
-                key={cat.value}
-                onClick={() => { setSelectedCat(cat.value); setSearch(''); }}
-                className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                  selectedCat === cat.value && !search
-                    ? 'bg-primary/10 text-primary font-semibold border-l-2 border-primary'
-                    : 'text-muted-foreground hover:bg-muted/50'
-                }`}
-              >
-                <span className="truncate">{cat.label}</span>
-                <Badge variant="outline" className="text-[10px] h-5 shrink-0 ml-2">{count}</Badge>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Grid de cards */}
-        <div className="flex-1 min-w-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Carregando catálogo...
-            </div>
-          ) : filtered.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <BookOpen className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                <p className="text-sm text-muted-foreground">
-                  {servicos.length === 0 ? 'Nenhum serviço cadastrado. Clique em "+ Novo Serviço" para começar.' : 'Nenhum serviço encontrado com os filtros aplicados.'}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-3">
-              {filtered.map(s => (
-                <ServicoCard
-                  key={s.id}
-                  servico={s}
-                  isExpanded={expandedId === s.id}
-                  onToggle={() => setExpandedId(expandedId === s.id ? null : s.id)}
-                  onPrecos={() => setPrecosServicoId(s.id)}
-                />
-              ))}
-            </div>
-          )}
+          <Button onClick={() => setShowCreate(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Novo Serviço
+          </Button>
         </div>
       </div>
 
-      {/* Modais — INALTERADOS */}
+      {/* Breadcrumb */}
+      {path.length > 0 && !search && (
+        <div className="flex items-center gap-1 text-sm flex-wrap">
+          {breadcrumbs.map((crumb, i) => (
+            <span key={i} className="flex items-center gap-1">
+              {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+              {i < breadcrumbs.length - 1 ? (
+                <span
+                  className="breadcrumb-item text-muted-foreground hover:text-primary"
+                  onClick={() => navigate(crumb.path)}
+                >
+                  {crumb.label}
+                </span>
+              ) : (
+                <span className="font-medium text-foreground">{crumb.label}</span>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Content */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Carregando catálogo...
+        </div>
+      ) : search && searchResults ? (
+        <SearchResultsView
+          results={searchResults}
+          search={search}
+          onSelectService={(s) => {
+            setSearch('');
+            // Find which group/child this service belongs to
+            for (const group of CATALOG_HIERARCHY) {
+              const allCats = getAllCategoriesForGroup(group);
+              if (allCats.includes(s.categoria)) {
+                if (group.children) {
+                  const child = group.children.find(c => c.categories.includes(s.categoria));
+                  if (child) {
+                    navigate([group.key, child.key, s.id]);
+                    return;
+                  }
+                } else {
+                  navigate([group.key, s.id]);
+                  return;
+                }
+              }
+            }
+          }}
+        />
+      ) : level3Service ? (
+        <ServiceDetailView
+          key={animKey}
+          service={level3Service}
+          onBack={() => navigate(path.slice(0, -1))}
+          onPrecos={() => setPrecosServicoId(level3Service.id)}
+        />
+      ) : level2Categories ? (
+        <Level2View
+          key={animKey}
+          services={level2Services}
+          onSelectService={(s) => navigate([...path, s.id])}
+          onBack={() => navigate(path.slice(0, -1))}
+        />
+      ) : currentGroup?.children ? (
+        <Level1View
+          key={animKey}
+          group={currentGroup}
+          servicos={servicos}
+          onSelectChild={(child) => navigate([currentGroup.key, child.key])}
+          onBack={() => navigate([])}
+        />
+      ) : (
+        <Level0View
+          key={animKey}
+          servicos={servicos}
+          onSelectGroup={(group) => {
+            if (group.children) {
+              navigate([group.key]);
+            } else {
+              navigate([group.key]);
+            }
+          }}
+        />
+      )}
+
+      {/* Modais */}
       <ServicoFormModal
         open={showCreate || !!servicoModal}
         servico={servicoModal}
@@ -334,6 +321,379 @@ export default function Catalogo() {
           servicoNome={precosServico.nome}
           onClose={() => setPrecosServicoId(null)}
         />
+      )}
+    </div>
+  );
+}
+
+// ═══════════ NÍVEL 0: MEGA-CARDS ═══════════
+function Level0View({
+  servicos,
+  onSelectGroup,
+}: {
+  servicos: ServicosCatalogo[];
+  onSelectGroup: (group: HierarchyGroup) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 catalog-enter">
+      {CATALOG_HIERARCHY.map((group, i) => {
+        const allCats = getAllCategoriesForGroup(group);
+        const count = countServicosForCategories(servicos, allCats);
+        return (
+          <div
+            key={group.key}
+            className="glass-card p-6 min-h-[180px] flex flex-col justify-between"
+            style={{ animationDelay: `${i * 60}ms` }}
+            onClick={() => onSelectGroup(group)}
+          >
+            <div className="glass-card-glow" style={{ background: group.glowColor }} />
+            <div className="relative z-10">
+              <span className="text-3xl mb-3 block">{group.icon}</span>
+              <h3 className="font-bold text-lg mb-1.5">{group.label}</h3>
+              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{group.description}</p>
+            </div>
+            <div className="relative z-10 flex items-center justify-between mt-4">
+              <Badge variant="outline" className="text-[10px] bg-muted/30 border-white/10">
+                {count} {count === 1 ? 'serviço' : 'serviços'}
+              </Badge>
+              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════ NÍVEL 1: CHILDREN DO GRUPO ═══════════
+function Level1View({
+  group,
+  servicos,
+  onSelectChild,
+  onBack,
+}: {
+  group: HierarchyGroup;
+  servicos: ServicosCatalogo[];
+  onSelectChild: (child: HierarchyChild) => void;
+  onBack: () => void;
+}) {
+  if (!group.children) return null;
+  return (
+    <div className="space-y-4 catalog-enter">
+      <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
+        <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+      </Button>
+      <div className="flex items-center gap-3 mb-2">
+        <span className="text-2xl">{group.icon}</span>
+        <div>
+          <h2 className="text-xl font-bold">{group.label}</h2>
+          <p className="text-sm text-muted-foreground">{group.description}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {group.children.map((child, i) => {
+          const count = countServicosForCategories(servicos, child.categories);
+          return (
+            <div
+              key={child.key}
+              className="glass-card p-5 min-h-[140px] flex flex-col justify-between"
+              style={{ animationDelay: `${i * 60}ms` }}
+              onClick={() => onSelectChild(child)}
+            >
+              <div className="glass-card-glow" style={{ background: group.glowColor }} />
+              <div className="relative z-10">
+                <h3 className="font-semibold text-base mb-1">{child.label}</h3>
+                <p className="text-xs text-muted-foreground line-clamp-2">{child.description}</p>
+              </div>
+              <div className="relative z-10 flex items-center justify-between mt-3">
+                <Badge variant="outline" className="text-[10px] bg-muted/30 border-white/10">
+                  {count} {count === 1 ? 'serviço' : 'serviços'}
+                </Badge>
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════ NÍVEL 2: SERVIÇOS INDIVIDUAIS ═══════════
+function Level2View({
+  services,
+  onSelectService,
+  onBack,
+}: {
+  services: ServicosCatalogo[];
+  onSelectService: (s: ServicosCatalogo) => void;
+  onBack: () => void;
+}) {
+  return (
+    <div className="space-y-4 catalog-enter">
+      <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
+        <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+      </Button>
+      {services.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <BookOpen className="h-10 w-10 text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">Nenhum serviço cadastrado nesta categoria.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {services.map((s, i) => {
+            const catLabel = CATEGORIAS_SERVICO.find(c => c.value === s.categoria)?.label || s.categoria;
+            return (
+              <div
+                key={s.id}
+                className="service-detail-card p-4 cursor-pointer flex flex-col gap-2"
+                style={{ animationDelay: `${i * 40}ms` }}
+                onClick={() => onSelectService(s)}
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm">{s.nome}</span>
+                </div>
+                {s.descricao && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{s.descricao}</p>
+                )}
+                <div className="flex items-center gap-2 mt-auto flex-wrap">
+                  <Badge variant="outline" className={`text-[10px] ${CATEGORIA_COLORS[s.categoria] || ''}`}>
+                    {catLabel}
+                  </Badge>
+                  {s.prazo_estimado && (
+                    <Badge variant="outline" className="text-[10px] bg-muted/50 border-white/10">
+                      {s.prazo_estimado}
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className={`text-[10px] ${s.ativo ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                    {s.ativo ? 'Ativo' : 'Inativo'}
+                  </Badge>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════ NÍVEL 3: DETALHE DO SERVIÇO ═══════════
+function ServiceDetailView({
+  service,
+  onBack,
+  onPrecos,
+}: {
+  service: ServicosCatalogo;
+  onBack: () => void;
+  onPrecos: () => void;
+}) {
+  const { data: precos = [], isLoading: loadingPrecos } = usePrecosUF(service.id);
+  const updateMut = useUpdateServico();
+  const deleteMut = useDeleteServico();
+  const catLabel = CATEGORIAS_SERVICO.find(c => c.value === service.categoria)?.label || service.categoria;
+
+  const [editNome, setEditNome] = useState(service.nome);
+  const [editDesc, setEditDesc] = useState(service.descricao || '');
+  const [editPrazo, setEditPrazo] = useState(service.prazo_estimado || '');
+  const [editCat, setEditCat] = useState(service.categoria);
+
+  function handleSave() {
+    updateMut.mutate({
+      id: service.id,
+      updates: {
+        nome: editNome,
+        descricao: editDesc || undefined,
+        prazo_estimado: editPrazo || undefined,
+        categoria: editCat,
+      },
+    });
+  }
+
+  function handleDelete() {
+    if (confirm('Tem certeza que deseja excluir este serviço e todos os preços associados?')) {
+      deleteMut.mutate(service.id, { onSuccess: onBack });
+    }
+  }
+
+  const precosPreenchidos = precos.filter(p => p.honorario_trevo > 0 || p.taxa_orgao > 0);
+
+  return (
+    <div className="space-y-6 catalog-enter max-w-4xl">
+      <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
+        <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+      </Button>
+
+      {/* Hero card */}
+      <div className="service-detail-card p-6 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold mb-2">{service.nome}</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="outline" className={`text-[10px] ${CATEGORIA_COLORS[service.categoria] || ''}`}>
+                {catLabel}
+              </Badge>
+              {service.prazo_estimado && (
+                <Badge variant="outline" className="text-[10px] bg-muted/50 border-white/10">
+                  Prazo: {service.prazo_estimado}
+                </Badge>
+              )}
+              <Badge variant="outline" className={`text-[10px] ${service.ativo ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                {service.ativo ? 'Ativo' : 'Inativo'}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        {service.descricao && (
+          <div className="text-sm text-muted-foreground whitespace-pre-line bg-white/[0.02] rounded-xl p-4 border border-white/5 leading-relaxed">
+            {service.descricao}
+          </div>
+        )}
+      </div>
+
+      {/* Edição inline */}
+      <div className="service-detail-card p-6 space-y-4">
+        <h3 className="font-semibold text-sm">Editar Serviço</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-[11px] font-medium text-muted-foreground">Nome</label>
+            <Input value={editNome} onChange={e => setEditNome(e.target.value)} className="h-8 text-xs mt-1" />
+          </div>
+          <div>
+            <label className="text-[11px] font-medium text-muted-foreground">Categoria</label>
+            <Select value={editCat} onValueChange={setEditCat}>
+              <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CATEGORIAS_SERVICO.map(c => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-[11px] font-medium text-muted-foreground">Prazo estimado</label>
+            <Input value={editPrazo} onChange={e => setEditPrazo(e.target.value)} className="h-8 text-xs mt-1" />
+          </div>
+        </div>
+        <div>
+          <label className="text-[11px] font-medium text-muted-foreground">Descrição</label>
+          <Textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={4} className="text-xs mt-1" />
+        </div>
+        <div className="flex items-center justify-between gap-2 pt-2">
+          <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleteMut.isPending}>
+            <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onPrecos}>
+              <DollarSign className="h-3.5 w-3.5 mr-1" /> Preços por UF
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={updateMut.isPending}>
+              {updateMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+              Salvar
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabela de preços por UF */}
+      <div className="service-detail-card p-6 space-y-4">
+        <h3 className="font-semibold text-sm flex items-center gap-2">
+          <DollarSign className="h-4 w-4" /> Preços por UF
+        </h3>
+        {loadingPrecos ? (
+          <p className="text-xs text-muted-foreground">Carregando preços...</p>
+        ) : precosPreenchidos.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">Nenhum preço cadastrado ainda.</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={onPrecos}>
+              <DollarSign className="h-3.5 w-3.5 mr-1" /> Cadastrar Preços
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-white/5 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/5 bg-white/[0.02]">
+                  <th className="text-left p-2.5 font-medium text-xs">UF</th>
+                  <th className="text-right p-2.5 font-medium text-xs">Honorário</th>
+                  <th className="text-right p-2.5 font-medium text-xs">Taxa Órgão</th>
+                  <th className="text-right p-2.5 font-medium text-xs">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {precosPreenchidos.map(p => (
+                  <tr key={p.uf} className="border-b border-white/5 last:border-0">
+                    <td className="p-2.5">
+                      <span className="font-medium">{p.uf}</span>
+                      <span className="text-xs text-muted-foreground ml-1.5">{UF_NOMES[p.uf]}</span>
+                    </td>
+                    <td className="p-2.5 text-right text-xs">{fmt(p.honorario_trevo)}</td>
+                    <td className="p-2.5 text-right text-xs">{fmt(p.taxa_orgao)}</td>
+                    <td className="p-2.5 text-right text-xs font-medium">{fmt(p.honorario_trevo + p.taxa_orgao)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════ BUSCA GLOBAL ═══════════
+function SearchResultsView({
+  results,
+  search,
+  onSelectService,
+}: {
+  results: ServicosCatalogo[];
+  search: string;
+  onSelectService: (s: ServicosCatalogo) => void;
+}) {
+  return (
+    <div className="space-y-4 catalog-enter">
+      <p className="text-sm text-muted-foreground">
+        {results.length} resultado(s) para "<span className="font-medium text-foreground">{search}</span>"
+      </p>
+      {results.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <Search className="h-10 w-10 text-muted-foreground/30 mb-3" />
+            <p className="text-sm text-muted-foreground">Nenhum serviço encontrado.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {results.map(s => {
+            const catLabel = CATEGORIAS_SERVICO.find(c => c.value === s.categoria)?.label || s.categoria;
+            return (
+              <div
+                key={s.id}
+                className="service-detail-card p-4 cursor-pointer flex flex-col gap-2"
+                onClick={() => onSelectService(s)}
+              >
+                <span className="font-semibold text-sm">{s.nome}</span>
+                {s.descricao && (
+                  <p className="text-xs text-muted-foreground line-clamp-2">{s.descricao}</p>
+                )}
+                <div className="flex items-center gap-2 mt-auto flex-wrap">
+                  <Badge variant="outline" className={`text-[10px] ${CATEGORIA_COLORS[s.categoria] || ''}`}>
+                    {catLabel}
+                  </Badge>
+                  {s.prazo_estimado && (
+                    <Badge variant="outline" className="text-[10px] bg-muted/50 border-white/10">
+                      {s.prazo_estimado}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
