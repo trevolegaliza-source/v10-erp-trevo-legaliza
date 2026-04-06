@@ -833,6 +833,24 @@ export interface ExtratoResult {
   processCount: number;
 }
 
+function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
+  const pdfWidth = doc.internal.pageSize.getWidth();
+  const pdfHeight = doc.internal.pageSize.getHeight();
+  const imgData = canvas.toDataURL('image/jpeg', 0.85);
+
+  let imgWidth = pdfWidth;
+  let imgHeight = (canvas.height / canvas.width) * pdfWidth;
+
+  if (imgHeight > pdfHeight) {
+    const scaleFactor = pdfHeight / imgHeight;
+    imgWidth = pdfWidth * scaleFactor;
+    imgHeight = pdfHeight;
+  }
+
+  const offsetX = (pdfWidth - imgWidth) / 2;
+  doc.addImage(imgData, 'JPEG', offsetX, 0, imgWidth, imgHeight);
+}
+
 export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult> {
   const fontLink = document.createElement('link');
   fontLink.rel = 'stylesheet';
