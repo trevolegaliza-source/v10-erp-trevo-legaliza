@@ -791,7 +791,7 @@ async function renderPageToCanvas(html: string, styles: string) {
 
   const pageEl = container.querySelector('.page') as HTMLElement;
   const canvas = await html2canvas(pageEl, {
-    scale: 2,
+    scale: 1,
     useCORS: true,
     logging: false,
     backgroundColor: '#ffffff',
@@ -862,13 +862,13 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
 
   const page1Html = buildPage1HTML(data, steps, selected, logoDataUrl, totalPages, detailPageGroups.length);
   const page1Canvas = await renderPageToCanvas(page1Html, GLOBAL_STYLES);
-  doc.addImage(page1Canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
+  doc.addImage(page1Canvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, pdfWidth, pdfHeight);
 
   for (let index = 0; index < detailPageGroups.length; index += 1) {
     const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, index + 2, totalPages, detailPageGroups.length);
     const detailCanvas = await renderPageToCanvas(detailHtml, GLOBAL_STYLES);
     doc.addPage();
-    doc.addImage(detailCanvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
+    doc.addImage(detailCanvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, pdfWidth, pdfHeight);
   }
 
   await renderAttachments(doc, data, totalPages, detailPageGroups.length + 2, logoDataUrl);
@@ -948,7 +948,7 @@ async function renderAttachments(
       const html = buildAttachmentPageHTML(attachment.label, imgData, logoDataUrl, pageNumber, totalPages);
       const canvas = await renderPageToCanvas(html, GLOBAL_STYLES);
       doc.addPage();
-      doc.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdfWidth, pdfHeight);
+      doc.addImage(canvas.toDataURL('image/jpeg', 0.85), 'JPEG', 0, 0, pdfWidth, pdfHeight);
       pageNumber += 1;
     } catch (error) {
       console.warn(`Erro ao renderizar anexo ${attachment.label}:`, error);
