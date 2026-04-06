@@ -379,9 +379,13 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
 
 function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo[], logoDataUrl: string | null): string {
   const now = new Date();
-  const mesRef = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   const emissao = now.toLocaleDateString('pt-BR');
-  const mesNum = String(now.getMonth() + 1).padStart(2, '0');
+
+  // Calculate period from actual process dates (selected), not current month
+  const datasProcessos = selected.map(s => new Date(s.processo.created_at));
+  const menorData = datasProcessos.length > 0 ? new Date(Math.min(...datasProcessos.map(d => d.getTime()))) : now;
+  const maiorData = datasProcessos.length > 0 ? new Date(Math.max(...datasProcessos.map(d => d.getTime()))) : now;
+  const periodoTexto = `${menorData.toLocaleDateString('pt-BR')} até ${maiorData.toLocaleDateString('pt-BR')}`;
 
   const totalHon = selected.reduce((s, st) => s + st.valorFinal, 0);
   // Only count taxas for selected processes
@@ -408,7 +412,7 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         ${data.cliente.nome_contador ? `<div class="client-contact">👤 ${data.cliente.nome_contador} (contador)</div>` : ''}
         ${data.cliente.telefone ? `<div class="client-contact">📱 ${data.cliente.telefone}</div>` : ''}
         ${data.cliente.email ? `<div class="client-contact">✉ ${data.cliente.email}</div>` : ''}
-        <div class="client-meta">Relatório de Performance: 01/${mesNum}/${now.getFullYear()} até ${emissao}</div>
+        <div class="client-meta">Relatório de Performance: ${periodoTexto}</div>
         <div class="client-meta">Emissão: ${emissao} • ${selected.length} processo(s) cobrado(s)</div>
       </div>
 
