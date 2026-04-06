@@ -920,8 +920,6 @@ async function renderAttachments(
   startPageNumber: number,
   logoDataUrl: string | null,
 ) {
-  const pdfWidth = doc.internal.pageSize.getWidth();
-  const pdfHeight = doc.internal.pageSize.getHeight();
   const attachments: Array<{ label: string; url: string }> = [];
 
   for (const processo of data.processos) {
