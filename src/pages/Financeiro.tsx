@@ -14,7 +14,6 @@ import {
   ClientesEnviar,
   ClientesAguardando,
   ClientesRecebidos,
-  ClientesVencidos,
 } from '@/components/financeiro/ClienteAccordionFinanceiro';
 import { formatBRL } from '@/lib/pricing-engine';
 import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
