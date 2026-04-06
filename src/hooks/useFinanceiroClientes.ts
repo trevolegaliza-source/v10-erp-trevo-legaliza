@@ -415,7 +415,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     clientesEnviados,
     clientesAguardando,
     clientesPagos,
-    clientesVencidos,
     metricas,
     isLoading: query.isLoading,
     isVencido: isLancamentoVencidoReal,
