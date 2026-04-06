@@ -444,7 +444,7 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         ${buildProgressionBar(steps, data)}
 
         <div class="vol-block">
-          <div class="vol-text">Volume Acumulado (01/${mesNum} até ${emissao}): ${data.allCompetencia.length} processo(s)</div>
+          <div class="vol-text">Volume Acumulado (${periodoTexto}): ${data.allCompetencia.length} processo(s)</div>
           <div class="vol-text">Valor Base: ${fmt(data.cliente.valor_base ?? 580)} • Desc. Contratual: ${descPct > 0 ? descPct + '% progressivo' : 'N/A'}</div>
         </div>
         ${(data.cliente.dia_vencimento_mensal && data.cliente.dia_vencimento_mensal > 0 && !data.cliente.dia_cobranca) ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:6px 10px;margin-top:8px;border-radius:0 3px 3px 0;"><span style="font-size:7px;color:#78350f;font-weight:600;">⚠ Vencimento fixo: dia ${data.cliente.dia_vencimento_mensal} de cada mês</span></div>` : ''}
