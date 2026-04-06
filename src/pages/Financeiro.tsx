@@ -257,7 +257,7 @@ export default function Financeiro() {
                   ? 'border-red-500/30 bg-red-500/5 hover:border-red-500/50'
                   : 'hover:border-border'
               }`}
-              onClick={() => setActiveTab('vencidos')}
+              onClick={() => setActiveTab('aguardando')}
             >
               <CardContent className="p-5">
                 <div className="rounded-lg bg-red-500/10 p-2 w-fit">
