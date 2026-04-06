@@ -379,9 +379,13 @@ function buildProgressionBar(steps: StepInfo[], data: ExtratoData): string {
 
 function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo[], logoDataUrl: string | null): string {
   const now = new Date();
-  const mesRef = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   const emissao = now.toLocaleDateString('pt-BR');
-  const mesNum = String(now.getMonth() + 1).padStart(2, '0');
+
+  // Calculate period from actual process dates (selected), not current month
+  const datasProcessos = selected.map(s => new Date(s.processo.created_at));
+  const menorData = datasProcessos.length > 0 ? new Date(Math.min(...datasProcessos.map(d => d.getTime()))) : now;
+  const maiorData = datasProcessos.length > 0 ? new Date(Math.max(...datasProcessos.map(d => d.getTime()))) : now;
+  const periodoTexto = `${menorData.toLocaleDateString('pt-BR')} até ${maiorData.toLocaleDateString('pt-BR')}`;
 
   const totalHon = selected.reduce((s, st) => s + st.valorFinal, 0);
   // Only count taxas for selected processes
@@ -408,7 +412,7 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         ${data.cliente.nome_contador ? `<div class="client-contact">👤 ${data.cliente.nome_contador} (contador)</div>` : ''}
         ${data.cliente.telefone ? `<div class="client-contact">📱 ${data.cliente.telefone}</div>` : ''}
         ${data.cliente.email ? `<div class="client-contact">✉ ${data.cliente.email}</div>` : ''}
-        <div class="client-meta">Relatório de Performance: 01/${mesNum}/${now.getFullYear()} até ${emissao}</div>
+        <div class="client-meta">Relatório de Performance: ${periodoTexto}</div>
         <div class="client-meta">Emissão: ${emissao} • ${selected.length} processo(s) cobrado(s)</div>
       </div>
 
@@ -440,7 +444,7 @@ function buildPage1HTML(data: ExtratoData, steps: StepInfo[], selected: StepInfo
         ${buildProgressionBar(steps, data)}
 
         <div class="vol-block">
-          <div class="vol-text">Volume Acumulado (01/${mesNum} até ${emissao}): ${data.allCompetencia.length} processo(s)</div>
+          <div class="vol-text">Volume Acumulado (${periodoTexto}): ${data.allCompetencia.length} processo(s)</div>
           <div class="vol-text">Valor Base: ${fmt(data.cliente.valor_base ?? 580)} • Desc. Contratual: ${descPct > 0 ? descPct + '% progressivo' : 'N/A'}</div>
         </div>
         ${(data.cliente.dia_vencimento_mensal && data.cliente.dia_vencimento_mensal > 0 && !data.cliente.dia_cobranca) ? `<div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:6px 10px;margin-top:8px;border-radius:0 3px 3px 0;"><span style="font-size:7px;color:#78350f;font-weight:600;">⚠ Vencimento fixo: dia ${data.cliente.dia_vencimento_mensal} de cada mês</span></div>` : ''}
@@ -925,21 +929,59 @@ export async function fetchValoresAdicionaisMulti(processoIds: string[]): Promis
   return map;
 }
 
-export async function fetchCompetenciaProcessos(clienteId: string): Promise<ProcessoFinanceiro[]> {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+export async function fetchCompetenciaProcessos(
+  clienteId: string,
+  processosSelecionados?: ProcessoFinanceiro[]
+): Promise<ProcessoFinanceiro[]> {
+  // Discover which months to fetch based on selected processes
+  const mesesUnicos = new Set<string>();
 
-  const { data, error } = await supabase
-    .from('processos')
-    .select('*, cliente:clientes(*)')
-    .eq('cliente_id', clienteId)
-    .gte('created_at', first)
-    .lte('created_at', last)
-    .order('created_at', { ascending: true });
-  if (error) throw error;
+  if (processosSelecionados && processosSelecionados.length > 0) {
+    processosSelecionados.forEach(p => {
+      const d = new Date(p.created_at);
+      mesesUnicos.add(`${d.getFullYear()}-${d.getMonth()}`);
+    });
+  } else {
+    // Fallback: current month
+    const now = new Date();
+    mesesUnicos.add(`${now.getFullYear()}-${now.getMonth()}`);
+  }
 
-  const ids = (data || []).map((p: any) => p.id);
+  let todosProcessos: any[] = [];
+
+  for (const mesKey of mesesUnicos) {
+    const [ano, mes] = mesKey.split('-').map(Number);
+    const first = new Date(ano, mes, 1).toISOString();
+    const last = new Date(ano, mes + 1, 0, 23, 59, 59).toISOString();
+
+    const { data, error } = await supabase
+      .from('processos')
+      .select('*, cliente:clientes(*)')
+      .eq('cliente_id', clienteId)
+      .gte('created_at', first)
+      .lte('created_at', last)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+
+    if (data) todosProcessos = [...todosProcessos, ...data];
+  }
+
+  // Deduplicate
+  const idsVistos = new Set<string>();
+  todosProcessos = todosProcessos.filter(p => {
+    if (idsVistos.has(p.id)) return false;
+    idsVistos.add(p.id);
+    return true;
+  });
+
+  // Sort by created_at across all months
+  todosProcessos.sort((a: any, b: any) =>
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  const ids = todosProcessos.map((p: any) => p.id);
+  if (ids.length === 0) return [];
+
   const { data: lancs } = await supabase
     .from('lancamentos')
     .select('*')
@@ -951,7 +993,7 @@ export async function fetchCompetenciaProcessos(clienteId: string): Promise<Proc
     if (!lancMap.has(l.processo_id)) lancMap.set(l.processo_id, l);
   });
 
-  return (data || []).map((p: any) => ({
+  return todosProcessos.map((p: any) => ({
     ...p,
     lancamento: lancMap.get(p.id) || null,
     etapa_financeiro: lancMap.get(p.id)?.etapa_financeiro || 'solicitacao_criada',
