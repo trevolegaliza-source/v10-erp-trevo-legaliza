@@ -601,7 +601,7 @@ function buildPage1HTML(
   const maiorData = datasSelecionadas.length > 0 ? new Date(Math.max(...datasSelecionadas.map((date) => date.getTime()))) : emissaoDate;
   const periodoTexto = `${menorData.toLocaleDateString('pt-BR')} até ${maiorData.toLocaleDateString('pt-BR')}`;
 
-  const previewCount = detailPageCount > 0 ? Math.min(selected.length, 6) : selected.length;
+  const previewCount = detailPageCount > 0 ? Math.min(selected.length, 4) : Math.min(selected.length, 6);
   const hiddenCount = Math.max(selected.length - previewCount, 0);
 
   return `
