@@ -103,6 +103,9 @@ export function ClientesFaturar({ clientes }: { clientes: ClienteFinanceiro[] })
 function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
+  const [taxaModalOpen, setTaxaModalOpen] = useState(false);
+  const [taxaProcessoId, setTaxaProcessoId] = useState<string>('');
+  const [taxaClienteApelido, setTaxaClienteApelido] = useState<string>('');
   const { salvarExtrato } = useExtratos();
   const qc = useQueryClient();
 
