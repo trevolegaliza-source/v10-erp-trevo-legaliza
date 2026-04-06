@@ -325,6 +325,13 @@ function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
           clienteApelido={taxaClienteApelido}
         />
       )}
+      <DeferimentoModal
+        open={deferimentoOpen}
+        onOpenChange={setDeferimentoOpen}
+        clienteNome={cliente.cliente_apelido || cliente.cliente_nome}
+        processos={deferimentoProcessos}
+        onConfirm={handleDeferimentoConfirm}
+      />
     </AccordionItem>
   );
 }
