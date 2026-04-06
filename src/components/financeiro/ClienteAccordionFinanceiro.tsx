@@ -589,10 +589,21 @@ export function ClientesAguardando({ clientes }: { clientes: ClienteFinanceiro[]
 function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const [showPago, setShowPago] = useState(false);
   const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split('T')[0]);
+  const [loadingExtrato, setLoadingExtrato] = useState(false);
   const qc = useQueryClient();
 
   const vencimento = cliente.lancamentos[0]?.data_vencimento;
   const dias = vencimento ? diasParaVencer(vencimento) : 0;
+
+  const lancVencidos = cliente.lancamentos.filter(l => isLancamentoVencidoReal(l));
+  const temVencidos = lancVencidos.length > 0;
+  const maiorAtraso = temVencidos
+    ? Math.max(...lancVencidos.map(l => {
+        const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+        const venc = new Date(l.data_vencimento + 'T00:00:00');
+        return Math.floor((hoje.getTime() - venc.getTime()) / 86400000);
+      }))
+    : 0;
 
   async function confirmarPago() {
     const ids = cliente.lancamentos.map(l => l.id);
@@ -611,9 +622,70 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
     toast.success('Pagamento confirmado!');
   }
 
+  async function handleCopiarCobranca() {
+    const lancsParaMsg = temVencidos ? lancVencidos : cliente.lancamentos;
+    if (lancsParaMsg.length === 0) return;
+
+    const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))];
+    let vaMap: Record<string, number> = {};
+    if (processoIds.length > 0) {
+      const { data: vas } = await supabase
+        .from('valores_adicionais')
+        .select('processo_id, valor')
+        .in('processo_id', processoIds);
+      if (vas) {
+        for (const va of vas) {
+          vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor;
+        }
+      }
+    }
+
+    const primeiro = lancsParaMsg[0];
+    const valorPrimeiro = primeiro.valor + (vaMap[primeiro.processo_id] || 0);
+    const adicionais = lancsParaMsg.slice(1).map(l => ({
+      tipo: l.processo_tipo,
+      razao_social: l.processo_razao_social,
+      valor: l.valor + (vaMap[l.processo_id] || 0),
+    }));
+    const msg = gerarMensagemCobranca({
+      tipo: primeiro.processo_tipo,
+      razao_social: primeiro.processo_razao_social,
+      valor: valorPrimeiro,
+      data_vencimento: primeiro.data_vencimento,
+      diasAtraso: maiorAtraso,
+      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
+    });
+    await navigator.clipboard.writeText(msg);
+    toast.success(temVencidos ? 'Mensagem de recobrança copiada!' : 'Mensagem de cobrança copiada!');
+  }
+
+  async function handleBaixarExtrato() {
+    setLoadingExtrato(true);
+    try {
+      const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
+      const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
+      if (!extratoId) {
+        toast.error('Nenhum extrato encontrado para este cliente.');
+        return;
+      }
+      const { data: extrato } = await supabase
+        .from('extratos')
+        .select('cliente_id, filename')
+        .eq('id', extratoId)
+        .single();
+      if (!extrato) { toast.error('Extrato não encontrado.'); return; }
+      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
+      await downloadExtrato('documentos', path, (extrato as any).filename);
+    } catch (err) {
+      toast.error('Erro ao baixar extrato.');
+    } finally {
+      setLoadingExtrato(false);
+    }
+  }
+
   return (
     <>
-      <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
+      <AccordionItem value={cliente.cliente_id} className={cn("border rounded-lg bg-card", temVencidos && "border-destructive/30")}>
         <AccordionTrigger className="px-4 py-3 hover:no-underline">
           <div className="flex items-center gap-3 flex-1 text-left">
             <div className="flex-1 min-w-0">
@@ -622,21 +694,50 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 {fmt(cliente.total_faturado)} · Enviado · Vence {fmtDate(vencimento)}
               </p>
             </div>
-            <Badge variant="outline" className={cn('text-xs', dias < 0
-              ? 'bg-destructive/10 text-destructive border-destructive/30'
-              : dias <= 3
-                ? 'bg-warning/10 text-warning border-warning/30'
-                : 'bg-muted text-muted-foreground'
-            )}>
-              {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
-            </Badge>
+            {temVencidos ? (
+              <Badge className="bg-destructive/15 text-destructive border-0 text-xs">
+                Vencido há {maiorAtraso}d
+              </Badge>
+            ) : (
+              <Badge variant="outline" className={cn('text-xs', dias < 0
+                ? 'bg-destructive/10 text-destructive border-destructive/30'
+                : dias <= 3
+                  ? 'bg-warning/10 text-warning border-warning/30'
+                  : 'bg-muted text-muted-foreground'
+              )}>
+                {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
+              </Badge>
+            )}
             <MoverParaMenu cliente={cliente} />
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-4 pb-4">
           <div className="space-y-2">
-            {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
-            <div className="flex gap-2 mt-3">
+            {cliente.lancamentos.map(l => {
+              const isVenc = isLancamentoVencidoReal(l);
+              const dAtraso = isVenc ? Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(l.data_vencimento + 'T00:00:00').getTime()) / 86400000) : 0;
+              return (
+                <div key={l.id} className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <LancamentoRow lancamento={l} />
+                  </div>
+                  {isVenc && (
+                    <Badge className="bg-destructive/15 text-destructive border-0 text-[10px] shrink-0">
+                      Vencido {dAtraso}d
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+            <div className="flex gap-2 mt-3 flex-wrap">
+              <Button size="sm" variant="outline" onClick={handleCopiarCobranca}>
+                <Copy className="h-4 w-4 mr-1" /> {temVencidos ? 'Reenviar Cobrança' : 'Copiar WhatsApp'}
+              </Button>
+              {(cliente.lancamentos.some(l => l.extrato_id) || cliente.extrato_mais_recente) && (
+                <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato}>
+                  <Download className="h-4 w-4 mr-1" /> {loadingExtrato ? 'Baixando...' : 'Baixar Extrato'}
+                </Button>
+              )}
               <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                 <CheckCircle className="h-4 w-4 mr-1" /> Marcar como Pago
               </Button>
