@@ -415,9 +415,6 @@ export default function Financeiro() {
             <TabsContent value="pagos" className="mt-4">
               <ClientesPagos clientes={clientesPagos} />
             </TabsContent>
-            <TabsContent value="vencidos" className="mt-4">
-              <ClientesVencidos clientes={clientesVencidos} />
-            </TabsContent>
             <TabsContent value="todos" className="mt-4">
               <TabTodos
                 lancamentos={todosLancamentos}
