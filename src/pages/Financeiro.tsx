@@ -63,7 +63,6 @@ export default function Financeiro() {
     clientesEnviados,
     clientesAguardando,
     clientesPagos,
-    clientesVencidos,
     metricas,
     isLoading,
   } = useFinanceiroClientes(dates.inicio, dates.fim);
