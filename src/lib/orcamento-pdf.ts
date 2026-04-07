@@ -56,12 +56,12 @@ async function preloadLogo(): Promise<string | null> {
   return null;
 }
 
-function logoHtml(logo: string | null, height = 50): string {
+function logoHtml(logo: string | null, height = 60): string {
   return logo
-    ? `<img src="${logo}" style="height: ${height}px; width: auto;" crossorigin="anonymous" />`
-    : `<div style="font-size: 28px; font-weight: 800;">
+    ? `<img src="${logo}" style="height: ${height}px; width: auto; display: block;" crossorigin="anonymous" />`
+    : `<div style="font-size: 30px; font-weight: 800; line-height: 1.2;">
          <span style="color: #22c55e;">Trevo</span>
-         <span style="color: #ffffff; font-weight: 400;"> Legaliza</span>
+         <span style="color: #ffffff; font-weight: 400; font-size: 26px;"> Legaliza</span>
        </div>`;
 }
 
@@ -121,7 +121,6 @@ function sanitizeFilename(name: string): string {
     .substring(0, 50);
 }
 
-// Resolve effective PDF mode from both old and new flags
 function resolvePDFMode(d: OrcamentoPDFData): OrcamentoPDFMode {
   if (d.modoPDF) return d.modoPDF;
   return d.modoContador ? 'cliente' : 'contador';
@@ -139,6 +138,46 @@ function getFooter(d: OrcamentoPDFData, pdfMode: OrcamentoPDFMode): string {
     return FOOTER_CLIENTE(d.clienteNome || d.prospect_nome);
   }
   return FOOTER_TREVO;
+}
+
+// CORREÇÃO 4 — Short name for prazos
+function shortName(descricao: string): string {
+  const map: Record<string, string> = {
+    'LICENÇA BOMBEIROS': 'Bombeiros',
+    'LICENCA BOMBEIROS': 'Bombeiros',
+    'ALVARÁ SANITÁRIO': 'Vigilância Sanitária',
+    'ALVARA SANITARIO': 'Vigilância Sanitária',
+    'ATUALIZAÇÃO CADASTRO': 'Cadastro Prefeitura',
+    'ATUALIZACAO CADASTRO': 'Cadastro Prefeitura',
+    'ATUALIZAÇÃO SC BEM': 'JUCESC',
+    'REGISTRO CRM': 'CRM PJ',
+    'CADASTRO CNES': 'CNES',
+    'REGISTRO MARCA': 'Marca INPI',
+    'REGISTRO DE MARCA': 'Marca INPI',
+  };
+  const upper = descricao.toUpperCase();
+  for (const [key, val] of Object.entries(map)) {
+    if (upper.includes(key)) return val;
+  }
+  return descricao.split(' ').slice(0, 3).join(' ');
+}
+
+// CORREÇÃO 7 — Ordem de execução com numeração visual
+function formatarOrdemExecucao(texto: string, isCliente: boolean): string {
+  const linhas = texto.split('\n').filter(l => l.trim());
+  const bgColor = isCliente ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'linear-gradient(135deg, #22c55e, #16a34a)';
+  const arrowColor = isCliente ? '#3b82f6' : '#22c55e';
+  return linhas.map((linha, idx) => {
+    const numero = idx + 1;
+    const isLast = idx === linhas.length - 1;
+    return `
+      <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0;">
+        <div style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: ${bgColor}; color: #fff; font-size: 11px; font-weight: 800; flex-shrink: 0;">${numero}</div>
+        <div style="flex: 1; font-size: 10px; color: #374151; line-height: 1.5;">${esc(linha.trim())}</div>
+        ${!isLast ? `<div style="color: ${arrowColor}; font-size: 16px; font-weight: 800; margin-left: -4px;">→</div>` : ''}
+      </div>
+    `;
+  }).join('');
 }
 
 // ────────────────────────────────────────
@@ -222,27 +261,26 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   const header = getHeader(d, logo, pdfMode);
   const footer = getFooter(d, pdfMode);
 
-  // Compute cover values
-  const getItemDisplayValue = (item: OrcamentoItem) => {
-    if (isCliente) {
-      return (item.honorario_minimo_contador || item.honorario) * item.quantidade;
-    }
-    return getItemValor(item) * item.quantidade;
-  };
+  // Compute values — Contador uses honorario (cost), Cliente uses honorario_minimo_contador (sell price)
+  const getCustoTrevo = (item: OrcamentoItem) => (item.honorario || 0) * item.quantidade;
+  const getPrecoCliente = (item: OrcamentoItem) => ((item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
 
-  const totalHonorarios = d.itens.reduce((s, i) => s + getItemDisplayValue(i), 0);
+  const totalCustoTrevo = d.itens.reduce((s, i) => s + getCustoTrevo(i), 0);
+  const totalPrecoCliente = d.itens.reduce((s, i) => s + getPrecoCliente(i), 0);
   const totalTaxaMin = d.itens.reduce((s, i) => s + i.taxa_min, 0);
   const totalTaxaMax = d.itens.reduce((s, i) => s + i.taxa_max, 0);
-  const descontoValor = totalHonorarios * (d.desconto_pct / 100);
-  const honorarioFinal = totalHonorarios - descontoValor;
   const hasTaxas = totalTaxaMin > 0 || totalTaxaMax > 0;
-  const investimentoMin = honorarioFinal + totalTaxaMin;
-  const investimentoMax = honorarioFinal + totalTaxaMax;
+
+  // For cover and summary: use appropriate values per mode
+  const totalHonorariosCapa = isCliente ? totalPrecoCliente : totalCustoTrevo;
+  const descontoValorCapa = totalHonorariosCapa * (d.desconto_pct / 100);
+  const honorarioFinalCapa = totalHonorariosCapa - descontoValorCapa;
+  const investimentoMin = honorarioFinalCapa + totalTaxaMin;
+  const investimentoMax = honorarioFinalCapa + totalTaxaMax;
   const valorCapa = hasTaxas
     ? `${fmt(investimentoMin)} a ${fmt(investimentoMax)}`
-    : fmt(honorarioFinal);
+    : fmt(honorarioFinalCapa);
 
-  const honorarioLabel = isCliente ? 'Investimento' : 'Honorário Trevo';
   const accentColor = isCliente ? '#3b82f6' : '#22c55e';
   const accentColorLight = isCliente ? '#93c5fd' : '#4ade80';
   const accentBg = isCliente ? '#eff6ff' : '#f0fdf4';
@@ -267,7 +305,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           <div style="font-size: ${hasTaxas ? '26' : '36'}px; font-weight: 900; color: ${accentText};">${valorCapa}</div>
         </div>
         <div style="font-size: 8px; color: #9ca3af; margin-top: 8px; letter-spacing: 0.3px;">
-          ${isCliente ? 'Honorários profissionais' : 'Honorários profissionais'}${hasTaxas ? ' + taxas governamentais estimadas' : ''}
+          Honorários profissionais${hasTaxas ? ' + taxas governamentais estimadas' : ''}
         </div>
         <div style="margin-top: 24px; font-size: 12px; color: #94a3b8;">
           Emissão: ${d.data_emissao} · Válida por ${d.validade_dias} dias
@@ -299,7 +337,9 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           ${temOrdem ? `
             <div>
               <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Ordem Sugerida de Execução</div>
-              <div style="font-size: 12px; color: #334155; line-height: 1.7; background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">${esc(d.ordem_execucao)}</div>
+              <div style="background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                ${formatarOrdemExecucao(d.ordem_execucao, isCliente)}
+              </div>
             </div>
           ` : ''}
         </div>
@@ -313,7 +353,14 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     .map(s => ({ ...s, items: d.itens.filter(i => i.secao === s.key).sort((a, b) => a.ordem - b.ordem) }))
     .filter(g => g.items.length > 0);
 
-  const allEntries: Array<{ item: OrcamentoItem; sectionLabel?: string; sectionKey?: string }> = [];
+  interface ItemEntry {
+    item: OrcamentoItem;
+    sectionLabel?: string;
+    sectionKey?: string;
+    _injectSectionLabel?: string;
+  }
+
+  const allEntries: ItemEntry[] = [];
   for (const group of grouped) {
     const label = group.key !== 'geral' ? `${group.label} (${group.items.length})` : undefined;
     group.items.forEach((item, i) => {
@@ -322,16 +369,19 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   }
 
   const ITEMS_PER_PAGE = 3;
-  const itemPages: Array<typeof allEntries> = [];
+  const itemPages: Array<ItemEntry[]> = [];
   for (let i = 0; i < allEntries.length; i += ITEMS_PER_PAGE) {
     itemPages.push(allEntries.slice(i, i + ITEMS_PER_PAGE));
   }
 
-  // Smart pagination: merge lonely last item into previous page
+  // CORREÇÃO 2 — Smart pagination: merge lonely last item into previous page
   if (itemPages.length > 1) {
     const lastPage = itemPages[itemPages.length - 1];
     const prevPage = itemPages[itemPages.length - 2];
     if (lastPage.length === 1 && prevPage.length <= 2) {
+      if (lastPage[0].sectionLabel) {
+        lastPage[0]._injectSectionLabel = lastPage[0].sectionLabel;
+      }
       prevPage.push(lastPage[0]);
       itemPages.pop();
     }
@@ -341,7 +391,11 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     let chunkHtml = '';
     for (const entry of chunk) {
       const item = entry.item;
-      if (entry.sectionLabel) {
+
+      // Inject section label for merged items
+      if (entry._injectSectionLabel) {
+        chunkHtml += `<div style="font-size: 11px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin: 16px 0 10px; padding-bottom: 6px; border-bottom: 2px solid ${accentBg};">${esc(entry._injectSectionLabel)}</div>`;
+      } else if (entry.sectionLabel) {
         chunkHtml += `<div style="font-size: 11px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid ${accentBg};">${esc(entry.sectionLabel)}</div>`;
       }
 
@@ -396,11 +450,10 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
             </div>
           `;
         } else {
-          // Fallback: simple row if no contador fields filled
           financialHtml = `
             <div style="padding: 12px 18px; background: #fafafa;">
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 10px;">
-                <span style="color: #6b7280;">${honorarioLabel}</span>
+                <span style="color: #6b7280;">Honorário Trevo</span>
                 <span style="font-weight: 700; color: #1a1a2e;">${fmt(valorTotal)}</span>
               </div>
               ${hasTaxaItem ? `
@@ -477,54 +530,110 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     `);
   }
 
-  // --- PACKAGES PAGE ---
+  // --- PACKAGES PAGE (CORREÇÃO 1) ---
   const validPacotes = d.pacotes.filter(p => p.nome && p.itens_ids.length > 0);
   if (validPacotes.length > 0) {
     let pacotesHtml = '';
     for (const pac of validPacotes) {
       const selected = d.itens.filter(i => pac.itens_ids.includes(i.id));
-      const honorario = selected.reduce((s, i) => {
-        return s + getItemDisplayValue(i);
-      }, 0);
-      const honorarioDesc = honorario * (1 - pac.desconto_pct / 100);
+      const descontoPct = pac.desconto_pct / 100;
+
+      // Custo Trevo
+      const custoSemDesconto = selected.reduce((s, i) => s + (i.honorario || 0) * i.quantidade, 0);
+      const custoComDesconto = custoSemDesconto * (1 - descontoPct);
+
+      // Preço sugerido ao cliente
+      const precoSemDesconto = selected.reduce((s, i) => s + ((i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0);
+      const precoComDesconto = precoSemDesconto * (1 - descontoPct);
+
+      // Margem
+      const margemValor = precoComDesconto - custoComDesconto;
+      const margemPct = custoComDesconto > 0 ? ((margemValor / custoComDesconto) * 100).toFixed(0) : '0';
+
+      // Taxas
       const taxaMin = selected.reduce((s, i) => s + i.taxa_min, 0);
       const taxaMax = selected.reduce((s, i) => s + i.taxa_max, 0);
       const hasTaxaPac = taxaMin > 0 || taxaMax > 0;
 
       const itensNomes = selected.map(i => `✓ ${i.ordem}. ${i.descricao}`);
-      const valorLabel = isCliente ? 'Investimento' : 'Honorários';
 
-      pacotesHtml += `
-        <div style="border: 1px solid #e5e7eb; border-radius: 16px; margin-bottom: 16px; overflow: hidden;">
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
-            <span style="font-size: 14px; font-weight: 800; color: #ffffff;">${esc(pac.nome)}</span>
-            <span style="font-size: 11px; color: ${accentColorLight}; font-weight: 700;">-${pac.desconto_pct}% de desconto</span>
-          </div>
-          <div style="padding: 12px 18px; border-bottom: 1px solid #f3f4f6;">
-            ${itensNomes.map(n => `<div style="font-size: 10px; color: #374151; padding: 2px 0;">${esc(n)}</div>`).join('')}
-          </div>
-          <div style="padding: 12px 18px; background: #fafafa;">
-            <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 10px;">
-              <span style="color: #6b7280;">${valorLabel} sem desconto</span>
-              <span style="text-decoration: line-through; color: #94a3b8;">${fmt(honorario)}</span>
+      if (!isCliente) {
+        // CONTADOR MODE — full breakdown with margins
+        pacotesHtml += `
+          <div style="border: 1px solid #e5e7eb; border-radius: 16px; margin-bottom: 16px; overflow: hidden;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
+              <span style="font-size: 14px; font-weight: 800; color: #ffffff;">${esc(pac.nome)}</span>
+              <span style="font-size: 11px; color: #4ade80; font-weight: 700;">-${pac.desconto_pct}% de desconto</span>
             </div>
-            <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 10px;">
-              <span style="color: ${accentText}; font-weight: 600;">${valorLabel} com -${pac.desconto_pct}%</span>
-              <span style="color: ${accentText}; font-weight: 700;">${fmt(honorarioDesc)}</span>
+            <div style="padding: 12px 18px; border-bottom: 1px solid #f3f4f6;">
+              ${itensNomes.map(n => `<div style="font-size: 10px; color: #374151; padding: 2px 0;">${esc(n)}</div>`).join('')}
             </div>
-            ${hasTaxaPac ? `
-              <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 10px;">
-                <span style="color: #6b7280;">Taxas externas estimadas</span>
-                <span style="color: #92400e;">${fmt(taxaMin)} a ${fmt(taxaMax)}</span>
+            <div style="border-top: 1px solid #e5e7eb;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6;">
+                <div style="font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">SEU CUSTO TREVO</div>
+                <div style="text-align: right; font-size: 11px;">
+                  <span style="text-decoration: line-through; color: #9ca3af; margin-right: 8px; font-size: 9px;">${fmt(custoSemDesconto)}</span>
+                  <span style="font-weight: 700;">${fmt(custoComDesconto)}</span>
+                </div>
               </div>
-            ` : ''}
-            <div style="display: flex; justify-content: space-between; margin-top: 6px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 11px;">
-              <span style="font-weight: 700; color: #1a1a2e;">INVESTIMENTO TOTAL</span>
-              <span style="font-weight: 800; color: ${accentText};">${hasTaxaPac ? `${fmt(honorarioDesc + taxaMin)} a ${fmt(honorarioDesc + taxaMax)}` : fmt(honorarioDesc)}</span>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6; background: #f0fdf4;">
+                <div style="font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">SUGESTÃO PARA SEU CLIENTE</div>
+                <div style="text-align: right; font-size: 11px;">
+                  <span style="text-decoration: line-through; color: #9ca3af; margin-right: 8px; font-size: 9px;">${fmt(precoSemDesconto)}</span>
+                  <span style="font-weight: 700; color: #166534;">${fmt(precoComDesconto)}</span>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6; background: #eff6ff;">
+                <div style="font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">SUA MARGEM NESTE PACOTE</div>
+                <div style="font-size: 11px; font-weight: 700; color: #1e40af;">${fmt(margemValor)} (${margemPct}%)</div>
+              </div>
+              ${hasTaxaPac ? `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6;">
+                  <div style="font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">TAXAS EXTERNAS</div>
+                  <div style="font-size: 11px;">${fmt(taxaMin)} a ${fmt(taxaMax)}</div>
+                </div>
+              ` : ''}
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 18px; background: #fafafa; border-top: 2px solid #e5e7eb;">
+                <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #1a1a2e;">INVESTIMENTO TOTAL CLIENTE</div>
+                <div style="font-size: 13px; font-weight: 800;">${hasTaxaPac ? `${fmt(precoComDesconto + taxaMin)} a ${fmt(precoComDesconto + taxaMax)}` : fmt(precoComDesconto)}</div>
+              </div>
             </div>
           </div>
-        </div>
-      `;
+        `;
+      } else {
+        // CLIENTE MODE — clean, no cost or margin
+        pacotesHtml += `
+          <div style="border: 1px solid #e5e7eb; border-radius: 16px; margin-bottom: 16px; overflow: hidden;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
+              <span style="font-size: 14px; font-weight: 800; color: #ffffff;">${esc(pac.nome)}</span>
+              <span style="font-size: 11px; color: #93c5fd; font-weight: 700;">-${pac.desconto_pct}% de desconto</span>
+            </div>
+            <div style="padding: 12px 18px; border-bottom: 1px solid #f3f4f6;">
+              ${itensNomes.map(n => `<div style="font-size: 10px; color: #374151; padding: 2px 0;">${esc(n)}</div>`).join('')}
+            </div>
+            <div style="padding: 12px 18px; background: #fafafa;">
+              <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 10px;">
+                <span style="color: #6b7280;">Investimento sem desconto</span>
+                <span style="text-decoration: line-through; color: #94a3b8;">${fmt(precoSemDesconto)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 10px;">
+                <span style="color: #1e40af; font-weight: 600;">Investimento com -${pac.desconto_pct}%</span>
+                <span style="color: #1e40af; font-weight: 700;">${fmt(precoComDesconto)}</span>
+              </div>
+              ${hasTaxaPac ? `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 10px;">
+                  <span style="color: #6b7280;">Taxas governamentais estimadas</span>
+                  <span style="color: #92400e;">${fmt(taxaMin)} a ${fmt(taxaMax)}</span>
+                </div>
+              ` : ''}
+              <div style="display: flex; justify-content: space-between; margin-top: 6px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 11px;">
+                <span style="font-weight: 700; color: #1a1a2e;">INVESTIMENTO TOTAL</span>
+                <span style="font-weight: 800; color: #1e40af;">${hasTaxaPac ? `${fmt(precoComDesconto + taxaMin)} a ${fmt(precoComDesconto + taxaMax)}` : fmt(precoComDesconto)}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }
     }
 
     pages.push(`
@@ -540,19 +649,22 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   }
 
   // --- TOTALS + CONDITIONS + CTA PAGE ---
-  // Dynamic prazo - vertical list instead of inline to prevent overflow
+  // CORREÇÃO 4 — Prazos with dots layout and shortName
   const prazosItens = d.itens.filter(i => i.prazo);
   let prazoHtml = '';
   if (prazosItens.length > 0) {
-    const prazoItems = prazosItens.map(i => {
-      const nome = i.descricao.length > 30 ? i.descricao.substring(0, 30) + '…' : i.descricao;
-      return `<div style="font-size: 10px; color: #374151; padding: 2px 0;">• ${esc(nome)}: ${esc(i.prazo)}</div>`;
-    }).join('');
+    const prazoItems = prazosItens.map(i => `
+      <div style="display: flex; align-items: baseline; gap: 4px; font-size: 9px; padding: 3px 0;">
+        <span style="font-weight: 600; color: #374151; white-space: nowrap;">${esc(shortName(i.descricao))}</span>
+        <span style="flex: 1; border-bottom: 1px dotted #d1d5db; min-width: 20px; margin: 0 4px;"></span>
+        <span style="font-weight: 500; color: #6b7280; white-space: nowrap;">${esc(i.prazo)}</span>
+      </div>
+    `).join('');
     prazoHtml = `
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
         <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Prazos por Serviço</div>
         ${prazoItems}
-        <div style="font-size: 9px; color: #94a3b8; margin-top: 8px; font-style: italic;">Prazo total estimado: execução sequencial conforme complexidade.</div>
+        <div style="margin-top: 8px; font-size: 8px; font-style: italic; color: #9ca3af;">Prazo total estimado: execução sequencial, 6 a 12 semanas.</div>
       </div>
     `;
   } else if (d.prazo_execucao) {
@@ -564,6 +676,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     `;
   }
 
+  // CORREÇÃO 6 — CTA per mode
   const ctaSection = !isCliente ? `
     <div style="background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); border-radius: 16px; padding: 24px; text-align: center;">
       <div style="font-size: 11px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
@@ -577,9 +690,84 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   ` : `
     <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 16px; padding: 24px; text-align: center;">
       <div style="font-size: 11px; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
-      <div style="font-size: 10px; color: rgba(255,255,255,0.7); margin-bottom: 16px;">Para aprovar esta proposta, entre em contato com a nossa equipe.</div>
+      <div style="font-size: 10px; color: rgba(255,255,255,0.7);">Para aprovar esta proposta ou esclarecer dúvidas, entre em contato com o escritório responsável.</div>
     </div>
   `;
+
+  // CORREÇÃO 8 — Resumo per mode
+  let resumoHtml = '';
+  if (!isCliente) {
+    // CONTADOR: show cost + suggested price + margin
+    const descontoCusto = totalCustoTrevo * (d.desconto_pct / 100);
+    const custoFinal = totalCustoTrevo - descontoCusto;
+    const descontoPreco = totalPrecoCliente * (d.desconto_pct / 100);
+    const precoFinal = totalPrecoCliente - descontoPreco;
+    const margemTotal = precoFinal - custoFinal;
+    const margemTotalPct = custoFinal > 0 ? (((precoFinal / custoFinal) - 1) * 100).toFixed(0) : '0';
+
+    resumoHtml = `
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
+          <span style="color: #64748b;">Seu custo Trevo (honorários)</span>
+          <span style="font-weight: 600;">${fmt(totalCustoTrevo)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; background: #f0fdf4; margin: 2px -20px; padding-left: 20px; padding-right: 20px;">
+          <span style="color: #166534;">Sugestão para seu cliente (honorários)</span>
+          <span style="font-weight: 700; color: #166534;">${fmt(totalPrecoCliente)}</span>
+        </div>
+        ${d.desconto_pct > 0 ? `
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; color: #dc2626;">
+            <span>Desconto (${d.desconto_pct}%)</span>
+            <span style="font-weight: 600;">- ${fmt(descontoPreco)} (cliente) / - ${fmt(descontoCusto)} (custo)</span>
+          </div>
+        ` : ''}
+        <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; background: #eff6ff; margin: 2px -20px; padding-left: 20px; padding-right: 20px;">
+          <span style="color: #1e40af;">Sua margem total</span>
+          <span style="font-weight: 700; color: #1e40af;">${fmt(margemTotal)} (${margemTotalPct}%)</span>
+        </div>
+        ${hasTaxas ? `
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-top: 1px solid #e2e8f0;">
+            <span style="color: #64748b;">Taxas externas estimadas</span>
+            <span style="color: #b45309; font-weight: 600;">${fmt(totalTaxaMin)} a ${fmt(totalTaxaMax)}</span>
+          </div>
+        ` : ''}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 10px; background: #f0fdf4; border: 2px solid #22c55e; border-radius: 12px;">
+          <span style="font-size: 12px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 1px;">Investimento Total do Cliente</span>
+          <span style="font-size: ${hasTaxas ? '22' : '28'}px; font-weight: 900; color: #166534;">
+            ${hasTaxas ? `${fmt(precoFinal + totalTaxaMin)} a ${fmt(precoFinal + totalTaxaMax)}` : fmt(precoFinal)}
+          </span>
+        </div>
+      </div>
+    `;
+  } else {
+    // CLIENTE: simple — just investment + taxes + total
+    resumoHtml = `
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
+          <span style="color: #64748b;">Investimento (honorários)</span>
+          <span style="font-weight: 600;">${fmt(totalPrecoCliente)}</span>
+        </div>
+        ${d.desconto_pct > 0 ? `
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; color: #dc2626;">
+            <span>Desconto (${d.desconto_pct}%)</span>
+            <span style="font-weight: 600;">- ${fmt(totalPrecoCliente * d.desconto_pct / 100)}</span>
+          </div>
+        ` : ''}
+        ${hasTaxas ? `
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-top: 1px solid #e2e8f0;">
+            <span style="color: #64748b;">Taxas externas estimadas</span>
+            <span style="color: #b45309; font-weight: 600;">${fmt(totalTaxaMin)} a ${fmt(totalTaxaMax)}</span>
+          </div>
+        ` : ''}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 10px; background: #eff6ff; border: 2px solid #3b82f6; border-radius: 12px;">
+          <span style="font-size: 12px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 1px;">${hasTaxas ? 'Investimento Total' : 'Total'}</span>
+          <span style="font-size: ${hasTaxas ? '22' : '28'}px; font-weight: 900; color: #1e40af;">
+            ${hasTaxas ? `${fmt(honorarioFinalCapa + totalTaxaMin)} a ${fmt(honorarioFinalCapa + totalTaxaMax)}` : fmt(honorarioFinalCapa)}
+          </span>
+        </div>
+      </div>
+    `;
+  }
 
   pages.push(`
     <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
@@ -587,30 +775,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
       <div style="padding: 30px 40px;">
         <!-- Totals -->
         <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Resumo do Investimento</div>
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
-          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
-            <span style="color: #64748b;">${honorarioLabel}${!isCliente ? ' profissionais' : ''}</span>
-            <span style="font-weight: 600;">${fmt(totalHonorarios)}</span>
-          </div>
-          ${d.desconto_pct > 0 ? `
-            <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; color: #dc2626;">
-              <span>Desconto (${d.desconto_pct}%)</span>
-              <span style="font-weight: 600;">- ${fmt(descontoValor)}</span>
-            </div>
-          ` : ''}
-          ${hasTaxas ? `
-            <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-top: 1px solid #e2e8f0;">
-              <span style="color: #64748b;">Taxas externas estimadas</span>
-              <span style="color: #b45309; font-weight: 600;">${fmt(totalTaxaMin)} a ${fmt(totalTaxaMax)}</span>
-            </div>
-          ` : ''}
-          <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 10px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 12px;">
-            <span style="font-size: 12px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 1px;">${hasTaxas ? 'Investimento Total' : 'Total'}</span>
-            <span style="font-size: ${hasTaxas ? '22' : '28'}px; font-weight: 900; color: ${accentText};">
-              ${hasTaxas ? `${fmt(investimentoMin)} a ${fmt(investimentoMax)}` : fmt(honorarioFinal)}
-            </span>
-          </div>
-        </div>
+        ${resumoHtml}
 
         <!-- Conditions -->
         <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Condições</div>
