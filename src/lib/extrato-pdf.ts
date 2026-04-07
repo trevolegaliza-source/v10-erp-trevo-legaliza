@@ -400,7 +400,7 @@ function buildFooterHTML(pageNumber: number, totalPages: number) {
   return `
     <div class="footer-contact">
       <div><strong>${escapeHtml(BRAND.fantasia)}</strong> · CNPJ ${escapeHtml(BRAND.cnpj)}</div>
-      <div>${escapeHtml(BRAND.endereco)} · ${escapeHtml(BRAND.email)} · ${escapeHtml(BRAND.telefone)}</div>
+      <div>${escapeHtml(BRAND.endereco)} · ${escapeHtml(BRAND.email)} · ${escapeHtml(BRAND.telefone)} · trevolegaliza.com.br</div>
     </div>
     <div class="page-footer">
       <span>Trevo Legaliza</span>
