@@ -9,7 +9,6 @@ import { MapPin, Users, Kanban, DollarSign, ChevronRight } from 'lucide-react';
 import { MapaBrasilEnterprise, type EstadoData } from '@/components/mapa/MapaBrasilEnterprise';
 import { useTheme } from 'next-themes';
 import { GlassCard } from '@/components/ui/glass-card';
-import { useTheme } from 'next-themes';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
