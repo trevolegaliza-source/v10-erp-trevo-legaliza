@@ -120,7 +120,7 @@ function buildHTML(d: OrcamentoPDFData): string {
       <!-- Footer -->
       <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 40px; border-top: 1px solid #e2e8f0; background: #f8fafc; text-align: center;">
         <div style="font-size: 10px; color: #94a3b8;">
-          Trevo Legaliza 🍀 · administrativo@trevolegaliza.com.br · (11) 93492-7001 · trevolegaliza.com.br
+          Trevo Legaliza · CNPJ 39.969.412/0001-70 · Rua Brasil, nº 1170, Rudge Ramos, SBC/SP · administrativo@trevolegaliza.com.br · (11) 93492-7001 · trevolegaliza.com.br
         </div>
       </div>
     </div>
