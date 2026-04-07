@@ -416,6 +416,34 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
             <Input value={fornecedor} onChange={e => setFornecedor(e.target.value)} placeholder="Quem recebe o pagamento..." />
           </div>
 
+          {/* Conta Contábil + Centro de Custo */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>Conta Contábil</Label>
+              <Select value={contaId} onValueChange={setContaId}>
+                <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                <SelectContent>
+                  {contasDespesa.map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.codigo} — {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Centro de Custo</Label>
+              <Select value={centroCusto} onValueChange={setCentroCusto}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="operacional">Operacional</SelectItem>
+                  <SelectItem value="administrativo">Administrativo</SelectItem>
+                  <SelectItem value="comercial">Comercial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           {/* Vincular Colaborador */}
           <div className="rounded-lg border border-border/60 p-3 space-y-3">
             <div className="flex items-center justify-between">
