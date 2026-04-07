@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
-import { Search, Sun, Moon } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { NotificationPopover } from '@/components/NotificationPopover';
 import { CommandPalette } from '@/components/CommandPalette';
-import { useTheme } from 'next-themes';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { usePermissions } from '@/hooks/usePermissions';
 
 export function AppLayout() {
-  const { theme, setTheme } = useTheme();
   const { user } = useAuth();
   const { role } = usePermissions();
   const [profileName, setProfileName] = useState<string | null>(null);
+
+  // Force dark mode
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -23,7 +26,6 @@ export function AppLayout() {
       if (data?.nome) setProfileName(data.nome);
     });
   }, [user]);
-
   const displayName = profileName || (user?.email
     ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1).replace(/[._-]/g, ' ')
     : 'Usuário');
