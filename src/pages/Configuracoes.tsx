@@ -75,38 +75,17 @@ export default function Configuracoes() {
           <Card className="border-border/60">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base"><Palette className="h-4 w-4 text-primary" />Aparência</CardTitle>
-              <CardDescription>Tema e personalização visual do sistema</CardDescription>
+              <CardDescription>Personalização visual do sistema</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">Tema do Sistema</Label>
-                <RadioGroup value={theme} onValueChange={setTheme} className="grid grid-cols-3 gap-3">
-                  <Label
-                    htmlFor="theme-light"
-                    className="flex flex-col items-center gap-2 rounded-lg border-2 border-border/40 p-4 cursor-pointer hover:bg-muted/50 transition-colors [&:has(:checked)]:border-primary [&:has(:checked)]:bg-primary/5"
-                  >
-                    <RadioGroupItem value="light" id="theme-light" className="sr-only" />
-                    <Sun className="h-6 w-6 text-warning" />
-                    <span className="text-sm font-medium">Claro</span>
-                  </Label>
-                  <Label
-                    htmlFor="theme-dark"
-                    className="flex flex-col items-center gap-2 rounded-lg border-2 border-border/40 p-4 cursor-pointer hover:bg-muted/50 transition-colors [&:has(:checked)]:border-primary [&:has(:checked)]:bg-primary/5"
-                  >
-                    <RadioGroupItem value="dark" id="theme-dark" className="sr-only" />
-                    <Moon className="h-6 w-6 text-info" />
-                    <span className="text-sm font-medium">Escuro</span>
-                  </Label>
-                  <Label
-                    htmlFor="theme-system"
-                    className="flex flex-col items-center gap-2 rounded-lg border-2 border-border/40 p-4 cursor-pointer hover:bg-muted/50 transition-colors [&:has(:checked)]:border-primary [&:has(:checked)]:bg-primary/5"
-                  >
-                    <RadioGroupItem value="system" id="theme-system" className="sr-only" />
-                    <Monitor className="h-6 w-6 text-muted-foreground" />
-                    <span className="text-sm font-medium">Automático</span>
-                  </Label>
-                </RadioGroup>
-                <p className="text-xs text-muted-foreground">O tema automático segue a preferência do seu sistema operacional.</p>
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Palette className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Tema Escuro</p>
+                  <p className="text-xs text-muted-foreground">O sistema opera exclusivamente em dark mode para melhor experiência visual.</p>
+                </div>
               </div>
             </CardContent>
           </Card>
