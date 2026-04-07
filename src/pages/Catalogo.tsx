@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, DollarSign, Trash2, BookOpen, Loader2, Save, ArrowLeft, ArrowRight, ChevronRight, Settings, Pencil } from 'lucide-react';
+import { Search, Plus, DollarSign, Trash2, BookOpen, Loader2, Save, ArrowLeft, ArrowRight, ChevronRight, Settings, Pencil, Link2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import {
   useServicos,
@@ -23,6 +23,7 @@ import {
 import { CATALOG_HIERARCHY, type HierarchyGroup, type HierarchyChild } from '@/constants/catalogo-hierarchy';
 import { UFS_BRASIL, UF_NOMES } from '@/constants/estados-brasil';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // ═══════════ CSS GLASSMORPHISM ═══════════
 const GLASS_CSS = `
@@ -141,6 +142,20 @@ export default function Catalogo() {
   const [animKey, setAnimKey] = useState(0);
   const [adminMode, setAdminMode] = useState(false);
 
+  async function handleCopyLink() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('empresa_id')
+      .eq('id', user.id)
+      .single();
+    if (!profile) return;
+    const link = `${window.location.origin}/portfolio/${profile.empresa_id}`;
+    await navigator.clipboard.writeText(link);
+    toast.success('Link público copiado! Envie para seus clientes.');
+  }
+
   function handleDeleteServico(id: string) {
     if (!confirm('Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.')) return;
     deleteMut.mutate(id);
@@ -240,9 +255,14 @@ export default function Catalogo() {
             />
           </div>
           {adminMode && (
-            <Button onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Novo Serviço
-            </Button>
+            <>
+              <Button variant="outline" onClick={handleCopyLink}>
+                <Link2 className="h-4 w-4 mr-1" /> Copiar Link Público
+              </Button>
+              <Button onClick={() => setShowCreate(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Novo Serviço
+              </Button>
+            </>
           )}
         </div>
       </div>

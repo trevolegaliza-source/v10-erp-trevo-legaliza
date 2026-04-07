@@ -27,6 +27,7 @@ const OrcamentoNovo = lazy(() => import("./pages/OrcamentoNovo"));
 const InteligenciaGeografica = lazy(() => import("./pages/InteligenciaGeografica"));
 const EstadoDetalhe = lazy(() => import("./pages/EstadoDetalhe"));
 const Catalogo = lazy(() => import("./pages/Catalogo"));
+const PortfolioPublico = lazy(() => import("./pages/PortfolioPublico"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -148,6 +149,7 @@ const App = () => (
                     </RequirePermission>
                   } />
                 </Route>
+                <Route path="/portfolio/:token" element={<PortfolioPublico />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
