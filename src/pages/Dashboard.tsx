@@ -348,44 +348,47 @@ export default function Dashboard() {
           });
           if (alertasFiltrados.length === 0) {
             return (
-              <Card className="p-4 border-green-500/30 bg-green-500/5">
+              <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.15)">
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                    <Check className="h-4 w-4 text-green-500" />
+                  <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <Check className="h-4 w-4 text-emerald-400" />
                   </div>
                   <div>
-                    <p className="font-medium text-green-500">Tudo em dia!</p>
-                    <p className="text-xs text-muted-foreground">Nenhuma ação urgente no momento.</p>
+                    <p className="font-medium text-emerald-400">Tudo em dia!</p>
+                    <p className="text-xs text-white/50">Nenhuma ação urgente no momento.</p>
                   </div>
                 </div>
-              </Card>
+              </GlassCard>
             );
           }
+          const glowMap = {
+            critical: 'rgba(239, 68, 68, 0.12)',
+            warning: 'rgba(245, 158, 11, 0.12)',
+            info: 'rgba(59, 130, 246, 0.12)',
+          };
+          const iconColorMap = {
+            critical: 'text-red-400',
+            warning: 'text-amber-400',
+            info: 'text-blue-400',
+          };
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {alertasFiltrados.map(alerta => {
-                const colors = {
-                  critical: { border: 'border-destructive/30 bg-destructive/5', circle: 'bg-destructive/20', icon: 'text-destructive' },
-                  warning: { border: 'border-amber-500/30 bg-amber-500/5', circle: 'bg-amber-500/20', icon: 'text-amber-500' },
-                  info: { border: 'border-blue-500/30 bg-blue-500/5', circle: 'bg-blue-500/20', icon: 'text-blue-500' },
-                }[alerta.severity];
-                return (
-                  <Card key={alerta.id} className={`p-4 cursor-pointer hover:-translate-y-0.5 transition-all duration-200 ${colors.border}`} onClick={() => navigate(alerta.link)}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`h-8 w-8 rounded-full flex items-center justify-center ${colors.circle}`}>
-                          <alerta.icon className={`h-4 w-4 ${colors.icon}`} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{alerta.titulo}</p>
-                          <p className="text-xs text-muted-foreground">{alerta.descricao}</p>
-                        </div>
+              {alertasFiltrados.map(alerta => (
+                <GlassCard key={alerta.id} variant="service" glowColor={glowMap[alerta.severity]} onClick={() => navigate(alerta.link)}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center">
+                        <alerta.icon className={`h-4 w-4 ${iconColorMap[alerta.severity]}`} />
                       </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium text-white">{alerta.titulo}</p>
+                        <p className="text-xs text-white/50">{alerta.descricao}</p>
+                      </div>
                     </div>
-                  </Card>
-                );
-              })}
+                    <ChevronRight className="h-4 w-4 text-white/30" />
+                  </div>
+                </GlassCard>
+              ))}
             </div>
           );
         })()}
