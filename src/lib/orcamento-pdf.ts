@@ -112,7 +112,7 @@ const FOOTER_CLIENTE = (nome: string) => `
   </div>
 `;
 
-export function sanitizeFilename(name: string): string {
+function sanitizeFilename(name: string): string {
   return name
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

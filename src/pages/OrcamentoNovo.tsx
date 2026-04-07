@@ -13,11 +13,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Plus, FileText, Save, FileDown, ArrowLeft, Copy,
 } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import {
-  type OrcamentoForm, type OrcamentoModo, type OrcamentoItem,
+  type OrcamentoForm, type OrcamentoModo, type OrcamentoItem, type OrcamentoPDFMode,
   DEFAULT_SECOES, createItem, normalizeItem, getItemValor,
 } from '@/components/orcamentos/types';
 import { ItemCardSimples } from '@/components/orcamentos/ItemCardSimples';
@@ -55,7 +54,7 @@ export default function OrcamentoNovo() {
   const [form, setForm] = useState<OrcamentoForm>(defaultForm());
   const [orcamentoId, setOrcamentoId] = useState<string | null>(editId);
   const [orcamentoNumero, setOrcamentoNumero] = useState<number>(0);
-  const [modoContador, setModoContador] = useState(false);
+  const [modoPDF, setModoPDF] = useState<OrcamentoPDFMode>('contador');
   const saveMutation = useSaveOrcamento();
 
   const { data: clientes } = useQuery({
@@ -83,7 +82,6 @@ export default function OrcamentoNovo() {
         }
       } catch { /* ignore */ }
 
-      // Detect mode: if any item has taxa_min/taxa_max/prazo/docs, it's detailed
       const hasDetailedData = itens.some(i => i.taxa_min > 0 || i.taxa_max > 0 || i.prazo || i.docs_necessarios);
       const hasContexto = !!(orc as any).contexto;
       const modo: OrcamentoModo = (hasDetailedData || hasContexto) ? 'detalhado' : 'simples';
@@ -228,9 +226,14 @@ export default function OrcamentoNovo() {
     try {
       await handleSave('enviado');
 
+      // Find client name for cliente mode
+      const selectedCliente = clientes?.find(c => c.id === form.cliente_id);
+      const clienteNome = selectedCliente?.nome || form.prospect_nome;
+
       const doc = await gerarOrcamentoPDF({
         modo: form.modo,
-        modoContador,
+        modoPDF,
+        clienteNome: clienteNome,
         prospect_nome: form.prospect_nome,
         prospect_cnpj: form.prospect_cnpj,
         itens: itensValidos,
@@ -248,8 +251,8 @@ export default function OrcamentoNovo() {
         numero: orcamentoNumero || 0,
         data_emissao: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
       });
-      const clienteName = sanitizeFilename(form.prospect_nome || 'proposta');
-      doc.save(`Proposta_${clienteName}_${new Date().toISOString().split('T')[0]}.pdf`);
+      const cleanName = sanitizeFilename(form.prospect_nome || 'proposta');
+      doc.save(`Proposta_${cleanName}_${new Date().toISOString().split('T')[0]}.pdf`);
       toast.dismiss(toastId);
       toast.success('PDF gerado com sucesso!');
     } catch (err: any) {
@@ -401,13 +404,29 @@ export default function OrcamentoNovo() {
                 </RadioGroup>
               </div>
 
-              {/* Contexto fields (detailed only) */}
+              {/* PDF Mode toggle (detailed only) */}
               {isDetalhado && (
                 <div className="space-y-3 pt-3 border-t">
-                  <div className="flex items-center gap-2">
-                    <Switch checked={modoContador} onCheckedChange={setModoContador} />
-                    <span className="text-sm text-muted-foreground">Gerar proposta para cliente do contador (com markup)</span>
+                  <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card">
+                    <span className="text-sm font-medium">Gerar PDF para:</span>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={modoPDF === 'contador' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setModoPDF('contador')}
+                      >
+                        📊 Contador (interno)
+                      </Button>
+                      <Button
+                        variant={modoPDF === 'cliente' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setModoPDF('cliente')}
+                      >
+                        📄 Cliente Final
+                      </Button>
+                    </div>
                   </div>
+
                   <div>
                     <Label className="text-xs">Contexto / Introdução</Label>
                     <Textarea
@@ -448,7 +467,7 @@ export default function OrcamentoNovo() {
                     item={item}
                     idx={idx}
                     secoes={form.secoes}
-                    modoContador={modoContador}
+                    modoContador={modoPDF === 'contador'}
                     onChange={updateItem}
                     onRemove={removeItem}
                     onAddSecao={handleAddSecao}
@@ -526,7 +545,7 @@ export default function OrcamentoNovo() {
                   itens={form.itens}
                   pacotes={form.pacotes}
                   secoes={form.secoes}
-                  modoContador={modoContador}
+                  modoContador={modoPDF === 'contador'}
                   desconto_pct={form.desconto_pct}
                   validade_dias={form.validade_dias}
                   pagamento={form.pagamento}
@@ -537,7 +556,7 @@ export default function OrcamentoNovo() {
             {/* Action Buttons */}
             <div className="space-y-2">
               <Button onClick={gerarPDF} className="w-full gap-2" disabled={saveMutation.isPending}>
-                <FileDown className="h-4 w-4" /> Gerar PDF
+                <FileDown className="h-4 w-4" /> Gerar PDF {isDetalhado ? (modoPDF === 'contador' ? '(Contador)' : '(Cliente Final)') : ''}
               </Button>
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" onClick={() => handleSave('rascunho')} disabled={saveMutation.isPending} className="gap-1">
