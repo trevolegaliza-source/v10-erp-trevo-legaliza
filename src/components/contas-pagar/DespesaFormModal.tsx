@@ -236,6 +236,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
       etapa_financeiro: 'solicitacao_criada',
       observacoes_financeiro: observacoes || null,
       comprovante_url: comprovanteUrl || editData?.comprovante_url || null,
+      conta_id: contaId || null,
+      centro_custo: centroCusto || null,
     };
 
     if (editData?.id) lancamento.id = editData.id;
