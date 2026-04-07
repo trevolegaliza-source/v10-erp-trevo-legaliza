@@ -619,6 +619,7 @@ export type Database = {
           confirmado_recebimento: boolean | null
           created_at: string | null
           data_pagamento: string | null
+          data_retorno_cobranca: string | null
           data_ultimo_contato: string | null
           data_vencimento: string
           descricao: string
@@ -655,6 +656,7 @@ export type Database = {
           confirmado_recebimento?: boolean | null
           created_at?: string | null
           data_pagamento?: string | null
+          data_retorno_cobranca?: string | null
           data_ultimo_contato?: string | null
           data_vencimento: string
           descricao: string
@@ -691,6 +693,7 @@ export type Database = {
           confirmado_recebimento?: boolean | null
           created_at?: string | null
           data_pagamento?: string | null
+          data_retorno_cobranca?: string | null
           data_ultimo_contato?: string | null
           data_vencimento?: string
           descricao?: string
