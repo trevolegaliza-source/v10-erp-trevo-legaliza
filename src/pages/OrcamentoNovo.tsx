@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useSaveOrcamento, type Orcamento } from '@/hooks/useOrcamentos';
-import { gerarOrcamentoPDF } from '@/lib/orcamento-pdf';
+import { gerarOrcamentoPDF, sanitizeFilename } from '@/lib/orcamento-pdf';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
