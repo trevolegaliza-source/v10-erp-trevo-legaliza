@@ -599,9 +599,32 @@ export default function OrcamentoNovo() {
 
             {/* Action Buttons */}
             <div className="space-y-2">
-              <Button onClick={gerarPDF} className="w-full gap-2" disabled={saveMutation.isPending}>
-                <FileDown className="h-4 w-4" /> Gerar PDF {isDetalhado ? (modoPDF === 'contador' ? '(Contador)' : '(Cliente Final)') : ''}
-              </Button>
+              {isDetalhado ? (
+                <>
+                  <Button
+                    onClick={handleGerarAmbos}
+                    disabled={gerando}
+                    className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
+                    size="lg"
+                  >
+                    {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                    {gerando ? 'Gerando...' : 'Gerar Ambas Propostas'}
+                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleGerarPDF('contador')} disabled={gerando}>
+                      📊 Só Contador
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleGerarPDF('cliente')} disabled={gerando}>
+                      📄 Só Cliente
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Button onClick={() => handleGerarPDF('contador')} className="w-full gap-2" disabled={gerando}>
+                  {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                  {gerando ? 'Gerando...' : 'Gerar PDF'}
+                </Button>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" onClick={() => handleSave('rascunho')} disabled={saveMutation.isPending} className="gap-1">
                   <Save className="h-4 w-4" /> Salvar
@@ -611,6 +634,57 @@ export default function OrcamentoNovo() {
                 </Button>
               </div>
             </div>
+
+            {/* Quick edit hint */}
+            {pdfs && pdfs.some(p => p.modo === 'cliente' && p.status === 'ativo') && (
+              <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                <p className="text-xs text-blue-400 font-medium">
+                  💡 Para atualizar valores do cliente: edite os campos "Sugestão Mínima" nos itens acima e clique "Só Cliente" para gerar nova versão.
+                </p>
+              </div>
+            )}
+
+            {/* PDF History */}
+            {pdfs && pdfs.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Propostas Geradas
+                </h4>
+                <div className="space-y-2">
+                  {pdfs.map(pdf => (
+                    <div
+                      key={pdf.id}
+                      className={cn(
+                        'flex items-center justify-between p-3 rounded-lg border text-sm',
+                        pdf.status === 'cancelado' ? 'opacity-50 bg-muted/30' : 'bg-card'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={pdf.modo === 'contador' ? 'default' : 'secondary'} className="text-[10px]">
+                          {pdf.modo === 'contador' ? '📊 Interno' : '📄 Cliente'}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          v{pdf.versao} · {new Date(pdf.gerado_em).toLocaleDateString('pt-BR')} {new Date(pdf.gerado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {pdf.status === 'cancelado' && pdf.cancelado_em && (
+                          <Badge variant="destructive" className="text-[9px]">
+                            Cancelado em {new Date(pdf.cancelado_em).toLocaleDateString('pt-BR')}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => window.open(pdf.url, '_blank')}>
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(pdf.url); toast.success('Link copiado!'); }}>
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
