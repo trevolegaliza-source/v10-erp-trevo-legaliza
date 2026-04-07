@@ -250,13 +250,33 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="dashboard-section">
-        <h1 className="text-2xl font-bold text-foreground">
-          {getSaudacao()}, {getNomeUsuario(user?.email, profileName)} <span className="animate-trevo-wave">🍀</span>
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
+      <div className="dashboard-section flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            {getSaudacao()}, {getNomeUsuario(user?.email, profileName)} <span className="animate-trevo-wave">🍀</span>
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
+        {podeVer('financeiro') && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={gerandoPdf}
+            onClick={async () => {
+              setGerandoPdf(true);
+              try {
+                await gerarRelatorioMensal();
+              } finally {
+                setGerandoPdf(false);
+              }
+            }}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {gerandoPdf ? 'Gerando...' : 'Relatório Mensal'}
+          </Button>
+        )}
       </div>
 
       {/* SEÇÃO 1: KPIs */}
