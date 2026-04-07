@@ -2,19 +2,22 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useSaveOrcamento, type Orcamento } from '@/hooks/useOrcamentos';
-import { gerarOrcamentoPDF, sanitizeFilename } from '@/lib/orcamento-pdf';
+import { gerarOrcamentoPDF, sanitizeFilename, downloadBlob } from '@/lib/orcamento-pdf';
+import { useOrcamentoPDFs } from '@/hooks/useOrcamentoPDFs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
-  Plus, FileText, Save, FileDown, ArrowLeft, Copy,
+  Plus, FileText, Save, FileDown, ArrowLeft, Copy, ExternalLink, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
 import {
   type OrcamentoForm, type OrcamentoModo, type OrcamentoItem, type OrcamentoPDFMode,
   DEFAULT_SECOES, createItem, normalizeItem, getItemValor,
