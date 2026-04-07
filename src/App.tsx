@@ -27,6 +27,7 @@ const OrcamentoNovo = lazy(() => import("./pages/OrcamentoNovo"));
 const InteligenciaGeografica = lazy(() => import("./pages/InteligenciaGeografica"));
 const EstadoDetalhe = lazy(() => import("./pages/EstadoDetalhe"));
 const Catalogo = lazy(() => import("./pages/Catalogo"));
+const ImportarProcessos = lazy(() => import("./pages/ImportarProcessos"));
 const PortfolioPublico = lazy(() => import("./pages/PortfolioPublico"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -105,6 +106,11 @@ const App = () => (
                   <Route path="/cadastro-rapido" element={
                     <RequirePermission modulo="processos" acao="criar">
                       <CadastroRapido />
+                    </RequirePermission>
+                  } />
+                  <Route path="/importar" element={
+                    <RequirePermission modulo="processos" acao="criar">
+                      <ImportarProcessos />
                     </RequirePermission>
                   } />
                   <Route path="/financeiro" element={
