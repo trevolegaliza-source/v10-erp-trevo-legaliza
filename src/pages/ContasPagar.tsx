@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 import FluxoProximos15Dias from '@/components/contas-pagar/FluxoProximos15Dias';
-import ContasPagarKPIs from '@/components/contas-pagar/ContasPagarKPIs';
+import ContasPagarKPIs, { type KpiFilter } from '@/components/contas-pagar/ContasPagarKPIs';
 import CategoriaAccordion from '@/components/contas-pagar/CategoriaAccordion';
 import ContasPagarLista from '@/components/contas-pagar/ContasPagarLista';
 import RecorrentesTab from '@/components/contas-pagar/RecorrentesTab';
@@ -46,6 +46,7 @@ import {
   useDeleteRecorrente,
   gerarLancamentosRecorrentes,
 } from '@/hooks/useContasPagar';
+import { useColaboradores } from '@/hooks/useColaboradores';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
@@ -53,6 +54,7 @@ import * as LucideIcons from 'lucide-react';
 
 const MESES_NAV = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const DIAS_SEMANA = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 
 export default function ContasPagar() {
   const { podeCriar, podeEditar, podeExcluir, podeAprovar } = usePermissions();
@@ -64,14 +66,26 @@ export default function ContasPagar() {
   const { data: lancByComp } = useLancamentosPagar(viewMonth, viewYear);
   const { data: lancByDate } = useLancamentosPagarByDate(viewMonth, viewYear);
   const { data: recorrentes = [] } = useDespesasRecorrentes();
+  const { data: colaboradores = [] } = useColaboradores();
   const queryClient = useQueryClient();
 
-  // Merge
+  // Colaboradores map
+  const colabMap = useMemo(() => {
+    const m = new Map<string, string>();
+    colaboradores.forEach((c: any) => m.set(c.id, c.nome));
+    return m;
+  }, [colaboradores]);
+
+  // Merge & enrich with colaborador name
   const lancamentos = useMemo(() => {
     const compSet = new Set((lancByComp || []).map(l => l.id));
     const legacy = (lancByDate || []).filter(l => !compSet.has(l.id));
-    return [...(lancByComp || []), ...legacy];
-  }, [lancByComp, lancByDate]);
+    const all = [...(lancByComp || []), ...legacy];
+    return all.map(l => ({
+      ...l,
+      colaborador_nome: l.colaborador_id ? colabMap.get(l.colaborador_id) || null : null,
+    }));
+  }, [lancByComp, lancByDate, colabMap]);
 
   // Mutations
   const createDespesa = useCreateDespesa();
@@ -117,6 +131,7 @@ export default function ContasPagar() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState('urgencia');
   const [diasAlerta, setDiasAlerta] = useState(() => parseInt(localStorage.getItem('trevo_dias_alerta_pagar') || '7'));
+  const [kpiFilter, setKpiFilter] = useState<KpiFilter>('total');
 
   const selectableIds = useMemo(() => {
     return lancamentos.filter(l => l.status !== 'pago').map(l => l.id);
@@ -172,15 +187,20 @@ export default function ContasPagar() {
     const hojeDate = new Date(); hojeDate.setHours(0, 0, 0, 0);
     const limiteAlerta = new Date(hojeDate);
     limiteAlerta.setDate(limiteAlerta.getDate() + diasAlerta);
+    const hojeStr = hojeDate.toISOString().split('T')[0];
 
     const vencidas = lancamentos.filter(l => {
       const v = new Date(l.data_vencimento + 'T00:00:00');
       return l.status !== 'pago' && v < hojeDate;
     }).sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento));
 
+    const hojeItems = lancamentos.filter(l => {
+      return l.status !== 'pago' && l.data_vencimento === hojeStr;
+    }).sort((a, b) => a.descricao.localeCompare(b.descricao));
+
     const proximas = lancamentos.filter(l => {
       const v = new Date(l.data_vencimento + 'T00:00:00');
-      return l.status !== 'pago' && v >= hojeDate && v <= limiteAlerta;
+      return l.status !== 'pago' && v > hojeDate && v <= limiteAlerta;
     }).sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento));
 
     const futuras = lancamentos.filter(l => {
@@ -191,7 +211,7 @@ export default function ContasPagar() {
     const pagas = lancamentos.filter(l => l.status === 'pago')
       .sort((a, b) => (b.data_pagamento || '').localeCompare(a.data_pagamento || ''));
 
-    return { vencidas, proximas, futuras, pagas };
+    return { vencidas, hojeItems, proximas, futuras, pagas };
   }, [lancamentos, diasAlerta]);
 
   // Navigation
@@ -246,6 +266,13 @@ export default function ContasPagar() {
     }
   };
 
+  const handleKpiFilter = useCallback((filter: KpiFilter) => {
+    setKpiFilter(filter);
+    if (filter !== 'total') {
+      setActiveTab('lista');
+    }
+  }, []);
+
   return (
     <div className="space-y-6">
       {/* Fluxo 15 dias */}
@@ -298,6 +325,8 @@ export default function ContasPagar() {
         totalPago={totalPago}
         totalPendente={totalPendente}
         totalVencido={totalVencido}
+        activeFilter={kpiFilter}
+        onFilterChange={handleKpiFilter}
       />
 
       {/* Dias alerta control */}
@@ -320,7 +349,7 @@ export default function ContasPagar() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={v => { setActiveTab(v); if (v !== 'lista') exitSelectionMode(); }} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={v => { setActiveTab(v); if (v !== 'lista') { exitSelectionMode(); setKpiFilter('total'); } }} className="space-y-4">
         <TabsList>
           <TabsTrigger value="urgencia">Urgência</TabsTrigger>
           <TabsTrigger value="categoria">Categoria</TabsTrigger>
@@ -331,18 +360,27 @@ export default function ContasPagar() {
         <TabsContent value="urgencia">
           <div className="space-y-6">
             {/* VENCIDAS */}
-            {urgencyGroups.vencidas.length > 0 && (
-              <UrgencySection
-                title={`⚠️ VENCIDAS (${urgencyGroups.vencidas.length})`}
-                items={urgencyGroups.vencidas}
-                variant="destructive"
-                onPagar={podeAprovar('contas_pagar') ? (l: any) => setPagoModal(l) : undefined}
-                onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
-                onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
-              />
-            )}
+            <UrgencySection
+              title={`⚠️ VENCIDAS (${urgencyGroups.vencidas.length})`}
+              items={urgencyGroups.vencidas}
+              variant="destructive"
+              onPagar={podeAprovar('contas_pagar') ? (l: any) => setPagoModal(l) : undefined}
+              onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
+              onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+            />
 
-            {/* PRÓXIMAS */}
+            {/* HOJE */}
+            <UrgencySection
+              title={`⏰ HOJE (${urgencyGroups.hojeItems.length})`}
+              items={urgencyGroups.hojeItems}
+              variant="warning"
+              onPagar={podeAprovar('contas_pagar') ? (l: any) => setPagoModal(l) : undefined}
+              onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
+              onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+              alwaysShow
+            />
+
+            {/* PRÓXIMOS N DIAS */}
             {urgencyGroups.proximas.length > 0 && (
               <UrgencySection
                 title={`📅 PRÓXIMOS ${diasAlerta} DIAS (${urgencyGroups.proximas.length})`}
@@ -375,6 +413,7 @@ export default function ContasPagar() {
                 onPagar={undefined}
                 onEdit={podeEditar('contas_pagar') ? (l: any) => { setEditDespesa(l); setDespesaModal(true); } : undefined}
                 onDelete={podeExcluir('contas_pagar') ? handleDelete : undefined}
+                groupByDate={false}
               />
             )}
 
@@ -406,6 +445,7 @@ export default function ContasPagar() {
             hideEdit={!podeEditar('contas_pagar')}
             hideDelete={!podeExcluir('contas_pagar')}
             hideApprove={!podeAprovar('contas_pagar')}
+            kpiFilter={kpiFilter}
           />
         </TabsContent>
 
@@ -511,14 +551,16 @@ export default function ContasPagar() {
   );
 }
 
-// Urgency-grouped section component
-function UrgencySection({ title, items, variant, onPagar, onEdit, onDelete }: {
+// ── Urgency Section with day grouping ──
+function UrgencySection({ title, items, variant, onPagar, onEdit, onDelete, alwaysShow, groupByDate = true }: {
   title: string;
   items: any[];
   variant: 'destructive' | 'warning' | 'default' | 'success';
   onPagar?: (l: any) => void;
   onEdit?: (l: any) => void;
   onDelete?: (l: any) => void;
+  alwaysShow?: boolean;
+  groupByDate?: boolean;
 }) {
   const borderClass = {
     destructive: 'border-destructive/30',
@@ -534,67 +576,137 @@ function UrgencySection({ title, items, variant, onPagar, onEdit, onDelete }: {
     success: 'bg-primary/5',
   }[variant];
 
+  // Group items by date
+  const dayGroups = useMemo(() => {
+    if (!groupByDate) return null;
+    const groups = new Map<string, any[]>();
+    items.forEach(l => {
+      const key = l.data_vencimento;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(l);
+    });
+    return Array.from(groups.entries()).map(([date, items]) => ({
+      date,
+      items,
+      total: items.reduce((s: number, l: any) => s + Number(l.valor), 0),
+    }));
+  }, [items, groupByDate]);
+
+  if (!alwaysShow && items.length === 0) return null;
+
+  return (
+    <div>
+      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">{title}</h3>
+
+      {items.length === 0 && alwaysShow && (
+        <p className="text-sm text-muted-foreground italic pl-2">Nenhum lançamento</p>
+      )}
+
+      {groupByDate && dayGroups ? (
+        <div className="space-y-4">
+          {dayGroups.map(group => {
+            const d = new Date(group.date + 'T12:00:00');
+            const diaSemana = DIAS_SEMANA[d.getDay()];
+            const dataFmt = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+            return (
+              <div key={group.date}>
+                <div className="flex items-center justify-between mb-1.5 px-1">
+                  <span className="text-xs font-semibold text-foreground">
+                    {dataFmt} · {diaSemana}
+                  </span>
+                  <span className="text-xs font-bold text-muted-foreground">
+                    {fmt(group.total)}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {group.items.map((l: any) => (
+                    <LancamentoRow key={l.id} l={l} variant={variant} borderClass={borderClass} bgClass={bgClass} onPagar={onPagar} onEdit={onEdit} onDelete={onDelete} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {items.map(l => (
+            <LancamentoRow key={l.id} l={l} variant={variant} borderClass={borderClass} bgClass={bgClass} onPagar={onPagar} onEdit={onEdit} onDelete={onDelete} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Single row inside urgency section ──
+function LancamentoRow({ l, variant, borderClass, bgClass, onPagar, onEdit, onDelete }: {
+  l: any;
+  variant: string;
+  borderClass: string;
+  bgClass: string;
+  onPagar?: (l: any) => void;
+  onEdit?: (l: any) => void;
+  onDelete?: (l: any) => void;
+}) {
+  const hojeDate = new Date(); hojeDate.setHours(0, 0, 0, 0);
+  const venc = new Date(l.data_vencimento + 'T00:00:00');
+  const diasAte = Math.ceil((venc.getTime() - hojeDate.getTime()) / 86400000);
+  const pago = l.status === 'pago';
+
   const catEmojis: Record<string, string> = {
     folha: '💰', infraestrutura: '🏢', software: '💻', impostos: '📋',
     servicos: '🔧', marketing: '📢', outros: '📌',
   };
 
   return (
-    <div>
-      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">{title}</h3>
-      <div className="space-y-1.5">
-        {items.map(l => {
-          const hojeDate = new Date(); hojeDate.setHours(0, 0, 0, 0);
-          const venc = new Date(l.data_vencimento + 'T00:00:00');
-          const diasAte = Math.ceil((venc.getTime() - hojeDate.getTime()) / 86400000);
-          const pago = l.status === 'pago';
+    <div className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${borderClass} ${bgClass}`}>
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="text-base">{catEmojis[l.categoria] || '📌'}</span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">
+            {l.subcategoria || l.descricao}
+            {l.colaborador_nome && (
+              <span className="text-muted-foreground font-normal"> — {l.colaborador_nome}</span>
+            )}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {pago
+              ? `Pago em ${l.data_pagamento ? new Date(l.data_pagamento + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}`
+              : diasAte < 0
+                ? `Venceu há ${Math.abs(diasAte)} dia${Math.abs(diasAte) > 1 ? 's' : ''}`
+                : diasAte === 0
+                  ? `Vence HOJE`
+                  : `Vence em ${diasAte} dia${diasAte > 1 ? 's' : ''}`
+            }
+            {l.categoria && ` · ${l.categoria}`}
+          </p>
+          {l.observacoes_financeiro && <p className="text-xs text-muted-foreground mt-0.5">💬 {l.observacoes_financeiro}</p>}
+        </div>
+      </div>
 
-          return (
-            <div key={l.id} className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${borderClass} ${bgClass}`}>
-              <div className="flex items-center gap-3 min-w-0">
-                <span className="text-base">{catEmojis[l.categoria] || '📌'}</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{l.subcategoria || l.descricao}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {pago
-                      ? `Pago em ${l.data_pagamento ? new Date(l.data_pagamento + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}`
-                      : diasAte < 0
-                        ? `Venceu há ${Math.abs(diasAte)} dia${Math.abs(diasAte) > 1 ? 's' : ''} (${venc.toLocaleDateString('pt-BR')})`
-                        : diasAte === 0
-                          ? `Vence HOJE`
-                          : `Vence em ${diasAte} dia${diasAte > 1 ? 's' : ''} (${venc.toLocaleDateString('pt-BR')})`
-                    }
-                  </p>
-                  {l.observacoes_financeiro && <p className="text-xs text-muted-foreground mt-0.5">💬 {l.observacoes_financeiro}</p>}
-                </div>
-              </div>
+      <div className="flex items-center gap-3 flex-shrink-0">
+        <span className={`text-sm font-bold ${
+          pago ? 'text-primary' : variant === 'destructive' ? 'text-destructive' : 'text-foreground'
+        }`}>
+          {fmt(Number(l.valor))}
+        </span>
 
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <span className={`text-sm font-bold ${
-                  pago ? 'text-primary' : variant === 'destructive' ? 'text-destructive' : 'text-foreground'
-                }`}>
-                  {fmt(Number(l.valor))}
-                </span>
+        {onPagar && !pago && (
+          <Button size="sm" variant="outline" onClick={() => onPagar(l)} className="h-7 text-xs">
+            <Check className="h-3 w-3 mr-1" /> Pagar
+          </Button>
+        )}
 
-                {onPagar && !pago && (
-                  <Button size="sm" variant="outline" onClick={() => onPagar(l)} className="h-7 text-xs">
-                    <Check className="h-3 w-3 mr-1" /> Pagar
-                  </Button>
-                )}
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {onEdit && <DropdownMenuItem onClick={() => onEdit(l)}>Editar</DropdownMenuItem>}
-                    {onDelete && <DropdownMenuItem onClick={() => onDelete(l)} className="text-destructive">Excluir</DropdownMenuItem>}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          );
-        })}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {onEdit && <DropdownMenuItem onClick={() => onEdit(l)}>Editar</DropdownMenuItem>}
+            {onDelete && <DropdownMenuItem onClick={() => onDelete(l)} className="text-destructive">Excluir</DropdownMenuItem>}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
