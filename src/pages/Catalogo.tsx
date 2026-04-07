@@ -398,24 +398,26 @@ function Level1View({
         {group.children.map((child, i) => {
           const count = countServicosForCategories(servicos, child.categories);
           return (
-            <div
+            <GlassCard
               key={child.key}
-              className="glass-card p-5 min-h-[140px] flex flex-col justify-between"
+              variant="sm"
+              glowColor={group.glowColor}
               style={{ animationDelay: `${i * 60}ms` }}
               onClick={() => onSelectChild(child)}
             >
-              <div className="glass-card-glow" style={{ background: group.glowColor }} />
-              <div className="relative z-10">
-                <h3 className="font-semibold text-base mb-1">{child.label}</h3>
-                <p className="text-xs text-muted-foreground line-clamp-2">{child.description}</p>
+              <div className="relative z-10 flex flex-col justify-between min-h-[100px]">
+                <div>
+                  <h3 className="font-semibold text-base mb-1 text-foreground">{child.label}</h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{child.description}</p>
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-[10px] font-medium text-foreground/80 px-2.5 py-1 rounded-full bg-foreground/5 border border-foreground/10">
+                    {count} {count === 1 ? 'serviço' : 'serviços'}
+                  </span>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
               </div>
-              <div className="relative z-10 flex items-center justify-between mt-3">
-                <Badge variant="outline" className="text-[10px] bg-muted/30 border-white/10">
-                  {count} {count === 1 ? 'serviço' : 'serviços'}
-                </Badge>
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-            </div>
+            </GlassCard>
           );
         })}
       </div>
