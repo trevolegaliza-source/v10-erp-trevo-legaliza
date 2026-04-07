@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Plus, FileText, Save, FileDown, ArrowLeft, Copy,
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -54,6 +55,7 @@ export default function OrcamentoNovo() {
   const [form, setForm] = useState<OrcamentoForm>(defaultForm());
   const [orcamentoId, setOrcamentoId] = useState<string | null>(editId);
   const [orcamentoNumero, setOrcamentoNumero] = useState<number>(0);
+  const [modoContador, setModoContador] = useState(false);
   const saveMutation = useSaveOrcamento();
 
   const { data: clientes } = useQuery({
@@ -228,6 +230,7 @@ export default function OrcamentoNovo() {
 
       const doc = await gerarOrcamentoPDF({
         modo: form.modo,
+        modoContador,
         prospect_nome: form.prospect_nome,
         prospect_cnpj: form.prospect_cnpj,
         itens: itensValidos,
@@ -400,6 +403,10 @@ export default function OrcamentoNovo() {
               {/* Contexto fields (detailed only) */}
               {isDetalhado && (
                 <div className="space-y-3 pt-3 border-t">
+                  <div className="flex items-center gap-2">
+                    <Switch checked={modoContador} onCheckedChange={setModoContador} />
+                    <span className="text-sm text-muted-foreground">Gerar proposta para cliente do contador (com markup)</span>
+                  </div>
                   <div>
                     <Label className="text-xs">Contexto / Introdução</Label>
                     <Textarea
@@ -440,6 +447,7 @@ export default function OrcamentoNovo() {
                     item={item}
                     idx={idx}
                     secoes={form.secoes}
+                    modoContador={modoContador}
                     onChange={updateItem}
                     onRemove={removeItem}
                     onAddSecao={handleAddSecao}
@@ -517,6 +525,7 @@ export default function OrcamentoNovo() {
                   itens={form.itens}
                   pacotes={form.pacotes}
                   secoes={form.secoes}
+                  modoContador={modoContador}
                   desconto_pct={form.desconto_pct}
                   validade_dias={form.validade_dias}
                   pagamento={form.pagamento}
