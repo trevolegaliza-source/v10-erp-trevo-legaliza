@@ -23,17 +23,17 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#0a1a0f] via-[#0d2818] to-[#0a1a0f] relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background relative overflow-hidden">
       {/* Subtle pattern overlay */}
-      <div className="fixed inset-0 opacity-[0.03]" style={{
-        backgroundImage: 'radial-gradient(circle at 25% 25%, #22c55e 1px, transparent 1px), radial-gradient(circle at 75% 75%, #22c55e 1px, transparent 1px)',
+      <div className="fixed inset-0 opacity-[0.03] dark:opacity-[0.03]" style={{
+        backgroundImage: 'radial-gradient(circle at 25% 25%, hsl(var(--primary)) 1px, transparent 1px), radial-gradient(circle at 75% 75%, hsl(var(--primary)) 1px, transparent 1px)',
         backgroundSize: '60px 60px',
       }} />
 
       {/* Ambient glow blobs */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/3 left-1/3 w-[500px] h-[500px] bg-emerald-500/[0.08] rounded-full blur-[150px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[120px]" />
+        <div className="glass-ambient w-[500px] h-[500px] bg-emerald-500 top-1/3 left-1/3" />
+        <div className="glass-ambient w-[400px] h-[400px] bg-blue-500 bottom-1/4 right-1/4" style={{ opacity: 'calc(var(--glass-glow-opacity) * 0.5)' }} />
       </div>
 
       <div className="relative z-10 w-full max-w-md mx-4">
