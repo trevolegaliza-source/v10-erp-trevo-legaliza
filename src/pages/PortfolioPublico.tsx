@@ -341,7 +341,7 @@ export default function PortfolioPublico() {
                       <div className="flex items-center gap-2 mt-auto flex-wrap">
                         <Badge variant="outline" className={`text-[10px] ${CATEGORIA_COLORS[s.categoria] || ''}`}>{catLabel}</Badge>
                         {s.prazo_estimado && (
-                          <Badge variant="outline" className="text-[10px] bg-muted/50 border-white/10">{s.prazo_estimado}</Badge>
+                          <Badge variant="outline" className="text-[10px] bg-muted/50 border-foreground/10">{s.prazo_estimado}</Badge>
                         )}
                       </div>
                     </div>
@@ -373,7 +373,7 @@ export default function PortfolioPublico() {
                       <p className="text-xs text-muted-foreground line-clamp-2">{child.description}</p>
                     </div>
                     <div className="relative z-10 flex items-center justify-between mt-3">
-                      <Badge variant="outline" className="text-[10px] bg-muted/30 border-white/10">{count} {count === 1 ? 'serviço' : 'serviços'}</Badge>
+                      <Badge variant="outline" className="text-[10px] bg-muted/30 border-foreground/10">{count} {count === 1 ? 'serviço' : 'serviços'}</Badge>
                       <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                     </div>
                   </div>
@@ -400,7 +400,7 @@ export default function PortfolioPublico() {
                     <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{group.description}</p>
                   </div>
                   <div className="relative z-10 flex items-center justify-between mt-4">
-                    <Badge variant="outline" className="text-[10px] bg-muted/30 border-white/10">{count} {count === 1 ? 'serviço' : 'serviços'}</Badge>
+                    <Badge variant="outline" className="text-[10px] bg-muted/30 border-foreground/10">{count} {count === 1 ? 'serviço' : 'serviços'}</Badge>
                     <ArrowRight className="h-4 w-4 text-muted-foreground" />
                   </div>
                 </div>
@@ -410,7 +410,7 @@ export default function PortfolioPublico() {
         )}
 
         {/* Rodapé */}
-        <div className="text-center mt-12 pt-8 border-t border-white/5">
+        <div className="text-center mt-12 pt-8 border-t border-foreground/5">
           <p className="text-sm text-muted-foreground">
             Trevo Legaliza · CNPJ 39.969.412/0001-70 · (11) 93492-7001
           </p>
@@ -451,11 +451,11 @@ function PublicServiceDetail({
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline" className={`text-[10px] ${CATEGORIA_COLORS[service.categoria] || ''}`}>{catLabel}</Badge>
           {service.prazo_estimado && (
-            <Badge variant="outline" className="text-[10px] bg-muted/50 border-white/10">Prazo: {service.prazo_estimado}</Badge>
+            <Badge variant="outline" className="text-[10px] bg-muted/50 border-foreground/10">Prazo: {service.prazo_estimado}</Badge>
           )}
         </div>
         {service.descricao && (
-          <div className="text-sm text-muted-foreground whitespace-pre-line bg-white/[0.02] rounded-xl p-4 border border-white/5 leading-relaxed">
+          <div className="text-sm text-muted-foreground whitespace-pre-line bg-foreground/[0.02] rounded-xl p-4 border border-foreground/5 leading-relaxed">
             {service.descricao}
           </div>
         )}
@@ -487,10 +487,10 @@ function PublicServiceDetail({
             </p>
           </div>
         ) : (
-          <div className="rounded-lg border border-white/5 overflow-hidden">
+          <div className="rounded-lg border border-foreground/5 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/5 bg-white/[0.02]">
+                <tr className="border-b border-foreground/5 bg-foreground/[0.02]">
                   <th className="text-left py-2 px-3 text-xs font-medium text-muted-foreground">UF</th>
                   <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Honorário</th>
                   <th className="text-right py-2 px-3 text-xs font-medium text-muted-foreground">Taxa do Órgão</th>
@@ -500,7 +500,7 @@ function PublicServiceDetail({
               </thead>
               <tbody>
                 {filteredPrecos.map(p => (
-                  <tr key={p.uf} className="border-b border-white/5">
+                  <tr key={p.uf} className="border-b border-foreground/5">
                     <td className="py-2 px-3 font-medium">{p.uf}</td>
                     <td className="py-2 px-3 text-right text-emerald-400">{fmt(p.honorario_trevo)}</td>
                     <td className="py-2 px-3 text-right text-muted-foreground">{fmt(p.taxa_orgao)}</td>

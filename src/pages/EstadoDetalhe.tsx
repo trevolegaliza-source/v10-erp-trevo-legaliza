@@ -236,7 +236,7 @@ export default function EstadoDetalhe() {
       <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={() => navigate('/inteligencia-geografica')}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/5"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-foreground/5"
           style={{ color: GREEN, border: '1px solid rgba(34,197,94,0.2)' }}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -273,7 +273,7 @@ export default function EstadoDetalhe() {
             <GlassCard key={k.label} variant="service" glowColor={glowMap[k.label] || 'rgba(34, 197, 94, 0.1)'}>
               <div className="flex items-center gap-2 mb-2">
                 <k.Icon className="h-4 w-4" style={{ color: GREEN }} />
-                <span className="text-xs font-bold uppercase tracking-wider text-white/50">{k.label}</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{k.label}</span>
               </div>
               <p className="text-2xl font-extrabold" style={{ color: textColor }}>{k.value}</p>
             </GlassCard>
@@ -453,21 +453,21 @@ export default function EstadoDetalhe() {
                           </div>
                           <div className="flex items-center gap-0.5">
                             {c.site_url && (
-                              <a href={c.site_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Abrir site">
+                              <a href={c.site_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-md transition-colors hover:bg-foreground/5" title="Abrir site">
                                 <ExternalLink className="h-3.5 w-3.5" style={{ color: GREEN }} />
                               </a>
                             )}
                             {c.telefone && (
-                              <a href={`tel:${c.telefone}`} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Ligar">
+                              <a href={`tel:${c.telefone}`} className="p-1.5 rounded-md transition-colors hover:bg-foreground/5" title="Ligar">
                                 <Phone className="h-3.5 w-3.5" style={{ color: mutedColor }} />
                               </a>
                             )}
                             {c.email && (
-                              <button onClick={() => { navigator.clipboard.writeText(c.email!); toast.success('Email copiado!'); }} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Copiar email">
+                              <button onClick={() => { navigator.clipboard.writeText(c.email!); toast.success('Email copiado!'); }} className="p-1.5 rounded-md transition-colors hover:bg-foreground/5" title="Copiar email">
                                 <Mail className="h-3.5 w-3.5" style={{ color: mutedColor }} />
                               </button>
                             )}
-                            <button onClick={() => openEdit(c)} className="p-1.5 rounded-md transition-colors hover:bg-white/5" title="Editar">
+                            <button onClick={() => openEdit(c)} className="p-1.5 rounded-md transition-colors hover:bg-foreground/5" title="Editar">
                               <Pencil className="h-3.5 w-3.5" style={{ color: mutedColor }} />
                             </button>
                             <button onClick={() => removerContato.mutate({ id: c.id, uf: ufUpper })} className="p-1.5 rounded-md transition-colors hover:bg-red-500/10" title="Excluir">
@@ -590,7 +590,7 @@ export default function EstadoDetalhe() {
                     <div key={c.id} className="pl-4 mt-1 flex items-center justify-between text-xs" style={{ color: mutedColor }}>
                       <span>{c.nome} {c.telefone && `· ${c.telefone}`}</span>
                       <div className="flex gap-1">
-                        <button onClick={() => openEdit(c)} className="p-1 rounded hover:bg-white/5">
+                        <button onClick={() => openEdit(c)} className="p-1 rounded hover:bg-foreground/5">
                           <Pencil className="h-3 w-3" />
                         </button>
                         <button onClick={() => removerContato.mutate({ id: c.id, uf: ufUpper })} className="p-1 rounded hover:bg-red-500/10">
