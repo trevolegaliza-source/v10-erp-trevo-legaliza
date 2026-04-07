@@ -452,12 +452,20 @@ function Level1View({
 // ═══════════ NÍVEL 2: SERVIÇOS INDIVIDUAIS ═══════════
 function Level2View({
   services,
+  adminMode,
   onSelectService,
   onBack,
+  onEditService,
+  onPrecosService,
+  onDeleteService,
 }: {
   services: ServicosCatalogo[];
+  adminMode: boolean;
   onSelectService: (s: ServicosCatalogo) => void;
   onBack: () => void;
+  onEditService: (s: ServicosCatalogo) => void;
+  onPrecosService: (s: ServicosCatalogo) => void;
+  onDeleteService: (s: ServicosCatalogo) => void;
 }) {
   return (
     <div className="space-y-4 catalog-enter">
@@ -478,10 +486,35 @@ function Level2View({
             return (
               <div
                 key={s.id}
-                className="service-detail-card p-4 cursor-pointer flex flex-col gap-2"
+                className="service-detail-card p-4 cursor-pointer flex flex-col gap-2 relative"
                 style={{ animationDelay: `${i * 40}ms` }}
                 onClick={() => onSelectService(s)}
               >
+                {adminMode && (
+                  <div className="absolute top-3 right-3 flex gap-1 z-10" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => onEditService(s)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all"
+                      title="Editar"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => onPrecosService(s)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-emerald-500/20 text-muted-foreground hover:text-emerald-400 transition-all"
+                      title="Preços por UF"
+                    >
+                      <DollarSign className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => onDeleteService(s)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-all"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{s.nome}</span>
                 </div>
