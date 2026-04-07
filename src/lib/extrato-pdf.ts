@@ -622,6 +622,7 @@ function buildPage1HTML(
             <div class="pill warning">Vencimento: ${escapeHtml(vencimento)}</div>
           </div>
           ${(data.cliente.telefone || data.cliente.email) ? `<div class="hero-subtitle">${escapeHtml([data.cliente.telefone, data.cliente.email].filter(Boolean).join(' · '))}</div>` : ''}
+          <div class="hero-subtitle" style="margin-top: 14px; font-size: 8px; opacity: 0.5; letter-spacing: 1px; text-transform: uppercase;">Assessoria societária com atuação em todo o território nacional</div>
         </div>
 
         <div class="summary-grid">
