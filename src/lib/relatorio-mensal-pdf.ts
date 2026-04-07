@@ -13,7 +13,7 @@ const BRAND = {
   tagline: 'Assessoria societária com atuação em todo o território nacional',
 };
 
-const LOGO_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png';
+const LOGO_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
 const pct = (v: number) => `${v.toFixed(1)}%`;
