@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useSaveOrcamento, type Orcamento } from '@/hooks/useOrcamentos';
-import { gerarOrcamentoPDF } from '@/lib/orcamento-pdf';
+import { gerarOrcamentoPDF, sanitizeFilename } from '@/lib/orcamento-pdf';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -248,7 +248,7 @@ export default function OrcamentoNovo() {
         numero: orcamentoNumero || 0,
         data_emissao: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
       });
-      const clienteName = (form.prospect_nome || 'proposta').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 50);
+      const clienteName = sanitizeFilename(form.prospect_nome || 'proposta');
       doc.save(`Proposta_${clienteName}_${new Date().toISOString().split('T')[0]}.pdf`);
       toast.dismiss(toastId);
       toast.success('PDF gerado com sucesso!');
