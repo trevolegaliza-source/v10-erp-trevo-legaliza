@@ -1,0 +1,1 @@
+ALTER TABLE lancamentos ADD COLUMN IF NOT EXISTS data_retorno_cobranca date;
