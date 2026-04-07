@@ -7,6 +7,7 @@ import {
 
 export interface OrcamentoPDFData {
   modo: OrcamentoModo;
+  modoContador?: boolean;
   prospect_nome: string;
   prospect_cnpj: string | null;
   itens: OrcamentoItem[];
@@ -181,28 +182,55 @@ function buildDetalhadoPages(d: OrcamentoPDFData): string[] {
       itemsHtml += `<div style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 2px; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #f0fdf4;">${esc(group.label)} (${group.items.length})</div>`;
     }
     for (const item of group.items) {
-      const totalMin = getItemValor(item) * item.quantidade + item.taxa_min;
-      const totalMax = getItemValor(item) * item.quantidade + item.taxa_max;
+      const valorExibido = d.modoContador && item.honorario_contador > 0
+        ? item.honorario_contador
+        : (getItemValor(item) || 0);
+      const valorTotal = valorExibido * item.quantidade;
+      const totalMin = valorTotal + item.taxa_min;
+      const totalMax = valorTotal + item.taxa_max;
       const hasTaxa = item.taxa_min > 0 || item.taxa_max > 0;
+      const secaoLabel = secoes.find(s => s.key === item.secao)?.label || '';
+      const honorarioLabel = d.modoContador ? 'Investimento' : 'Honorário Trevo';
 
       itemsHtml += `
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 12px;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-            <div style="font-size: 13px; font-weight: 700; color: #1a1a2e;">${item.ordem || '•'}. ${esc(item.descricao)}</div>
-            <div style="font-size: 14px; font-weight: 800; color: #166534; white-space: nowrap; margin-left: 16px;">${fmt(getItemValor(item) * item.quantidade)}</div>
+        <div style="border: 1px solid #e5e7eb; border-radius: 16px; margin-bottom: 14px; overflow: hidden; page-break-inside: avoid;">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
+            <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 800; flex-shrink: 0;">${item.ordem || idx + 1}</div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 12px; font-weight: 700; color: #ffffff; line-height: 1.3;">${esc(item.descricao)}</div>
+              ${secaoLabel && secaoLabel !== 'Geral' ? `<div style="display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: rgba(34,197,94,0.2); color: #86efac; font-size: 7px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;">${esc(secaoLabel)}</div>` : ''}
+            </div>
+            <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
           </div>
-          ${item.detalhes ? `<div style="font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.5;">${esc(item.detalhes)}</div>` : ''}
-          <div style="display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap;">
-            ${item.prazo ? `<div style="font-size: 10px;"><span style="color: #94a3b8;">Prazo:</span> <span style="color: #334155; font-weight: 600;">${esc(item.prazo)}</span></div>` : ''}
-            ${item.docs_necessarios ? `<div style="font-size: 10px;"><span style="color: #94a3b8;">Docs:</span> <span style="color: #334155;">${esc(item.docs_necessarios)}</span></div>` : ''}
-          </div>
-          ${hasTaxa ? `
-            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0; display: flex; gap: 20px; font-size: 10px;">
-              <div><span style="color: #94a3b8;">Honorário Trevo:</span> <span style="color: #166534; font-weight: 700;">${fmt(getItemValor(item) * item.quantidade)}</span></div>
-              <div><span style="color: #94a3b8;">Taxas externas:</span> <span style="color: #b45309; font-weight: 600;">${fmt(item.taxa_min)} a ${fmt(item.taxa_max)}</span></div>
-              <div><span style="color: #94a3b8;">Total estimado:</span> <span style="font-weight: 700;">${fmt(totalMin)} a ${fmt(totalMax)}</span></div>
+          ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 9.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
+          ${(item.prazo || item.docs_necessarios) ? `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #f3f4f6; border-bottom: 1px solid #f3f4f6;">
+              <div style="padding: 10px 18px; background: #ffffff;">
+                <div style="font-size: 7px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Prazo</div>
+                <div style="font-size: 9px; color: #374151; font-weight: 500;">${esc(item.prazo || 'A definir')}</div>
+              </div>
+              <div style="padding: 10px 18px; background: #ffffff;">
+                <div style="font-size: 7px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Documentos necessários</div>
+                <div style="font-size: 9px; color: #374151; font-weight: 500;">${esc(item.docs_necessarios || '—')}</div>
+              </div>
             </div>
           ` : ''}
+          <div style="padding: 12px 18px; background: #fafafa;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 9px;">
+              <span style="color: #6b7280;">${honorarioLabel}</span>
+              <span style="font-weight: 700; color: #1a1a2e;">${fmt(valorTotal)}</span>
+            </div>
+            ${hasTaxa ? `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 9px;">
+                <span style="color: #6b7280;">Taxas externas (estimativa)</span>
+                <span style="font-weight: 500; color: #92400e;">${fmt(item.taxa_min)} a ${fmt(item.taxa_max)}</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 9px;">
+                <span style="font-weight: 700; color: #1a1a2e;">Total estimado</span>
+                <span style="font-size: 11px; font-weight: 700; color: #166534;">${fmt(totalMin)} a ${fmt(totalMax)}</span>
+              </div>
+            ` : ''}
+          </div>
         </div>
       `;
     }
@@ -268,7 +296,10 @@ function buildDetalhadoPages(d: OrcamentoPDFData): string[] {
   }
 
   // --- TOTALS + CONDITIONS PAGE ---
-  const totalHonorarios = d.itens.reduce((s, i) => s + getItemValor(i) * i.quantidade, 0);
+  const totalHonorarios = d.itens.reduce((s, i) => {
+    const v = d.modoContador && i.honorario_contador > 0 ? i.honorario_contador : getItemValor(i);
+    return s + v * i.quantidade;
+  }, 0);
   const totalTaxaMin = d.itens.reduce((s, i) => s + i.taxa_min, 0);
   const totalTaxaMax = d.itens.reduce((s, i) => s + i.taxa_max, 0);
   const descontoValor = totalHonorarios * (d.desconto_pct / 100);
@@ -283,7 +314,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData): string[] {
         <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Resumo do Investimento</div>
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
           <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
-            <span style="color: #64748b;">Honorários Trevo</span>
+            <span style="color: #64748b;">${d.modoContador ? 'Investimento' : 'Honorários Trevo'}</span>
             <span style="font-weight: 600;">${fmt(totalHonorarios)}</span>
           </div>
           ${d.desconto_pct > 0 ? `
@@ -346,7 +377,7 @@ async function renderPageToCanvas(html: string): Promise<HTMLCanvasElement> {
   document.body.appendChild(container);
   try {
     const el = container.firstElementChild as HTMLElement;
-    return await html2canvas(el, { scale: 2, useCORS: true });
+    return await html2canvas(el, { scale: 1.5, useCORS: true, logging: false, backgroundColor: '#ffffff' });
   } finally {
     document.body.removeChild(container);
   }
@@ -362,10 +393,8 @@ export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<jsPDF> 
     const html = buildSimplesHTML(data);
     const canvas = await renderPageToCanvas(html);
     const doc = new jsPDF('p', 'mm', 'a4');
-    const imgData = canvas.toDataURL('image/png');
-    const imgWidth = 210;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    doc.addImage(imgData, 'PNG', 0, 0, imgWidth, Math.min(imgHeight, 297));
+    const doc = new jsPDF('p', 'mm', 'a4');
+    addCanvasToDoc(doc, canvas);
     return doc;
   }
 
@@ -376,11 +405,23 @@ export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<jsPDF> 
   for (let i = 0; i < pagesHtml.length; i++) {
     if (i > 0) doc.addPage();
     const canvas = await renderPageToCanvas(pagesHtml[i]);
-    const imgData = canvas.toDataURL('image/png');
-    const imgWidth = 210;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    doc.addImage(imgData, 'PNG', 0, 0, imgWidth, Math.min(imgHeight, 297));
+    addCanvasToDoc(doc, canvas);
   }
 
   return doc;
+}
+
+function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
+  const pdfW = doc.internal.pageSize.getWidth();
+  const pdfH = doc.internal.pageSize.getHeight();
+  const imgData = canvas.toDataURL('image/jpeg', 0.82);
+  let imgW = pdfW;
+  let imgH = (canvas.height / canvas.width) * pdfW;
+  if (imgH > pdfH) {
+    const scale = pdfH / imgH;
+    imgW = pdfW * scale;
+    imgH = pdfH;
+  }
+  const offsetX = (pdfW - imgW) / 2;
+  doc.addImage(imgData, 'JPEG', offsetX, 0, imgW, imgH);
 }
