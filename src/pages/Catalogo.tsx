@@ -131,12 +131,23 @@ function countServicosForCategories(servicos: ServicosCatalogo[], categories: st
 // ═══════════ COMPONENTE PRINCIPAL ═══════════
 export default function Catalogo() {
   const { data: servicos = [], isLoading } = useServicos();
+  const updateMut = useUpdateServico();
+  const deleteMut = useDeleteServico();
   const [path, setPath] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [servicoModal, setServicoModal] = useState<ServicosCatalogo | null>(null);
   const [precosServicoId, setPrecosServicoId] = useState<string | null>(null);
   const [animKey, setAnimKey] = useState(0);
+  const [adminMode, setAdminMode] = useState(false);
+
+  function handleDeleteServico(id: string) {
+    if (!confirm('Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.')) return;
+    deleteMut.mutate(id);
+    if (path.length > 0 && path[path.length - 1] === id) {
+      setPath(path.slice(0, -1));
+    }
+  }
 
   function navigate(newPath: string[]) {
     setPath(newPath);
