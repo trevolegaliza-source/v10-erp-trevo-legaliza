@@ -331,32 +331,40 @@ function Level0View({
   onSelectGroup: (group: HierarchyGroup) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 catalog-enter">
-      {CATALOG_HIERARCHY.map((group, i) => {
-        const allCats = getAllCategoriesForGroup(group);
-        const count = countServicosForCategories(servicos, allCats);
-        return (
-          <div
-            key={group.key}
-            className="glass-card p-6 min-h-[180px] flex flex-col justify-between"
-            style={{ animationDelay: `${i * 60}ms` }}
-            onClick={() => onSelectGroup(group)}
-          >
-            <div className="glass-card-glow" style={{ background: group.glowColor }} />
-            <div className="relative z-10">
-              <span className="text-3xl mb-3 block">{group.icon}</span>
-              <h3 className="font-bold text-lg mb-1.5">{group.label}</h3>
-              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{group.description}</p>
-            </div>
-            <div className="relative z-10 flex items-center justify-between mt-4">
-              <Badge variant="outline" className="text-[10px] bg-muted/30 border-white/10">
-                {count} {count === 1 ? 'serviço' : 'serviços'}
-              </Badge>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-        );
-      })}
+    <div className="relative">
+      {/* Ambient glow background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-[120px]" />
+      </div>
+      <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 catalog-enter">
+        {CATALOG_HIERARCHY.map((group, i) => {
+          const allCats = getAllCategoriesForGroup(group);
+          const count = countServicosForCategories(servicos, allCats);
+          return (
+            <GlassCard
+              key={group.key}
+              glowColor={group.glowColor}
+              style={{ animationDelay: `${i * 60}ms` }}
+              onClick={() => onSelectGroup(group)}
+            >
+              <div className="relative z-10 flex flex-col justify-between min-h-[152px]">
+                <div>
+                  <span className="text-3xl mb-3 block">{group.icon}</span>
+                  <h3 className="font-bold text-lg mb-1.5 text-foreground">{group.label}</h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{group.description}</p>
+                </div>
+                <div className="flex items-center justify-between mt-4">
+                  <span className="text-xs font-medium text-foreground/80 px-3 py-1.5 rounded-full bg-foreground/5 backdrop-blur-sm border border-foreground/10">
+                    {count} {count === 1 ? 'serviço' : 'serviços'}
+                  </span>
+                  <span className="text-muted-foreground group-hover:text-foreground/80 transition-colors text-lg">→</span>
+                </div>
+              </div>
+            </GlassCard>
+          );
+        })}
+      </div>
     </div>
   );
 }
