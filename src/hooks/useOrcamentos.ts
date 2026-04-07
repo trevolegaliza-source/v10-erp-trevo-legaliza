@@ -34,6 +34,10 @@ export interface Orcamento {
   updated_at: string;
   created_by: string | null;
   prazo_execucao?: string | null;
+  contexto?: string | null;
+  ordem_execucao?: string | null;
+  pacotes?: any;
+  secoes?: any;
 }
 
 export type OrcamentoInsert = Omit<Orcamento, 'id' | 'numero' | 'share_token' | 'created_at' | 'updated_at'>;
