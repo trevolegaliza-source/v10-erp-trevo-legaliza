@@ -216,62 +216,95 @@ export default function OrcamentoNovo() {
     }
   }
 
-  async function gerarPDF() {
-    if (!form.prospect_nome.trim()) {
-      toast.error('Preencha o nome do cliente');
-      return;
-    }
+  function buildPDFParams(modo?: 'contador' | 'cliente') {
+    const selectedCliente = clientes?.find(c => c.id === form.cliente_id);
+    const clienteNome = selectedCliente?.nome || form.prospect_nome;
     const itensValidos = form.itens.filter(i => i.descricao.trim());
-    if (itensValidos.length === 0) {
-      toast.error('Adicione pelo menos um item');
-      return;
-    }
+    return {
+      modo: form.modo,
+      modoPDF: modo || modoPDF,
+      clienteNome,
+      prospect_nome: form.prospect_nome,
+      prospect_cnpj: form.prospect_cnpj,
+      itens: itensValidos,
+      pacotes: form.pacotes,
+      secoes: form.secoes,
+      contexto: form.contexto,
+      ordem_execucao: form.ordem_execucao,
+      desconto_pct: form.desconto_pct,
+      subtotal,
+      total: totalFinal,
+      validade_dias: form.validade_dias,
+      prazo_execucao: form.prazo_execucao,
+      pagamento: form.pagamento,
+      observacoes: form.observacoes,
+      numero: orcamentoNumero || 0,
+      data_emissao: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
+    };
+  }
 
-    const toastId = toast.loading('Gerando PDF...');
+  function buildFilename(modo: 'contador' | 'cliente') {
+    const nome = sanitizeFilename(form.prospect_nome || 'proposta');
+    const sufixo = modo === 'contador' ? '_interno' : '_cliente';
+    return `Proposta_${nome}${sufixo}_${new Date().toISOString().split('T')[0]}.pdf`;
+  }
+
+  async function salvarOrcamento(): Promise<string> {
+    if (!form.prospect_nome?.trim()) throw new Error('Informe o nome do cliente');
+    const payload: any = buildPayload('enviado');
+    if (orcamentoId) payload.id = orcamentoId;
+    const id = await saveMutation.mutateAsync(payload);
+    setOrcamentoId(id);
+    return id;
+  }
+
+  async function handleGerarPDF(modo: 'contador' | 'cliente') {
+    if (!form.prospect_nome.trim()) { toast.error('Preencha o nome do cliente'); return; }
+    const itensValidos = form.itens.filter(i => i.descricao.trim());
+    if (itensValidos.length === 0) { toast.error('Adicione pelo menos um item'); return; }
+
+    setGerando(true);
     try {
-      await handleSave('enviado');
+      const savedId = await salvarOrcamento();
+      const blob = await gerarOrcamentoPDF(buildPDFParams(modo));
+      const filename = buildFilename(modo);
 
-      // Find client name for cliente mode
-      const selectedCliente = clientes?.find(c => c.id === form.cliente_id);
-      const clienteNome = selectedCliente?.nome || form.prospect_nome;
-
-      const doc = await gerarOrcamentoPDF({
-        modo: form.modo,
-        modoPDF,
-        clienteNome: clienteNome,
-        prospect_nome: form.prospect_nome,
-        prospect_cnpj: form.prospect_cnpj,
-        itens: itensValidos,
-        pacotes: form.pacotes,
-        secoes: form.secoes,
-        contexto: form.contexto,
-        ordem_execucao: form.ordem_execucao,
-        desconto_pct: form.desconto_pct,
-        subtotal,
-        total: totalFinal,
-        validade_dias: form.validade_dias,
-        prazo_execucao: form.prazo_execucao,
-        pagamento: form.pagamento,
-        observacoes: form.observacoes,
-        numero: orcamentoNumero || 0,
-        data_emissao: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
-      });
-      const cleanName = sanitizeFilename(form.prospect_nome || 'proposta');
-      doc.save(`Proposta_${cleanName}_${new Date().toISOString().split('T')[0]}.pdf`);
-      toast.dismiss(toastId);
-      toast.success('PDF gerado com sucesso!');
+      const result = await salvarPDF.mutateAsync({ blob, modo, orcamentoId: savedId, filename });
+      downloadBlob(blob, filename);
+      toast.success(`Proposta ${modo === 'contador' ? 'interna' : 'do cliente'} gerada e salva! (v${result.versao})`);
     } catch (err: any) {
-      toast.dismiss(toastId);
-      toast.error('Erro ao gerar PDF');
+      toast.error('Erro ao gerar PDF: ' + (err.message || ''));
       console.error(err);
+    } finally {
+      setGerando(false);
     }
   }
 
-  function handleDuplicate() {
-    setForm(f => ({ ...f, prospect_nome: f.prospect_nome + ' (cópia)' }));
-    setOrcamentoId(null);
-    setOrcamentoNumero(0);
-    toast.success('Duplicado! Salve para criar um novo orçamento.');
+  async function handleGerarAmbos() {
+    if (!form.prospect_nome.trim()) { toast.error('Preencha o nome do cliente'); return; }
+    const itensValidos = form.itens.filter(i => i.descricao.trim());
+    if (itensValidos.length === 0) { toast.error('Adicione pelo menos um item'); return; }
+
+    setGerando(true);
+    try {
+      const savedId = await salvarOrcamento();
+
+      const blobContador = await gerarOrcamentoPDF(buildPDFParams('contador'));
+      await salvarPDF.mutateAsync({ blob: blobContador, modo: 'contador', orcamentoId: savedId, filename: buildFilename('contador') });
+      downloadBlob(blobContador, buildFilename('contador'));
+
+      const blobCliente = await gerarOrcamentoPDF(buildPDFParams('cliente'));
+      await salvarPDF.mutateAsync({ blob: blobCliente, modo: 'cliente', orcamentoId: savedId, filename: buildFilename('cliente') });
+      downloadBlob(blobCliente, buildFilename('cliente'));
+
+      toast.success('Ambas propostas geradas e salvas!');
+    } catch (err: any) {
+      toast.error('Erro: ' + (err.message || ''));
+      console.error(err);
+    } finally {
+      setGerando(false);
+    }
+  }
   }
 
   const validItems = form.itens.filter(i => i.descricao.trim());
