@@ -83,7 +83,8 @@ export default function Orcamentos() {
         numero: orc.numero,
         data_emissao: new Date(orc.created_at).toLocaleDateString('pt-BR'),
       });
-      doc.save(`orcamento_${String(orc.numero).padStart(3, '0')}_${orc.prospect_nome.replace(/\s/g, '_')}.pdf`);
+      const clienteName = (orc.prospect_nome || 'proposta').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 50);
+      doc.save(`Proposta_${clienteName}_${new Date().toISOString().split('T')[0]}.pdf`);
       toast.success('PDF gerado!');
     } catch (err: any) {
       toast.error('Erro ao gerar PDF: ' + (err.message || ''));

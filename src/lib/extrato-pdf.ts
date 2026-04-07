@@ -13,7 +13,7 @@ const BRAND = {
   telefone: '(11) 93492-7001',
 };
 
-const LOGO_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png';
+const LOGO_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png';
 
 function fmt(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });

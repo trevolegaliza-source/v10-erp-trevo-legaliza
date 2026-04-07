@@ -17,7 +17,7 @@ const BRAND = {
   banco: 'C6 Bank',
 };
 
-const LOGO_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png';
+const LOGO_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('pt-BR');

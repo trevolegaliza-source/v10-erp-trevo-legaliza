@@ -230,7 +230,7 @@ export default function PortfolioPublico() {
         {/* Header com branding */}
         <div className="text-center mb-8">
           <img
-            src="https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png"
+            src="https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png"
             alt="Trevo Legaliza"
             className="h-16 mx-auto mb-4"
           />
