@@ -48,12 +48,12 @@ export default function Login() {
         {/* Glass card */}
         <div className="glass-card-wrapper">
           <div className="glass-card-inner" style={{ padding: '32px' }}>
-            <p className="text-sm text-white/50 text-center mb-6">
+            <p className="text-sm text-muted-foreground text-center mb-6">
               Sistema de Gestão Societária
             </p>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-white/70">E-mail</Label>
+                <Label htmlFor="email" className="text-foreground/70">E-mail</Label>
                 <Input
                   id="email"
                   type="email"
@@ -61,11 +61,11 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                  className="bg-foreground/5 border-foreground/10 text-white placeholder:text-muted-foreground/50"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-white/70">Senha</Label>
+                <Label htmlFor="password" className="text-foreground/70">Senha</Label>
                 <Input
                   id="password"
                   type="password"
@@ -73,7 +73,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                  className="bg-foreground/5 border-foreground/10 text-white placeholder:text-muted-foreground/50"
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
@@ -81,7 +81,7 @@ export default function Login() {
                 Entrar
               </Button>
             </form>
-            <p className="text-[10px] text-white/30 text-center mt-6">
+            <p className="text-[10px] text-muted-foreground/50 text-center mt-6">
               Trevo Engine v10 · © {new Date().getFullYear()} Trevo Legaliza
             </p>
           </div>
@@ -89,7 +89,7 @@ export default function Login() {
           <div className="glass-card-shine" />
         </div>
 
-        <p className="text-center text-xs text-white/30 mt-8">
+        <p className="text-center text-xs text-muted-foreground/50 mt-8">
           Trevo Legaliza · Assessoria Societária Nacional
         </p>
       </div>

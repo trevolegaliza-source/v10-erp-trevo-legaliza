@@ -205,12 +205,12 @@ export default function Financeiro() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {/* Faturado */}
             <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)">
-              <div className="rounded-lg bg-white/5 p-2 w-fit">
+              <div className="rounded-lg bg-foreground/5 p-2 w-fit">
                 <DollarSign className="h-4.5 w-4.5 text-white" />
               </div>
               <p className="text-2xl font-bold mt-3 text-white">{formatBRL(metricas.totalFaturado)}</p>
-              <p className="text-xs text-white/50">{metricas.totalProcessos} processos</p>
-              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-1">Faturado</p>
+              <p className="text-xs text-muted-foreground">{metricas.totalProcessos} processos</p>
+              <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Faturado</p>
             </GlassCard>
 
             {/* Cobrado */}
@@ -219,8 +219,8 @@ export default function Financeiro() {
                 <Send className="h-4.5 w-4.5 text-blue-400" />
               </div>
               <p className="text-2xl font-bold mt-3 text-blue-400">{formatBRL(metricas.totalCobrado)}</p>
-              <p className="text-xs text-white/50">{metricas.clientesCobrados} clientes</p>
-              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-1">Cobrado</p>
+              <p className="text-xs text-muted-foreground">{metricas.clientesCobrados} clientes</p>
+              <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Cobrado</p>
             </GlassCard>
 
             {/* Recebido */}
@@ -229,11 +229,11 @@ export default function Financeiro() {
                 <CheckCircle className="h-4.5 w-4.5 text-emerald-400" />
               </div>
               <p className="text-2xl font-bold mt-3 text-emerald-400">{formatBRL(metricas.totalRecebido)}</p>
-              <div className="w-full bg-white/10 rounded-full h-1.5 mt-2">
+              <div className="w-full bg-foreground/10 rounded-full h-1.5 mt-2">
                 <div className="bg-emerald-400 h-1.5 rounded-full transition-all" style={{ width: `${metricas.taxaRecebimento}%` }} />
               </div>
-              <p className="text-xs text-white/50 mt-1">{metricas.taxaRecebimento}% do faturado</p>
-              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-1">Recebido</p>
+              <p className="text-xs text-muted-foreground mt-1">{metricas.taxaRecebimento}% do faturado</p>
+              <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Recebido</p>
             </GlassCard>
 
             {/* Inadimplente */}
@@ -246,11 +246,11 @@ export default function Financeiro() {
               <div className="rounded-lg bg-red-500/10 p-2 w-fit">
                 <AlertTriangle className="h-4.5 w-4.5 text-red-400" />
               </div>
-              <p className={`text-2xl font-bold mt-3 ${inadimplenciaCalc.total > 0 ? 'text-red-400' : 'text-white/40'}`}>
+              <p className={`text-2xl font-bold mt-3 ${inadimplenciaCalc.total > 0 ? 'text-red-400' : 'text-muted-foreground/70'}`}>
                 {formatBRL(inadimplenciaCalc.total)}
               </p>
               <p className="text-xs text-red-400/80">{inadimplenciaCalc.qtdClientes} clientes</p>
-              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-1">Inadimplente</p>
+              <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Inadimplente</p>
             </GlassCard>
 
             {/* Resultado */}
@@ -261,8 +261,8 @@ export default function Financeiro() {
               <p className={`text-2xl font-bold mt-3 ${resultado >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatBRL(resultado)}
               </p>
-              <p className="text-xs text-white/50">Receita - Despesas</p>
-              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-1">Resultado</p>
+              <p className="text-xs text-muted-foreground">Receita - Despesas</p>
+              <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Resultado</p>
             </GlassCard>
           </div>
 

@@ -262,8 +262,8 @@ export default function Dashboard() {
         {podeVer('financeiro') && (
           <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)" onClick={() => navigate('/financeiro')}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-white/50 uppercase tracking-wider">Receita do mês</span>
-              <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">Receita do mês</span>
+              <div className="h-8 w-8 rounded-lg bg-foreground/5 flex items-center justify-center">
                 <DollarSign className="h-4 w-4 text-emerald-400" />
               </div>
             </div>
@@ -281,13 +281,13 @@ export default function Dashboard() {
         {podeVer('financeiro') && (
           <GlassCard variant="service" glowColor="rgba(245, 158, 11, 0.12)" onClick={() => navigate('/financeiro')}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-white/50 uppercase tracking-wider">A receber</span>
-              <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">A receber</span>
+              <div className="h-8 w-8 rounded-lg bg-foreground/5 flex items-center justify-center">
                 <Clock className="h-4 w-4 text-amber-400" />
               </div>
             </div>
             <p className="text-2xl font-bold tracking-tight text-amber-400">{fmt(animPendente)}</p>
-            <p className="text-xs text-white/50 mt-2">pendente de confirmação</p>
+            <p className="text-xs text-muted-foreground mt-2">pendente de confirmação</p>
           </GlassCard>
         )}
 
@@ -295,29 +295,29 @@ export default function Dashboard() {
         {podeVer('financeiro') && (
           <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-white/50 uppercase tracking-wider">Recebido</span>
-              <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">Recebido</span>
+              <div className="h-8 w-8 rounded-lg bg-foreground/5 flex items-center justify-center">
                 <CheckCircle className="h-4 w-4 text-emerald-400" />
               </div>
             </div>
             <p className="text-2xl font-bold tracking-tight text-emerald-400">{fmt(animRecebido)}</p>
-            <div className="w-full bg-white/10 rounded-full h-2 mt-2">
+            <div className="w-full bg-foreground/10 rounded-full h-2 mt-2">
               <div className="bg-emerald-400 h-2 rounded-full transition-all duration-500" style={{ width: `${taxaRecebimento}%` }} />
             </div>
-            <p className="text-xs text-white/50 mt-1">{taxaRecebimento}% do faturado</p>
+            <p className="text-xs text-muted-foreground mt-1">{taxaRecebimento}% do faturado</p>
           </GlassCard>
         )}
 
         {/* Processos Ativos */}
         <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)" onClick={() => navigate('/processos')}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-white/50 uppercase tracking-wider">Processos ativos</span>
-            <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
+            <span className="text-xs text-muted-foreground uppercase tracking-wider">Processos ativos</span>
+            <div className="h-8 w-8 rounded-lg bg-foreground/5 flex items-center justify-center">
               <Activity className="h-4 w-4 text-blue-400" />
             </div>
           </div>
           <p className="text-2xl font-bold tracking-tight text-white">{animAtivos}</p>
-          <p className="text-xs text-white/50 mt-2">{processosNovos} novos esta semana</p>
+          <p className="text-xs text-muted-foreground mt-2">{processosNovos} novos esta semana</p>
         </GlassCard>
       </div>
 
@@ -355,7 +355,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="font-medium text-emerald-400">Tudo em dia!</p>
-                    <p className="text-xs text-white/50">Nenhuma ação urgente no momento.</p>
+                    <p className="text-xs text-muted-foreground">Nenhuma ação urgente no momento.</p>
                   </div>
                 </div>
               </GlassCard>
@@ -377,15 +377,15 @@ export default function Dashboard() {
                 <GlassCard key={alerta.id} variant="service" glowColor={glowMap[alerta.severity]} onClick={() => navigate(alerta.link)}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center">
+                      <div className="h-8 w-8 rounded-full bg-foreground/10 flex items-center justify-center">
                         <alerta.icon className={`h-4 w-4 ${iconColorMap[alerta.severity]}`} />
                       </div>
                       <div>
                         <p className="text-sm font-medium text-white">{alerta.titulo}</p>
-                        <p className="text-xs text-white/50">{alerta.descricao}</p>
+                        <p className="text-xs text-muted-foreground">{alerta.descricao}</p>
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 text-white/30" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                   </div>
                 </GlassCard>
               ))}
