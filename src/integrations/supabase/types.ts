@@ -610,6 +610,7 @@ export type Database = {
         Row: {
           boleto_url: string | null
           categoria: string | null
+          centro_custo: string | null
           cliente_id: string | null
           cobranca_encaminhada: boolean | null
           colaborador_id: string | null
@@ -617,6 +618,7 @@ export type Database = {
           competencia_mes: number | null
           comprovante_url: string | null
           confirmado_recebimento: boolean | null
+          conta_id: string | null
           created_at: string | null
           data_pagamento: string | null
           data_retorno_cobranca: string | null
@@ -647,6 +649,7 @@ export type Database = {
         Insert: {
           boleto_url?: string | null
           categoria?: string | null
+          centro_custo?: string | null
           cliente_id?: string | null
           cobranca_encaminhada?: boolean | null
           colaborador_id?: string | null
@@ -654,6 +657,7 @@ export type Database = {
           competencia_mes?: number | null
           comprovante_url?: string | null
           confirmado_recebimento?: boolean | null
+          conta_id?: string | null
           created_at?: string | null
           data_pagamento?: string | null
           data_retorno_cobranca?: string | null
@@ -684,6 +688,7 @@ export type Database = {
         Update: {
           boleto_url?: string | null
           categoria?: string | null
+          centro_custo?: string | null
           cliente_id?: string | null
           cobranca_encaminhada?: boolean | null
           colaborador_id?: string | null
@@ -691,6 +696,7 @@ export type Database = {
           competencia_mes?: number | null
           comprovante_url?: string | null
           confirmado_recebimento?: boolean | null
+          conta_id?: string | null
           created_at?: string | null
           data_pagamento?: string | null
           data_retorno_cobranca?: string | null
@@ -731,6 +737,13 @@ export type Database = {
             columns: ["colaborador_id"]
             isOneToOne: false
             referencedRelation: "colaboradores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_conta_id_fkey"
+            columns: ["conta_id"]
+            isOneToOne: false
+            referencedRelation: "plano_contas"
             referencedColumns: ["id"]
           },
           {
@@ -898,6 +911,56 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plano_contas: {
+        Row: {
+          ativo: boolean
+          centro_custo: string | null
+          codigo: string
+          created_at: string | null
+          empresa_id: string | null
+          grupo: string
+          id: string
+          nome: string
+          parent_id: string | null
+          subgrupo: string | null
+          tipo: string
+        }
+        Insert: {
+          ativo?: boolean
+          centro_custo?: string | null
+          codigo: string
+          created_at?: string | null
+          empresa_id?: string | null
+          grupo: string
+          id?: string
+          nome: string
+          parent_id?: string | null
+          subgrupo?: string | null
+          tipo: string
+        }
+        Update: {
+          ativo?: boolean
+          centro_custo?: string | null
+          codigo?: string
+          created_at?: string | null
+          empresa_id?: string | null
+          grupo?: string
+          id?: string
+          nome?: string
+          parent_id?: string | null
+          subgrupo?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plano_contas_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "plano_contas"
             referencedColumns: ["id"]
           },
         ]
