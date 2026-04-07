@@ -22,60 +22,77 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#0a1a0f] via-[#0d2818] to-[#0a1a0f]">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#0a1a0f] via-[#0d2818] to-[#0a1a0f] relative overflow-hidden">
       {/* Subtle pattern overlay */}
       <div className="fixed inset-0 opacity-[0.03]" style={{
         backgroundImage: 'radial-gradient(circle at 25% 25%, #22c55e 1px, transparent 1px), radial-gradient(circle at 75% 75%, #22c55e 1px, transparent 1px)',
         backgroundSize: '60px 60px',
       }} />
 
-      <Card className="relative w-full max-w-md border-border/50 bg-card/80 backdrop-blur-xl shadow-2xl shadow-primary/5">
-        <CardHeader className="text-center space-y-4 pb-2">
-          <div className="flex justify-center">
-            <img
-              src={logoTrevo}
-              alt="Trevo Legaliza"
-              className="h-16 w-auto logo-pulse"
-            />
+      {/* Ambient glow blobs */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/3 left-1/3 w-[500px] h-[500px] bg-emerald-500/[0.08] rounded-full blur-[150px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[120px]" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md mx-4">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <img
+            src={logoTrevo}
+            alt="Trevo Legaliza"
+            className="h-20 mx-auto logo-pulse"
+          />
+        </div>
+
+        {/* Glass card */}
+        <div className="glass-card-wrapper">
+          <div className="glass-card-inner" style={{ padding: '32px' }}>
+            <p className="text-sm text-white/50 text-center mb-6">
+              Sistema de Gestão Societária
+            </p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-white/70">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-white/70">Senha</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <LogIn className="h-4 w-4 mr-2" />}
+                Entrar
+              </Button>
+            </form>
+            <p className="text-[10px] text-white/30 text-center mt-6">
+              Trevo Engine v10 · © {new Date().getFullYear()} Trevo Legaliza
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Sistema de Gestão Societária
-          </p>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <LogIn className="h-4 w-4 mr-2" />}
-              Entrar
-            </Button>
-          </form>
-          <p className="text-[10px] text-muted-foreground text-center mt-6">
-            Trevo Engine v10 · © {new Date().getFullYear()} Trevo Legaliza
-          </p>
-        </CardContent>
-      </Card>
+          <div className="glass-card-glow" style={{ background: 'rgba(34, 197, 94, 0.15)' }} />
+          <div className="glass-card-shine" />
+        </div>
+
+        <p className="text-center text-xs text-white/30 mt-8">
+          Trevo Legaliza · Assessoria Societária Nacional
+        </p>
+      </div>
     </div>
   );
 }
