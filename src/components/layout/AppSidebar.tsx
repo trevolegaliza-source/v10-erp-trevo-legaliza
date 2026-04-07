@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, Kanban, Users, DollarSign, FileText, Settings,
+  LayoutDashboard, Kanban, Users, DollarSign, Settings,
   ChevronLeft, ChevronRight, PlusCircle, ArrowUpCircle, LogOut, UsersRound, Receipt, MapPin, BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -20,7 +20,7 @@ const navItems = [
   { path: '/financeiro', label: 'Financeiro', icon: DollarSign, badgeKey: 'pendentesFinanceiro' as const, modulo: 'financeiro' },
   { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle, badgeKey: null, modulo: 'contas_pagar' },
   { path: '/colaboradores', label: 'Colaboradores', icon: UsersRound, badgeKey: null, modulo: 'colaboradores' },
-  { path: '/documentos', label: 'Documentos', icon: FileText, badgeKey: 'docsPendentes' as const, modulo: 'documentos' },
+  
   { path: '/inteligencia-geografica', label: 'Intel. Geográfica', icon: MapPin, badgeKey: null, modulo: 'intel_geografica' },
   { path: '/catalogo', label: 'Portfólio & Preços', icon: BookOpen, badgeKey: null, modulo: 'configuracoes' },
   { path: '/configuracoes', label: 'Configurações', icon: Settings, badgeKey: null, modulo: 'configuracoes' },
