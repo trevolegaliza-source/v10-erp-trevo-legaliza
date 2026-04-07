@@ -26,52 +26,8 @@ import { UFS_BRASIL, UF_NOMES } from '@/constants/estados-brasil';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
-// ═══════════ CSS GLASSMORPHISM ═══════════
+// Inline CSS kept minimal — glass effects moved to index.css
 const GLASS_CSS = `
-.glass-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 24px;
-  cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-.glass-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 24px;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent 50%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-.glass-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  transform: translateY(-4px) scale(1.01);
-}
-.glass-card-glow {
-  position: absolute;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.4;
-  top: -40px;
-  right: -40px;
-  pointer-events: none;
-  transition: opacity 0.4s;
-}
-.glass-card:hover .glass-card-glow {
-  opacity: 0.7;
-}
 .breadcrumb-item {
   cursor: pointer;
   transition: color 0.2s;
@@ -85,17 +41,6 @@ const GLASS_CSS = `
 @keyframes catalogFadeIn {
   from { opacity: 0; transform: translateY(16px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
-}
-.service-detail-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
-  transition: all 0.3s;
-}
-.service-detail-card:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
 }
 `;
 
