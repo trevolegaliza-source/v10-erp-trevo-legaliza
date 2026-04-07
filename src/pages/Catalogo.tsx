@@ -301,15 +301,21 @@ export default function Catalogo() {
         <ServiceDetailView
           key={animKey}
           service={level3Service}
+          adminMode={adminMode}
           onBack={() => navigate(path.slice(0, -1))}
           onPrecos={() => setPrecosServicoId(level3Service.id)}
+          onDelete={() => handleDeleteServico(level3Service.id)}
         />
       ) : level2Categories ? (
         <Level2View
           key={animKey}
           services={level2Services}
+          adminMode={adminMode}
           onSelectService={(s) => navigate([...path, s.id])}
           onBack={() => navigate(path.slice(0, -1))}
+          onEditService={(s) => setServicoModal(s)}
+          onPrecosService={(s) => setPrecosServicoId(s.id)}
+          onDeleteService={(s) => handleDeleteServico(s.id)}
         />
       ) : currentGroup?.children ? (
         <Level1View
