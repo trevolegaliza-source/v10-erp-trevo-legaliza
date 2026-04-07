@@ -60,7 +60,8 @@ Se preferir realizar o pagamento via ${formatarNegrito('boleto bancário')}, é 
 Qualquer dúvida, estamos à disposição.
 
 ${formatarNegrito('Trevo Legaliza')} 🍀
-(11) 93492-7001`;
+Assessoria societária · Atuação nacional
+(11) 93492-7001 · trevolegaliza.com.br`;
   }
 
   // Múltiplos processos
