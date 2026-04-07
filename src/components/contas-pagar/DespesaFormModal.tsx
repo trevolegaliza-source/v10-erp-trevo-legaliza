@@ -129,6 +129,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
       setObservacoes(editData.observacoes_financeiro || '');
       setSalvarRecorrente(false);
       setParcelado(false);
+      setContaId(editData.conta_id || '');
+      setCentroCusto(editData.centro_custo || '');
     } else {
       resetForm();
     }
