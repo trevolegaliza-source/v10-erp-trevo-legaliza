@@ -296,6 +296,12 @@
   }
 }
 
+/* ── Sidebar glass perf fix ── */
+.sidebar-glass button {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
 /* ═══ GLASS DESIGN SYSTEM — DUAL MODE ═══ */
 
 /* ── Glass Variables por tema ── */

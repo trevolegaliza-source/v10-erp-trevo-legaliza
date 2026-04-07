@@ -142,6 +142,7 @@ export function AppSidebar() {
           size="icon"
           onClick={() => setCollapsed(!collapsed)}
           className="w-full text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          style={{ willChange: 'auto', backfaceVisibility: 'hidden' }}
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
