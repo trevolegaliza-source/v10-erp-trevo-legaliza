@@ -59,12 +59,20 @@ export default function Orcamentos() {
   async function handleDownloadPDF(orc: Orcamento) {
     try {
       const f = formFromOrcamento(orc);
-      const sub = f.itens.reduce((s: number, i: any) => s + (Number(i.valor) || 0) * (Number(i.quantidade) || 1), 0);
+      const itens = f.itens.map(normalizeItem);
+      const sub = itens.reduce((s: number, i: any) => s + (Number(i.honorario) || Number(i.valor) || 0) * (Number(i.quantidade) || 1), 0);
       const desc = sub * (f.desconto_pct / 100);
+      const hasDetailed = itens.some((i: any) => i.taxa_min > 0 || i.taxa_max > 0 || i.prazo || i.docs_necessarios);
+      const orcAny = orc as any;
       const doc = await gerarOrcamentoPDF({
+        modo: hasDetailed || orcAny.contexto ? 'detalhado' : 'simples',
         prospect_nome: orc.prospect_nome,
         prospect_cnpj: orc.prospect_cnpj,
-        itens: f.itens,
+        itens,
+        pacotes: Array.isArray(orcAny.pacotes) ? orcAny.pacotes : [],
+        secoes: Array.isArray(orcAny.secoes) && orcAny.secoes.length > 0 ? orcAny.secoes : [...DEFAULT_SECOES],
+        contexto: orcAny.contexto || '',
+        ordem_execucao: orcAny.ordem_execucao || '',
         desconto_pct: f.desconto_pct,
         subtotal: sub,
         total: sub - desc,
