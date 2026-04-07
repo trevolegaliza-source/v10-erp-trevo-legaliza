@@ -53,15 +53,6 @@ export function AppLayout() {
             </kbd>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              title={theme === 'dark' ? 'Tema Claro' : 'Tema Escuro'}
-            >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
             <NotificationPopover />
             <div className="flex items-center gap-2 ml-2">
               <Avatar className="h-8 w-8">
