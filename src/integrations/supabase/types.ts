@@ -780,6 +780,7 @@ export type Database = {
       orcamentos: {
         Row: {
           cliente_id: string | null
+          contexto: string | null
           convertido_em: string | null
           created_at: string | null
           created_by: string | null
@@ -793,6 +794,8 @@ export type Database = {
           naturezas: Json
           numero: number
           observacoes: string | null
+          ordem_execucao: string | null
+          pacotes: Json | null
           pagamento: string | null
           pdf_url: string | null
           prazo_execucao: string | null
@@ -802,6 +805,7 @@ export type Database = {
           prospect_nome: string
           prospect_telefone: string | null
           qtd_processos: number | null
+          secoes: Json | null
           servicos: Json
           share_token: string | null
           sla: string | null
@@ -814,6 +818,7 @@ export type Database = {
         }
         Insert: {
           cliente_id?: string | null
+          contexto?: string | null
           convertido_em?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -827,6 +832,8 @@ export type Database = {
           naturezas?: Json
           numero?: number
           observacoes?: string | null
+          ordem_execucao?: string | null
+          pacotes?: Json | null
           pagamento?: string | null
           pdf_url?: string | null
           prazo_execucao?: string | null
@@ -836,6 +843,7 @@ export type Database = {
           prospect_nome: string
           prospect_telefone?: string | null
           qtd_processos?: number | null
+          secoes?: Json | null
           servicos?: Json
           share_token?: string | null
           sla?: string | null
@@ -848,6 +856,7 @@ export type Database = {
         }
         Update: {
           cliente_id?: string | null
+          contexto?: string | null
           convertido_em?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -861,6 +870,8 @@ export type Database = {
           naturezas?: Json
           numero?: number
           observacoes?: string | null
+          ordem_execucao?: string | null
+          pacotes?: Json | null
           pagamento?: string | null
           pdf_url?: string | null
           prazo_execucao?: string | null
@@ -870,6 +881,7 @@ export type Database = {
           prospect_nome?: string
           prospect_telefone?: string | null
           qtd_processos?: number | null
+          secoes?: Json | null
           servicos?: Json
           share_token?: string | null
           sla?: string | null

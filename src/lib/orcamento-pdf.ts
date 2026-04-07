@@ -1,17 +1,19 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-
-interface OrcamentoItem {
-  descricao: string;
-  detalhes: string;
-  valor: number;
-  quantidade: number;
-}
+import {
+  type OrcamentoItem, type OrcamentoPacote, type OrcamentoSecao,
+  type OrcamentoModo, getItemValor, DEFAULT_SECOES,
+} from '@/components/orcamentos/types';
 
 export interface OrcamentoPDFData {
+  modo: OrcamentoModo;
   prospect_nome: string;
   prospect_cnpj: string | null;
   itens: OrcamentoItem[];
+  pacotes: OrcamentoPacote[];
+  secoes: OrcamentoSecao[];
+  contexto: string;
+  ordem_execucao: string;
   desconto_pct: number;
   subtotal: number;
   total: number;
@@ -24,74 +26,75 @@ export interface OrcamentoPDFData {
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
 
-function buildHTML(d: OrcamentoPDFData): string {
-  const itensHtml = d.itens
-    .filter(i => i.descricao)
-    .map((item, idx) => `
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 0; ${idx > 0 ? 'border-top: 1px solid #e2e8f0;' : ''}">
-        <div style="flex: 1; padding-right: 20px;">
-          <div style="font-size: 13px; font-weight: 700; color: #1a1a2e;">${idx + 1}. ${item.descricao}${item.quantidade > 1 ? ` (×${item.quantidade})` : ''}</div>
-          ${item.detalhes ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.4;">${item.detalhes}</div>` : ''}
+const HEADER = (numero: number, data: string) => `
+  <div style="background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 32px 40px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+      <div>
+        <div style="font-size: 22px; font-weight: 800; color: white; letter-spacing: -0.5px;">
+          <span style="color: #4ade80;">Trevo</span> <span style="color: rgba(255,255,255,0.7);">Legaliza</span>
         </div>
-        <div style="font-size: 14px; font-weight: 800; color: #166534; white-space: nowrap;">${fmt(item.valor * item.quantidade)}</div>
+        <div style="font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 4px;">CNPJ 39.969.412/0001-70</div>
+        <div style="font-size: 8px; color: rgba(255,255,255,0.3); margin-top: 2px;">Assessoria societária com atuação em todo o território nacional</div>
       </div>
-    `)
-    .join('');
+      <div style="text-align: right;">
+        <div style="font-size: 10px; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">Proposta #${String(numero).padStart(3, '0')}</div>
+        <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 4px;">${data}</div>
+      </div>
+    </div>
+  </div>
+  <div style="height: 4px; background: linear-gradient(90deg, #22c55e, #86efac, #22c55e);"></div>
+`;
+
+const FOOTER = `
+  <div style="padding: 16px 40px; border-top: 1px solid #e2e8f0; background: #f8fafc; text-align: center;">
+    <div style="font-size: 10px; color: #94a3b8;">
+      Trevo Legaliza · CNPJ 39.969.412/0001-70 · Rua Brasil, nº 1170, Rudge Ramos, SBC/SP · administrativo@trevolegaliza.com.br · (11) 93492-7001 · trevolegaliza.com.br
+    </div>
+  </div>
+`;
+
+function buildSimplesHTML(d: OrcamentoPDFData): string {
+  const itensHtml = d.itens.map((item, idx) => `
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 0; ${idx > 0 ? 'border-top: 1px solid #e2e8f0;' : ''}">
+      <div style="flex: 1; padding-right: 20px;">
+        <div style="font-size: 13px; font-weight: 700; color: #1a1a2e;">${idx + 1}. ${esc(item.descricao)}${item.quantidade > 1 ? ` (×${item.quantidade})` : ''}</div>
+        ${item.detalhes ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.4;">${esc(item.detalhes)}</div>` : ''}
+      </div>
+      <div style="font-size: 14px; font-weight: 800; color: #166534; white-space: nowrap;">${fmt(getItemValor(item) * item.quantidade)}</div>
+    </div>
+  `).join('');
 
   const descontoHtml = d.desconto_pct > 0
     ? `<div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #e2e8f0; font-size: 12px;">
         <span style="color: #64748b;">Desconto (${d.desconto_pct}%)</span>
         <span style="color: #dc2626; font-weight: 600;">- ${fmt(d.subtotal * d.desconto_pct / 100)}</span>
-       </div>`
-    : '';
+       </div>` : '';
 
   const observacoesHtml = d.observacoes
     ? `<div style="margin-top: 20px;">
         <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Observações</div>
-        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${d.observacoes.replace(/\n/g, '<br/>')}</div>
-       </div>`
-    : '';
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${esc(d.observacoes)}</div>
+       </div>` : '';
 
   return `
     <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
-      <!-- Header -->
-      <div style="background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 32px 40px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-          <div>
-            <div style="font-size: 22px; font-weight: 800; color: white; letter-spacing: -0.5px;">
-              <span style="color: #4ade80;">Trevo</span> <span style="color: rgba(255,255,255,0.7);">Legaliza</span>
-            </div>
-            <div style="font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 4px;">CNPJ 39.969.412/0001-70</div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-size: 10px; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">Proposta #${String(d.numero).padStart(3, '0')}</div>
-            <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 4px;">${d.data_emissao}</div>
-          </div>
-        </div>
-      </div>
-      <div style="height: 4px; background: linear-gradient(90deg, #22c55e, #86efac, #22c55e);"></div>
-
-      <!-- Client Info -->
+      ${HEADER(d.numero, d.data_emissao)}
       <div style="padding: 24px 40px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
         <div style="font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">Preparada para</div>
-        <div style="font-size: 18px; font-weight: 800; color: #1a1a2e;">${d.prospect_nome}</div>
-        ${d.prospect_cnpj ? `<div style="font-size: 11px; color: #64748b; margin-top: 2px;">CNPJ: ${d.prospect_cnpj}</div>` : ''}
+        <div style="font-size: 18px; font-weight: 800; color: #1a1a2e;">${esc(d.prospect_nome)}</div>
+        ${d.prospect_cnpj ? `<div style="font-size: 11px; color: #64748b; margin-top: 2px;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
         <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Válida por ${d.validade_dias} dias</div>
       </div>
-
-      <!-- Items -->
       <div style="padding: 24px 40px;">
         <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Escopo dos Serviços</div>
         ${itensHtml}
       </div>
-
-      <!-- Totals -->
       <div style="padding: 0 40px 24px;">
         <div style="border-top: 2px solid #e2e8f0; padding-top: 12px;">
           <div style="display: flex; justify-content: space-between; font-size: 12px; color: #64748b; padding: 6px 0;">
-            <span>Subtotal</span>
-            <span style="font-weight: 600;">${fmt(d.subtotal)}</span>
+            <span>Subtotal</span><span style="font-weight: 600;">${fmt(d.subtotal)}</span>
           </div>
           ${descontoHtml}
           <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 8px; background: #f0fdf4; border: 2px solid #22c55e; border-radius: 12px;">
@@ -100,52 +103,284 @@ function buildHTML(d: OrcamentoPDFData): string {
           </div>
         </div>
       </div>
-
-      <!-- Conditions -->
       <div style="padding: 0 40px 24px;">
         <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Condições</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
             <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Pagamento</div>
-            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${d.pagamento || 'A combinar'}</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${esc(d.pagamento || 'A combinar')}</div>
           </div>
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
             <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Prazo de Execução</div>
-            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${d.prazo_execucao || 'A combinar'}</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${esc(d.prazo_execucao || 'A combinar')}</div>
           </div>
         </div>
         ${observacoesHtml}
       </div>
-
-      <!-- Footer -->
-      <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 40px; border-top: 1px solid #e2e8f0; background: #f8fafc; text-align: center;">
-        <div style="font-size: 10px; color: #94a3b8;">
-          Trevo Legaliza · CNPJ 39.969.412/0001-70 · Rua Brasil, nº 1170, Rudge Ramos, SBC/SP · administrativo@trevolegaliza.com.br · (11) 93492-7001 · trevolegaliza.com.br
-        </div>
-      </div>
+      <div style="position: absolute; bottom: 0; left: 0; right: 0;">${FOOTER}</div>
     </div>
   `;
 }
 
-export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<jsPDF> {
-  const html = buildHTML(data);
+function buildDetalhadoPages(d: OrcamentoPDFData): string[] {
+  const pages: string[] = [];
+  const secoes = d.secoes.length > 0 ? d.secoes : DEFAULT_SECOES;
 
+  // --- PAGE 1: Cover ---
+  pages.push(`
+    <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; height: 1123px; background: white; position: relative; display: flex; flex-direction: column;">
+      ${HEADER(d.numero, d.data_emissao)}
+      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 60px;">
+        <div style="font-size: 10px; color: #4ade80; text-transform: uppercase; letter-spacing: 4px; font-weight: 700; margin-bottom: 20px;">Proposta Comercial</div>
+        <div style="font-size: 32px; font-weight: 900; color: #1a1a2e; text-align: center; margin-bottom: 16px;">${esc(d.prospect_nome)}</div>
+        ${d.prospect_cnpj ? `<div style="font-size: 14px; color: #64748b;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
+        <div style="margin-top: 40px; padding: 20px 40px; background: #f0fdf4; border: 2px solid #22c55e; border-radius: 16px; text-align: center;">
+          <div style="font-size: 10px; color: #166534; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px;">Investimento Estimado</div>
+          <div style="font-size: 36px; font-weight: 900; color: #166534;">${fmt(d.total)}</div>
+        </div>
+        <div style="margin-top: 24px; font-size: 12px; color: #94a3b8;">
+          Emissão: ${d.data_emissao} · Válida por ${d.validade_dias} dias
+        </div>
+      </div>
+      <div style="position: absolute; bottom: 0; left: 0; right: 0;">${FOOTER}</div>
+    </div>
+  `);
+
+  // --- PAGE 2: Context (if filled) ---
+  if (d.contexto || d.ordem_execucao) {
+    pages.push(`
+      <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
+        ${HEADER(d.numero, d.data_emissao)}
+        <div style="padding: 30px 40px;">
+          ${d.contexto ? `
+            <div style="margin-bottom: 30px;">
+              <div style="font-size: 10px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid #f0fdf4; padding-bottom: 8px;">Cenário e Oportunidade</div>
+              <div style="font-size: 12px; color: #334155; line-height: 1.7;">${esc(d.contexto)}</div>
+            </div>
+          ` : ''}
+          ${d.ordem_execucao ? `
+            <div>
+              <div style="font-size: 10px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid #f0fdf4; padding-bottom: 8px;">Ordem Sugerida de Execução</div>
+              <div style="font-size: 12px; color: #334155; line-height: 1.7; background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">${esc(d.ordem_execucao)}</div>
+            </div>
+          ` : ''}
+        </div>
+        <div style="position: absolute; bottom: 0; left: 0; right: 0;">${FOOTER}</div>
+      </div>
+    `);
+  }
+
+  // --- ITEMS PAGES (grouped by section) ---
+  const grouped = secoes
+    .map(s => ({ ...s, items: d.itens.filter(i => i.secao === s.key).sort((a, b) => a.ordem - b.ordem) }))
+    .filter(g => g.items.length > 0);
+
+  let itemsHtml = '';
+  for (const group of grouped) {
+    if (group.key !== 'geral') {
+      itemsHtml += `<div style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 2px; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #f0fdf4;">${esc(group.label)} (${group.items.length})</div>`;
+    }
+    for (const item of group.items) {
+      const totalMin = getItemValor(item) * item.quantidade + item.taxa_min;
+      const totalMax = getItemValor(item) * item.quantidade + item.taxa_max;
+      const hasTaxa = item.taxa_min > 0 || item.taxa_max > 0;
+
+      itemsHtml += `
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="font-size: 13px; font-weight: 700; color: #1a1a2e;">${item.ordem || '•'}. ${esc(item.descricao)}</div>
+            <div style="font-size: 14px; font-weight: 800; color: #166534; white-space: nowrap; margin-left: 16px;">${fmt(getItemValor(item) * item.quantidade)}</div>
+          </div>
+          ${item.detalhes ? `<div style="font-size: 11px; color: #64748b; margin-top: 6px; line-height: 1.5;">${esc(item.detalhes)}</div>` : ''}
+          <div style="display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap;">
+            ${item.prazo ? `<div style="font-size: 10px;"><span style="color: #94a3b8;">Prazo:</span> <span style="color: #334155; font-weight: 600;">${esc(item.prazo)}</span></div>` : ''}
+            ${item.docs_necessarios ? `<div style="font-size: 10px;"><span style="color: #94a3b8;">Docs:</span> <span style="color: #334155;">${esc(item.docs_necessarios)}</span></div>` : ''}
+          </div>
+          ${hasTaxa ? `
+            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0; display: flex; gap: 20px; font-size: 10px;">
+              <div><span style="color: #94a3b8;">Honorário Trevo:</span> <span style="color: #166534; font-weight: 700;">${fmt(getItemValor(item) * item.quantidade)}</span></div>
+              <div><span style="color: #94a3b8;">Taxas externas:</span> <span style="color: #b45309; font-weight: 600;">${fmt(item.taxa_min)} a ${fmt(item.taxa_max)}</span></div>
+              <div><span style="color: #94a3b8;">Total estimado:</span> <span style="font-weight: 700;">${fmt(totalMin)} a ${fmt(totalMax)}</span></div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+  }
+
+  pages.push(`
+    <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
+      ${HEADER(d.numero, d.data_emissao)}
+      <div style="padding: 24px 40px;">
+        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Escopo dos Serviços</div>
+        ${itemsHtml}
+      </div>
+      <div style="position: absolute; bottom: 0; left: 0; right: 0;">${FOOTER}</div>
+    </div>
+  `);
+
+  // --- PACKAGES PAGE ---
+  const validPacotes = d.pacotes.filter(p => p.nome && p.itens_ids.length > 0);
+  if (validPacotes.length > 0) {
+    let pacotesRows = '';
+    for (const pac of validPacotes) {
+      const selected = d.itens.filter(i => pac.itens_ids.includes(i.id));
+      const honorario = selected.reduce((s, i) => s + getItemValor(i) * i.quantidade, 0);
+      const honorarioDesc = honorario * (1 - pac.desconto_pct / 100);
+      const taxaMin = selected.reduce((s, i) => s + i.taxa_min, 0);
+      const taxaMax = selected.reduce((s, i) => s + i.taxa_max, 0);
+
+      pacotesRows += `
+        <tr>
+          <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-weight: 700; color: #166534;">${esc(pac.nome)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #64748b;">${esc(pac.descricao || `${selected.length} itens`)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right;">
+            <div style="text-decoration: line-through; font-size: 10px; color: #94a3b8;">${fmt(honorario)}</div>
+            <div style="font-weight: 700; color: #166534;">${fmt(honorarioDesc)} <span style="font-size: 10px; color: #4ade80;">(-${pac.desconto_pct}%)</span></div>
+          </td>
+          <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: 11px; color: #b45309;">${fmt(taxaMin)} a ${fmt(taxaMax)}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 800; color: #1a1a2e;">${fmt(honorarioDesc + taxaMin)} a ${fmt(honorarioDesc + taxaMax)}</td>
+        </tr>
+      `;
+    }
+
+    pages.push(`
+      <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
+        ${HEADER(d.numero, d.data_emissao)}
+        <div style="padding: 24px 40px;">
+          <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Pacotes Disponíveis</div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+              <tr style="background: #f0fdf4;">
+                <th style="padding: 10px 12px; text-align: left; font-size: 9px; color: #166534; text-transform: uppercase; letter-spacing: 1px;">Pacote</th>
+                <th style="padding: 10px 12px; text-align: left; font-size: 9px; color: #166534; text-transform: uppercase; letter-spacing: 1px;">Inclui</th>
+                <th style="padding: 10px 12px; text-align: right; font-size: 9px; color: #166534; text-transform: uppercase; letter-spacing: 1px;">Honorário</th>
+                <th style="padding: 10px 12px; text-align: right; font-size: 9px; color: #166534; text-transform: uppercase; letter-spacing: 1px;">Taxas Est.</th>
+                <th style="padding: 10px 12px; text-align: right; font-size: 9px; color: #166534; text-transform: uppercase; letter-spacing: 1px;">Investimento</th>
+              </tr>
+            </thead>
+            <tbody>${pacotesRows}</tbody>
+          </table>
+        </div>
+        <div style="position: absolute; bottom: 0; left: 0; right: 0;">${FOOTER}</div>
+      </div>
+    `);
+  }
+
+  // --- TOTALS + CONDITIONS PAGE ---
+  const totalHonorarios = d.itens.reduce((s, i) => s + getItemValor(i) * i.quantidade, 0);
+  const totalTaxaMin = d.itens.reduce((s, i) => s + i.taxa_min, 0);
+  const totalTaxaMax = d.itens.reduce((s, i) => s + i.taxa_max, 0);
+  const descontoValor = totalHonorarios * (d.desconto_pct / 100);
+  const honorarioFinal = totalHonorarios - descontoValor;
+  const hasTaxas = totalTaxaMin > 0 || totalTaxaMax > 0;
+
+  pages.push(`
+    <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
+      ${HEADER(d.numero, d.data_emissao)}
+      <div style="padding: 30px 40px;">
+        <!-- Totals -->
+        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Resumo do Investimento</div>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
+            <span style="color: #64748b;">Honorários Trevo</span>
+            <span style="font-weight: 600;">${fmt(totalHonorarios)}</span>
+          </div>
+          ${d.desconto_pct > 0 ? `
+            <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; color: #dc2626;">
+              <span>Desconto (${d.desconto_pct}%)</span>
+              <span style="font-weight: 600;">- ${fmt(descontoValor)}</span>
+            </div>
+          ` : ''}
+          ${hasTaxas ? `
+            <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-top: 1px solid #e2e8f0;">
+              <span style="color: #64748b;">Taxas externas estimadas</span>
+              <span style="color: #b45309; font-weight: 600;">${fmt(totalTaxaMin)} a ${fmt(totalTaxaMax)}</span>
+            </div>
+          ` : ''}
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 10px; background: #f0fdf4; border: 2px solid #22c55e; border-radius: 12px;">
+            <span style="font-size: 12px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 1px;">${hasTaxas ? 'Investimento Total' : 'Total'}</span>
+            <span style="font-size: 28px; font-weight: 900; color: #166534;">
+              ${hasTaxas ? `${fmt(honorarioFinal + totalTaxaMin)} a ${fmt(honorarioFinal + totalTaxaMax)}` : fmt(d.total)}
+            </span>
+          </div>
+        </div>
+
+        <!-- Conditions -->
+        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Condições</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+            <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Validade</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${d.validade_dias} dias</div>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+            <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Prazo de Execução</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${esc(d.prazo_execucao || 'A combinar')}</div>
+          </div>
+        </div>
+        ${d.pagamento ? `
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+            <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Condições de Pagamento</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${esc(d.pagamento)}</div>
+          </div>
+        ` : ''}
+        ${d.observacoes ? `
+          <div style="margin-top: 16px;">
+            <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Observações</div>
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${esc(d.observacoes)}</div>
+          </div>
+        ` : ''}
+      </div>
+      <div style="position: absolute; bottom: 0; left: 0; right: 0;">${FOOTER}</div>
+    </div>
+  `);
+
+  return pages;
+}
+
+async function renderPageToCanvas(html: string): Promise<HTMLCanvasElement> {
   const container = document.createElement('div');
   container.style.position = 'absolute';
   container.style.left = '-9999px';
   container.innerHTML = html;
   document.body.appendChild(container);
-
   try {
-    const pageEl = container.firstElementChild as HTMLElement;
-    const canvas = await html2canvas(pageEl, { scale: 2, useCORS: true });
+    const el = container.firstElementChild as HTMLElement;
+    return await html2canvas(el, { scale: 2, useCORS: true });
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
+export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<jsPDF> {
+  const isDetalhado = data.modo === 'detalhado' ||
+    data.itens.some(i => i.taxa_min > 0 || i.taxa_max > 0 || i.prazo || i.docs_necessarios) ||
+    !!data.contexto;
+
+  if (!isDetalhado) {
+    // Simple mode: single page
+    const html = buildSimplesHTML(data);
+    const canvas = await renderPageToCanvas(html);
     const doc = new jsPDF('p', 'mm', 'a4');
     const imgData = canvas.toDataURL('image/png');
     const imgWidth = 210;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     doc.addImage(imgData, 'PNG', 0, 0, imgWidth, Math.min(imgHeight, 297));
     return doc;
-  } finally {
-    document.body.removeChild(container);
   }
+
+  // Detailed mode: multiple pages
+  const pagesHtml = buildDetalhadoPages(data);
+  const doc = new jsPDF('p', 'mm', 'a4');
+
+  for (let i = 0; i < pagesHtml.length; i++) {
+    if (i > 0) doc.addPage();
+    const canvas = await renderPageToCanvas(pagesHtml[i]);
+    const imgData = canvas.toDataURL('image/png');
+    const imgWidth = 210;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    doc.addImage(imgData, 'PNG', 0, 0, imgWidth, Math.min(imgHeight, 297));
+  }
+
+  return doc;
 }

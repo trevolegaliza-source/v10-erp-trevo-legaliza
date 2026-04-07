@@ -9,36 +9,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
-  Plus, FileText, Trash2, Save, FileDown, ArrowLeft, Link as LinkIcon, Copy,
+  Plus, FileText, Save, FileDown, ArrowLeft, Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
+import {
+  type OrcamentoForm, type OrcamentoModo, type OrcamentoItem,
+  DEFAULT_SECOES, createItem, normalizeItem, getItemValor,
+} from '@/components/orcamentos/types';
+import { ItemCardSimples } from '@/components/orcamentos/ItemCardSimples';
+import { ItemCardDetalhado } from '@/components/orcamentos/ItemCardDetalhado';
+import { PacotesEditor } from '@/components/orcamentos/PacotesEditor';
+import { PreviewDetalhado } from '@/components/orcamentos/PreviewDetalhado';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-interface OrcamentoItem {
-  id: string;
-  descricao: string;
-  detalhes: string;
-  valor: number;
-  quantidade: number;
-}
-
-interface OrcamentoForm {
-  prospect_nome: string;
-  prospect_cnpj: string;
-  prospect_email: string;
-  prospect_telefone: string;
-  prospect_contato: string;
-  cliente_id: string | null;
-  itens: OrcamentoItem[];
-  desconto_pct: number;
-  validade_dias: number;
-  prazo_execucao: string;
-  pagamento: string;
-  observacoes: string;
-}
 
 const defaultForm = (): OrcamentoForm => ({
   prospect_nome: '',
@@ -47,7 +33,12 @@ const defaultForm = (): OrcamentoForm => ({
   prospect_telefone: '',
   prospect_contato: '',
   cliente_id: null,
-  itens: [{ id: crypto.randomUUID(), descricao: '', detalhes: '', valor: 0, quantidade: 1 }],
+  modo: 'simples',
+  contexto: '',
+  ordem_execucao: '',
+  itens: [createItem()],
+  pacotes: [],
+  secoes: [...DEFAULT_SECOES],
   desconto_pct: 0,
   validade_dias: 15,
   prazo_execucao: 'Prazo de execução: até 15 dias úteis após recebimento da documentação completa.',
@@ -79,21 +70,25 @@ export default function OrcamentoNovo() {
     (async () => {
       const { data } = await supabase.from('orcamentos').select('*').eq('id', editId).single();
       if (!data) return;
-      const orc = data as unknown as Orcamento;
+      const orc = data as unknown as Orcamento & { contexto?: string; ordem_execucao?: string; pacotes?: any; secoes?: any };
       setOrcamentoNumero(orc.numero);
+
       let itens: OrcamentoItem[] = [];
       try {
         const raw = orc.servicos as any;
-        if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'object' && 'descricao' in raw[0]) {
-          itens = raw.map((r: any) => ({
-            id: r.id || crypto.randomUUID(),
-            descricao: r.descricao || '',
-            detalhes: r.detalhes || '',
-            valor: Number(r.valor) || 0,
-            quantidade: Number(r.quantidade) || 1,
-          }));
+        if (Array.isArray(raw) && raw.length > 0) {
+          itens = raw.map(normalizeItem);
         }
       } catch { /* ignore */ }
+
+      // Detect mode: if any item has taxa_min/taxa_max/prazo/docs, it's detailed
+      const hasDetailedData = itens.some(i => i.taxa_min > 0 || i.taxa_max > 0 || i.prazo || i.docs_necessarios);
+      const hasContexto = !!(orc as any).contexto;
+      const modo: OrcamentoModo = (hasDetailedData || hasContexto) ? 'detalhado' : 'simples';
+
+      const rawPacotes = (orc as any).pacotes;
+      const rawSecoes = (orc as any).secoes;
+
       setForm({
         prospect_nome: orc.prospect_nome,
         prospect_cnpj: orc.prospect_cnpj || '',
@@ -101,7 +96,12 @@ export default function OrcamentoNovo() {
         prospect_telefone: orc.prospect_telefone || '',
         prospect_contato: orc.prospect_contato || '',
         cliente_id: orc.cliente_id || null,
-        itens: itens.length ? itens : [{ id: crypto.randomUUID(), descricao: '', detalhes: '', valor: 0, quantidade: 1 }],
+        modo,
+        contexto: (orc as any).contexto || '',
+        ordem_execucao: (orc as any).ordem_execucao || '',
+        itens: itens.length ? itens : [createItem()],
+        pacotes: Array.isArray(rawPacotes) ? rawPacotes : [],
+        secoes: Array.isArray(rawSecoes) && rawSecoes.length > 0 ? rawSecoes : [...DEFAULT_SECOES],
         desconto_pct: orc.desconto_pct,
         validade_dias: orc.validade_dias,
         prazo_execucao: orc.prazo_execucao || '',
@@ -111,16 +111,27 @@ export default function OrcamentoNovo() {
     })();
   }, [editId]);
 
-  const subtotal = useMemo(() => form.itens.reduce((s, i) => s + i.valor * i.quantidade, 0), [form.itens]);
+  const isDetalhado = form.modo === 'detalhado';
+
+  const subtotal = useMemo(() =>
+    form.itens.reduce((s, i) => s + getItemValor(i) * i.quantidade, 0),
+    [form.itens]
+  );
   const descontoValor = subtotal * (form.desconto_pct / 100);
   const totalFinal = subtotal - descontoValor;
 
   function addItem() {
-    setForm(f => ({ ...f, itens: [...f.itens, { id: crypto.randomUUID(), descricao: '', detalhes: '', valor: 0, quantidade: 1 }] }));
+    setForm(f => ({
+      ...f,
+      itens: [...f.itens, createItem({ ordem: f.itens.length + 1 })],
+    }));
   }
 
   function updateItem(idx: number, field: keyof OrcamentoItem, value: any) {
-    setForm(f => ({ ...f, itens: f.itens.map((item, i) => i === idx ? { ...item, [field]: value } : item) }));
+    setForm(f => ({
+      ...f,
+      itens: f.itens.map((item, i) => i === idx ? { ...item, [field]: value } : item),
+    }));
   }
 
   function removeItem(idx: number) {
@@ -137,6 +148,16 @@ export default function OrcamentoNovo() {
       prospect_cnpj: c.cnpj || '',
       prospect_email: c.email || '',
       prospect_telefone: c.telefone || '',
+    }));
+  }
+
+  function handleAddSecao() {
+    const nome = prompt('Nome da nova seção:');
+    if (!nome) return;
+    const key = nome.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    setForm(f => ({
+      ...f,
+      secoes: [...f.secoes, { key, label: nome, descricao: '' }],
     }));
   }
 
@@ -164,6 +185,10 @@ export default function OrcamentoNovo() {
       sla: null,
       observacoes: form.observacoes || null,
       prazo_execucao: form.prazo_execucao || null,
+      contexto: isDetalhado ? (form.contexto || null) : null,
+      ordem_execucao: isDetalhado ? (form.ordem_execucao || null) : null,
+      pacotes: isDetalhado ? (form.pacotes as any) : ([] as any),
+      secoes: isDetalhado ? (form.secoes as any) : ([] as any),
       status,
       created_by: null,
       pdf_url: null,
@@ -199,13 +224,17 @@ export default function OrcamentoNovo() {
 
     const toastId = toast.loading('Gerando PDF...');
     try {
-      // Save first
       await handleSave('enviado');
 
       const doc = await gerarOrcamentoPDF({
+        modo: form.modo,
         prospect_nome: form.prospect_nome,
         prospect_cnpj: form.prospect_cnpj,
         itens: itensValidos,
+        pacotes: form.pacotes,
+        secoes: form.secoes,
+        contexto: form.contexto,
+        ordem_execucao: form.ordem_execucao,
         desconto_pct: form.desconto_pct,
         subtotal,
         total: totalFinal,
@@ -234,6 +263,52 @@ export default function OrcamentoNovo() {
   }
 
   const validItems = form.itens.filter(i => i.descricao.trim());
+
+  // Simple mode preview
+  const previewSimples = (
+    <div className="bg-gradient-to-br from-[hsl(120,60%,8%)] to-[hsl(120,40%,12%)] p-5 text-white rounded-lg">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-lg font-extrabold">
+          <span className="text-primary">Trevo</span>{' '}
+          <span className="opacity-60">Legaliza</span>
+        </span>
+      </div>
+      <p className="text-[10px] font-bold uppercase tracking-[3px] text-primary/80 mb-1">Proposta Comercial</p>
+      {form.prospect_nome && (
+        <div className="mb-4">
+          <p className="text-[10px] text-primary/60">Preparada para</p>
+          <p className="font-bold text-sm">{form.prospect_nome}</p>
+          {form.prospect_cnpj && <p className="text-[10px] opacity-40">{form.prospect_cnpj}</p>}
+        </div>
+      )}
+      {validItems.length > 0 && (
+        <div className="space-y-1.5 mb-4">
+          {validItems.map((item, idx) => (
+            <div key={item.id} className="flex justify-between text-xs">
+              <span className="opacity-70 truncate mr-3">
+                {idx + 1}. {item.descricao}{item.quantidade > 1 ? ` (×${item.quantidade})` : ''}
+              </span>
+              <span className="font-bold whitespace-nowrap">{fmt(getItemValor(item) * item.quantidade)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {form.desconto_pct > 0 && subtotal > 0 && (
+        <div className="flex justify-between text-xs border-t border-white/10 pt-2">
+          <span className="opacity-50">Desconto ({form.desconto_pct}%)</span>
+          <span className="text-primary/80">-{fmt(descontoValor)}</span>
+        </div>
+      )}
+      <div className="flex justify-between border-t border-white/20 pt-3 mt-3">
+        <span className="text-primary/80 font-bold text-[10px] uppercase">Total</span>
+        <span className="text-xl font-extrabold">{fmt(totalFinal)}</span>
+      </div>
+      <p className="mt-3 text-[10px] opacity-30">
+        Válida por {form.validade_dias} dias
+        {form.pagamento ? ` · ${form.pagamento.substring(0, 50)}${form.pagamento.length > 50 ? '...' : ''}` : ''}
+      </p>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -268,7 +343,7 @@ export default function OrcamentoNovo() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* LEFT: Form (60%) */}
         <div className="lg:col-span-3 space-y-5">
-          {/* Cliente */}
+          {/* Cliente + Contexto */}
           <Card className="p-5">
             <h3 className="text-sm font-semibold mb-3">Cliente</h3>
             <div className="space-y-3">
@@ -302,6 +377,49 @@ export default function OrcamentoNovo() {
                   <Input value={form.prospect_telefone} onChange={e => setForm(f => ({ ...f, prospect_telefone: e.target.value }))} placeholder="(11) 99999-9999" />
                 </div>
               </div>
+
+              {/* Modo toggle */}
+              <div className="pt-3 border-t">
+                <Label className="text-xs mb-2 block">Modo do orçamento</Label>
+                <RadioGroup
+                  value={form.modo}
+                  onValueChange={(v: OrcamentoModo) => setForm(f => ({ ...f, modo: v }))}
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="simples" id="modo-simples" />
+                    <Label htmlFor="modo-simples" className="text-sm cursor-pointer">Simples</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="detalhado" id="modo-detalhado" />
+                    <Label htmlFor="modo-detalhado" className="text-sm cursor-pointer">Detalhado</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Contexto fields (detailed only) */}
+              {isDetalhado && (
+                <div className="space-y-3 pt-3 border-t">
+                  <div>
+                    <Label className="text-xs">Contexto / Introdução</Label>
+                    <Textarea
+                      value={form.contexto}
+                      onChange={e => setForm(f => ({ ...f, contexto: e.target.value }))}
+                      placeholder="Descreva o cenário do cliente, riscos, urgência..."
+                      rows={4}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Ordem de Execução Sugerida</Label>
+                    <Textarea
+                      value={form.ordem_execucao}
+                      onChange={e => setForm(f => ({ ...f, ordem_execucao: e.target.value }))}
+                      placeholder="1. Bombeiros → 2. Vigilância → 3. Prefeitura..."
+                      rows={2}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </Card>
 
@@ -316,49 +434,25 @@ export default function OrcamentoNovo() {
 
             <div className="space-y-3">
               {form.itens.map((item, idx) => (
-                <div key={item.id} className="p-4 rounded-lg border bg-card space-y-2">
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <Input
-                        value={item.descricao}
-                        onChange={e => updateItem(idx, 'descricao', e.target.value)}
-                        placeholder="Descrição do serviço (ex: Retorno ao Simples Nacional)"
-                        className="font-medium"
-                      />
-                    </div>
-                    <div className="w-28">
-                      <Input
-                        type="number"
-                        value={item.valor || ''}
-                        onChange={e => updateItem(idx, 'valor', parseFloat(e.target.value) || 0)}
-                        placeholder="Valor R$"
-                        className="text-right"
-                      />
-                    </div>
-                    <div className="w-16">
-                      <Input
-                        type="number"
-                        value={item.quantidade}
-                        onChange={e => updateItem(idx, 'quantidade', parseInt(e.target.value) || 1)}
-                        min={1}
-                        className="text-center"
-                      />
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => removeItem(idx)} className="text-destructive shrink-0">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Textarea
-                    value={item.detalhes}
-                    onChange={e => updateItem(idx, 'detalhes', e.target.value)}
-                    placeholder="Detalhes, escopo, o que está incluso... (opcional)"
-                    rows={2}
-                    className="text-sm"
+                isDetalhado ? (
+                  <ItemCardDetalhado
+                    key={item.id}
+                    item={item}
+                    idx={idx}
+                    secoes={form.secoes}
+                    onChange={updateItem}
+                    onRemove={removeItem}
+                    onAddSecao={handleAddSecao}
                   />
-                  <p className="text-right text-sm font-bold text-primary">
-                    Subtotal: {fmt(item.valor * item.quantidade)}
-                  </p>
-                </div>
+                ) : (
+                  <ItemCardSimples
+                    key={item.id}
+                    item={item}
+                    idx={idx}
+                    onChange={updateItem}
+                    onRemove={removeItem}
+                  />
+                )
               ))}
 
               {form.itens.length === 0 && (
@@ -372,6 +466,15 @@ export default function OrcamentoNovo() {
               )}
             </div>
           </Card>
+
+          {/* Pacotes (detailed only) */}
+          {isDetalhado && (
+            <PacotesEditor
+              pacotes={form.pacotes}
+              itens={form.itens}
+              onChange={pacotes => setForm(f => ({ ...f, pacotes }))}
+            />
+          )}
 
           {/* Condições */}
           <Card className="p-5">
@@ -406,61 +509,19 @@ export default function OrcamentoNovo() {
         {/* RIGHT: Preview (40%) */}
         <div className="lg:col-span-2">
           <div className="sticky top-20 space-y-4">
-            {/* Live Preview Card */}
             <Card className="overflow-hidden">
-              <div className="bg-gradient-to-br from-[hsl(120,60%,8%)] to-[hsl(120,40%,12%)] p-5 text-white">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-lg font-extrabold">
-                    <span className="text-primary">Trevo</span>{' '}
-                    <span className="opacity-60">Legaliza</span>
-                  </span>
-                </div>
-                <p className="text-[10px] font-bold uppercase tracking-[3px] text-primary/80 mb-1">
-                  Proposta Comercial
-                </p>
-
-                {form.prospect_nome && (
-                  <div className="mb-4">
-                    <p className="text-[10px] text-primary/60">Preparada para</p>
-                    <p className="font-bold text-sm">{form.prospect_nome}</p>
-                    {form.prospect_cnpj && <p className="text-[10px] opacity-40">{form.prospect_cnpj}</p>}
-                  </div>
-                )}
-
-                {validItems.length > 0 && (
-                  <div className="space-y-1.5 mb-4">
-                    {validItems.map((item, idx) => (
-                      <div key={item.id} className="flex justify-between text-xs">
-                        <span className="opacity-70 truncate mr-3">
-                          {idx + 1}. {item.descricao}{item.quantidade > 1 ? ` (×${item.quantidade})` : ''}
-                        </span>
-                        <span className="font-bold whitespace-nowrap">
-                          {fmt(item.valor * item.quantidade)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {form.desconto_pct > 0 && subtotal > 0 && (
-                  <div className="flex justify-between text-xs border-t border-white/10 pt-2">
-                    <span className="opacity-50">Desconto ({form.desconto_pct}%)</span>
-                    <span className="text-primary/80">-{fmt(descontoValor)}</span>
-                  </div>
-                )}
-
-                <div className="flex justify-between border-t border-white/20 pt-3 mt-3">
-                  <span className="text-primary/80 font-bold text-[10px] uppercase">Total</span>
-                  <span className="text-xl font-extrabold">
-                    {fmt(totalFinal)}
-                  </span>
-                </div>
-
-                <p className="mt-3 text-[10px] opacity-30">
-                  Válida por {form.validade_dias} dias
-                  {form.pagamento ? ` · ${form.pagamento.substring(0, 50)}${form.pagamento.length > 50 ? '...' : ''}` : ''}
-                </p>
-              </div>
+              {isDetalhado ? (
+                <PreviewDetalhado
+                  prospect_nome={form.prospect_nome}
+                  prospect_cnpj={form.prospect_cnpj}
+                  itens={form.itens}
+                  pacotes={form.pacotes}
+                  secoes={form.secoes}
+                  desconto_pct={form.desconto_pct}
+                  validade_dias={form.validade_dias}
+                  pagamento={form.pagamento}
+                />
+              ) : previewSimples}
             </Card>
 
             {/* Action Buttons */}
