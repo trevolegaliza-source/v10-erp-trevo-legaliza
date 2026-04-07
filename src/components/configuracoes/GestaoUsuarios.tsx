@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, Users, Pencil, Loader2, UserPlus, Eye, FilePlus, Edit, Trash2, CheckSquare, Check, X } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Shield, Users, Loader2, UserPlus, UserX, UserCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -36,46 +37,98 @@ interface Permission {
 }
 
 const MODULOS = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'processos', label: 'Processos' },
-  { key: 'clientes', label: 'Clientes' },
-  { key: 'orcamentos', label: 'Orçamentos' },
-  { key: 'financeiro', label: 'Financeiro' },
-  { key: 'contas_pagar', label: 'Contas a Pagar' },
-  { key: 'colaboradores', label: 'Colaboradores' },
-  { key: 'documentos', label: 'Documentos' },
-  { key: 'intel_geografica', label: 'Intel. Geográfica' },
-  { key: 'configuracoes', label: 'Configurações' },
+  // Operação
+  { key: 'dashboard', label: 'Dashboard', grupo: 'Operação' },
+  { key: 'processos', label: 'Processos', grupo: 'Operação' },
+  { key: 'clientes', label: 'Clientes', grupo: 'Operação' },
+  { key: 'importar', label: 'Importar Planilha', grupo: 'Operação' },
+
+  // Comercial
+  { key: 'orcamentos', label: 'Orçamentos', grupo: 'Comercial' },
+  { key: 'catalogo', label: 'Portfólio & Preços', grupo: 'Comercial' },
+
+  // Financeiro
+  { key: 'financeiro', label: 'Financeiro (Cobranças)', grupo: 'Financeiro' },
+  { key: 'contas_pagar', label: 'Contas a Pagar', grupo: 'Financeiro' },
+  { key: 'relatorios_dre', label: 'Relatórios DRE', grupo: 'Financeiro' },
+  { key: 'fluxo_caixa', label: 'Fluxo de Caixa', grupo: 'Financeiro' },
+
+  // Gestão
+  { key: 'colaboradores', label: 'Colaboradores', grupo: 'Gestão' },
+  { key: 'intel_geografica', label: 'Inteligência Geográfica', grupo: 'Gestão' },
+
+  // Sistema
+  { key: 'configuracoes', label: 'Configurações', grupo: 'Sistema' },
 ];
+
+const GRUPOS = ['Operação', 'Comercial', 'Financeiro', 'Gestão', 'Sistema'];
 
 const ROLES = [
-  { value: 'master', label: 'Master', color: 'bg-destructive/10 text-destructive' },
-  { value: 'financeiro', label: 'Financeiro', color: 'bg-warning/10 text-warning' },
-  { value: 'operacional', label: 'Operacional', color: 'bg-primary/10 text-primary' },
-  { value: 'visualizador', label: 'Visualizador', color: 'bg-muted text-muted-foreground' },
+  { value: 'master', label: 'Master' },
+  { value: 'financeiro', label: 'Financeiro' },
+  { value: 'operacional', label: 'Operacional' },
+  { value: 'visualizador', label: 'Visualizador' },
 ];
 
-const ROLE_PRESETS: Record<string, Record<string, boolean[]>> = {
-  master: Object.fromEntries(MODULOS.map(m => [m.key, [true, true, true, true, true]])),
-  financeiro: Object.fromEntries(MODULOS.map(m => [m.key,
-    ['financeiro', 'contas_pagar'].includes(m.key) ? [true, true, true, false, true] :
-    ['colaboradores'].includes(m.key) ? [true, false, false, false, false] :
-    ['dashboard', 'processos', 'clientes', 'orcamentos'].includes(m.key) ? [true, false, false, false, false] :
-    [false, false, false, false, false]
-  ])),
-  operacional: Object.fromEntries(MODULOS.map(m => [m.key,
-    ['processos', 'clientes', 'documentos'].includes(m.key) ? [true, true, true, false, false] :
-    ['dashboard'].includes(m.key) ? [true, false, false, false, false] :
-    [false, false, false, false, false]
-  ])),
-  visualizador: Object.fromEntries(MODULOS.map(m => [m.key,
-    ['financeiro', 'contas_pagar', 'colaboradores', 'configuracoes'].includes(m.key) ? [false, false, false, false, false] :
-    [true, false, false, false, false]
-  ])),
+const ROLE_COLORS: Record<string, string> = {
+  master: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
+  financeiro: 'bg-blue-500/15 text-blue-500 border-blue-500/30',
+  operacional: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
+  visualizador: 'bg-gray-500/15 text-gray-500 border-gray-500/30',
 };
 
-const PERM_LABELS = ['VER', 'CRIAR', 'EDITAR', 'EXCLUIR', 'APROVAR'];
-const PERM_ICONS = [Eye, FilePlus, Edit, Trash2, CheckSquare];
+const ROLE_PRESETS: Record<string, Record<string, boolean[]>> = {
+  master: Object.fromEntries(
+    MODULOS.map(m => [m.key, [true, true, true, true, true]])
+  ),
+  financeiro: {
+    dashboard:        [true, false, false, false, false],
+    processos:        [true, false, false, false, false],
+    clientes:         [true, false, false, false, false],
+    importar:         [false, false, false, false, false],
+    orcamentos:       [true, false, false, false, false],
+    catalogo:         [true, false, false, false, false],
+    financeiro:       [true, true, true, false, true],
+    contas_pagar:     [true, true, true, false, true],
+    relatorios_dre:   [true, false, false, false, false],
+    fluxo_caixa:      [true, false, false, false, false],
+    colaboradores:    [true, false, false, false, false],
+    intel_geografica: [false, false, false, false, false],
+    configuracoes:    [false, false, false, false, false],
+  },
+  operacional: {
+    dashboard:        [true, false, false, false, false],
+    processos:        [true, true, true, false, false],
+    clientes:         [true, true, true, false, false],
+    importar:         [true, true, false, false, false],
+    orcamentos:       [true, true, true, false, false],
+    catalogo:         [true, false, false, false, false],
+    financeiro:       [false, false, false, false, false],
+    contas_pagar:     [false, false, false, false, false],
+    relatorios_dre:   [false, false, false, false, false],
+    fluxo_caixa:      [false, false, false, false, false],
+    colaboradores:    [false, false, false, false, false],
+    intel_geografica: [true, true, true, false, false],
+    configuracoes:    [false, false, false, false, false],
+  },
+  visualizador: {
+    dashboard:        [true, false, false, false, false],
+    processos:        [true, false, false, false, false],
+    clientes:         [true, false, false, false, false],
+    importar:         [false, false, false, false, false],
+    orcamentos:       [true, false, false, false, false],
+    catalogo:         [true, false, false, false, false],
+    financeiro:       [false, false, false, false, false],
+    contas_pagar:     [false, false, false, false, false],
+    relatorios_dre:   [false, false, false, false, false],
+    fluxo_caixa:      [false, false, false, false, false],
+    colaboradores:    [false, false, false, false, false],
+    intel_geografica: [true, false, false, false, false],
+    configuracoes:    [false, false, false, false, false],
+  },
+};
+
+const PERM_LABELS = ['Ver', 'Criar', 'Editar', 'Excluir', 'Aprovar'];
 
 export default function GestaoUsuarios() {
   const { user } = useAuth();
@@ -108,13 +161,17 @@ export default function GestaoUsuarios() {
 
   useEffect(() => { loadData(); }, [user]);
 
-  const getRoleColor = (role: string) => ROLES.find(r => r.value === role)?.color || 'bg-muted text-muted-foreground';
   const getRoleLabel = (role: string) => ROLES.find(r => r.value === role)?.label || role;
+
+  const getPermCount = (profileId: string) => {
+    const userPerms = permissions.filter(p => p.user_id === profileId);
+    return userPerms.filter(p => p.pode_ver).length;
+  };
 
   const openCreate = () => {
     setEditUser(null);
     setForm({ nome: '', email: '', password: '', confirmPassword: '', role: 'operacional' });
-    setEditPerms(ROLE_PRESETS.operacional);
+    setEditPerms({ ...ROLE_PRESETS.operacional });
     setModalOpen(true);
   };
 
@@ -137,48 +194,54 @@ export default function GestaoUsuarios() {
     if (preset) setEditPerms({ ...preset });
   };
 
-  const markAll = (val: boolean) => {
-    const newPerms: Record<string, boolean[]> = {};
-    MODULOS.forEach(m => { newPerms[m.key] = [val, val, val, val, val]; });
-    setEditPerms(newPerms);
+  const applyPreset = (role: string) => {
+    const preset = ROLE_PRESETS[role];
+    if (preset) setEditPerms({ ...preset });
   };
 
-  const savePermissions = async (userId: string) => {
-    for (const mod of MODULOS) {
-      const vals = editPerms[mod.key] || [false, false, false, false, false];
-      const existing = permissions.find(p => p.user_id === userId && p.modulo === mod.key);
-      const payload = { pode_ver: vals[0], pode_criar: vals[1], pode_editar: vals[2], pode_excluir: vals[3], pode_aprovar: vals[4] };
-      if (existing) {
-        await supabase.from('user_permissions').update(payload as any).eq('id', existing.id);
-      } else {
-        await supabase.from('user_permissions').insert({ user_id: userId, empresa_id: empresaId, modulo: mod.key, ...payload } as any);
-      }
-    }
+  const togglePerm = (modKey: string, idx: number, val: boolean) => {
+    const curr = [...(editPerms[modKey] || [false, false, false, false, false])];
+    curr[idx] = val;
+    setEditPerms({ ...editPerms, [modKey]: curr });
+  };
+
+  const savePermissions = async (userId: string, empId: string) => {
+    // Delete all existing permissions for this user
+    await supabase.from('user_permissions').delete().eq('user_id', userId) as any;
+
+    // Insert new permissions for all 13 modules
+    const inserts = MODULOS.map(m => ({
+      user_id: userId,
+      empresa_id: empId,
+      modulo: m.key,
+      pode_ver: editPerms[m.key]?.[0] || false,
+      pode_criar: editPerms[m.key]?.[1] || false,
+      pode_editar: editPerms[m.key]?.[2] || false,
+      pode_excluir: editPerms[m.key]?.[3] || false,
+      pode_aprovar: editPerms[m.key]?.[4] || false,
+    }));
+
+    await supabase.from('user_permissions').insert(inserts as any);
   };
 
   const handleSave = async () => {
     if (editUser) {
-      // Edit mode
       setSaving(true);
       try {
         await supabase.from('profiles').update({ role: form.role, ativo: editUser.ativo, updated_at: new Date().toISOString() } as any).eq('id', editUser.id);
-        await savePermissions(editUser.id);
+        await savePermissions(editUser.id, empresaId);
         toast.success('Usuário atualizado com sucesso!');
         setModalOpen(false);
         loadData();
       } catch (e: any) { toast.error('Erro: ' + e.message); }
       finally { setSaving(false); }
     } else {
-      // Create mode
       if (!form.email.trim() || !form.password.trim()) { toast.error('E-mail e senha são obrigatórios'); return; }
       if (form.password !== form.confirmPassword) { toast.error('As senhas não coincidem'); return; }
       if (form.password.length < 6) { toast.error('Senha deve ter no mínimo 6 caracteres'); return; }
 
       setSaving(true);
       try {
-        const { data: session } = await supabase.auth.getSession();
-        const token = session?.session?.access_token;
-
         const res = await supabase.functions.invoke('create-user', {
           body: { email: form.email.trim(), password: form.password, nome: form.nome || form.email, role: form.role },
         });
@@ -187,18 +250,7 @@ export default function GestaoUsuarios() {
         const newUserId = res.data?.user?.id;
         if (!newUserId) throw new Error('ID do usuário não retornado');
 
-        // Save permissions
-        const permsToInsert = MODULOS.map(m => ({
-          user_id: newUserId,
-          empresa_id: empresaId,
-          modulo: m.key,
-          pode_ver: editPerms[m.key]?.[0] ?? false,
-          pode_criar: editPerms[m.key]?.[1] ?? false,
-          pode_editar: editPerms[m.key]?.[2] ?? false,
-          pode_excluir: editPerms[m.key]?.[3] ?? false,
-          pode_aprovar: editPerms[m.key]?.[4] ?? false,
-        }));
-        await supabase.from('user_permissions').insert(permsToInsert as any);
+        await savePermissions(newUserId, empresaId);
 
         toast.success(`Usuário criado com sucesso! Credenciais: ${form.email}`);
         setModalOpen(false);
@@ -206,6 +258,13 @@ export default function GestaoUsuarios() {
       } catch (e: any) { toast.error('Erro: ' + e.message); }
       finally { setSaving(false); }
     }
+  };
+
+  const toggleAtivo = async (profile: Profile) => {
+    const newAtivo = !(profile.ativo ?? true);
+    await supabase.from('profiles').update({ ativo: newAtivo, updated_at: new Date().toISOString() } as any).eq('id', profile.id);
+    toast.success(newAtivo ? 'Usuário ativado' : 'Usuário desativado');
+    loadData();
   };
 
   if (loading) {
@@ -221,48 +280,59 @@ export default function GestaoUsuarios() {
               <CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4 text-primary" />USUÁRIOS & ACESSO</CardTitle>
               <CardDescription>Gerencie quem acessa o sistema e o que cada um pode fazer.</CardDescription>
             </div>
-            <Button size="sm" onClick={openCreate}><UserPlus className="h-4 w-4 mr-1" />+ NOVO USUÁRIO</Button>
+            <Button size="sm" onClick={openCreate}><UserPlus className="h-4 w-4 mr-1" />Novo Usuário</Button>
           </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs uppercase">Nome</TableHead>
-                <TableHead className="text-xs uppercase">E-mail</TableHead>
+                <TableHead className="text-xs uppercase">Usuário</TableHead>
                 <TableHead className="text-xs uppercase">Perfil</TableHead>
                 <TableHead className="text-xs uppercase">Status</TableHead>
+                <TableHead className="text-xs uppercase">Acesso</TableHead>
                 <TableHead className="text-xs uppercase text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {profiles.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-medium text-sm">
+                  <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
                         {(p.nome || p.email || '?')[0].toUpperCase()}
                       </div>
-                      {p.nome || p.email}
+                      <div>
+                        <p className="font-medium text-sm">{p.nome || p.email}</p>
+                        <p className="text-xs text-muted-foreground">{p.email}</p>
+                      </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{p.email}</TableCell>
                   <TableCell>
-                    <Badge className={`${getRoleColor(p.role)} border-0 text-[10px] uppercase`}>
+                    <Badge className={`${ROLE_COLORS[p.role] || 'bg-muted text-muted-foreground'} border text-[10px] uppercase`}>
                       {getRoleLabel(p.role)}{p.id === user?.id ? ' (você)' : ''}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {p.ativo !== false
-                      ? <Badge className="bg-primary/10 text-primary border-0 text-[10px]">ATIVO</Badge>
-                      : <Badge variant="outline" className="text-[10px] text-destructive">INATIVO</Badge>
-                    }
+                    <Badge variant="outline" className={`text-[10px] ${p.ativo !== false ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                      {p.ativo !== false ? 'ATIVO' : 'INATIVO'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs text-muted-foreground">
+                      {p.role === 'master' ? '13 módulos' : `${getPermCount(p.id)} módulos com acesso`}
+                    </span>
                   </TableCell>
                   <TableCell className="text-right">
                     {p.id !== user?.id ? (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}>
-                        <Pencil className="h-3 w-3 mr-1" />Editar
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}>
+                          <Shield className="h-3 w-3 mr-1" />Permissões
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7" onClick={() => toggleAtivo(p)}>
+                          {p.ativo !== false ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                        </Button>
+                      </div>
                     ) : (
                       <span className="text-[10px] text-muted-foreground">—</span>
                     )}
@@ -276,40 +346,48 @@ export default function GestaoUsuarios() {
 
       {/* MODAL: Criar/Editar Usuário */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 uppercase text-sm">
+            <DialogTitle className="flex items-center gap-2 text-sm">
               <Shield className="h-4 w-4 text-primary" />
-              {editUser ? `Editar — ${editUser.nome || editUser.email}` : 'Novo Usuário'}
+              {editUser ? `Permissões — ${editUser.nome || editUser.email}` : 'Novo Usuário'}
             </DialogTitle>
+            {editUser && (
+              <DialogDescription>
+                Role: <Badge className={`${ROLE_COLORS[form.role] || ''} border text-[10px] uppercase ml-1`}>{getRoleLabel(form.role)}</Badge>
+                <span className="ml-2">· Defina o acesso a cada módulo do sistema.</span>
+              </DialogDescription>
+            )}
           </DialogHeader>
 
-          <div className="space-y-5">
-            {/* Form fields */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs uppercase">Nome *</Label>
-                <Input value={form.nome} onChange={(e) => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Nome completo" disabled={!!editUser} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs uppercase">E-mail *</Label>
-                <Input type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} placeholder="usuario@empresa.com" disabled={!!editUser} />
-              </div>
-            </div>
-
+          <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+            {/* Form fields for new user */}
             {!editUser && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs uppercase">Senha *</Label>
-                  <Input type="password" value={form.password} onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Mínimo 6 caracteres" />
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase">Nome *</Label>
+                    <Input value={form.nome} onChange={(e) => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Nome completo" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase">E-mail *</Label>
+                    <Input type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} placeholder="usuario@empresa.com" />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs uppercase">Confirmar Senha *</Label>
-                  <Input type="password" value={form.confirmPassword} onChange={(e) => setForm(f => ({ ...f, confirmPassword: e.target.value }))} placeholder="Repetir senha" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase">Senha *</Label>
+                    <Input type="password" value={form.password} onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Mínimo 6 caracteres" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs uppercase">Confirmar Senha *</Label>
+                    <Input type="password" value={form.confirmPassword} onChange={(e) => setForm(f => ({ ...f, confirmPassword: e.target.value }))} placeholder="Repetir senha" />
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
+            {/* Role selector */}
             <div className="flex items-center gap-4">
               <div className="space-y-1.5 flex-1">
                 <Label className="text-xs uppercase">Perfil Base *</Label>
@@ -330,58 +408,56 @@ export default function GestaoUsuarios() {
               )}
             </div>
 
-            {/* Permissions Grid */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs uppercase">Permissões por Módulo</Label>
-                <div className="flex gap-1">
-                  <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => markAll(true)}>
-                    <Check className="h-3 w-3 mr-1" />Marcar Todos
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => markAll(false)}>
-                    <X className="h-3 w-3 mr-1" />Desmarcar Todos
-                  </Button>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border/40 overflow-hidden">
-                <div className="grid grid-cols-[1fr_repeat(5,60px)] gap-0 bg-muted/50 px-3 py-2">
-                  <span className="text-[10px] uppercase text-muted-foreground font-medium">Módulo</span>
-                  {PERM_LABELS.map((label, i) => {
-                    const Icon = PERM_ICONS[i];
-                    return (
-                      <span key={label} className="text-center text-[10px] uppercase text-muted-foreground font-medium flex flex-col items-center gap-0.5">
-                        <Icon className="h-3 w-3" />
-                        {label}
-                      </span>
-                    );
-                  })}
-                </div>
-                {MODULOS.map((mod) => (
-                  <div key={mod.key} className="grid grid-cols-[1fr_repeat(5,60px)] gap-0 px-3 py-2 border-t border-border/20 hover:bg-muted/20">
-                    <span className="text-xs font-medium">{mod.label}</span>
-                    {[0, 1, 2, 3, 4].map(i => (
-                      <div key={i} className="flex justify-center">
-                        <Checkbox
-                          checked={editPerms[mod.key]?.[i] ?? false}
-                          onCheckedChange={(v) => {
-                            const curr = [...(editPerms[mod.key] || [false, false, false, false, false])];
-                            curr[i] = !!v;
-                            setEditPerms({ ...editPerms, [mod.key]: curr });
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+            {/* Preset buttons */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Aplicar preset:</span>
+              {ROLES.map(r => (
+                <Button key={r.value} variant="outline" size="sm" className="h-6 text-[10px] capitalize" onClick={() => applyPreset(r.value)}>
+                  {r.label}
+                </Button>
+              ))}
             </div>
+
+            {/* Permissions Grid grouped by section */}
+            <ScrollArea className="flex-1 border rounded-lg border-border/40">
+              <div className="p-3 space-y-5">
+                {GRUPOS.map(grupo => {
+                  const modulosDoGrupo = MODULOS.filter(m => m.grupo === grupo);
+                  return (
+                    <div key={grupo}>
+                      <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 border-b border-border pb-1">
+                        {grupo}
+                      </h4>
+                      <div className="space-y-1">
+                        {modulosDoGrupo.map(modulo => (
+                          <div key={modulo.key} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/30">
+                            <span className="text-sm font-medium flex-1 min-w-[160px]">{modulo.label}</span>
+                            <div className="flex gap-4">
+                              {PERM_LABELS.map((acao, idx) => (
+                                <label key={acao} className="flex flex-col items-center gap-1 cursor-pointer">
+                                  <span className="text-[10px] text-muted-foreground">{acao}</span>
+                                  <Checkbox
+                                    checked={editPerms[modulo.key]?.[idx] ?? false}
+                                    onCheckedChange={(checked) => togglePerm(modulo.key, idx, !!checked)}
+                                  />
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>CANCELAR</Button>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              {editUser ? 'SALVAR PERMISSÕES' : 'SALVAR USUÁRIO'}
+              {editUser ? 'Salvar Permissões' : 'Salvar Usuário'}
             </Button>
           </DialogFooter>
         </DialogContent>

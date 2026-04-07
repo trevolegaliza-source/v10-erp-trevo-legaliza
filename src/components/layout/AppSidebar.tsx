@@ -14,7 +14,7 @@ import logoTrevo from '@/assets/logo-trevo.png';
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, badgeKey: null, modulo: 'dashboard' },
   { path: '/cadastro-rapido', label: 'Cadastro Rápido', icon: PlusCircle, badgeKey: null, modulo: 'processos' },
-  { path: '/importar', label: 'Importar Planilha', icon: Upload, badgeKey: null, modulo: 'processos' },
+  { path: '/importar', label: 'Importar Planilha', icon: Upload, badgeKey: null, modulo: 'importar' },
   { path: '/processos', label: 'Processos', icon: Kanban, badgeKey: 'processosAtivos' as const, modulo: 'processos' },
   { path: '/clientes', label: 'Clientes', icon: Users, badgeKey: null, modulo: 'clientes' },
   { path: '/orcamentos', label: 'Orçamentos', icon: Receipt, badgeKey: 'orcamentosPendentes' as const, modulo: 'orcamentos' },
@@ -22,10 +22,10 @@ const navItems = [
   { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle, badgeKey: null, modulo: 'contas_pagar' },
   { path: '/colaboradores', label: 'Colaboradores', icon: UsersRound, badgeKey: null, modulo: 'colaboradores' },
   
-  { path: '/relatorios/dre', label: 'Relatórios (DRE)', icon: BarChart3, badgeKey: null, modulo: 'financeiro' },
-  { path: '/relatorios/fluxo-caixa', label: 'Fluxo de Caixa', icon: ArrowUpCircle, badgeKey: null, modulo: 'financeiro' },
+  { path: '/relatorios/dre', label: 'Relatórios (DRE)', icon: BarChart3, badgeKey: null, modulo: 'relatorios_dre' },
+  { path: '/relatorios/fluxo-caixa', label: 'Fluxo de Caixa', icon: ArrowUpCircle, badgeKey: null, modulo: 'fluxo_caixa' },
   { path: '/inteligencia-geografica', label: 'Intel. Geográfica', icon: MapPin, badgeKey: null, modulo: 'intel_geografica' },
-  { path: '/catalogo', label: 'Portfólio & Preços', icon: BookOpen, badgeKey: null, modulo: 'configuracoes' },
+  { path: '/catalogo', label: 'Portfólio & Preços', icon: BookOpen, badgeKey: null, modulo: 'catalogo' },
   { path: '/configuracoes', label: 'Configurações', icon: Settings, badgeKey: null, modulo: 'configuracoes' },
 ];
 
