@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Users, Webhook, DollarSign, UserCog, Loader2, CheckCircle2, Palette, BookOpen } from 'lucide-react';
+import { Shield, Users, Webhook, UserCog, Loader2, CheckCircle2, Palette, BookOpen } from 'lucide-react';
 import PlanoContasTab from '@/components/configuracoes/PlanoContasTab';
 import GestaoUsuarios from '@/components/configuracoes/GestaoUsuarios';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,7 +64,6 @@ export default function Configuracoes() {
       <Tabs defaultValue="aparencia">
         <TabsList>
           <TabsTrigger value="aparencia" className="gap-1.5"><Palette className="h-3.5 w-3.5" />Aparência</TabsTrigger>
-          <TabsTrigger value="pricing" className="gap-1.5"><DollarSign className="h-3.5 w-3.5" />Preços</TabsTrigger>
           {isMaster() && <TabsTrigger value="rbac" className="gap-1.5"><Shield className="h-3.5 w-3.5" />Usuários</TabsTrigger>}
           <TabsTrigger value="webhooks" className="gap-1.5"><Webhook className="h-3.5 w-3.5" />Webhooks</TabsTrigger>
           <TabsTrigger value="plano_contas" className="gap-1.5"><BookOpen className="h-3.5 w-3.5" />Plano de Contas</TabsTrigger>
@@ -90,32 +89,6 @@ export default function Configuracoes() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="pricing">
-          <Card className="border-border/60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base"><DollarSign className="h-4 w-4 text-primary" />Tiered Pricing</CardTitle>
-              <CardDescription>Valores por competência mensal. Prioridade aplica ×1.5 automaticamente.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                { range: '1-5 processos', value: 'R$ 1.200' },
-                { range: '6-10 processos', value: 'R$ 1.050' },
-                { range: '11-20 processos', value: 'R$ 900' },
-                { range: '21+ processos', value: 'R$ 750' },
-              ].map((tier) => (
-                <div key={tier.range} className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-4 py-3">
-                  <span className="text-sm">{tier.range}</span>
-                  <div className="flex items-center gap-2">
-                    <Input defaultValue={tier.value} className="w-28 h-8 text-sm text-right" />
-                    <span className="text-xs text-muted-foreground">/proc</span>
-                  </div>
-                </div>
-              ))}
-              <p className="text-xs text-muted-foreground">Fórmula: Valor_Final = (Valor_Base × 1.5) + Σ Reembolsos (quando urgente)</p>
-              <Button size="sm" className="mt-2">Salvar Preços</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="rbac">
           <GestaoUsuarios />
