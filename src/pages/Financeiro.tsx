@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
+import { GlassCard } from '@/components/ui/glass-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -203,87 +204,66 @@ export default function Financeiro() {
           {/* 5 KPIs */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {/* Faturado */}
-            <Card className="border-border/60">
-              <CardContent className="p-5">
-                <div className="rounded-lg bg-muted p-2 w-fit">
-                  <DollarSign className="h-4.5 w-4.5 text-foreground" />
-                </div>
-                <p className="text-2xl font-bold mt-3">{formatBRL(metricas.totalFaturado)}</p>
-                <p className="text-xs text-muted-foreground">{metricas.totalProcessos} processos</p>
-                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Faturado</p>
-              </CardContent>
-            </Card>
+            <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)">
+              <div className="rounded-lg bg-white/5 p-2 w-fit">
+                <DollarSign className="h-4.5 w-4.5 text-white" />
+              </div>
+              <p className="text-2xl font-bold mt-3 text-white">{formatBRL(metricas.totalFaturado)}</p>
+              <p className="text-xs text-white/50">{metricas.totalProcessos} processos</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-1">Faturado</p>
+            </GlassCard>
 
-            {/* Cobrado — clickable */}
-            <Card
-              className="border-border/60 cursor-pointer hover:border-blue-500/50 transition-colors"
-              onClick={() => setActiveTab('enviados')}
-            >
-              <CardContent className="p-5">
-                <div className="rounded-lg bg-blue-500/10 p-2 w-fit">
-                  <Send className="h-4.5 w-4.5 text-blue-500" />
-                </div>
-                <p className="text-2xl font-bold mt-3 text-blue-500">{formatBRL(metricas.totalCobrado)}</p>
-                <p className="text-xs text-muted-foreground">{metricas.clientesCobrados} clientes</p>
-                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Cobrado</p>
-              </CardContent>
-            </Card>
+            {/* Cobrado */}
+            <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)" onClick={() => setActiveTab('enviados')} className="cursor-pointer">
+              <div className="rounded-lg bg-blue-500/10 p-2 w-fit">
+                <Send className="h-4.5 w-4.5 text-blue-400" />
+              </div>
+              <p className="text-2xl font-bold mt-3 text-blue-400">{formatBRL(metricas.totalCobrado)}</p>
+              <p className="text-xs text-white/50">{metricas.clientesCobrados} clientes</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-1">Cobrado</p>
+            </GlassCard>
 
-            {/* Recebido — clickable + progress bar */}
-            <Card
-              className="border-border/60 cursor-pointer hover:border-emerald-500/50 transition-colors"
-              onClick={() => setActiveTab('pagos')}
-            >
-              <CardContent className="p-5">
-                <div className="rounded-lg bg-emerald-500/10 p-2 w-fit">
-                  <CheckCircle className="h-4.5 w-4.5 text-emerald-500" />
-                </div>
-                <p className="text-2xl font-bold mt-3 text-emerald-500">{formatBRL(metricas.totalRecebido)}</p>
-                <div className="w-full bg-muted rounded-full h-1.5 mt-2">
-                  <div
-                    className="bg-emerald-500 h-1.5 rounded-full transition-all"
-                    style={{ width: `${metricas.taxaRecebimento}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">{metricas.taxaRecebimento}% do faturado</p>
-                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Recebido</p>
-              </CardContent>
-            </Card>
+            {/* Recebido */}
+            <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)" onClick={() => setActiveTab('pagos')} className="cursor-pointer">
+              <div className="rounded-lg bg-emerald-500/10 p-2 w-fit">
+                <CheckCircle className="h-4.5 w-4.5 text-emerald-400" />
+              </div>
+              <p className="text-2xl font-bold mt-3 text-emerald-400">{formatBRL(metricas.totalRecebido)}</p>
+              <div className="w-full bg-white/10 rounded-full h-1.5 mt-2">
+                <div className="bg-emerald-400 h-1.5 rounded-full transition-all" style={{ width: `${metricas.taxaRecebimento}%` }} />
+              </div>
+              <p className="text-xs text-white/50 mt-1">{metricas.taxaRecebimento}% do faturado</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-1">Recebido</p>
+            </GlassCard>
 
-            {/* Inadimplente — clickable + red highlight */}
-            <Card
-              className={`border-border/60 cursor-pointer transition-colors ${
-                inadimplenciaCalc.total > 0
-                  ? 'border-red-500/30 bg-red-500/5 hover:border-red-500/50'
-                  : 'hover:border-border'
-              }`}
+            {/* Inadimplente */}
+            <GlassCard
+              variant="service"
+              glowColor="rgba(239, 68, 68, 0.12)"
               onClick={() => setActiveTab('aguardando')}
+              className="cursor-pointer"
             >
-              <CardContent className="p-5">
-                <div className="rounded-lg bg-red-500/10 p-2 w-fit">
-                  <AlertTriangle className="h-4.5 w-4.5 text-red-500" />
-                </div>
-                <p className={`text-2xl font-bold mt-3 ${inadimplenciaCalc.total > 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                  {formatBRL(inadimplenciaCalc.total)}
-                </p>
-                <p className="text-xs text-red-400">{inadimplenciaCalc.qtdClientes} clientes</p>
-                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Inadimplente</p>
-              </CardContent>
-            </Card>
+              <div className="rounded-lg bg-red-500/10 p-2 w-fit">
+                <AlertTriangle className="h-4.5 w-4.5 text-red-400" />
+              </div>
+              <p className={`text-2xl font-bold mt-3 ${inadimplenciaCalc.total > 0 ? 'text-red-400' : 'text-white/40'}`}>
+                {formatBRL(inadimplenciaCalc.total)}
+              </p>
+              <p className="text-xs text-red-400/80">{inadimplenciaCalc.qtdClientes} clientes</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-1">Inadimplente</p>
+            </GlassCard>
 
             {/* Resultado */}
-            <Card className="border-border/60">
-              <CardContent className="p-5">
-                <div className={`rounded-lg p-2 w-fit ${resultado >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-                  {resultado >= 0 ? <TrendingUp className="h-4.5 w-4.5 text-emerald-500" /> : <TrendingDown className="h-4.5 w-4.5 text-red-500" />}
-                </div>
-                <p className={`text-2xl font-bold mt-3 ${resultado >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  {formatBRL(resultado)}
-                </p>
-                <p className="text-xs text-muted-foreground">Receita - Despesas</p>
-                <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Resultado</p>
-              </CardContent>
-            </Card>
+            <GlassCard variant="service" glowColor={resultado >= 0 ? 'rgba(168, 85, 247, 0.12)' : 'rgba(239, 68, 68, 0.12)'}>
+              <div className={`rounded-lg p-2 w-fit ${resultado >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+                {resultado >= 0 ? <TrendingUp className="h-4.5 w-4.5 text-emerald-400" /> : <TrendingDown className="h-4.5 w-4.5 text-red-400" />}
+              </div>
+              <p className={`text-2xl font-bold mt-3 ${resultado >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {formatBRL(resultado)}
+              </p>
+              <p className="text-xs text-white/50">Receita - Despesas</p>
+              <p className="text-[10px] text-white/40 uppercase tracking-wide mt-1">Resultado</p>
+            </GlassCard>
           </div>
 
           {/* Resumo do Mês */}
