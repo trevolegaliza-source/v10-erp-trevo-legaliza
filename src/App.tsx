@@ -150,6 +150,11 @@ const App = () => (
                       <Catalogo />
                     </RequirePermission>
                   } />
+                  <Route path="/relatorios/dre" element={
+                    <RequirePermission modulo="financeiro">
+                      <RelatoriosDRE />
+                    </RequirePermission>
+                  } />
                   <Route path="/configuracoes" element={
                     <RequirePermission modulo="configuracoes">
                       <Configuracoes />

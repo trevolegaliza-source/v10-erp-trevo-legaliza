@@ -22,6 +22,7 @@ const navItems = [
   { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle, badgeKey: null, modulo: 'contas_pagar' },
   { path: '/colaboradores', label: 'Colaboradores', icon: UsersRound, badgeKey: null, modulo: 'colaboradores' },
   
+  { path: '/relatorios/dre', label: 'Relatórios (DRE)', icon: BarChart3, badgeKey: null, modulo: 'financeiro' },
   { path: '/inteligencia-geografica', label: 'Intel. Geográfica', icon: MapPin, badgeKey: null, modulo: 'intel_geografica' },
   { path: '/catalogo', label: 'Portfólio & Preços', icon: BookOpen, badgeKey: null, modulo: 'configuracoes' },
   { path: '/configuracoes', label: 'Configurações', icon: Settings, badgeKey: null, modulo: 'configuracoes' },
