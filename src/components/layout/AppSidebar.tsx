@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Kanban, Users, DollarSign, Settings,
-  ChevronLeft, ChevronRight, PlusCircle, ArrowUpCircle, LogOut, UsersRound, Receipt, MapPin, BookOpen, Upload,
+  ChevronLeft, ChevronRight, PlusCircle, ArrowUpCircle, LogOut, UsersRound, Receipt, MapPin, BookOpen, Upload, BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -22,6 +22,7 @@ const navItems = [
   { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle, badgeKey: null, modulo: 'contas_pagar' },
   { path: '/colaboradores', label: 'Colaboradores', icon: UsersRound, badgeKey: null, modulo: 'colaboradores' },
   
+  { path: '/relatorios/dre', label: 'Relatórios (DRE)', icon: BarChart3, badgeKey: null, modulo: 'financeiro' },
   { path: '/inteligencia-geografica', label: 'Intel. Geográfica', icon: MapPin, badgeKey: null, modulo: 'intel_geografica' },
   { path: '/catalogo', label: 'Portfólio & Preços', icon: BookOpen, badgeKey: null, modulo: 'configuracoes' },
   { path: '/configuracoes', label: 'Configurações', icon: Settings, badgeKey: null, modulo: 'configuracoes' },

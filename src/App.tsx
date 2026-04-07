@@ -28,6 +28,7 @@ const InteligenciaGeografica = lazy(() => import("./pages/InteligenciaGeografica
 const EstadoDetalhe = lazy(() => import("./pages/EstadoDetalhe"));
 const Catalogo = lazy(() => import("./pages/Catalogo"));
 const ImportarProcessos = lazy(() => import("./pages/ImportarProcessos"));
+const RelatoriosDRE = lazy(() => import("./pages/RelatoriosDRE"));
 const PortfolioPublico = lazy(() => import("./pages/PortfolioPublico"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -147,6 +148,11 @@ const App = () => (
                   <Route path="/catalogo" element={
                     <RequirePermission modulo="configuracoes">
                       <Catalogo />
+                    </RequirePermission>
+                  } />
+                  <Route path="/relatorios/dre" element={
+                    <RequirePermission modulo="financeiro">
+                      <RelatoriosDRE />
                     </RequirePermission>
                   } />
                   <Route path="/configuracoes" element={
