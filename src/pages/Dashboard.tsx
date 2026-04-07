@@ -5,6 +5,7 @@ import { useDashboardData, useCountUp } from '@/hooks/useDashboardData';
 import { getNomeUsuario, getSaudacao } from '@/hooks/useDashboard';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
+import { gerarRelatorioMensal } from '@/lib/relatorio-mensal-pdf';
 import { Card } from '@/components/ui/card';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Input } from '@/components/ui/input';
