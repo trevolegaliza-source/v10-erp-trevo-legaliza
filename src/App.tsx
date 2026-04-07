@@ -149,6 +149,7 @@ const App = () => (
                     </RequirePermission>
                   } />
                 </Route>
+                <Route path="/portfolio/:token" element={<PortfolioPublico />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

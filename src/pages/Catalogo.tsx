@@ -23,6 +23,7 @@ import {
 import { CATALOG_HIERARCHY, type HierarchyGroup, type HierarchyChild } from '@/constants/catalogo-hierarchy';
 import { UFS_BRASIL, UF_NOMES } from '@/constants/estados-brasil';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 // ═══════════ CSS GLASSMORPHISM ═══════════
 const GLASS_CSS = `
