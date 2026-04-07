@@ -287,3 +287,127 @@
     animation: municipioPulse 2s ease-in-out infinite;
   }
 }
+
+/* ═══ Glass Card System ═══ */
+.glass-card-wrapper {
+  position: relative;
+  border-radius: 24px;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card-wrapper:hover {
+  transform: translateY(-6px) scale(1.02);
+}
+
+.glass-card-inner {
+  position: relative;
+  z-index: 2;
+  border-radius: 24px;
+  padding: 28px;
+  min-height: 200px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 4px 24px rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.08);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.glass-card-wrapper:hover .glass-card-inner {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+    0 8px 40px rgba(0, 0, 0, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.glass-card-glow {
+  position: absolute;
+  z-index: 1;
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.3;
+  top: -60px;
+  right: -60px;
+  pointer-events: none;
+  transition: opacity 0.5s, transform 0.5s;
+}
+
+.glass-card-wrapper:hover .glass-card-glow {
+  opacity: 0.6;
+  transform: scale(1.3);
+}
+
+.glass-card-shine {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  border-radius: 24px;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.02) 40%,
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.glass-card-wrapper:hover .glass-card-shine {
+  opacity: 1;
+}
+
+/* Versão menor para sub-cards (Nível 1) */
+.glass-card-inner.glass-sm {
+  min-height: 140px;
+  padding: 20px;
+  border-radius: 20px;
+}
+
+.glass-card-wrapper.glass-sm {
+  border-radius: 20px;
+}
+
+.glass-card-wrapper.glass-sm .glass-card-glow {
+  width: 150px;
+  height: 150px;
+  filter: blur(70px);
+}
+
+.glass-card-wrapper.glass-sm .glass-card-shine {
+  border-radius: 20px;
+}
+
+/* Versão para cards de serviço individual (Nível 2) */
+.glass-card-inner.glass-service {
+  min-height: auto;
+  padding: 18px 22px;
+  border-radius: 18px;
+}
+
+.glass-card-wrapper.glass-service {
+  border-radius: 18px;
+}
+
+.glass-card-wrapper.glass-service:hover {
+  transform: translateY(-3px) scale(1.005);
+}
+
+.glass-card-wrapper.glass-service .glass-card-glow {
+  width: 120px;
+  height: 120px;
+  filter: blur(60px);
+  opacity: 0.15;
+}
+
+.glass-card-wrapper.glass-service .glass-card-shine {
+  border-radius: 18px;
+}

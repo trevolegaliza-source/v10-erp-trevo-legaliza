@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { GlassCard } from '@/components/ui/glass-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -25,52 +26,8 @@ import { UFS_BRASIL, UF_NOMES } from '@/constants/estados-brasil';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
-// ═══════════ CSS GLASSMORPHISM ═══════════
+// Inline CSS kept minimal — glass effects moved to index.css
 const GLASS_CSS = `
-.glass-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 24px;
-  cursor: pointer;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-.glass-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 24px;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent 50%);
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-.glass-card:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  transform: translateY(-4px) scale(1.01);
-}
-.glass-card-glow {
-  position: absolute;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.4;
-  top: -40px;
-  right: -40px;
-  pointer-events: none;
-  transition: opacity 0.4s;
-}
-.glass-card:hover .glass-card-glow {
-  opacity: 0.7;
-}
 .breadcrumb-item {
   cursor: pointer;
   transition: color 0.2s;
@@ -84,17 +41,6 @@ const GLASS_CSS = `
 @keyframes catalogFadeIn {
   from { opacity: 0; transform: translateY(16px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
-}
-.service-detail-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
-  transition: all 0.3s;
-}
-.service-detail-card:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
 }
 `;
 
@@ -385,32 +331,40 @@ function Level0View({
   onSelectGroup: (group: HierarchyGroup) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 catalog-enter">
-      {CATALOG_HIERARCHY.map((group, i) => {
-        const allCats = getAllCategoriesForGroup(group);
-        const count = countServicosForCategories(servicos, allCats);
-        return (
-          <div
-            key={group.key}
-            className="glass-card p-6 min-h-[180px] flex flex-col justify-between"
-            style={{ animationDelay: `${i * 60}ms` }}
-            onClick={() => onSelectGroup(group)}
-          >
-            <div className="glass-card-glow" style={{ background: group.glowColor }} />
-            <div className="relative z-10">
-              <span className="text-3xl mb-3 block">{group.icon}</span>
-              <h3 className="font-bold text-lg mb-1.5">{group.label}</h3>
-              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{group.description}</p>
-            </div>
-            <div className="relative z-10 flex items-center justify-between mt-4">
-              <Badge variant="outline" className="text-[10px] bg-muted/30 border-white/10">
-                {count} {count === 1 ? 'serviço' : 'serviços'}
-              </Badge>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-        );
-      })}
+    <div className="relative">
+      {/* Ambient glow background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-[120px]" />
+      </div>
+      <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 catalog-enter">
+        {CATALOG_HIERARCHY.map((group, i) => {
+          const allCats = getAllCategoriesForGroup(group);
+          const count = countServicosForCategories(servicos, allCats);
+          return (
+            <GlassCard
+              key={group.key}
+              glowColor={group.glowColor}
+              style={{ animationDelay: `${i * 60}ms` }}
+              onClick={() => onSelectGroup(group)}
+            >
+              <div className="relative z-10 flex flex-col justify-between min-h-[152px]">
+                <div>
+                  <span className="text-3xl mb-3 block">{group.icon}</span>
+                  <h3 className="font-bold text-lg mb-1.5 text-foreground">{group.label}</h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{group.description}</p>
+                </div>
+                <div className="flex items-center justify-between mt-4">
+                  <span className="text-xs font-medium text-foreground/80 px-3 py-1.5 rounded-full bg-foreground/5 backdrop-blur-sm border border-foreground/10">
+                    {count} {count === 1 ? 'serviço' : 'serviços'}
+                  </span>
+                  <span className="text-muted-foreground group-hover:text-foreground/80 transition-colors text-lg">→</span>
+                </div>
+              </div>
+            </GlassCard>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -444,24 +398,26 @@ function Level1View({
         {group.children.map((child, i) => {
           const count = countServicosForCategories(servicos, child.categories);
           return (
-            <div
+            <GlassCard
               key={child.key}
-              className="glass-card p-5 min-h-[140px] flex flex-col justify-between"
+              variant="sm"
+              glowColor={group.glowColor}
               style={{ animationDelay: `${i * 60}ms` }}
               onClick={() => onSelectChild(child)}
             >
-              <div className="glass-card-glow" style={{ background: group.glowColor }} />
-              <div className="relative z-10">
-                <h3 className="font-semibold text-base mb-1">{child.label}</h3>
-                <p className="text-xs text-muted-foreground line-clamp-2">{child.description}</p>
+              <div className="relative z-10 flex flex-col justify-between min-h-[100px]">
+                <div>
+                  <h3 className="font-semibold text-base mb-1 text-foreground">{child.label}</h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{child.description}</p>
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-[10px] font-medium text-foreground/80 px-2.5 py-1 rounded-full bg-foreground/5 border border-foreground/10">
+                    {count} {count === 1 ? 'serviço' : 'serviços'}
+                  </span>
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
               </div>
-              <div className="relative z-10 flex items-center justify-between mt-3">
-                <Badge variant="outline" className="text-[10px] bg-muted/30 border-white/10">
-                  {count} {count === 1 ? 'serviço' : 'serviços'}
-                </Badge>
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-            </div>
+            </GlassCard>
           );
         })}
       </div>
@@ -504,57 +460,60 @@ function Level2View({
           {services.map((s, i) => {
             const catLabel = CATEGORIAS_SERVICO.find(c => c.value === s.categoria)?.label || s.categoria;
             return (
-              <div
+              <GlassCard
                 key={s.id}
-                className="service-detail-card p-4 cursor-pointer flex flex-col gap-2 relative"
+                variant="service"
+                glowColor="rgba(34, 197, 94, 0.1)"
                 style={{ animationDelay: `${i * 40}ms` }}
                 onClick={() => onSelectService(s)}
               >
-                {adminMode && (
-                  <div className="absolute top-3 right-3 flex gap-1 z-10" onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => onEditService(s)}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all"
-                      title="Editar"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onPrecosService(s)}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-emerald-500/20 text-muted-foreground hover:text-emerald-400 transition-all"
-                      title="Preços por UF"
-                    >
-                      <DollarSign className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteService(s)}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-all"
-                      title="Excluir"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-sm">{s.nome}</span>
-                </div>
-                {s.descricao && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{s.descricao}</p>
-                )}
-                <div className="flex items-center gap-2 mt-auto flex-wrap">
-                  <Badge variant="outline" className={`text-[10px] ${CATEGORIA_COLORS[s.categoria] || ''}`}>
-                    {catLabel}
-                  </Badge>
-                  {s.prazo_estimado && (
-                    <Badge variant="outline" className="text-[10px] bg-muted/50 border-white/10">
-                      {s.prazo_estimado}
-                    </Badge>
+                <div className="relative z-10 flex flex-col gap-2">
+                  {adminMode && (
+                    <div className="absolute top-0 right-0 flex gap-1 z-10" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => onEditService(s)}
+                        className="p-1.5 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-all"
+                        title="Editar"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => onPrecosService(s)}
+                        className="p-1.5 rounded-lg bg-foreground/5 hover:bg-emerald-500/20 text-muted-foreground hover:text-emerald-400 transition-all"
+                        title="Preços por UF"
+                      >
+                        <DollarSign className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteService(s)}
+                        className="p-1.5 rounded-lg bg-foreground/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-all"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   )}
-                  <Badge variant="outline" className={`text-[10px] ${s.ativo ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
-                    {s.ativo ? 'Ativo' : 'Inativo'}
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-sm text-foreground">{s.nome}</span>
+                  </div>
+                  {s.descricao && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{s.descricao}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-auto flex-wrap">
+                    <Badge variant="outline" className={`text-[10px] ${CATEGORIA_COLORS[s.categoria] || ''}`}>
+                      {catLabel}
+                    </Badge>
+                    {s.prazo_estimado && (
+                      <Badge variant="outline" className="text-[10px] bg-muted/50 border-foreground/10">
+                        {s.prazo_estimado}
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className={`text-[10px] ${s.ativo ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                      {s.ativo ? 'Ativo' : 'Inativo'}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
+              </GlassCard>
             );
           })}
         </div>
@@ -617,7 +576,7 @@ function ServiceDetailView({
       </Button>
 
       {/* Hero card */}
-      <div className="service-detail-card p-6 space-y-4">
+      <div className="glass-card-inner p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold mb-2">{service.nome}</h2>
@@ -646,7 +605,7 @@ function ServiceDetailView({
 
       {/* Admin: Edição inline */}
       {adminMode && (
-        <div className="service-detail-card p-6 space-y-4">
+        <div className="glass-card-inner p-6 space-y-4">
           <h3 className="font-semibold text-sm">Editar Serviço</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -698,7 +657,7 @@ function ServiceDetailView({
       )}
 
       {/* Tabela de preços por UF */}
-      <div className="service-detail-card p-6 space-y-4">
+      <div className="glass-card-inner p-6 space-y-4">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <DollarSign className="h-4 w-4" /> Preços por UF
         </h3>
@@ -774,7 +733,7 @@ function SearchResultsView({
             return (
               <div
                 key={s.id}
-                className="service-detail-card p-4 cursor-pointer flex flex-col gap-2"
+                className="glass-card-inner p-4 cursor-pointer flex flex-col gap-2"
                 onClick={() => onSelectService(s)}
               >
                 <span className="font-semibold text-sm">{s.nome}</span>
