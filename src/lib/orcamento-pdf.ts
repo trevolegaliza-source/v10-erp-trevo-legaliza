@@ -156,7 +156,10 @@ function buildDetalhadoPages(d: OrcamentoPDFData): string[] {
           ${d.contexto ? `
             <div style="margin-bottom: 30px;">
               <div style="font-size: 10px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid #f0fdf4; padding-bottom: 8px;">Cenário e Oportunidade</div>
-              <div style="font-size: 12px; color: #334155; line-height: 1.7;">${esc(d.contexto)}</div>
+              <div style="background: #fafafa; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-top: 12px;">
+                <div style="font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 12px;">Descrição Geral do Orçamento</div>
+                <div style="font-size: 10px; line-height: 1.8; color: #4b5563; white-space: pre-line;">${esc(d.contexto)}</div>
+              </div>
             </div>
           ` : ''}
           ${d.ordem_execucao ? `
