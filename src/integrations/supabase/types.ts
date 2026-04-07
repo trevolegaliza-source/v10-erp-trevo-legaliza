@@ -790,6 +790,59 @@ export type Database = {
         }
         Relationships: []
       }
+      orcamento_pdfs: {
+        Row: {
+          cancelado_em: string | null
+          created_at: string | null
+          empresa_id: string | null
+          filename: string
+          gerado_em: string
+          id: string
+          modo: string
+          orcamento_id: string
+          status: string
+          storage_path: string
+          url: string
+          versao: number
+        }
+        Insert: {
+          cancelado_em?: string | null
+          created_at?: string | null
+          empresa_id?: string | null
+          filename: string
+          gerado_em?: string
+          id?: string
+          modo: string
+          orcamento_id: string
+          status?: string
+          storage_path: string
+          url: string
+          versao?: number
+        }
+        Update: {
+          cancelado_em?: string | null
+          created_at?: string | null
+          empresa_id?: string | null
+          filename?: string
+          gerado_em?: string
+          id?: string
+          modo?: string
+          orcamento_id?: string
+          status?: string
+          storage_path?: string
+          url?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamento_pdfs_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orcamentos: {
         Row: {
           cliente_id: string | null
