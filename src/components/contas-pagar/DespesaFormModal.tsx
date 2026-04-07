@@ -153,6 +153,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
     setParcelado(false);
     setNumParcelas(2);
     setDataPrimeiraParcela('');
+    setContaId('');
+    setCentroCusto('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
