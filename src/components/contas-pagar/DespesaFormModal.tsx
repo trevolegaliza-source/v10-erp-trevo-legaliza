@@ -87,6 +87,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
   const [observacoes, setObservacoes] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [salvarRecorrente, setSalvarRecorrente] = useState(false);
+  const [contaId, setContaId] = useState('');
+  const [centroCusto, setCentroCusto] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Parcelamento
