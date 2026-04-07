@@ -831,7 +831,7 @@ async function renderPageToCanvas(html: string): Promise<HTMLCanvasElement> {
   }
 }
 
-export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<jsPDF> {
+export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<Blob> {
   const logo = await preloadLogo();
 
   const isDetalhado = data.modo === 'detalhado' ||
@@ -843,7 +843,7 @@ export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<jsPDF> 
     const canvas = await renderPageToCanvas(html);
     const doc = new jsPDF('p', 'mm', 'a4');
     addCanvasToDoc(doc, canvas);
-    return doc;
+    return doc.output('blob');
   }
 
   const pagesHtml = buildDetalhadoPages(data, logo);
@@ -855,7 +855,16 @@ export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<jsPDF> 
     addCanvasToDoc(doc, canvas);
   }
 
-  return doc;
+  return doc.output('blob');
+}
+
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
