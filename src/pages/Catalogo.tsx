@@ -8,7 +8,8 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, DollarSign, Trash2, BookOpen, Loader2, Save, ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
+import { Search, Plus, DollarSign, Trash2, BookOpen, Loader2, Save, ArrowLeft, ArrowRight, ChevronRight, Settings, Pencil } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import {
   useServicos,
   usePrecosUF,
@@ -130,12 +131,23 @@ function countServicosForCategories(servicos: ServicosCatalogo[], categories: st
 // ═══════════ COMPONENTE PRINCIPAL ═══════════
 export default function Catalogo() {
   const { data: servicos = [], isLoading } = useServicos();
+  const updateMut = useUpdateServico();
+  const deleteMut = useDeleteServico();
   const [path, setPath] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [servicoModal, setServicoModal] = useState<ServicosCatalogo | null>(null);
   const [precosServicoId, setPrecosServicoId] = useState<string | null>(null);
   const [animKey, setAnimKey] = useState(0);
+  const [adminMode, setAdminMode] = useState(false);
+
+  function handleDeleteServico(id: string) {
+    if (!confirm('Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.')) return;
+    deleteMut.mutate(id);
+    if (path.length > 0 && path[path.length - 1] === id) {
+      setPath(path.slice(0, -1));
+    }
+  }
 
   function navigate(newPath: string[]) {
     setPath(newPath);
@@ -197,6 +209,11 @@ export default function Catalogo() {
     <div className="space-y-6">
       <style dangerouslySetInnerHTML={{ __html: GLASS_CSS }} />
 
+      {/* Admin mode indicator */}
+      {adminMode && (
+        <div className="fixed top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 z-50" />
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -207,7 +224,12 @@ export default function Catalogo() {
             {servicos.length} serviços cadastrados · {CATALOG_HIERARCHY.length} áreas de atuação
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Admin</span>
+            <Switch checked={adminMode} onCheckedChange={setAdminMode} />
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -217,9 +239,11 @@ export default function Catalogo() {
               className="pl-9 h-9 w-64"
             />
           </div>
-          <Button onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Novo Serviço
-          </Button>
+          {adminMode && (
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Novo Serviço
+            </Button>
+          )}
         </div>
       </div>
 
@@ -277,15 +301,21 @@ export default function Catalogo() {
         <ServiceDetailView
           key={animKey}
           service={level3Service}
+          adminMode={adminMode}
           onBack={() => navigate(path.slice(0, -1))}
           onPrecos={() => setPrecosServicoId(level3Service.id)}
+          onDelete={() => handleDeleteServico(level3Service.id)}
         />
       ) : level2Categories ? (
         <Level2View
           key={animKey}
           services={level2Services}
+          adminMode={adminMode}
           onSelectService={(s) => navigate([...path, s.id])}
           onBack={() => navigate(path.slice(0, -1))}
+          onEditService={(s) => setServicoModal(s)}
+          onPrecosService={(s) => setPrecosServicoId(s.id)}
+          onDeleteService={(s) => handleDeleteServico(s.id)}
         />
       ) : currentGroup?.children ? (
         <Level1View
@@ -422,12 +452,20 @@ function Level1View({
 // ═══════════ NÍVEL 2: SERVIÇOS INDIVIDUAIS ═══════════
 function Level2View({
   services,
+  adminMode,
   onSelectService,
   onBack,
+  onEditService,
+  onPrecosService,
+  onDeleteService,
 }: {
   services: ServicosCatalogo[];
+  adminMode: boolean;
   onSelectService: (s: ServicosCatalogo) => void;
   onBack: () => void;
+  onEditService: (s: ServicosCatalogo) => void;
+  onPrecosService: (s: ServicosCatalogo) => void;
+  onDeleteService: (s: ServicosCatalogo) => void;
 }) {
   return (
     <div className="space-y-4 catalog-enter">
@@ -448,10 +486,35 @@ function Level2View({
             return (
               <div
                 key={s.id}
-                className="service-detail-card p-4 cursor-pointer flex flex-col gap-2"
+                className="service-detail-card p-4 cursor-pointer flex flex-col gap-2 relative"
                 style={{ animationDelay: `${i * 40}ms` }}
                 onClick={() => onSelectService(s)}
               >
+                {adminMode && (
+                  <div className="absolute top-3 right-3 flex gap-1 z-10" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => onEditService(s)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all"
+                      title="Editar"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => onPrecosService(s)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-emerald-500/20 text-muted-foreground hover:text-emerald-400 transition-all"
+                      title="Preços por UF"
+                    >
+                      <DollarSign className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => onDeleteService(s)}
+                      className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-all"
+                      title="Excluir"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{s.nome}</span>
                 </div>
@@ -483,24 +546,36 @@ function Level2View({
 // ═══════════ NÍVEL 3: DETALHE DO SERVIÇO ═══════════
 function ServiceDetailView({
   service,
+  adminMode,
   onBack,
   onPrecos,
+  onDelete,
 }: {
   service: ServicosCatalogo;
+  adminMode: boolean;
   onBack: () => void;
   onPrecos: () => void;
+  onDelete: () => void;
 }) {
   const { data: precos = [], isLoading: loadingPrecos } = usePrecosUF(service.id);
   const updateMut = useUpdateServico();
-  const deleteMut = useDeleteServico();
   const catLabel = CATEGORIAS_SERVICO.find(c => c.value === service.categoria)?.label || service.categoria;
 
   const [editNome, setEditNome] = useState(service.nome);
   const [editDesc, setEditDesc] = useState(service.descricao || '');
   const [editPrazo, setEditPrazo] = useState(service.prazo_estimado || '');
   const [editCat, setEditCat] = useState(service.categoria);
+  const [editAtivo, setEditAtivo] = useState(service.ativo);
 
-  function handleSave() {
+  useEffect(() => {
+    setEditNome(service.nome);
+    setEditDesc(service.descricao || '');
+    setEditPrazo(service.prazo_estimado || '');
+    setEditCat(service.categoria);
+    setEditAtivo(service.ativo);
+  }, [service.id]);
+
+  function handleSaveEdit() {
     updateMut.mutate({
       id: service.id,
       updates: {
@@ -508,14 +583,9 @@ function ServiceDetailView({
         descricao: editDesc || undefined,
         prazo_estimado: editPrazo || undefined,
         categoria: editCat,
+        ativo: editAtivo,
       },
     });
-  }
-
-  function handleDelete() {
-    if (confirm('Tem certeza que deseja excluir este serviço e todos os preços associados?')) {
-      deleteMut.mutate(service.id, { onSuccess: onBack });
-    }
   }
 
   const precosPreenchidos = precos.filter(p => p.honorario_trevo > 0 || p.taxa_orgao > 0);
@@ -554,49 +624,58 @@ function ServiceDetailView({
         )}
       </div>
 
-      {/* Edição inline */}
-      <div className="service-detail-card p-6 space-y-4">
-        <h3 className="font-semibold text-sm">Editar Serviço</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="text-[11px] font-medium text-muted-foreground">Nome</label>
-            <Input value={editNome} onChange={e => setEditNome(e.target.value)} className="h-8 text-xs mt-1" />
+      {/* Admin: Edição inline */}
+      {adminMode && (
+        <div className="service-detail-card p-6 space-y-4">
+          <h3 className="font-semibold text-sm">Editar Serviço</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Nome do serviço</label>
+              <Input value={editNome} onChange={e => setEditNome(e.target.value)} className="h-8 text-xs mt-1 bg-white/5 border-white/10" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+              <Select value={editCat} onValueChange={setEditCat}>
+                <SelectTrigger className="h-8 text-xs mt-1 bg-white/5 border-white/10"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIAS_SERVICO.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Prazo estimado</label>
+              <Input value={editPrazo} onChange={e => setEditPrazo(e.target.value)} className="h-8 text-xs mt-1 bg-white/5 border-white/10" />
+            </div>
           </div>
           <div>
-            <label className="text-[11px] font-medium text-muted-foreground">Categoria</label>
-            <Select value={editCat} onValueChange={setEditCat}>
-              <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {CATEGORIAS_SERVICO.map(c => (
-                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-xs font-medium text-muted-foreground">Descrição</label>
+            <Textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={6} className="text-xs mt-1 bg-white/5 border-white/10" />
           </div>
           <div>
-            <label className="text-[11px] font-medium text-muted-foreground">Prazo estimado</label>
-            <Input value={editPrazo} onChange={e => setEditPrazo(e.target.value)} className="h-8 text-xs mt-1" />
+            <label className="text-xs font-medium text-muted-foreground">Status</label>
+            <div className="flex items-center gap-2 mt-1">
+              <Switch checked={editAtivo} onCheckedChange={setEditAtivo} />
+              <span className="text-sm">{editAtivo ? 'Ativo' : 'Inativo'}</span>
+            </div>
           </div>
-        </div>
-        <div>
-          <label className="text-[11px] font-medium text-muted-foreground">Descrição</label>
-          <Textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={4} className="text-xs mt-1" />
-        </div>
-        <div className="flex items-center justify-between gap-2 pt-2">
-          <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleteMut.isPending}>
-            <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onPrecos}>
-              <DollarSign className="h-3.5 w-3.5 mr-1" /> Preços por UF
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <Button variant="destructive" size="sm" onClick={onDelete}>
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir Serviço
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={updateMut.isPending}>
-              {updateMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
-              Salvar
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onPrecos}>
+                <DollarSign className="h-3.5 w-3.5 mr-1" /> Gerenciar Preços por UF
+              </Button>
+              <Button size="sm" onClick={handleSaveEdit} disabled={updateMut.isPending} className="bg-emerald-600 hover:bg-emerald-700">
+                {updateMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+                Salvar Alterações
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Tabela de preços por UF */}
       <div className="service-detail-card p-6 space-y-4">
@@ -608,9 +687,11 @@ function ServiceDetailView({
         ) : precosPreenchidos.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground">Nenhum preço cadastrado ainda.</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={onPrecos}>
-              <DollarSign className="h-3.5 w-3.5 mr-1" /> Cadastrar Preços
-            </Button>
+            {adminMode && (
+              <Button variant="outline" size="sm" className="mt-3" onClick={onPrecos}>
+                <DollarSign className="h-3.5 w-3.5 mr-1" /> Cadastrar Preços
+              </Button>
+            )}
           </div>
         ) : (
           <div className="rounded-lg border border-white/5 overflow-hidden">
