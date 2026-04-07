@@ -262,15 +262,23 @@ export default function EstadoDetalhe() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map(k => (
-          <div key={k.label} className="p-4 rounded-xl" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
-            <div className="flex items-center gap-2 mb-2">
-              <k.Icon className="h-4 w-4" style={{ color: GREEN }} />
-              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: mutedColor }}>{k.label}</span>
-            </div>
-            <p className="text-2xl font-extrabold" style={{ color: textColor }}>{k.value}</p>
-          </div>
-        ))}
+        {kpis.map(k => {
+          const glowMap: Record<string, string> = {
+            Clientes: 'rgba(59, 130, 246, 0.1)',
+            Processos: 'rgba(34, 197, 94, 0.1)',
+            Receita: 'rgba(34, 197, 94, 0.12)',
+            Contatos: 'rgba(168, 85, 247, 0.1)',
+          };
+          return (
+            <GlassCard key={k.label} variant="service" glowColor={glowMap[k.label] || 'rgba(34, 197, 94, 0.1)'}>
+              <div className="flex items-center gap-2 mb-2">
+                <k.Icon className="h-4 w-4" style={{ color: GREEN }} />
+                <span className="text-xs font-bold uppercase tracking-wider text-white/50">{k.label}</span>
+              </div>
+              <p className="text-2xl font-extrabold" style={{ color: textColor }}>{k.value}</p>
+            </GlassCard>
+          );
+        })}
       </div>
 
       {/* Tabs */}
