@@ -393,7 +393,13 @@ export default function EstadoDetalhe() {
             const Icon = TIPO_ICONS[tipo] || Globe;
             const contatos = contatosByTipo[tipo] || [];
             return (
-              <div key={tipo} className="p-4 rounded-xl" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+              <GlassCard variant="service" glowColor={
+                tipo === 'junta_comercial' ? 'rgba(234, 179, 8, 0.1)' :
+                tipo === 'outro' ? 'rgba(59, 130, 246, 0.1)' :
+                tipo === 'cartorio' ? 'rgba(168, 85, 247, 0.1)' :
+                tipo === 'conselho' ? 'rgba(236, 72, 153, 0.1)' :
+                'rgba(34, 197, 94, 0.1)'
+              }>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Icon className="h-4 w-4" style={{ color: GREEN }} />
