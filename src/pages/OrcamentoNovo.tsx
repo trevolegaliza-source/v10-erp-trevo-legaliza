@@ -248,7 +248,8 @@ export default function OrcamentoNovo() {
         numero: orcamentoNumero || 0,
         data_emissao: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
       });
-      doc.save(`Proposta_${form.prospect_nome.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+      const clienteName = (form.prospect_nome || 'proposta').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 50);
+      doc.save(`Proposta_${clienteName}_${new Date().toISOString().split('T')[0]}.pdf`);
       toast.dismiss(toastId);
       toast.success('PDF gerado com sucesso!');
     } catch (err: any) {
