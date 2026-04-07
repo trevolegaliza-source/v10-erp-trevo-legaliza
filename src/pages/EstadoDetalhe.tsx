@@ -479,7 +479,7 @@ export default function EstadoDetalhe() {
                     ))}
                   </div>
                 )}
-              </div>
+              </GlassCard>
             );
           })}
         </TabsContent>
