@@ -170,7 +170,6 @@ export default function InteligenciaGeografica() {
         </div>
 
         {/* Ranking */}
-        <GlassCard variant="sm" glowColor="rgba(34, 197, 94, 0.08)" className="p-4 lg:flex-[3]">
           <h3 className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: GREEN_BRIGHT }}>Ranking por Estado</h3>
           {ranking.length === 0 ? (
             <p className="text-sm text-center py-4" style={{ color: mutedColor }}>Nenhum cliente cadastrado</p>
