@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Upload, CreditCard } from 'lucide-react';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
 import { useColaboradores } from '@/hooks/useColaboradores';
+import { usePlanoContas } from '@/hooks/usePlanoContas';
 import { supabase } from '@/integrations/supabase/client';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import { toast } from 'sonner';
