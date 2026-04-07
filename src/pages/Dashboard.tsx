@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   DollarSign, Clock, CheckCircle, Activity, TrendingUp, TrendingDown,
-  AlertTriangle, FileText, Send, PauseCircle, ChevronRight, Check, CreditCard,
+  AlertTriangle, FileText, Send, PauseCircle, ChevronRight, Check, CreditCard, Download,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
