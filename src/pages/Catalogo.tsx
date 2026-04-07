@@ -255,9 +255,14 @@ export default function Catalogo() {
             />
           </div>
           {adminMode && (
-            <Button onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Novo Serviço
-            </Button>
+            <>
+              <Button variant="outline" onClick={handleCopyLink}>
+                <Link2 className="h-4 w-4 mr-1" /> Copiar Link Público
+              </Button>
+              <Button onClick={() => setShowCreate(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Novo Serviço
+              </Button>
+            </>
           )}
         </div>
       </div>
