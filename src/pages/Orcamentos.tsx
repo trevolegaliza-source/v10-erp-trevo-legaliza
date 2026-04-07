@@ -84,7 +84,9 @@ export default function Orcamentos() {
         data_emissao: new Date(orc.created_at).toLocaleDateString('pt-BR'),
       });
       const clienteName = (orc.prospect_nome || 'proposta').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 50);
-      doc.save(`Proposta_${clienteName}_${new Date().toISOString().split('T')[0]}.pdf`);
+      const filename = `Proposta_${clienteName}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const { downloadBlob } = await import('@/lib/orcamento-pdf');
+      downloadBlob(doc, filename);
       toast.success('PDF gerado!');
     } catch (err: any) {
       toast.error('Erro ao gerar PDF: ' + (err.message || ''));
