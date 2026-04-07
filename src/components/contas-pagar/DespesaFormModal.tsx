@@ -70,7 +70,9 @@ function calcularParcelas(
 export default function DespesaFormModal({ open, onClose, onSave, editData, defaultMes, defaultAno }: Props) {
   const queryClient = useQueryClient();
   const { data: colaboradores } = useColaboradores();
+  const { data: planoContas } = usePlanoContas();
   const activeColabs = (colaboradores || []).filter(c => c.status === 'ativo');
+  const contasDespesa = (planoContas || []).filter(c => ['custo', 'despesa', 'despesa_financeira', 'deducao'].includes(c.tipo) && c.codigo.includes('.'));
 
   const [categoria, setCategoria] = useState<CategoriaKey>('infraestrutura');
   const [subcategoria, setSubcategoria] = useState('');
