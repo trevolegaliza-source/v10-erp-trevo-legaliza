@@ -460,57 +460,60 @@ function Level2View({
           {services.map((s, i) => {
             const catLabel = CATEGORIAS_SERVICO.find(c => c.value === s.categoria)?.label || s.categoria;
             return (
-              <div
+              <GlassCard
                 key={s.id}
-                className="service-detail-card p-4 cursor-pointer flex flex-col gap-2 relative"
+                variant="service"
+                glowColor="rgba(34, 197, 94, 0.1)"
                 style={{ animationDelay: `${i * 40}ms` }}
                 onClick={() => onSelectService(s)}
               >
-                {adminMode && (
-                  <div className="absolute top-3 right-3 flex gap-1 z-10" onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => onEditService(s)}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all"
-                      title="Editar"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onPrecosService(s)}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-emerald-500/20 text-muted-foreground hover:text-emerald-400 transition-all"
-                      title="Preços por UF"
-                    >
-                      <DollarSign className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteService(s)}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-all"
-                      title="Excluir"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-sm">{s.nome}</span>
-                </div>
-                {s.descricao && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{s.descricao}</p>
-                )}
-                <div className="flex items-center gap-2 mt-auto flex-wrap">
-                  <Badge variant="outline" className={`text-[10px] ${CATEGORIA_COLORS[s.categoria] || ''}`}>
-                    {catLabel}
-                  </Badge>
-                  {s.prazo_estimado && (
-                    <Badge variant="outline" className="text-[10px] bg-muted/50 border-white/10">
-                      {s.prazo_estimado}
-                    </Badge>
+                <div className="relative z-10 flex flex-col gap-2">
+                  {adminMode && (
+                    <div className="absolute top-0 right-0 flex gap-1 z-10" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => onEditService(s)}
+                        className="p-1.5 rounded-lg bg-foreground/5 hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-all"
+                        title="Editar"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => onPrecosService(s)}
+                        className="p-1.5 rounded-lg bg-foreground/5 hover:bg-emerald-500/20 text-muted-foreground hover:text-emerald-400 transition-all"
+                        title="Preços por UF"
+                      >
+                        <DollarSign className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => onDeleteService(s)}
+                        className="p-1.5 rounded-lg bg-foreground/5 hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-all"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   )}
-                  <Badge variant="outline" className={`text-[10px] ${s.ativo ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
-                    {s.ativo ? 'Ativo' : 'Inativo'}
-                  </Badge>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-sm text-foreground">{s.nome}</span>
+                  </div>
+                  {s.descricao && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{s.descricao}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-auto flex-wrap">
+                    <Badge variant="outline" className={`text-[10px] ${CATEGORIA_COLORS[s.categoria] || ''}`}>
+                      {catLabel}
+                    </Badge>
+                    {s.prazo_estimado && (
+                      <Badge variant="outline" className="text-[10px] bg-muted/50 border-foreground/10">
+                        {s.prazo_estimado}
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className={`text-[10px] ${s.ativo ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                      {s.ativo ? 'Ativo' : 'Inativo'}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
+              </GlassCard>
             );
           })}
         </div>
