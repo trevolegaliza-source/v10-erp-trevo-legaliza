@@ -562,8 +562,6 @@ function UrgencySection({ title, items, variant, onPagar, onEdit, onDelete, alwa
   alwaysShow?: boolean;
   groupByDate?: boolean;
 }) {
-  if (!alwaysShow && items.length === 0) return null;
-
   const borderClass = {
     destructive: 'border-destructive/30',
     warning: 'border-warning/30',
@@ -593,6 +591,8 @@ function UrgencySection({ title, items, variant, onPagar, onEdit, onDelete, alwa
       total: items.reduce((s: number, l: any) => s + Number(l.valor), 0),
     }));
   }, [items, groupByDate]);
+
+  if (!alwaysShow && items.length === 0) return null;
 
   return (
     <div>
