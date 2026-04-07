@@ -305,6 +305,12 @@ export default function OrcamentoNovo() {
       setGerando(false);
     }
   }
+
+  function handleDuplicate() {
+    setForm(f => ({ ...f, prospect_nome: f.prospect_nome + ' (cópia)' }));
+    setOrcamentoId(null);
+    setOrcamentoNumero(0);
+    toast.success('Duplicado! Salve para criar um novo orçamento.');
   }
 
   const validItems = form.itens.filter(i => i.descricao.trim());
