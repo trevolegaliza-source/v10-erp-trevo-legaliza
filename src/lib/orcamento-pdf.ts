@@ -195,7 +195,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData): string[] {
       itemsHtml += `
         <div style="border: 1px solid #e5e7eb; border-radius: 16px; margin-bottom: 14px; overflow: hidden; page-break-inside: avoid;">
           <div style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
-            <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 800; flex-shrink: 0;">${item.ordem || idx + 1}</div>
+            <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 800; flex-shrink: 0;">${item.ordem || '•'}</div>
             <div style="flex: 1; min-width: 0;">
               <div style="font-size: 12px; font-weight: 700; color: #ffffff; line-height: 1.3;">${esc(item.descricao)}</div>
               ${secaoLabel && secaoLabel !== 'Geral' ? `<div style="display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px; background: rgba(34,197,94,0.2); color: #86efac; font-size: 7px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase;">${esc(secaoLabel)}</div>` : ''}
@@ -392,7 +392,6 @@ export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<jsPDF> 
     // Simple mode: single page
     const html = buildSimplesHTML(data);
     const canvas = await renderPageToCanvas(html);
-    const doc = new jsPDF('p', 'mm', 'a4');
     const doc = new jsPDF('p', 'mm', 'a4');
     addCanvasToDoc(doc, canvas);
     return doc;
