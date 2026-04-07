@@ -576,7 +576,7 @@ function ServiceDetailView({
       </Button>
 
       {/* Hero card */}
-      <div className="service-detail-card p-6 space-y-4">
+      <div className="glass-card-inner p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold mb-2">{service.nome}</h2>
@@ -605,7 +605,7 @@ function ServiceDetailView({
 
       {/* Admin: Edição inline */}
       {adminMode && (
-        <div className="service-detail-card p-6 space-y-4">
+        <div className="glass-card-inner p-6 space-y-4">
           <h3 className="font-semibold text-sm">Editar Serviço</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -657,7 +657,7 @@ function ServiceDetailView({
       )}
 
       {/* Tabela de preços por UF */}
-      <div className="service-detail-card p-6 space-y-4">
+      <div className="glass-card-inner p-6 space-y-4">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <DollarSign className="h-4 w-4" /> Preços por UF
         </h3>
@@ -733,7 +733,7 @@ function SearchResultsView({
             return (
               <div
                 key={s.id}
-                className="service-detail-card p-4 cursor-pointer flex flex-col gap-2"
+                className="glass-card-inner p-4 cursor-pointer flex flex-col gap-2"
                 onClick={() => onSelectService(s)}
               >
                 <span className="font-semibold text-sm">{s.nome}</span>
