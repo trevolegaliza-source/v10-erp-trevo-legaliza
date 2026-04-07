@@ -7,15 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { usePlanoContas, useSaveConta, useDeleteConta, type PlanoContas } from '@/hooks/usePlanoContas';
 
 const TIPOS = [
-  { value: 'receita', label: 'Receita', color: 'text-emerald-400' },
-  { value: 'deducao', label: 'Dedução', color: 'text-amber-400' },
-  { value: 'custo', label: 'Custo', color: 'text-red-400' },
-  { value: 'despesa', label: 'Despesa', color: 'text-orange-400' },
-  { value: 'despesa_financeira', label: 'Desp. Financeira', color: 'text-rose-400' },
+  { value: 'receita', label: '📈 Receitas', color: 'text-emerald-500' },
+  { value: 'deducao', label: '📉 Deduções sobre Receita', color: 'text-amber-500' },
+  { value: 'custo', label: '⚙️ Custos Operacionais', color: 'text-blue-500' },
+  { value: 'despesa', label: '💰 Despesas Operacionais', color: 'text-orange-500' },
+  { value: 'despesa_financeira', label: '🏦 Despesas Financeiras', color: 'text-red-500' },
 ];
 
 const CENTROS = [
@@ -31,7 +31,6 @@ export default function PlanoContasTab() {
   const [editConta, setEditConta] = useState<PlanoContas | null>(null);
   const [showForm, setShowForm] = useState(false);
 
-  // Form state
   const [codigo, setCodigo] = useState('');
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState('despesa');
@@ -76,14 +75,6 @@ export default function PlanoContasTab() {
     setShowForm(false);
   }
 
-  function getLevel(codigo: string): number {
-    return codigo.split('.').length - 1;
-  }
-
-  function getTipoInfo(tipo: string) {
-    return TIPOS.find(t => t.value === tipo) || TIPOS[3];
-  }
-
   if (isLoading) {
     return (
       <Card>
@@ -101,7 +92,10 @@ export default function PlanoContasTab() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-base">Plano de Contas</CardTitle>
-              <CardDescription>Classificação contábil para DRE e relatórios financeiros</CardDescription>
+              <CardDescription>
+                Classificação contábil para DRE e relatórios financeiros.
+                Cada lançamento (receita ou despesa) é vinculado a uma conta para gerar o DRE automaticamente.
+              </CardDescription>
             </div>
             <Button size="sm" onClick={() => openNew()}>
               <Plus className="h-4 w-4 mr-1" /> Nova Conta
@@ -109,54 +103,58 @@ export default function PlanoContasTab() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-0.5">
-            {(contas || []).map(conta => {
-              const level = getLevel(conta.codigo);
-              const tipoInfo = getTipoInfo(conta.tipo);
-              const isHeader = level === 0;
+          <div className="space-y-6">
+            {TIPOS.map(tipoInfo => {
+              const contasTipo = (contas || []).filter(c => c.tipo === tipoInfo.value);
+              if (contasTipo.length === 0) return null;
 
               return (
-                <div
-                  key={conta.id}
-                  className={`flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-muted/50 group ${isHeader ? 'mt-3 first:mt-0' : ''}`}
-                  style={{ paddingLeft: `${level * 24 + 8}px` }}
-                >
-                  {level > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />}
-                  <span className={`font-mono text-xs ${isHeader ? 'font-bold' : 'text-muted-foreground'}`}>
-                    {conta.codigo}
-                  </span>
-                  <span className={`text-sm flex-1 ${isHeader ? 'font-bold' : ''}`}>
-                    {conta.nome}
-                  </span>
-                  <Badge variant="outline" className={`text-[10px] ${tipoInfo.color}`}>
-                    {tipoInfo.label}
-                  </Badge>
-                  {conta.centro_custo && (
-                    <Badge variant="secondary" className="text-[10px]">
-                      {conta.centro_custo}
-                    </Badge>
-                  )}
-                  <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openNew(conta.codigo)}>
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(conta)}>
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    {level > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-destructive"
-                        onClick={() => {
-                          if (confirm(`Excluir "${conta.codigo} — ${conta.nome}"?`)) {
-                            deleteMutation.mutate(conta.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
+                <div key={tipoInfo.value}>
+                  <h4 className={`text-sm font-bold ${tipoInfo.color} mb-2`}>{tipoInfo.label}</h4>
+                  <div className="space-y-0.5 ml-2">
+                    {contasTipo.map(conta => {
+                      const nivel = conta.codigo.split('.').length;
+                      const indent = (nivel - 1) * 20;
+                      return (
+                        <div
+                          key={conta.id}
+                          className="flex items-center gap-2 py-1.5 hover:bg-muted/30 rounded px-2 group"
+                          style={{ paddingLeft: `${indent}px` }}
+                        >
+                          <span className="text-xs text-muted-foreground font-mono w-12">{conta.codigo}</span>
+                          <span className={`text-sm flex-1 ${nivel === 1 ? 'font-bold' : nivel === 2 ? 'font-medium' : ''}`}>
+                            {conta.nome}
+                          </span>
+                          {conta.centro_custo && (
+                            <Badge variant="outline" className="text-[9px] ml-auto">
+                              {conta.centro_custo}
+                            </Badge>
+                          )}
+                          <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openNew(conta.codigo)}>
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(conta)}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            {nivel > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive"
+                                onClick={() => {
+                                  if (confirm(`Excluir "${conta.codigo} — ${conta.nome}"?`)) {
+                                    deleteMutation.mutate(conta.id);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -165,7 +163,6 @@ export default function PlanoContasTab() {
         </CardContent>
       </Card>
 
-      {/* Form Dialog */}
       <Dialog open={showForm} onOpenChange={v => { if (!v) setShowForm(false); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
