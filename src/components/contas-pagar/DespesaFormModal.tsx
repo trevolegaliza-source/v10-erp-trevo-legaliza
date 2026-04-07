@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Upload, CreditCard } from 'lucide-react';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
 import { useColaboradores } from '@/hooks/useColaboradores';
+import { usePlanoContas } from '@/hooks/usePlanoContas';
 import { supabase } from '@/integrations/supabase/client';
 import { STORAGE_BUCKETS } from '@/constants/storage';
 import { toast } from 'sonner';
@@ -69,7 +70,9 @@ function calcularParcelas(
 export default function DespesaFormModal({ open, onClose, onSave, editData, defaultMes, defaultAno }: Props) {
   const queryClient = useQueryClient();
   const { data: colaboradores } = useColaboradores();
+  const { data: planoContas } = usePlanoContas();
   const activeColabs = (colaboradores || []).filter(c => c.status === 'ativo');
+  const contasDespesa = (planoContas || []).filter(c => ['custo', 'despesa', 'despesa_financeira', 'deducao'].includes(c.tipo) && c.codigo.includes('.'));
 
   const [categoria, setCategoria] = useState<CategoriaKey>('infraestrutura');
   const [subcategoria, setSubcategoria] = useState('');
@@ -84,6 +87,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
   const [observacoes, setObservacoes] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [salvarRecorrente, setSalvarRecorrente] = useState(false);
+  const [contaId, setContaId] = useState('');
+  const [centroCusto, setCentroCusto] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Parcelamento
@@ -124,6 +129,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
       setObservacoes(editData.observacoes_financeiro || '');
       setSalvarRecorrente(false);
       setParcelado(false);
+      setContaId(editData.conta_id || '');
+      setCentroCusto(editData.centro_custo || '');
     } else {
       resetForm();
     }
@@ -146,6 +153,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
     setParcelado(false);
     setNumParcelas(2);
     setDataPrimeiraParcela('');
+    setContaId('');
+    setCentroCusto('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -192,6 +201,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
         etapa_financeiro: 'solicitacao_criada',
         observacoes_financeiro: observacoes || null,
         comprovante_url: comprovanteUrl || null,
+        conta_id: contaId || null,
+        centro_custo: centroCusto || null,
       }));
 
       try {
@@ -227,6 +238,8 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
       etapa_financeiro: 'solicitacao_criada',
       observacoes_financeiro: observacoes || null,
       comprovante_url: comprovanteUrl || editData?.comprovante_url || null,
+      conta_id: contaId || null,
+      centro_custo: centroCusto || null,
     };
 
     if (editData?.id) lancamento.id = editData.id;
@@ -401,6 +414,34 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
           <div className="grid gap-2">
             <Label>Fornecedor</Label>
             <Input value={fornecedor} onChange={e => setFornecedor(e.target.value)} placeholder="Quem recebe o pagamento..." />
+          </div>
+
+          {/* Conta Contábil + Centro de Custo */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>Conta Contábil</Label>
+              <Select value={contaId} onValueChange={setContaId}>
+                <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                <SelectContent>
+                  {contasDespesa.map(c => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.codigo} — {c.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Centro de Custo</Label>
+              <Select value={centroCusto} onValueChange={setCentroCusto}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="operacional">Operacional</SelectItem>
+                  <SelectItem value="administrativo">Administrativo</SelectItem>
+                  <SelectItem value="comercial">Comercial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Vincular Colaborador */}
