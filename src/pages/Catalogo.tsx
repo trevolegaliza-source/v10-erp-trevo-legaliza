@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, DollarSign, Trash2, BookOpen, Loader2, Save, ArrowLeft, ArrowRight, ChevronRight, Settings, Pencil } from 'lucide-react';
+import { Search, Plus, DollarSign, Trash2, BookOpen, Loader2, Save, ArrowLeft, ArrowRight, ChevronRight, Settings, Pencil, Link2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import {
   useServicos,
