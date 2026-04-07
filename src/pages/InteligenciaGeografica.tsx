@@ -211,7 +211,7 @@ export default function InteligenciaGeografica() {
               )}
             </div>
           )}
-        </div>
+        </GlassCard>
       </div>
     </div>
   );
