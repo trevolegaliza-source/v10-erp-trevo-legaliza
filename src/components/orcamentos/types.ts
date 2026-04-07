@@ -4,8 +4,11 @@ export interface OrcamentoItem {
   ordem: number;
   descricao: string;
   detalhes: string;
-  honorario: number;    // detailed mode
-  honorario_contador: number; // valor sugerido para o contador cobrar do cliente final
+  honorario: number;    // Custo Trevo
+  honorario_contador: number; // legacy compat alias
+  honorario_minimo_contador: number; // Mínimo sugerido para o contador cobrar
+  valor_mercado: number;  // Referência de mercado
+  valor_premium: number;  // Acima = caro
   taxa_min: number;
   taxa_max: number;
   prazo: string;
@@ -30,6 +33,7 @@ export interface OrcamentoSecao {
 }
 
 export type OrcamentoModo = 'simples' | 'detalhado';
+export type OrcamentoPDFMode = 'contador' | 'cliente';
 
 export interface OrcamentoForm {
   prospect_nome: string;
@@ -65,7 +69,10 @@ export function createItem(overrides?: Partial<OrcamentoItem>): OrcamentoItem {
     descricao: '',
     detalhes: '',
     honorario: 0,
-  honorario_contador: 0,
+    honorario_contador: 0,
+    honorario_minimo_contador: 0,
+    valor_mercado: 0,
+    valor_premium: 0,
     taxa_min: 0,
     taxa_max: 0,
     prazo: '',
@@ -100,6 +107,9 @@ export function normalizeItem(raw: any): OrcamentoItem {
     detalhes: raw.detalhes || '',
     honorario: Number(raw.honorario) || Number(raw.valor) || 0,
     honorario_contador: Number(raw.honorario_contador) || 0,
+    honorario_minimo_contador: Number(raw.honorario_minimo_contador) || Number(raw.honorario_contador) || 0,
+    valor_mercado: Number(raw.valor_mercado) || 0,
+    valor_premium: Number(raw.valor_premium) || 0,
     taxa_min: Number(raw.taxa_min) || 0,
     taxa_max: Number(raw.taxa_max) || 0,
     prazo: raw.prazo || '',
