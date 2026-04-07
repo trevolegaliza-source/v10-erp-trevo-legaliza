@@ -5,6 +5,7 @@ export interface OrcamentoItem {
   descricao: string;
   detalhes: string;
   honorario: number;    // detailed mode
+  honorario_contador: number; // valor sugerido para o contador cobrar do cliente final
   taxa_min: number;
   taxa_max: number;
   prazo: string;
@@ -64,6 +65,7 @@ export function createItem(overrides?: Partial<OrcamentoItem>): OrcamentoItem {
     descricao: '',
     detalhes: '',
     honorario: 0,
+  honorario_contador: 0,
     taxa_min: 0,
     taxa_max: 0,
     prazo: '',
@@ -97,6 +99,7 @@ export function normalizeItem(raw: any): OrcamentoItem {
     descricao: raw.descricao || '',
     detalhes: raw.detalhes || '',
     honorario: Number(raw.honorario) || Number(raw.valor) || 0,
+    honorario_contador: Number(raw.honorario_contador) || 0,
     taxa_min: Number(raw.taxa_min) || 0,
     taxa_max: Number(raw.taxa_max) || 0,
     prazo: raw.prazo || '',

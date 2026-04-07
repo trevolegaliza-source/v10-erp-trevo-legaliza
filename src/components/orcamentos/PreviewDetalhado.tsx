@@ -8,12 +8,13 @@ interface Props {
   itens: OrcamentoItem[];
   pacotes: OrcamentoPacote[];
   secoes: OrcamentoSecao[];
+  modoContador?: boolean;
   desconto_pct: number;
   validade_dias: number;
   pagamento: string;
 }
 
-export function PreviewDetalhado({ prospect_nome, prospect_cnpj, itens, pacotes, secoes, desconto_pct, validade_dias, pagamento }: Props) {
+export function PreviewDetalhado({ prospect_nome, prospect_cnpj, itens, pacotes, secoes, modoContador, desconto_pct, validade_dias, pagamento }: Props) {
   const validItems = itens.filter(i => i.descricao.trim());
   const grouped = secoes
     .map(s => ({ ...s, items: validItems.filter(i => i.secao === s.key).sort((a, b) => a.ordem - b.ordem) }))
@@ -60,7 +61,7 @@ export function PreviewDetalhado({ prospect_nome, prospect_cnpj, itens, pacotes,
                     {item.ordem || idx + 1}. {item.descricao}
                   </span>
                   <span className="font-bold whitespace-nowrap">
-                    {fmt(getItemValor(item) * item.quantidade)}
+                      {fmt((modoContador && item.honorario_contador > 0 ? item.honorario_contador : getItemValor(item)) * item.quantidade)}
                   </span>
                 </div>
                 {(item.taxa_min > 0 || item.taxa_max > 0) && (
@@ -100,7 +101,7 @@ export function PreviewDetalhado({ prospect_nome, prospect_cnpj, itens, pacotes,
       <div className="border-t border-white/20 pt-3 mt-3 space-y-1">
         <div className="flex justify-between text-xs">
           <span className="opacity-60">Honorários</span>
-          <span className="font-bold">{fmt(honorarioFinal)}</span>
+          <span className="font-bold">{fmt(modoContador ? itens.filter(i => i.descricao.trim()).reduce((s, i) => s + (i.honorario_contador > 0 ? i.honorario_contador : getItemValor(i)) * i.quantidade, 0) * (1 - desconto_pct / 100) : honorarioFinal)}</span>
         </div>
         {(totalTaxaMin > 0 || totalTaxaMax > 0) && (
           <div className="flex justify-between text-xs">

@@ -12,12 +12,13 @@ interface Props {
   item: OrcamentoItem;
   idx: number;
   secoes: OrcamentoSecao[];
+  modoContador?: boolean;
   onChange: (idx: number, field: keyof OrcamentoItem, value: any) => void;
   onRemove: (idx: number) => void;
   onAddSecao: () => void;
 }
 
-export function ItemCardDetalhado({ item, idx, secoes, onChange, onRemove, onAddSecao }: Props) {
+export function ItemCardDetalhado({ item, idx, secoes, modoContador, onChange, onRemove, onAddSecao }: Props) {
   const totalMin = item.honorario * item.quantidade + item.taxa_min;
   const totalMax = item.honorario * item.quantidade + item.taxa_max;
 
@@ -80,9 +81,9 @@ export function ItemCardDetalhado({ item, idx, secoes, onChange, onRemove, onAdd
       </div>
 
       {/* Valores */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid ${modoContador ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
         <div>
-          <Label className="text-xs">Honorário R$</Label>
+          <Label className="text-xs">Honorário Trevo R$</Label>
           <Input
             type="number"
             value={item.honorario || ''}
@@ -91,6 +92,20 @@ export function ItemCardDetalhado({ item, idx, secoes, onChange, onRemove, onAdd
             className="text-right"
           />
         </div>
+        {modoContador && (
+          <div>
+            <Label className="text-xs">Honorário Sugerido ao Contador R$</Label>
+            <Input
+              type="number"
+              value={item.honorario_contador || ''}
+              onChange={e => onChange(idx, 'honorario_contador', parseFloat(e.target.value) || 0)}
+              placeholder="0,00"
+              className="text-right"
+            />
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
         <div>
           <Label className="text-xs">Taxa Min R$</Label>
           <Input
@@ -138,6 +153,11 @@ export function ItemCardDetalhado({ item, idx, secoes, onChange, onRemove, onAdd
         <span className="font-bold text-primary">
           Honorário: {fmt(item.honorario * item.quantidade)}
         </span>
+        {modoContador && item.honorario_contador > 0 && (
+          <span className="text-amber-500 ml-3">
+            Sugerido: {fmt(item.honorario_contador * item.quantidade)}
+          </span>
+        )}
         {(item.taxa_min > 0 || item.taxa_max > 0) && (
           <span className="text-muted-foreground ml-3">
             Taxas: {fmt(item.taxa_min)} a {fmt(item.taxa_max)}
