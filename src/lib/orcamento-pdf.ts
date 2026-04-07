@@ -374,16 +374,21 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     itemPages.push(allEntries.slice(i, i + ITEMS_PER_PAGE));
   }
 
-  // CORREÇÃO 2 — Smart pagination: merge lonely last item into previous page
-  if (itemPages.length > 1) {
+  // CORREÇÃO 2 — Smart pagination: merge lonely last item(s) into previous page
+  // Keep merging while the last page has fewer items than would overflow
+  while (itemPages.length >= 2) {
     const lastPage = itemPages[itemPages.length - 1];
     const prevPage = itemPages[itemPages.length - 2];
-    if (lastPage.length === 1 && prevPage.length <= 2) {
-      if (lastPage[0].sectionLabel) {
+    // Merge if last page has 1 item AND combined total ≤ 4
+    if (lastPage.length === 1 && prevPage.length <= 3) {
+      if (lastPage[0].sectionLabel && prevPage.some(e => e.sectionKey !== lastPage[0].sectionKey)) {
         lastPage[0]._injectSectionLabel = lastPage[0].sectionLabel;
+        lastPage[0].sectionLabel = undefined;
       }
       prevPage.push(lastPage[0]);
       itemPages.pop();
+    } else {
+      break;
     }
   }
 
