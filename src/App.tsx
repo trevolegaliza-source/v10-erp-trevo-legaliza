@@ -29,6 +29,7 @@ const EstadoDetalhe = lazy(() => import("./pages/EstadoDetalhe"));
 const Catalogo = lazy(() => import("./pages/Catalogo"));
 const ImportarProcessos = lazy(() => import("./pages/ImportarProcessos"));
 const RelatoriosDRE = lazy(() => import("./pages/RelatoriosDRE"));
+const RelatoriosFluxoCaixa = lazy(() => import("./pages/RelatoriosFluxoCaixa"));
 const PortfolioPublico = lazy(() => import("./pages/PortfolioPublico"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
