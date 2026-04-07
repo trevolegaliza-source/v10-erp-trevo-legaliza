@@ -151,6 +151,10 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="plano_contas">
+          <PlanoContasTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
