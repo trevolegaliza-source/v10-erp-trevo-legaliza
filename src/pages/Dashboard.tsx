@@ -38,6 +38,7 @@ export default function Dashboard() {
   const { data, isLoading } = useDashboardData();
   const { podeVer, loading: permsLoading, isMaster } = usePermissions();
   const [profileName, setProfileName] = useState<string | null>(null);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
 
   const [diasAlertaPagar, setDiasAlertaPagar] = useState(() => {
     return parseInt(localStorage.getItem('trevo_dias_alerta_pagar') || '7');
