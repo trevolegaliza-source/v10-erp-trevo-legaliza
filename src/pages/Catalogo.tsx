@@ -546,24 +546,36 @@ function Level2View({
 // ═══════════ NÍVEL 3: DETALHE DO SERVIÇO ═══════════
 function ServiceDetailView({
   service,
+  adminMode,
   onBack,
   onPrecos,
+  onDelete,
 }: {
   service: ServicosCatalogo;
+  adminMode: boolean;
   onBack: () => void;
   onPrecos: () => void;
+  onDelete: () => void;
 }) {
   const { data: precos = [], isLoading: loadingPrecos } = usePrecosUF(service.id);
   const updateMut = useUpdateServico();
-  const deleteMut = useDeleteServico();
   const catLabel = CATEGORIAS_SERVICO.find(c => c.value === service.categoria)?.label || service.categoria;
 
   const [editNome, setEditNome] = useState(service.nome);
   const [editDesc, setEditDesc] = useState(service.descricao || '');
   const [editPrazo, setEditPrazo] = useState(service.prazo_estimado || '');
   const [editCat, setEditCat] = useState(service.categoria);
+  const [editAtivo, setEditAtivo] = useState(service.ativo);
 
-  function handleSave() {
+  useEffect(() => {
+    setEditNome(service.nome);
+    setEditDesc(service.descricao || '');
+    setEditPrazo(service.prazo_estimado || '');
+    setEditCat(service.categoria);
+    setEditAtivo(service.ativo);
+  }, [service.id]);
+
+  function handleSaveEdit() {
     updateMut.mutate({
       id: service.id,
       updates: {
@@ -571,14 +583,9 @@ function ServiceDetailView({
         descricao: editDesc || undefined,
         prazo_estimado: editPrazo || undefined,
         categoria: editCat,
+        ativo: editAtivo,
       },
     });
-  }
-
-  function handleDelete() {
-    if (confirm('Tem certeza que deseja excluir este serviço e todos os preços associados?')) {
-      deleteMut.mutate(service.id, { onSuccess: onBack });
-    }
   }
 
   const precosPreenchidos = precos.filter(p => p.honorario_trevo > 0 || p.taxa_orgao > 0);
@@ -617,49 +624,58 @@ function ServiceDetailView({
         )}
       </div>
 
-      {/* Edição inline */}
-      <div className="service-detail-card p-6 space-y-4">
-        <h3 className="font-semibold text-sm">Editar Serviço</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="text-[11px] font-medium text-muted-foreground">Nome</label>
-            <Input value={editNome} onChange={e => setEditNome(e.target.value)} className="h-8 text-xs mt-1" />
+      {/* Admin: Edição inline */}
+      {adminMode && (
+        <div className="service-detail-card p-6 space-y-4">
+          <h3 className="font-semibold text-sm">Editar Serviço</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Nome do serviço</label>
+              <Input value={editNome} onChange={e => setEditNome(e.target.value)} className="h-8 text-xs mt-1 bg-white/5 border-white/10" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Categoria</label>
+              <Select value={editCat} onValueChange={setEditCat}>
+                <SelectTrigger className="h-8 text-xs mt-1 bg-white/5 border-white/10"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIAS_SERVICO.map(c => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Prazo estimado</label>
+              <Input value={editPrazo} onChange={e => setEditPrazo(e.target.value)} className="h-8 text-xs mt-1 bg-white/5 border-white/10" />
+            </div>
           </div>
           <div>
-            <label className="text-[11px] font-medium text-muted-foreground">Categoria</label>
-            <Select value={editCat} onValueChange={setEditCat}>
-              <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {CATEGORIAS_SERVICO.map(c => (
-                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-xs font-medium text-muted-foreground">Descrição</label>
+            <Textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={6} className="text-xs mt-1 bg-white/5 border-white/10" />
           </div>
           <div>
-            <label className="text-[11px] font-medium text-muted-foreground">Prazo estimado</label>
-            <Input value={editPrazo} onChange={e => setEditPrazo(e.target.value)} className="h-8 text-xs mt-1" />
+            <label className="text-xs font-medium text-muted-foreground">Status</label>
+            <div className="flex items-center gap-2 mt-1">
+              <Switch checked={editAtivo} onCheckedChange={setEditAtivo} />
+              <span className="text-sm">{editAtivo ? 'Ativo' : 'Inativo'}</span>
+            </div>
           </div>
-        </div>
-        <div>
-          <label className="text-[11px] font-medium text-muted-foreground">Descrição</label>
-          <Textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={4} className="text-xs mt-1" />
-        </div>
-        <div className="flex items-center justify-between gap-2 pt-2">
-          <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleteMut.isPending}>
-            <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onPrecos}>
-              <DollarSign className="h-3.5 w-3.5 mr-1" /> Preços por UF
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <Button variant="destructive" size="sm" onClick={onDelete}>
+              <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir Serviço
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={updateMut.isPending}>
-              {updateMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
-              Salvar
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onPrecos}>
+                <DollarSign className="h-3.5 w-3.5 mr-1" /> Gerenciar Preços por UF
+              </Button>
+              <Button size="sm" onClick={handleSaveEdit} disabled={updateMut.isPending} className="bg-emerald-600 hover:bg-emerald-700">
+                {updateMut.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+                Salvar Alterações
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Tabela de preços por UF */}
       <div className="service-detail-card p-6 space-y-4">
@@ -671,9 +687,11 @@ function ServiceDetailView({
         ) : precosPreenchidos.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-sm text-muted-foreground">Nenhum preço cadastrado ainda.</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={onPrecos}>
-              <DollarSign className="h-3.5 w-3.5 mr-1" /> Cadastrar Preços
-            </Button>
+            {adminMode && (
+              <Button variant="outline" size="sm" className="mt-3" onClick={onPrecos}>
+                <DollarSign className="h-3.5 w-3.5 mr-1" /> Cadastrar Preços
+              </Button>
+            )}
           </div>
         ) : (
           <div className="rounded-lg border border-white/5 overflow-hidden">
