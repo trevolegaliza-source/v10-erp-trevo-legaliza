@@ -171,17 +171,36 @@ function buildDetalhadoPages(d: OrcamentoPDFData): string[] {
     `);
   }
 
-  // --- ITEMS PAGES (grouped by section) ---
+  // --- ITEMS PAGES (grouped by section, max 3 per page) ---
   const grouped = secoes
     .map(s => ({ ...s, items: d.itens.filter(i => i.secao === s.key).sort((a, b) => a.ordem - b.ordem) }))
     .filter(g => g.items.length > 0);
 
-  let itemsHtml = '';
+  // Flatten into a list of { item, sectionLabel? } entries
+  const allEntries: Array<{ item: OrcamentoItem; sectionLabel?: string }> = [];
   for (const group of grouped) {
-    if (group.key !== 'geral') {
-      itemsHtml += `<div style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 2px; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #f0fdf4;">${esc(group.label)} (${group.items.length})</div>`;
-    }
-    for (const item of group.items) {
+    const label = group.key !== 'geral' ? `${group.label} (${group.items.length})` : undefined;
+    group.items.forEach((item, i) => {
+      allEntries.push({ item, sectionLabel: i === 0 ? label : undefined });
+    });
+  }
+
+  // Chunk into pages of max 3 items
+  const ITEMS_PER_PAGE = 3;
+  const itemPages: Array<typeof allEntries> = [];
+  for (let i = 0; i < allEntries.length; i += ITEMS_PER_PAGE) {
+    itemPages.push(allEntries.slice(i, i + ITEMS_PER_PAGE));
+  }
+
+  const honorarioLabel = d.modoContador ? 'Investimento' : 'Honorário Trevo';
+
+  for (const chunk of itemPages) {
+    let chunkHtml = '';
+    for (const entry of chunk) {
+      const item = entry.item;
+      if (entry.sectionLabel) {
+        chunkHtml += `<div style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 2px; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid #f0fdf4;">${esc(entry.sectionLabel)}</div>`;
+      }
       const valorExibido = d.modoContador && item.honorario_contador > 0
         ? item.honorario_contador
         : (getItemValor(item) || 0);
@@ -190,9 +209,8 @@ function buildDetalhadoPages(d: OrcamentoPDFData): string[] {
       const totalMax = valorTotal + item.taxa_max;
       const hasTaxa = item.taxa_min > 0 || item.taxa_max > 0;
       const secaoLabel = secoes.find(s => s.key === item.secao)?.label || '';
-      const honorarioLabel = d.modoContador ? 'Investimento' : 'Honorário Trevo';
 
-      itemsHtml += `
+      chunkHtml += `
         <div style="border: 1px solid #e5e7eb; border-radius: 16px; margin-bottom: 14px; overflow: hidden; page-break-inside: avoid;">
           <div style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
             <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 800; flex-shrink: 0;">${item.ordem || '•'}</div>
@@ -234,18 +252,18 @@ function buildDetalhadoPages(d: OrcamentoPDFData): string[] {
         </div>
       `;
     }
-  }
 
-  pages.push(`
-    <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
-      ${HEADER(d.numero, d.data_emissao)}
-      <div style="padding: 24px 40px;">
-        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Escopo dos Serviços</div>
-        ${itemsHtml}
+    pages.push(`
+      <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
+        ${HEADER(d.numero, d.data_emissao)}
+        <div style="padding: 24px 40px;">
+          <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Escopo dos Serviços</div>
+          ${chunkHtml}
+        </div>
+        <div style="position: absolute; bottom: 0; left: 0; right: 0;">${FOOTER}</div>
       </div>
-      <div style="position: absolute; bottom: 0; left: 0; right: 0;">${FOOTER}</div>
-    </div>
-  `);
+    `);
+  }
 
   // --- PACKAGES PAGE ---
   const validPacotes = d.pacotes.filter(p => p.nome && p.itens_ids.length > 0);
