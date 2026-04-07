@@ -209,6 +209,11 @@ export default function Catalogo() {
     <div className="space-y-6">
       <style dangerouslySetInnerHTML={{ __html: GLASS_CSS }} />
 
+      {/* Admin mode indicator */}
+      {adminMode && (
+        <div className="fixed top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 z-50" />
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -219,7 +224,12 @@ export default function Catalogo() {
             {servicos.length} serviços cadastrados · {CATALOG_HIERARCHY.length} áreas de atuação
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Admin</span>
+            <Switch checked={adminMode} onCheckedChange={setAdminMode} />
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -229,9 +239,11 @@ export default function Catalogo() {
               className="pl-9 h-9 w-64"
             />
           </div>
-          <Button onClick={() => setShowCreate(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Novo Serviço
-          </Button>
+          {adminMode && (
+            <Button onClick={() => setShowCreate(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Novo Serviço
+            </Button>
+          )}
         </div>
       </div>
 
