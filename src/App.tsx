@@ -147,17 +147,17 @@ const App = () => (
                     </RequirePermission>
                   } />
                   <Route path="/catalogo" element={
-                    <RequirePermission modulo="configuracoes">
+                    <RequirePermission modulo="catalogo">
                       <Catalogo />
                     </RequirePermission>
                   } />
                   <Route path="/relatorios/dre" element={
-                    <RequirePermission modulo="financeiro">
+                    <RequirePermission modulo="relatorios_dre">
                       <RelatoriosDRE />
                     </RequirePermission>
                   } />
                   <Route path="/relatorios/fluxo-caixa" element={
-                    <RequirePermission modulo="financeiro">
+                    <RequirePermission modulo="fluxo_caixa">
                       <RelatoriosFluxoCaixa />
                     </RequirePermission>
                   } />
