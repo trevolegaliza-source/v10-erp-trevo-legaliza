@@ -111,7 +111,7 @@ const App = () => (
                     </RequirePermission>
                   } />
                   <Route path="/importar" element={
-                    <RequirePermission modulo="processos" acao="criar">
+                    <RequirePermission modulo="importar">
                       <ImportarProcessos />
                     </RequirePermission>
                   } />
