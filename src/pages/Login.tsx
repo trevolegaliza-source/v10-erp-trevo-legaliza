@@ -61,7 +61,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="bg-foreground/5 border-foreground/10 text-white placeholder:text-muted-foreground/50"
+                  className="bg-foreground/5 border-foreground/10 text-foreground placeholder:text-muted-foreground/50"
                 />
               </div>
               <div className="space-y-2">
@@ -73,7 +73,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="bg-foreground/5 border-foreground/10 text-white placeholder:text-muted-foreground/50"
+                  className="bg-foreground/5 border-foreground/10 text-foreground placeholder:text-muted-foreground/50"
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>

@@ -206,9 +206,9 @@ export default function Financeiro() {
             {/* Faturado */}
             <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)">
               <div className="rounded-lg bg-foreground/5 p-2 w-fit">
-                <DollarSign className="h-4.5 w-4.5 text-white" />
+                <DollarSign className="h-4.5 w-4.5 text-foreground" />
               </div>
-              <p className="text-2xl font-bold mt-3 text-white">{formatBRL(metricas.totalFaturado)}</p>
+              <p className="text-2xl font-bold mt-3 text-foreground">{formatBRL(metricas.totalFaturado)}</p>
               <p className="text-xs text-muted-foreground">{metricas.totalProcessos} processos</p>
               <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Faturado</p>
             </GlassCard>

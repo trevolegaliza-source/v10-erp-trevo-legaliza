@@ -267,7 +267,7 @@ export default function Dashboard() {
                 <DollarSign className="h-4 w-4 text-emerald-400" />
               </div>
             </div>
-            <p className="text-2xl font-bold tracking-tight text-white">{fmt(animFaturado)}</p>
+            <p className="text-2xl font-bold tracking-tight text-foreground">{fmt(animFaturado)}</p>
             <div className="flex items-center gap-1 mt-2">
               {variacaoReceita >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-400" /> : <TrendingDown className="h-3 w-3 text-red-400" />}
               <span className={`text-xs ${variacaoReceita >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -316,7 +316,7 @@ export default function Dashboard() {
               <Activity className="h-4 w-4 text-blue-400" />
             </div>
           </div>
-          <p className="text-2xl font-bold tracking-tight text-white">{animAtivos}</p>
+          <p className="text-2xl font-bold tracking-tight text-foreground">{animAtivos}</p>
           <p className="text-xs text-muted-foreground mt-2">{processosNovos} novos esta semana</p>
         </GlassCard>
       </div>
@@ -381,7 +381,7 @@ export default function Dashboard() {
                         <alerta.icon className={`h-4 w-4 ${iconColorMap[alerta.severity]}`} />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-white">{alerta.titulo}</p>
+                        <p className="text-sm font-medium text-foreground">{alerta.titulo}</p>
                         <p className="text-xs text-muted-foreground">{alerta.descricao}</p>
                       </div>
                     </div>
@@ -407,7 +407,7 @@ export default function Dashboard() {
                 onClick={() => navigate('/processos')}
                 title={`${fase.nome}: ${fase.qtd}`}
               >
-                <span className="text-[10px] font-bold text-white drop-shadow-sm">{fase.qtd}</span>
+                <span className="text-[10px] font-bold text-foreground drop-shadow-sm">{fase.qtd}</span>
               </div>
             ))}
           </div>
