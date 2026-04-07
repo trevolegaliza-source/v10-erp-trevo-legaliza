@@ -14,6 +14,7 @@ import logoTrevo from '@/assets/logo-trevo.png';
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard, badgeKey: null, modulo: 'dashboard' },
   { path: '/cadastro-rapido', label: 'Cadastro Rápido', icon: PlusCircle, badgeKey: null, modulo: 'processos' },
+  { path: '/importar', label: 'Importar Planilha', icon: Upload, badgeKey: null, modulo: 'processos' },
   { path: '/processos', label: 'Processos', icon: Kanban, badgeKey: 'processosAtivos' as const, modulo: 'processos' },
   { path: '/clientes', label: 'Clientes', icon: Users, badgeKey: null, modulo: 'clientes' },
   { path: '/orcamentos', label: 'Orçamentos', icon: Receipt, badgeKey: 'orcamentosPendentes' as const, modulo: 'orcamentos' },

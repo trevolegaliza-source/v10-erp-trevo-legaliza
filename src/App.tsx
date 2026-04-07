@@ -108,6 +108,11 @@ const App = () => (
                       <CadastroRapido />
                     </RequirePermission>
                   } />
+                  <Route path="/importar" element={
+                    <RequirePermission modulo="processos" acao="criar">
+                      <ImportarProcessos />
+                    </RequirePermission>
+                  } />
                   <Route path="/financeiro" element={
                     <RequirePermission modulo="financeiro">
                       <Financeiro />
