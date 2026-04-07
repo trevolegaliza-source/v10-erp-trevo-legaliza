@@ -136,16 +136,16 @@ export default function InteligenciaGeografica() {
       <div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {kpis.map(kpi => (
-            <div key={kpi.label} className="p-4 transition-all duration-300 rounded-xl" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+            <GlassCard key={kpi.label} variant="service" glowColor={kpi.isReceita ? 'rgba(34, 197, 94, 0.12)' : 'rgba(59, 130, 246, 0.1)'}>
               <div className="flex items-center gap-2 mb-2">
                 <kpi.Icon className="h-4 w-4" style={{ color: GREEN_BRIGHT }} />
-                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: mutedColor }}>{kpi.label}</span>
+                <span className="text-xs font-bold uppercase tracking-wider text-white/50">{kpi.label}</span>
               </div>
               <p className={`text-2xl font-extrabold`} style={{ color: kpi.isReceita ? GREEN_BRIGHT : textColor }}>
                 {kpi.valor}
               </p>
-              <p className="text-[10px] mt-1" style={{ color: mutedColor }}>{kpiSubLabel}</p>
-            </div>
+              <p className="text-[10px] mt-1 text-white/40">{kpiSubLabel}</p>
+            </GlassCard>
           ))}
         </div>
 
