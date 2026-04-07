@@ -64,6 +64,7 @@ export function AppLayout() {
             </kbd>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <NotificationPopover />
             <div className="flex items-center gap-2 ml-2">
               <Avatar className="h-8 w-8">
