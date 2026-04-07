@@ -2,19 +2,22 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useSaveOrcamento, type Orcamento } from '@/hooks/useOrcamentos';
-import { gerarOrcamentoPDF, sanitizeFilename } from '@/lib/orcamento-pdf';
+import { gerarOrcamentoPDF, sanitizeFilename, downloadBlob } from '@/lib/orcamento-pdf';
+import { useOrcamentoPDFs } from '@/hooks/useOrcamentoPDFs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
-  Plus, FileText, Save, FileDown, ArrowLeft, Copy,
+  Plus, FileText, Save, FileDown, ArrowLeft, Copy, ExternalLink, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
 import {
   type OrcamentoForm, type OrcamentoModo, type OrcamentoItem, type OrcamentoPDFMode,
   DEFAULT_SECOES, createItem, normalizeItem, getItemValor,
@@ -56,6 +59,8 @@ export default function OrcamentoNovo() {
   const [orcamentoNumero, setOrcamentoNumero] = useState<number>(0);
   const [modoPDF, setModoPDF] = useState<OrcamentoPDFMode>('contador');
   const saveMutation = useSaveOrcamento();
+  const { pdfs, salvarPDF } = useOrcamentoPDFs(orcamentoId);
+  const [gerando, setGerando] = useState(false);
 
   const { data: clientes } = useQuery({
     queryKey: ['clientes_select'],
@@ -211,54 +216,93 @@ export default function OrcamentoNovo() {
     }
   }
 
-  async function gerarPDF() {
-    if (!form.prospect_nome.trim()) {
-      toast.error('Preencha o nome do cliente');
-      return;
-    }
+  function buildPDFParams(modo?: 'contador' | 'cliente') {
+    const selectedCliente = clientes?.find(c => c.id === form.cliente_id);
+    const clienteNome = selectedCliente?.nome || form.prospect_nome;
     const itensValidos = form.itens.filter(i => i.descricao.trim());
-    if (itensValidos.length === 0) {
-      toast.error('Adicione pelo menos um item');
-      return;
-    }
+    return {
+      modo: form.modo,
+      modoPDF: modo || modoPDF,
+      clienteNome,
+      prospect_nome: form.prospect_nome,
+      prospect_cnpj: form.prospect_cnpj,
+      itens: itensValidos,
+      pacotes: form.pacotes,
+      secoes: form.secoes,
+      contexto: form.contexto,
+      ordem_execucao: form.ordem_execucao,
+      desconto_pct: form.desconto_pct,
+      subtotal,
+      total: totalFinal,
+      validade_dias: form.validade_dias,
+      prazo_execucao: form.prazo_execucao,
+      pagamento: form.pagamento,
+      observacoes: form.observacoes,
+      numero: orcamentoNumero || 0,
+      data_emissao: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
+    };
+  }
 
-    const toastId = toast.loading('Gerando PDF...');
+  function buildFilename(modo: 'contador' | 'cliente') {
+    const nome = sanitizeFilename(form.prospect_nome || 'proposta');
+    const sufixo = modo === 'contador' ? '_interno' : '_cliente';
+    return `Proposta_${nome}${sufixo}_${new Date().toISOString().split('T')[0]}.pdf`;
+  }
+
+  async function salvarOrcamento(): Promise<string> {
+    if (!form.prospect_nome?.trim()) throw new Error('Informe o nome do cliente');
+    const payload: any = buildPayload('enviado');
+    if (orcamentoId) payload.id = orcamentoId;
+    const id = await saveMutation.mutateAsync(payload);
+    setOrcamentoId(id);
+    return id;
+  }
+
+  async function handleGerarPDF(modo: 'contador' | 'cliente') {
+    if (!form.prospect_nome.trim()) { toast.error('Preencha o nome do cliente'); return; }
+    const itensValidos = form.itens.filter(i => i.descricao.trim());
+    if (itensValidos.length === 0) { toast.error('Adicione pelo menos um item'); return; }
+
+    setGerando(true);
     try {
-      await handleSave('enviado');
+      const savedId = await salvarOrcamento();
+      const blob = await gerarOrcamentoPDF(buildPDFParams(modo));
+      const filename = buildFilename(modo);
 
-      // Find client name for cliente mode
-      const selectedCliente = clientes?.find(c => c.id === form.cliente_id);
-      const clienteNome = selectedCliente?.nome || form.prospect_nome;
-
-      const doc = await gerarOrcamentoPDF({
-        modo: form.modo,
-        modoPDF,
-        clienteNome: clienteNome,
-        prospect_nome: form.prospect_nome,
-        prospect_cnpj: form.prospect_cnpj,
-        itens: itensValidos,
-        pacotes: form.pacotes,
-        secoes: form.secoes,
-        contexto: form.contexto,
-        ordem_execucao: form.ordem_execucao,
-        desconto_pct: form.desconto_pct,
-        subtotal,
-        total: totalFinal,
-        validade_dias: form.validade_dias,
-        prazo_execucao: form.prazo_execucao,
-        pagamento: form.pagamento,
-        observacoes: form.observacoes,
-        numero: orcamentoNumero || 0,
-        data_emissao: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
-      });
-      const cleanName = sanitizeFilename(form.prospect_nome || 'proposta');
-      doc.save(`Proposta_${cleanName}_${new Date().toISOString().split('T')[0]}.pdf`);
-      toast.dismiss(toastId);
-      toast.success('PDF gerado com sucesso!');
+      const result = await salvarPDF.mutateAsync({ blob, modo, orcamentoId: savedId, filename });
+      downloadBlob(blob, filename);
+      toast.success(`Proposta ${modo === 'contador' ? 'interna' : 'do cliente'} gerada e salva! (v${result.versao})`);
     } catch (err: any) {
-      toast.dismiss(toastId);
-      toast.error('Erro ao gerar PDF');
+      toast.error('Erro ao gerar PDF: ' + (err.message || ''));
       console.error(err);
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  async function handleGerarAmbos() {
+    if (!form.prospect_nome.trim()) { toast.error('Preencha o nome do cliente'); return; }
+    const itensValidos = form.itens.filter(i => i.descricao.trim());
+    if (itensValidos.length === 0) { toast.error('Adicione pelo menos um item'); return; }
+
+    setGerando(true);
+    try {
+      const savedId = await salvarOrcamento();
+
+      const blobContador = await gerarOrcamentoPDF(buildPDFParams('contador'));
+      await salvarPDF.mutateAsync({ blob: blobContador, modo: 'contador', orcamentoId: savedId, filename: buildFilename('contador') });
+      downloadBlob(blobContador, buildFilename('contador'));
+
+      const blobCliente = await gerarOrcamentoPDF(buildPDFParams('cliente'));
+      await salvarPDF.mutateAsync({ blob: blobCliente, modo: 'cliente', orcamentoId: savedId, filename: buildFilename('cliente') });
+      downloadBlob(blobCliente, buildFilename('cliente'));
+
+      toast.success('Ambas propostas geradas e salvas!');
+    } catch (err: any) {
+      toast.error('Erro: ' + (err.message || ''));
+      console.error(err);
+    } finally {
+      setGerando(false);
     }
   }
 
@@ -555,9 +599,32 @@ export default function OrcamentoNovo() {
 
             {/* Action Buttons */}
             <div className="space-y-2">
-              <Button onClick={gerarPDF} className="w-full gap-2" disabled={saveMutation.isPending}>
-                <FileDown className="h-4 w-4" /> Gerar PDF {isDetalhado ? (modoPDF === 'contador' ? '(Contador)' : '(Cliente Final)') : ''}
-              </Button>
+              {isDetalhado ? (
+                <>
+                  <Button
+                    onClick={handleGerarAmbos}
+                    disabled={gerando}
+                    className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
+                    size="lg"
+                  >
+                    {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                    {gerando ? 'Gerando...' : 'Gerar Ambas Propostas'}
+                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleGerarPDF('contador')} disabled={gerando}>
+                      📊 Só Contador
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleGerarPDF('cliente')} disabled={gerando}>
+                      📄 Só Cliente
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Button onClick={() => handleGerarPDF('contador')} className="w-full gap-2" disabled={gerando}>
+                  {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                  {gerando ? 'Gerando...' : 'Gerar PDF'}
+                </Button>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" onClick={() => handleSave('rascunho')} disabled={saveMutation.isPending} className="gap-1">
                   <Save className="h-4 w-4" /> Salvar
@@ -567,6 +634,57 @@ export default function OrcamentoNovo() {
                 </Button>
               </div>
             </div>
+
+            {/* Quick edit hint */}
+            {pdfs && pdfs.some(p => p.modo === 'cliente' && p.status === 'ativo') && (
+              <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
+                <p className="text-xs text-blue-400 font-medium">
+                  💡 Para atualizar valores do cliente: edite os campos "Sugestão Mínima" nos itens acima e clique "Só Cliente" para gerar nova versão.
+                </p>
+              </div>
+            )}
+
+            {/* PDF History */}
+            {pdfs && pdfs.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Propostas Geradas
+                </h4>
+                <div className="space-y-2">
+                  {pdfs.map(pdf => (
+                    <div
+                      key={pdf.id}
+                      className={cn(
+                        'flex items-center justify-between p-3 rounded-lg border text-sm',
+                        pdf.status === 'cancelado' ? 'opacity-50 bg-muted/30' : 'bg-card'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={pdf.modo === 'contador' ? 'default' : 'secondary'} className="text-[10px]">
+                          {pdf.modo === 'contador' ? '📊 Interno' : '📄 Cliente'}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          v{pdf.versao} · {new Date(pdf.gerado_em).toLocaleDateString('pt-BR')} {new Date(pdf.gerado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        {pdf.status === 'cancelado' && pdf.cancelado_em && (
+                          <Badge variant="destructive" className="text-[9px]">
+                            Cancelado em {new Date(pdf.cancelado_em).toLocaleDateString('pt-BR')}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => window.open(pdf.url, '_blank')}>
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(pdf.url); toast.success('Link copiado!'); }}>
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
