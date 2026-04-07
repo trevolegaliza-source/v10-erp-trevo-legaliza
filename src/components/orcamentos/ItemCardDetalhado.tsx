@@ -125,6 +125,8 @@ export function ItemCardDetalhado({ item, idx, secoes, modoContador, onChange, o
             placeholder="0,00"
             className="text-right"
           />
+        </div>
+      </div>
 
       {/* Prazo + Docs */}
       <div className="grid grid-cols-2 gap-3">
