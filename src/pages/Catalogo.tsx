@@ -142,6 +142,20 @@ export default function Catalogo() {
   const [animKey, setAnimKey] = useState(0);
   const [adminMode, setAdminMode] = useState(false);
 
+  async function handleCopyLink() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('empresa_id')
+      .eq('id', user.id)
+      .single();
+    if (!profile) return;
+    const link = `${window.location.origin}/portfolio/${profile.empresa_id}`;
+    await navigator.clipboard.writeText(link);
+    toast.success('Link público copiado! Envie para seus clientes.');
+  }
+
   function handleDeleteServico(id: string) {
     if (!confirm('Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.')) return;
     deleteMut.mutate(id);
