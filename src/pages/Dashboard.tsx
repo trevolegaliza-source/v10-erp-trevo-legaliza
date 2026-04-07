@@ -258,67 +258,67 @@ export default function Dashboard() {
 
       {/* SEÇÃO 1: KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 dashboard-section">
-        {/* Receita - only for financeiro permission */}
+        {/* Receita */}
         {podeVer('financeiro') && (
-          <Card className="p-5 cursor-pointer group hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10 transition-all duration-300" onClick={() => navigate('/financeiro')}>
+          <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)" onClick={() => navigate('/financeiro')}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">Receita do mês</span>
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                <DollarSign className="h-4 w-4 text-primary" />
+              <span className="text-xs text-white/50 uppercase tracking-wider">Receita do mês</span>
+              <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
+                <DollarSign className="h-4 w-4 text-emerald-400" />
               </div>
             </div>
-            <p className="text-2xl font-bold tracking-tight text-foreground">{fmt(animFaturado)}</p>
+            <p className="text-2xl font-bold tracking-tight text-white">{fmt(animFaturado)}</p>
             <div className="flex items-center gap-1 mt-2">
-              {variacaoReceita >= 0 ? <TrendingUp className="h-3 w-3 text-green-500" /> : <TrendingDown className="h-3 w-3 text-destructive" />}
-              <span className={`text-xs ${variacaoReceita >= 0 ? 'text-green-500' : 'text-destructive'}`}>
+              {variacaoReceita >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-400" /> : <TrendingDown className="h-3 w-3 text-red-400" />}
+              <span className={`text-xs ${variacaoReceita >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {variacaoReceita >= 0 ? '+' : ''}{variacaoReceita}% vs mês anterior
               </span>
             </div>
-          </Card>
+          </GlassCard>
         )}
 
         {/* A Receber */}
         {podeVer('financeiro') && (
-          <Card className="p-5 cursor-pointer group hover:-translate-y-1 hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-300" onClick={() => navigate('/financeiro')}>
+          <GlassCard variant="service" glowColor="rgba(245, 158, 11, 0.12)" onClick={() => navigate('/financeiro')}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">A receber</span>
-              <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
-                <Clock className="h-4 w-4 text-amber-500" />
+              <span className="text-xs text-white/50 uppercase tracking-wider">A receber</span>
+              <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
+                <Clock className="h-4 w-4 text-amber-400" />
               </div>
             </div>
-            <p className="text-2xl font-bold tracking-tight text-amber-500">{fmt(animPendente)}</p>
-            <p className="text-xs text-muted-foreground mt-2">pendente de confirmação</p>
-          </Card>
+            <p className="text-2xl font-bold tracking-tight text-amber-400">{fmt(animPendente)}</p>
+            <p className="text-xs text-white/50 mt-2">pendente de confirmação</p>
+          </GlassCard>
         )}
 
         {/* Recebido */}
         {podeVer('financeiro') && (
-          <Card className="p-5 group hover:-translate-y-1 hover:shadow-lg hover:shadow-green-500/10 transition-all duration-300">
+          <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">Recebido</span>
-              <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
-                <CheckCircle className="h-4 w-4 text-green-500" />
+              <span className="text-xs text-white/50 uppercase tracking-wider">Recebido</span>
+              <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
+                <CheckCircle className="h-4 w-4 text-emerald-400" />
               </div>
             </div>
-            <p className="text-2xl font-bold tracking-tight text-green-500">{fmt(animRecebido)}</p>
-            <div className="w-full bg-muted rounded-full h-2 mt-2">
-              <div className="bg-green-500 h-2 rounded-full transition-all duration-500" style={{ width: `${taxaRecebimento}%` }} />
+            <p className="text-2xl font-bold tracking-tight text-emerald-400">{fmt(animRecebido)}</p>
+            <div className="w-full bg-white/10 rounded-full h-2 mt-2">
+              <div className="bg-emerald-400 h-2 rounded-full transition-all duration-500" style={{ width: `${taxaRecebimento}%` }} />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{taxaRecebimento}% do faturado</p>
-          </Card>
+            <p className="text-xs text-white/50 mt-1">{taxaRecebimento}% do faturado</p>
+          </GlassCard>
         )}
 
-        {/* Processos Ativos - always visible */}
-        <Card className="p-5 cursor-pointer group hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300" onClick={() => navigate('/processos')}>
+        {/* Processos Ativos */}
+        <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)" onClick={() => navigate('/processos')}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">Processos ativos</span>
-            <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
-              <Activity className="h-4 w-4 text-blue-500" />
+            <span className="text-xs text-white/50 uppercase tracking-wider">Processos ativos</span>
+            <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center">
+              <Activity className="h-4 w-4 text-blue-400" />
             </div>
           </div>
-          <p className="text-2xl font-bold tracking-tight text-foreground">{animAtivos}</p>
-          <p className="text-xs text-muted-foreground mt-2">{processosNovos} novos esta semana</p>
-        </Card>
+          <p className="text-2xl font-bold tracking-tight text-white">{animAtivos}</p>
+          <p className="text-xs text-white/50 mt-2">{processosNovos} novos esta semana</p>
+        </GlassCard>
       </div>
 
       {/* SEÇÃO 2: Ações Urgentes */}
