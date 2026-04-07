@@ -89,32 +89,6 @@ export default function Configuracoes() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="pricing">
-          <Card className="border-border/60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base"><DollarSign className="h-4 w-4 text-primary" />Tiered Pricing</CardTitle>
-              <CardDescription>Valores por competência mensal. Prioridade aplica ×1.5 automaticamente.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                { range: '1-5 processos', value: 'R$ 1.200' },
-                { range: '6-10 processos', value: 'R$ 1.050' },
-                { range: '11-20 processos', value: 'R$ 900' },
-                { range: '21+ processos', value: 'R$ 750' },
-              ].map((tier) => (
-                <div key={tier.range} className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-4 py-3">
-                  <span className="text-sm">{tier.range}</span>
-                  <div className="flex items-center gap-2">
-                    <Input defaultValue={tier.value} className="w-28 h-8 text-sm text-right" />
-                    <span className="text-xs text-muted-foreground">/proc</span>
-                  </div>
-                </div>
-              ))}
-              <p className="text-xs text-muted-foreground">Fórmula: Valor_Final = (Valor_Base × 1.5) + Σ Reembolsos (quando urgente)</p>
-              <Button size="sm" className="mt-2">Salvar Preços</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="rbac">
           <GestaoUsuarios />
