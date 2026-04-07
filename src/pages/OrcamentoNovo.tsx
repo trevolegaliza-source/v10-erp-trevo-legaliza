@@ -59,6 +59,8 @@ export default function OrcamentoNovo() {
   const [orcamentoNumero, setOrcamentoNumero] = useState<number>(0);
   const [modoPDF, setModoPDF] = useState<OrcamentoPDFMode>('contador');
   const saveMutation = useSaveOrcamento();
+  const { pdfs, salvarPDF } = useOrcamentoPDFs(orcamentoId);
+  const [gerando, setGerando] = useState(false);
 
   const { data: clientes } = useQuery({
     queryKey: ['clientes_select'],
