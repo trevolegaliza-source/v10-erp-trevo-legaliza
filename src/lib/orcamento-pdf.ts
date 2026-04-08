@@ -353,7 +353,7 @@ function buildSimplesHTML(d: OrcamentoPDFData, logo: string | null): string {
 async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Promise<string[]> {
   const pages: string[] = [];
   const pdfMode = resolvePDFMode(d);
-  const isCliente = pdfMode === 'cliente';
+  const isCliente = isClienteView(pdfMode); // true for 'cliente' and 'direto' (hides costs/margins)
   const secoes = d.secoes.length > 0 ? d.secoes : DEFAULT_SECOES;
   const header = getHeader(d, logo, pdfMode);
   const footer = getFooter(d, pdfMode);
