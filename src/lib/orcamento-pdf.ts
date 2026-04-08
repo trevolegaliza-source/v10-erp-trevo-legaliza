@@ -949,7 +949,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     pages.push(`
       <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
         ${header}
-        <div style="padding: 24px 40px;">
+        <div style="padding: 24px 36px; box-sizing: border-box;">
           <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Pacotes Disponíveis</div>
           ${pacotesHtml}
         </div>
