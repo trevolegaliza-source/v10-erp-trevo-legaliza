@@ -207,6 +207,7 @@ function getHeader(d: OrcamentoPDFData, logo: string | null, pdfMode: OrcamentoP
   if (pdfMode === 'cliente') {
     return HEADER_CLIENTE(d.numero, d.data_emissao, d.clienteNome || d.prospect_nome);
   }
+  // 'contador' and 'direto' both use Trevo header
   return HEADER_TREVO(d.numero, d.data_emissao, logo);
 }
 
@@ -214,7 +215,13 @@ function getFooter(d: OrcamentoPDFData, pdfMode: OrcamentoPDFMode): string {
   if (pdfMode === 'cliente') {
     return FOOTER_CLIENTE(d.clienteNome || d.prospect_nome);
   }
+  // 'contador' and 'direto' both use Trevo footer
   return FOOTER_TREVO;
+}
+
+/** For rendering logic: 'direto' behaves like 'cliente' (no margins/costs) but with Trevo branding */
+function isClienteView(pdfMode: OrcamentoPDFMode): boolean {
+  return pdfMode === 'cliente' || pdfMode === 'direto';
 }
 
 // Short name for prazos
