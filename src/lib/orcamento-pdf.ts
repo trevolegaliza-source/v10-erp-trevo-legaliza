@@ -34,12 +34,52 @@ export interface OrcamentoPDFData {
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
 
-// FIX 8 — Title Case for ALL CAPS names
+// FIX 5 — Title Case for ALL CAPS names (smart: keeps conjunctions lowercase)
 function toTitleCase(str: string): string {
-  if (str === str.toUpperCase() && str.length > 3) {
-    return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-  }
-  return str;
+  const minusculas = new Set([
+    'e', 'de', 'da', 'do', 'das', 'dos',
+    'em', 'no', 'na', 'nos', 'nas',
+    'por', 'para', 'com', 'sem', 'sob',
+    'a', 'o', 'as', 'os',
+    'um', 'uma',
+  ]);
+  const semEspacos = str.replace(/\s+/g, '');
+  if (semEspacos !== semEspacos.toUpperCase()) return str;
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map((word, index) => {
+      if (!word) return word;
+      if (index === 0) return word.charAt(0).toUpperCase() + word.slice(1);
+      if (minusculas.has(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
+// FIX 7 — Format contexto with highlighted risk words and monetary values
+function formatarContextoPDF(texto: string): string {
+  if (!texto) return '';
+  let html = texto
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  html = html.replace(
+    /(R\$[\s]?[\d.,kmKM\-]+)/g,
+    '<strong style="color: #b91c1c; font-weight: 700;">$1</strong>'
+  );
+  const palavrasRisco = [
+    'interdição', 'interditada', 'embargo', 'embargada',
+    'multa', 'multas', 'autuação', 'penalidade',
+    'bloqueio', 'bloqueada', 'suspensão',
+    'proibição', 'proibida', 'ilegal',
+  ];
+  palavrasRisco.forEach(palavra => {
+    const regex = new RegExp(`\\b(${palavra})\\b`, 'gi');
+    html = html.replace(regex, '<strong style="color: #b91c1c; font-weight: 700;">$1</strong>');
+  });
+  html = html.replace(/\n/g, '<br>');
+  return html;
 }
 
 const LOGO_URLS = [
