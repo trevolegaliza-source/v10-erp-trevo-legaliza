@@ -67,27 +67,25 @@ async function preloadLogo(): Promise<string | null> {
   return null;
 }
 
-function logoHtml(logo: string | null, height = 60): string {
+const HEADER_HEIGHT = 64;
+
+function logoHtml(logo: string | null, height = 32): string {
   return logo
-    ? `<img src="${logo}" style="height: ${height}px; width: auto; display: block;" crossorigin="anonymous" />`
-    : `<div style="font-size: 30px; font-weight: 800; line-height: 1.2;">
+    ? `<img src="${logo}" style="height: ${height}px; width: auto; object-fit: contain; display: block;" crossorigin="anonymous" />`
+    : `<div style="font-size: 22px; font-weight: 800; line-height: 1.2;">
          <span style="color: #22c55e;">Trevo</span>
-         <span style="color: #ffffff; font-weight: 400; font-size: 26px;"> Legaliza</span>
+         <span style="color: #ffffff; font-weight: 400; font-size: 18px;"> Legaliza</span>
        </div>`;
 }
 
-// FIX 1 — Fixed height header (80px content + 4px accent bar = 84px total)
 const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
-  <div style="height:80px;overflow:hidden;flex-shrink:0;background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 16px 40px; position:relative;">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-      <div>
-        ${logoHtml(logo)}
-        <div style="font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 4px;">CNPJ 39.969.412/0001-70</div>
-      </div>
-      <div style="text-align: right;">
-        <div style="font-size: 10px; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">Proposta #${String(numero).padStart(3, '0')}</div>
-        <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 4px;">${data}</div>
-      </div>
+  <div style="height:${HEADER_HEIGHT}px;min-height:${HEADER_HEIGHT}px;max-height:${HEADER_HEIGHT}px;overflow:hidden;flex-shrink:0;background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      ${logoHtml(logo, 32)}
+    </div>
+    <div style="text-align: right;">
+      <div style="font-size: 10px; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">PROPOSTA #${String(numero).padStart(3, '0')}</div>
+      <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px;">${data}</div>
     </div>
   </div>
   <div style="height: 4px; flex-shrink:0; background: linear-gradient(90deg, #22c55e, #86efac, #22c55e);"></div>
