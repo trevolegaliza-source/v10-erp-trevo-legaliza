@@ -396,7 +396,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   // Compute values
   const getCustoTrevo = (item: OrcamentoItem) => (item.honorario || 0) * item.quantidade;
   const getPrecoCliente = (item: OrcamentoItem) => ((item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
-  const getPrecoDireto = (item: OrcamentoItem) => ((item.valor_mercado || item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
+  const getPrecoDireto = (item: OrcamentoItem) => ((item.valorVendaDireto || item.valor_mercado || item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
 
   const totalCustoTrevo = d.itens.reduce((s, i) => s + getCustoTrevo(i), 0);
   const totalPrecoCliente = d.itens.reduce((s, i) => s + getPrecoCliente(i), 0);
