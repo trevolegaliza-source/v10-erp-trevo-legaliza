@@ -993,7 +993,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   }
 
   // FIX 2 — CTA per mode with contador contact info
-  const ctaSection = !isCliente ? `
+  const ctaSection = (!isCliente || pdfMode === 'direto') ? `
     <div style="background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); border-radius: 16px; padding: 24px; text-align: center;">
       <div style="font-size: 11px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
       <div style="font-size: 10px; color: rgba(255,255,255,0.7); margin-bottom: 16px;">Para aprovar esta proposta, entre em contato conosco:</div>
