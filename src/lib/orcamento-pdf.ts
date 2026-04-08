@@ -1036,16 +1036,19 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       </div>
     </div>
   ` : (() => {
-    // CLIENTE MODE: show contador contact if available
-    if (d.contadorNome) {
+    // CLIENTE MODE: show escritório/contador contact if available
+    const ctaNome = d.escritorioNome || d.contadorNome || '';
+    const ctaTelefone = d.escritorioTelefone || d.contadorTelefone || '';
+    const ctaEmail = d.escritorioEmail || d.contadorEmail || '';
+    if (ctaNome) {
       const contactLines: string[] = [];
-      if (d.contadorTelefone) contactLines.push(`<div style="font-size: 11px; color: #ffffff; margin-top: 6px;">📱 ${esc(d.contadorTelefone)}</div>`);
-      if (d.contadorEmail) contactLines.push(`<div style="font-size: 11px; color: #ffffff; margin-top: 4px;">✉️ ${esc(d.contadorEmail)}</div>`);
+      if (ctaTelefone) contactLines.push(`<div style="font-size: 11px; color: #ffffff; margin-top: 6px;">📱 ${esc(ctaTelefone)}</div>`);
+      if (ctaEmail) contactLines.push(`<div style="font-size: 11px; color: #ffffff; margin-top: 4px;">✉️ ${esc(ctaEmail)}</div>`);
       return `
         <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 16px; padding: 24px; text-align: center;">
           <div style="font-size: 11px; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
           <div style="font-size: 10px; color: rgba(255,255,255,0.7); margin-bottom: 12px;">Esta proposta é válida por ${d.validade_dias} dias. Para avançar ou esclarecer dúvidas, entre em contato — estamos prontos para começar.</div>
-          <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 8px;">${esc(d.contadorNome)}</div>
+          <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 8px;">${esc(ctaNome)}</div>
           ${contactLines.join('')}
         </div>
       `;
