@@ -390,10 +390,12 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   const accentBorder = useBlueTheme ? '#3b82f6' : '#22c55e';
   const accentText = useBlueTheme ? '#1e40af' : '#166534';
 
-  // FIX 5+6 — Display name: use apelido if available, then Title Case
-  const displayName = d.clienteNome?.trim()
-    ? toTitleCase(d.clienteNome)
-    : toTitleCase(d.prospect_nome);
+  // FIX 5+6 — Display name logic:
+  // Internal mode: displayName = contador name (clienteNome) for partner panel
+  // Client/Direto modes: displayName = prospect (final client) name — clienteNome is only for header/footer
+  const displayName = isCliente
+    ? toTitleCase(d.prospect_nome)
+    : (d.clienteNome?.trim() ? toTitleCase(d.clienteNome) : toTitleCase(d.prospect_nome));
   const nomeEmpresaCurto = displayName.split(' ').slice(0, 3).join(' ');
 
 
