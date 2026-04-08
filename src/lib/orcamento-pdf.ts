@@ -712,7 +712,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     }
 
     const valorExibido = pdfMode === 'direto'
-      ? (item.valor_mercado || item.honorario_minimo_contador || item.honorario)
+      ? (item.valorVendaDireto || item.valor_mercado || item.honorario_minimo_contador || item.honorario)
       : isCliente
         ? (item.honorario_minimo_contador || item.honorario)
         : getItemValor(item);
