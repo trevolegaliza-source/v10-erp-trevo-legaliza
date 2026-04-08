@@ -9,12 +9,19 @@ export interface OrcamentoPDFData {
   modo: OrcamentoModo;
   modoContador?: boolean; // legacy compat
   modoPDF?: OrcamentoPDFMode; // 'contador' | 'cliente' | 'direto'
+  destinatario?: 'contador' | 'cliente_via_contador' | 'cliente_direto';
   prospect_nome: string;
   prospect_cnpj: string | null;
-  clienteNome?: string; // nome da contabilidade para modo cliente
-  contadorNome?: string;   // FIX 2
-  contadorEmail?: string;  // FIX 2
-  contadorTelefone?: string; // FIX 2
+  // Escritório contábil (used in contador and cliente_via_contador modes)
+  escritorioNome?: string;
+  escritorioEmail?: string;
+  escritorioTelefone?: string;
+  escritorioCnpj?: string;
+  // Legacy compat fields
+  clienteNome?: string;
+  contadorNome?: string;
+  contadorEmail?: string;
+  contadorTelefone?: string;
   itens: OrcamentoItem[];
   pacotes: OrcamentoPacote[];
   secoes: OrcamentoSecao[];
