@@ -1,0 +1,2 @@
+ALTER TABLE public.orcamento_pdfs DROP CONSTRAINT IF EXISTS orcamento_pdfs_modo_check;
+ALTER TABLE public.orcamento_pdfs ADD CONSTRAINT orcamento_pdfs_modo_check CHECK (modo IN ('contador', 'cliente', 'direto'));
