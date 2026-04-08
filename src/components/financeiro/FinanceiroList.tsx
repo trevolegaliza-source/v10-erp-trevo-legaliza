@@ -296,6 +296,7 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
               <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Vencimento</th>
               <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Etapa</th>
               <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Status</th>
+              <th className="px-3 py-2.5 w-10"></th>
             </tr>
           </thead>
           <tbody>
