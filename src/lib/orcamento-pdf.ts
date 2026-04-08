@@ -620,7 +620,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
                 ${formatarOrdemExecucao(d.ordem_execucao, isCliente)}
               </div>
             </div>
-            ${!isCliente ? `
+            ${(!isCliente || pdfMode === 'direto') ? `
               <div style="margin-top: 32px; padding: 20px 24px; background: #f0faf4; border-left: 4px solid #1a4731; border-radius: 0 8px 8px 0;">
                 <div style="font-size: 12px; font-weight: 700; color: #1a4731; margin-bottom: 12px;">Por que a Trevo Legaliza?</div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
@@ -629,7 +629,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
                   <div style="font-size: 11px; color: #333;">✓ Expertise full-service</div>
                   <div style="font-size: 11px; color: #333;">✓ Honorários fixos por item</div>
                 </div>
-                <div style="font-size: 10px; color: #555; font-style: italic; margin-top: 10px;">Você vende. A Trevo executa. Simples assim.</div>
+                <div style="font-size: 10px; color: #555; font-style: italic; margin-top: 10px;">${pdfMode === 'direto' ? 'Regularize sua empresa com quem entende do assunto.' : 'Você vende. A Trevo executa. Simples assim.'}</div>
               </div>
             ` : ''}
           ` : ''}
