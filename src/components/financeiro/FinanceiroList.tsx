@@ -345,6 +345,30 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
                       {STATUS_LABELS[status]}
                     </Badge>
                   </td>
+                  <td className="px-3 py-2.5">
+                    {p.etapa_financeiro === 'honorario_pago' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUndoProcesso(p);
+                              setShowUndoDialog(true);
+                            }}
+                          >
+                            <Undo2 className="h-4 w-4 mr-2" />
+                            Desfazer Pagamento
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </td>
                 </tr>
               );
             })}
