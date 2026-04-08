@@ -123,6 +123,7 @@ export function normalizeItem(raw: any): OrcamentoItem {
     prazo: raw.prazo || '',
     docs_necessarios: raw.docs_necessarios || '',
     quantidade: Number(raw.quantidade) || 1,
+    isOptional: raw.isOptional === true,
     valor: Number(raw.valor) || undefined,
   };
 }
