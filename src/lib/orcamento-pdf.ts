@@ -626,24 +626,23 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     });
   }
 
+  // Pagination: max 3 items per page, with safe height estimation
+  // Each item ~300px, available height ~963px → max 3 items safely
   const ITEMS_PER_PAGE = 3;
   const itemPages: Array<ItemEntry[]> = [];
   for (let i = 0; i < allEntries.length; i += ITEMS_PER_PAGE) {
     itemPages.push(allEntries.slice(i, i + ITEMS_PER_PAGE));
   }
 
-  // FIX 5 — Anti-orphan: merge lonely last item into previous page (compressed)
+  // Anti-orphan: merge lonely last item into previous page ONLY if it has < 3 items
   while (itemPages.length >= 2) {
     const lastPage = itemPages[itemPages.length - 1];
     const prevPage = itemPages[itemPages.length - 2];
-    if (lastPage.length === 1 && prevPage.length <= 3) {
+    // Only merge if previous page has room (max 2 items, so merging makes 3)
+    if (lastPage.length === 1 && prevPage.length <= 2) {
       if (lastPage[0].sectionLabel && prevPage.some(e => e.sectionKey !== lastPage[0].sectionKey)) {
         lastPage[0]._injectSectionLabel = lastPage[0].sectionLabel;
         lastPage[0].sectionLabel = undefined;
-      }
-      // Mark as compressed if merging into a full page
-      if (prevPage.length === 3) {
-        lastPage[0]._compressed = true;
       }
       prevPage.push(lastPage[0]);
       itemPages.pop();
