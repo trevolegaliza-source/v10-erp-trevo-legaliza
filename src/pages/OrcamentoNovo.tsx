@@ -455,22 +455,29 @@ export default function OrcamentoNovo() {
               {/* PDF Mode toggle (detailed only) */}
               {isDetalhado && (
                 <div className="space-y-3 pt-3 border-t">
-                  <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card">
-                    <span className="text-sm font-medium">Gerar PDF para:</span>
-                    <div className="flex gap-2">
+                  <div className="flex flex-col gap-3 p-4 rounded-xl border border-border bg-card">
+                    <span className="text-sm font-medium">Destinatário do PDF:</span>
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         variant={modoPDF === 'contador' ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setModoPDF('contador')}
                       >
-                        📊 Contador (interno)
+                        📊 Contador (intermediário)
                       </Button>
                       <Button
                         variant={modoPDF === 'cliente' ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setModoPDF('cliente')}
                       >
-                        📄 Cliente Final
+                        📄 Cliente Final (via contador)
+                      </Button>
+                      <Button
+                        variant={modoPDF === 'direto' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setModoPDF('direto')}
+                      >
+                        🍀 Cliente Final (direto Trevo)
                       </Button>
                     </div>
                   </div>
