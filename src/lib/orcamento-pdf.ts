@@ -610,7 +610,12 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
       const totalMax = valorTotal + item.taxa_max;
       const hasTaxaItem = item.taxa_min > 0 || item.taxa_max > 0;
       const isObrigatorio = entry.sectionKey === 'obrigatorios';
-      const borderColor = isObrigatorio ? '#22c55e' : (entry.sectionKey === 'opcionais' ? '#3b82f6' : '#e5e7eb');
+      const isOpcional = entry.sectionKey === 'opcionais' || (secoes.find(s => s.key === entry.sectionKey)?.label || '').toLowerCase().includes('opcional');
+      const isCNES = /cnes|altamente recomendado/i.test(item.descricao);
+      const borderColor = isOpcional
+        ? (isCNES ? '#10b981' : '#f59e0b')
+        : (isObrigatorio ? '#22c55e' : '#e5e7eb');
+      const borderStyle = (isOpcional && !isCNES) ? 'dashed' : 'solid';
       const isCompressed = !!entry._compressed;
 
       // Build financial section based on PDF mode
