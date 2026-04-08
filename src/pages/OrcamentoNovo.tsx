@@ -562,7 +562,7 @@ export default function OrcamentoNovo() {
                           <Label className="text-xs text-emerald-700 font-medium">Valor de venda R$</Label>
                           <Input
                             type="number"
-                            value={item.valorVendaDireto ?? (item.valor_mercado || item.honorario_minimo_contador || item.honorario) || ''}
+                            value={item.valorVendaDireto ?? (item.valor_mercado || item.honorario_minimo_contador || item.honorario || '')}
                             onChange={e => updateItem(idx, 'valorVendaDireto', parseFloat(e.target.value) || 0)}
                             placeholder="0,00"
                             className="text-right"
