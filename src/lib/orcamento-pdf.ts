@@ -193,7 +193,7 @@ function formatarOrdemExecucao(texto: string, isCliente: boolean): string {
       <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0;">
         <div style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: ${bgColor}; color: #fff; font-size: 11px; font-weight: 800; flex-shrink: 0;">${stepNum}</div>
         <div style="flex: 1; font-size: 10px; color: #374151; line-height: 1.5;">${esc(trimmed)}</div>
-        ${!isLast ? `<div style="color: ${arrowColor}; font-size: 16px; font-weight: 800; margin-left: -4px;">→</div>` : ''}
+        
       </div>
     `;
   }
