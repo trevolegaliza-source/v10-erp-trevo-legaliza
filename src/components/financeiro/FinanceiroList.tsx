@@ -440,6 +440,28 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Undo payment dialog */}
+      <AlertDialog open={showUndoDialog} onOpenChange={setShowUndoDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desfazer pagamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O processo voltará para "A Cobrar" e a data de pagamento será removida. Esta ação não pode ser desfeita automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDesfazerPagamento}
+              disabled={undoing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {undoing ? 'Revertendo...' : 'Sim, desfazer'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <ProcessoEditModal
         open={editModalOpen}
         onOpenChange={setEditModalOpen}
