@@ -141,14 +141,15 @@ async function medirAlturaReal(html: string): Promise<number> {
 
   const altura = probe.getBoundingClientRect().height;
   document.body.removeChild(probe);
-  return Math.ceil(altura) + 24; // +24px safety margin
+  return Math.ceil(altura) + 12; // +12px safety margin (reduced from 24 for better packing)
 }
 
 const HEADER_HEIGHT = 64;
 
-function logoHtml(logo: string | null, height = 36): string {
+function logoHtml(logo: string | null, height = 36, width?: number): string {
+  const widthStyle = width ? `width: ${width}px !important; height: auto !important;` : `height: ${height}px !important; width: auto !important; max-height: ${height}px !important; min-height: ${height}px !important;`;
   return logo
-    ? `<img src="${logo}" style="height: ${height}px !important; width: auto !important; max-height: ${height}px !important; min-height: ${height}px !important; object-fit: contain !important; display: block !important; flex-shrink: 0 !important;" crossorigin="anonymous" />`
+    ? `<img src="${logo}" style="${widthStyle} object-fit: contain !important; display: block !important; flex-shrink: 0 !important;" crossorigin="anonymous" />`
     : `<div style="font-size: 22px; font-weight: 800; line-height: 1.2;">
          <span style="color: #22c55e;">Trevo</span>
          <span style="color: #ffffff; font-weight: 400; font-size: 18px;"> Legaliza</span>
@@ -158,7 +159,7 @@ function logoHtml(logo: string | null, height = 36): string {
 const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
   <div style="height:${HEADER_HEIGHT}px !important;min-height:${HEADER_HEIGHT}px !important;max-height:${HEADER_HEIGHT}px !important;overflow:hidden !important;flex-shrink:0;background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
     <div style="display:flex;align-items:center;gap:12px;">
-      ${logoHtml(logo, 36)}
+      ${logoHtml(logo, 36, 140)}
     </div>
     <div style="text-align: right;">
       <div style="font-size: 10px; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">PROPOSTA #${String(numero).padStart(3, '0')}</div>
@@ -395,14 +396,16 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   // Compute values
   const getCustoTrevo = (item: OrcamentoItem) => (item.honorario || 0) * item.quantidade;
   const getPrecoCliente = (item: OrcamentoItem) => ((item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
+  const getPrecoDireto = (item: OrcamentoItem) => ((item.valor_mercado || item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
 
   const totalCustoTrevo = d.itens.reduce((s, i) => s + getCustoTrevo(i), 0);
   const totalPrecoCliente = d.itens.reduce((s, i) => s + getPrecoCliente(i), 0);
+  const totalPrecoDireto = d.itens.reduce((s, i) => s + getPrecoDireto(i), 0);
   const totalTaxaMin = d.itens.reduce((s, i) => s + i.taxa_min, 0);
   const totalTaxaMax = d.itens.reduce((s, i) => s + i.taxa_max, 0);
   const hasTaxas = totalTaxaMin > 0 || totalTaxaMax > 0;
 
-  const totalHonorariosCapa = isCliente ? totalPrecoCliente : totalCustoTrevo;
+  const totalHonorariosCapa = pdfMode === 'direto' ? totalPrecoDireto : isCliente ? totalPrecoCliente : totalCustoTrevo;
   const descontoValorCapa = totalHonorariosCapa * (d.desconto_pct / 100);
   const honorarioFinalCapa = totalHonorariosCapa - descontoValorCapa;
   const investimentoMin = honorarioFinalCapa + totalTaxaMin;
@@ -414,8 +417,15 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   // Contador-specific cover values
   const custoTrevoFinalCapa = totalCustoTrevo * (1 - d.desconto_pct / 100);
   const precoClienteFinalCapa = totalPrecoCliente * (1 - d.desconto_pct / 100);
-  const margemCapa = precoClienteFinalCapa - custoTrevoFinalCapa;
-  const margemCapaPct = custoTrevoFinalCapa > 0 ? (((precoClienteFinalCapa / custoTrevoFinalCapa) - 1) * 100).toFixed(0) : '0';
+  // Margem mínima (baseado no honorario_minimo_contador)
+  const margemCapaMin = precoClienteFinalCapa - custoTrevoFinalCapa;
+  const margemCapaMinPct = custoTrevoFinalCapa > 0 ? (((precoClienteFinalCapa / custoTrevoFinalCapa) - 1) * 100).toFixed(0) : '0';
+  // Margem ideal (baseado no valor_mercado)
+  const totalPrecoIdeal = d.itens.reduce((s, i) => s + ((i.valor_mercado || i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0);
+  const precoIdealFinalCapa = totalPrecoIdeal * (1 - d.desconto_pct / 100);
+  const margemCapaIdeal = precoIdealFinalCapa - custoTrevoFinalCapa;
+  const margemCapaIdealPct = custoTrevoFinalCapa > 0 ? (((precoIdealFinalCapa / custoTrevoFinalCapa) - 1) * 100).toFixed(0) : '0';
+  const temMargemFaixa = margemCapaIdeal > margemCapaMin && totalPrecoIdeal > totalPrecoCliente;
 
   const useBlueTheme = pdfMode === 'cliente'; // only pure client mode uses blue; direto uses Trevo green
   const accentColor = useBlueTheme ? '#3b82f6' : '#22c55e';
@@ -482,8 +492,8 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             <!-- Card 3: Sua Margem -->
             <div style="flex: 1; background: #1a4731; border-radius: 8px; padding: 20px 16px; text-align: center;">
               <div style="font-size: 9px; color: #86efac; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">SUA MARGEM</div>
-              <div style="font-size: 24px; font-weight: 700; color: #ffffff;">${fmt(margemCapa)}</div>
-              <div style="font-size: 12px; color: #86efac; margin-top: 6px;">${margemCapaPct}% de lucro</div>
+              <div style="font-size: ${temMargemFaixa ? '18' : '24'}px; font-weight: 700; color: #ffffff;">${temMargemFaixa ? `${fmt(margemCapaMin)} a ${fmt(margemCapaIdeal)}` : fmt(margemCapaMin)}</div>
+              <div style="font-size: 11px; color: #86efac; margin-top: 6px;">${temMargemFaixa ? `${margemCapaMinPct}% a ${margemCapaIdealPct}%` : `${margemCapaMinPct}%`} de lucro</div>
             </div>
           </div>
         </div>
@@ -701,9 +711,11 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       cardHtml += `<div style="font-size: 11px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid ${accentBg};">${esc(entry.sectionLabel)}</div>`;
     }
 
-    const valorExibido = isCliente
-      ? (item.honorario_minimo_contador || item.honorario)
-      : getItemValor(item);
+    const valorExibido = pdfMode === 'direto'
+      ? (item.valor_mercado || item.honorario_minimo_contador || item.honorario)
+      : isCliente
+        ? (item.honorario_minimo_contador || item.honorario)
+        : getItemValor(item);
     const valorTotal = valorExibido * item.quantidade;
     const totalMin = valorTotal + item.taxa_min;
     const totalMax = valorTotal + item.taxa_max;
@@ -798,8 +810,8 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const showDocsSection = item.prazo || item.docs_necessarios;
     const opcionalBadge = isOpcional
       ? (isCNES
-        ? `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#d1fae5;color:#064e3b;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">★ RECOMENDADO</span>`
-        : `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fef3c7;color:#92400e;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">OPCIONAL</span>`)
+        ? `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#d1fae5;color:#064e3b;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1;">★ RECOMENDADO</span>`
+        : `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fef3c7;color:#92400e;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1;">OPCIONAL</span>`)
       : '';
 
     cardHtml += `
