@@ -92,16 +92,14 @@ const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
 `;
 
 const HEADER_CLIENTE = (numero: number, data: string, nomeContabilidade: string) => `
-  <div style="height:80px;overflow:hidden;flex-shrink:0;background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 16px 40px; position:relative;">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-      <div>
-        <div style="font-size: 24px; font-weight: 800; color: #ffffff;">${esc(nomeContabilidade)}</div>
-        <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 4px;">Assessoria empresarial</div>
-      </div>
-      <div style="text-align: right;">
-        <div style="font-size: 10px; color: #93c5fd; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">Proposta #${String(numero).padStart(3, '0')}</div>
-        <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 4px;">${data}</div>
-      </div>
+  <div style="height:${HEADER_HEIGHT}px;min-height:${HEADER_HEIGHT}px;max-height:${HEADER_HEIGHT}px;overflow:hidden;flex-shrink:0;background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
+    <div>
+      <div style="font-size: 20px; font-weight: 800; color: #ffffff;">${esc(nomeContabilidade)}</div>
+      <div style="font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 2px;">Assessoria empresarial</div>
+    </div>
+    <div style="text-align: right;">
+      <div style="font-size: 10px; color: #93c5fd; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">PROPOSTA #${String(numero).padStart(3, '0')}</div>
+      <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px;">${data}</div>
     </div>
   </div>
   <div style="height: 4px; flex-shrink:0; background: linear-gradient(90deg, #3b82f6, #93c5fd, #3b82f6);"></div>
