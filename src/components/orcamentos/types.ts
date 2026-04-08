@@ -35,6 +35,7 @@ export interface OrcamentoSecao {
 
 export type OrcamentoModo = 'simples' | 'detalhado';
 export type OrcamentoPDFMode = 'contador' | 'cliente' | 'direto';
+export type OrcamentoDestinatario = 'contador' | 'cliente_via_contador' | 'cliente_direto';
 
 export interface OrcamentoForm {
   prospect_nome: string;
