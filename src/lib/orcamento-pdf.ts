@@ -415,8 +415,15 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   // Contador-specific cover values
   const custoTrevoFinalCapa = totalCustoTrevo * (1 - d.desconto_pct / 100);
   const precoClienteFinalCapa = totalPrecoCliente * (1 - d.desconto_pct / 100);
-  const margemCapa = precoClienteFinalCapa - custoTrevoFinalCapa;
-  const margemCapaPct = custoTrevoFinalCapa > 0 ? (((precoClienteFinalCapa / custoTrevoFinalCapa) - 1) * 100).toFixed(0) : '0';
+  // Margem mínima (baseado no honorario_minimo_contador)
+  const margemCapaMin = precoClienteFinalCapa - custoTrevoFinalCapa;
+  const margemCapaMinPct = custoTrevoFinalCapa > 0 ? (((precoClienteFinalCapa / custoTrevoFinalCapa) - 1) * 100).toFixed(0) : '0';
+  // Margem ideal (baseado no valor_mercado)
+  const totalPrecoIdeal = d.itens.reduce((s, i) => s + ((i.valor_mercado || i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0);
+  const precoIdealFinalCapa = totalPrecoIdeal * (1 - d.desconto_pct / 100);
+  const margemCapaIdeal = precoIdealFinalCapa - custoTrevoFinalCapa;
+  const margemCapaIdealPct = custoTrevoFinalCapa > 0 ? (((precoIdealFinalCapa / custoTrevoFinalCapa) - 1) * 100).toFixed(0) : '0';
+  const temMargemFaixa = margemCapaIdeal > margemCapaMin && totalPrecoIdeal > totalPrecoCliente;
 
   const useBlueTheme = pdfMode === 'cliente'; // only pure client mode uses blue; direto uses Trevo green
   const accentColor = useBlueTheme ? '#3b82f6' : '#22c55e';
