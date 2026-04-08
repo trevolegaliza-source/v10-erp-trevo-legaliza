@@ -79,7 +79,7 @@ function logoHtml(logo: string | null, height = 32): string {
 }
 
 const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
-  <div style="height:${HEADER_HEIGHT}px;min-height:${HEADER_HEIGHT}px;max-height:${HEADER_HEIGHT}px;overflow:hidden;flex-shrink:0;background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
+  <div style="height:${HEADER_HEIGHT}px !important;min-height:${HEADER_HEIGHT}px !important;max-height:${HEADER_HEIGHT}px !important;overflow:hidden !important;flex-shrink:0;background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
     <div style="display:flex;align-items:center;gap:12px;">
       ${logoHtml(logo, 32)}
     </div>
@@ -92,7 +92,7 @@ const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
 `;
 
 const HEADER_CLIENTE = (numero: number, data: string, nomeContabilidade: string) => `
-  <div style="height:${HEADER_HEIGHT}px;min-height:${HEADER_HEIGHT}px;max-height:${HEADER_HEIGHT}px;overflow:hidden;flex-shrink:0;background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
+  <div style="height:${HEADER_HEIGHT}px !important;min-height:${HEADER_HEIGHT}px !important;max-height:${HEADER_HEIGHT}px !important;overflow:hidden !important;flex-shrink:0;background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
     <div>
       <div style="font-size: 20px; font-weight: 800; color: #ffffff;">${esc(nomeContabilidade)}</div>
       <div style="font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 2px;">Assessoria empresarial</div>
@@ -193,7 +193,7 @@ function formatarOrdemExecucao(texto: string, isCliente: boolean): string {
       <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0;">
         <div style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: ${bgColor}; color: #fff; font-size: 11px; font-weight: 800; flex-shrink: 0;">${stepNum}</div>
         <div style="flex: 1; font-size: 10px; color: #374151; line-height: 1.5;">${esc(trimmed)}</div>
-        ${!isLast ? `<div style="color: ${arrowColor}; font-size: 16px; font-weight: 800; margin-left: -4px;">→</div>` : ''}
+        
       </div>
     `;
   }
@@ -355,8 +355,8 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
         </div>
 
         <!-- ZONA 3: Three financial cards -->
-        <div style="flex: 1; display: flex; align-items: center; padding: 0 40px;">
-          <div style="display: flex; gap: 16px; width: 100%;">
+        <div style="padding: 0 40px; flex-shrink: 0;">
+          <div style="display: flex; gap: 16px; width: 100%; margin-top: 24px;">
             <!-- Card 1: Custo Trevo -->
             <div style="flex: 1; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px 16px; text-align: center;">
               <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">SEU CUSTO TREVO</div>
@@ -427,9 +427,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           ${d.prospect_cnpj ? `<div style="font-size: 14px; color: #64748b;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
           ${coverValueBoxHtml}
           ${coverBulletsHtml}
-          <div style="margin-top: 16px; font-size: 12px; color: #94a3b8;">
-            Emissão: ${d.data_emissao} · Válida por ${d.validade_dias} dias
-          </div>
+          ${d.data_emissao ? `<div style="margin-top: 16px; font-size: 12px; color: #94a3b8;">Proposta emitida em ${d.data_emissao}</div>` : ''}
         </div>
         <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
       </div>
@@ -442,9 +440,9 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   if (temContexto || temOrdem) {
     // FIX 4 — Risk box for client mode (before context)
     const riskBoxHtml = isCliente ? `
-      <div style="background: #fff8e1; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
-        <div style="font-size: 11px; font-weight: 700; color: #92400e; margin-bottom: 8px;">⚠ SITUAÇÃO ATUAL — RISCOS DE OPERAÇÃO SEM REGULARIZAÇÃO</div>
-        <div style="font-size: 11px; color: #78350f; line-height: 1.8;">
+      <div style="background: #FEF2F2; border-left: 4px solid #B03030; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
+        <div style="font-size: 11px; font-weight: 700; color: #7F1D1D; margin-bottom: 8px;">⛔ SITUAÇÃO ATUAL — RISCOS DE OPERAÇÃO SEM REGULARIZAÇÃO</div>
+        <div style="font-size: 11px; color: #991B1B; line-height: 1.8;">
           • Multas de R$ 5.000 a R$ 50.000 por autuação da Vigilância Sanitária<br/>
           • Risco de interdição imediata e embargo das atividades<br/>
           • Bloqueio de convênios médicos e SUS sem CNES ativo
@@ -480,6 +478,18 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
                 ${formatarOrdemExecucao(d.ordem_execucao, isCliente)}
               </div>
             </div>
+            ${!isCliente ? `
+              <div style="margin-top: 32px; padding: 20px 24px; background: #f0faf4; border-left: 4px solid #1a4731; border-radius: 0 8px 8px 0;">
+                <div style="font-size: 12px; font-weight: 700; color: #1a4731; margin-bottom: 12px;">Por que a Trevo Legaliza?</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
+                  <div style="font-size: 11px; color: #333;">✓ +8 anos de mercado</div>
+                  <div style="font-size: 11px; color: #333;">✓ 27 estados de atuação</div>
+                  <div style="font-size: 11px; color: #333;">✓ Expertise full-service</div>
+                  <div style="font-size: 11px; color: #333;">✓ Honorários fixos por item</div>
+                </div>
+                <div style="font-size: 10px; color: #555; font-style: italic; margin-top: 10px;">Você vende. A Trevo executa. Simples assim.</div>
+              </div>
+            ` : ''}
           ` : ''}
         </div>
         <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
@@ -652,7 +662,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
             </div>
             <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
           </div>
-          ${item.detalhes && !isCompressed ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
+          ${item.detalhes ? `<div style="padding: ${isCompressed ? '8' : '12'}px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
           ${showDocsSection ? `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #f3f4f6; border-bottom: 1px solid #f3f4f6;">
               <div style="padding: 10px 18px; background: #ffffff;">
