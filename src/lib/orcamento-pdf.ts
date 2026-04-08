@@ -913,6 +913,10 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
                 <span style="color: #1e40af; font-weight: 600;">Investimento com -${pac.desconto_pct}%</span>
                 <span style="color: #1e40af; font-weight: 700;">${fmt(precoComDesconto)}</span>
               </div>
+              <!-- FIX 8: Economia em reais -->
+              <div style="font-size: 10px; color: #15803d; font-weight: 600; text-align: right; margin-top: -4px; margin-bottom: 8px; padding: 0 0;">
+                ↓ Economia de ${fmt(precoSemDesconto - precoComDesconto)} com este pacote
+              </div>
               ${hasTaxaPac ? `
                 <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 10px;">
                   <span style="color: #6b7280;">Taxas governamentais estimadas</span>
