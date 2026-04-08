@@ -1196,7 +1196,7 @@ export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<Blob> {
     return doc.output('blob');
   }
 
-  const pagesHtml = buildDetalhadoPages(data, logo);
+  const pagesHtml = await buildDetalhadoPages(data, logo);
   const doc = new jsPDF('p', 'mm', 'a4');
 
   for (let i = 0; i < pagesHtml.length; i++) {
