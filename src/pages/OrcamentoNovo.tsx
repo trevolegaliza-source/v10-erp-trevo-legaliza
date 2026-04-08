@@ -224,6 +224,10 @@ export default function OrcamentoNovo() {
       modo: form.modo,
       modoPDF: modo || modoPDF,
       clienteNome,
+      // FIX 2 — Pass contador contact info for client PDF CTA
+      contadorNome: selectedCliente?.nome || undefined,
+      contadorEmail: selectedCliente?.email || undefined,
+      contadorTelefone: selectedCliente?.telefone || undefined,
       prospect_nome: form.prospect_nome,
       prospect_cnpj: form.prospect_cnpj,
       itens: itensValidos,

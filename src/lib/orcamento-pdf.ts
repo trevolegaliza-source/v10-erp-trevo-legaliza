@@ -12,6 +12,9 @@ export interface OrcamentoPDFData {
   prospect_nome: string;
   prospect_cnpj: string | null;
   clienteNome?: string; // nome da contabilidade para modo cliente
+  contadorNome?: string;   // FIX 2
+  contadorEmail?: string;  // FIX 2
+  contadorTelefone?: string; // FIX 2
   itens: OrcamentoItem[];
   pacotes: OrcamentoPacote[];
   secoes: OrcamentoSecao[];
@@ -30,6 +33,14 @@ export interface OrcamentoPDFData {
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+
+// FIX 8 — Title Case for ALL CAPS names
+function toTitleCase(str: string): string {
+  if (str === str.toUpperCase() && str.length > 3) {
+    return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  }
+  return str;
+}
 
 const LOGO_URLS = [
   'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png',
@@ -65,13 +76,13 @@ function logoHtml(logo: string | null, height = 60): string {
        </div>`;
 }
 
+// FIX 1 — Fixed height header (80px content + 4px accent bar = 84px total)
 const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
-  <div style="background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 32px 40px;">
+  <div style="height:80px;overflow:hidden;flex-shrink:0;background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 16px 40px; position:relative;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
       <div>
         ${logoHtml(logo)}
         <div style="font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 4px;">CNPJ 39.969.412/0001-70</div>
-        <div style="font-size: 8px; color: rgba(255,255,255,0.3); margin-top: 2px;">Assessoria societária com atuação em todo o território nacional</div>
       </div>
       <div style="text-align: right;">
         <div style="font-size: 10px; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">Proposta #${String(numero).padStart(3, '0')}</div>
@@ -79,11 +90,11 @@ const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
       </div>
     </div>
   </div>
-  <div style="height: 4px; background: linear-gradient(90deg, #22c55e, #86efac, #22c55e);"></div>
+  <div style="height: 4px; flex-shrink:0; background: linear-gradient(90deg, #22c55e, #86efac, #22c55e);"></div>
 `;
 
 const HEADER_CLIENTE = (numero: number, data: string, nomeContabilidade: string) => `
-  <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 32px 40px;">
+  <div style="height:80px;overflow:hidden;flex-shrink:0;background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 16px 40px; position:relative;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start;">
       <div>
         <div style="font-size: 24px; font-weight: 800; color: #ffffff;">${esc(nomeContabilidade)}</div>
@@ -95,7 +106,7 @@ const HEADER_CLIENTE = (numero: number, data: string, nomeContabilidade: string)
       </div>
     </div>
   </div>
-  <div style="height: 4px; background: linear-gradient(90deg, #3b82f6, #93c5fd, #3b82f6);"></div>
+  <div style="height: 4px; flex-shrink:0; background: linear-gradient(90deg, #3b82f6, #93c5fd, #3b82f6);"></div>
 `;
 
 const FOOTER_TREVO = `
@@ -140,7 +151,7 @@ function getFooter(d: OrcamentoPDFData, pdfMode: OrcamentoPDFMode): string {
   return FOOTER_TREVO;
 }
 
-// CORREÇÃO 4 — Short name for prazos
+// Short name for prazos
 function shortName(descricao: string): string {
   const map: Record<string, string> = {
     'LICENÇA BOMBEIROS': 'Bombeiros',
@@ -162,22 +173,35 @@ function shortName(descricao: string): string {
   return descricao.split(' ').slice(0, 3).join(' ');
 }
 
-// CORREÇÃO 7 — Ordem de execução com numeração visual
+// FIX 6 — Ordem de execução: filter meta-text lines ending with ":"
 function formatarOrdemExecucao(texto: string, isCliente: boolean): string {
   const linhas = texto.split('\n').filter(l => l.trim());
   const bgColor = isCliente ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'linear-gradient(135deg, #22c55e, #16a34a)';
   const arrowColor = isCliente ? '#3b82f6' : '#22c55e';
-  return linhas.map((linha, idx) => {
-    const numero = idx + 1;
-    const isLast = idx === linhas.length - 1;
-    return `
+
+  let html = '';
+  let stepNum = 0;
+
+  for (const linha of linhas) {
+    const trimmed = linha.trim();
+    // Meta-text: ends with ":" or first line that doesn't start with a number
+    const isMetaText = trimmed.endsWith(':');
+    if (isMetaText) {
+      // Render as subtitle, not numbered step
+      html += `<div style="font-size: 9px; color: #9ca3af; font-style: italic; padding: 4px 0 2px; margin-top: 4px;">${esc(trimmed)}</div>`;
+      continue;
+    }
+    stepNum++;
+    const isLast = linhas.indexOf(linha) === linhas.length - 1;
+    html += `
       <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0;">
-        <div style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: ${bgColor}; color: #fff; font-size: 11px; font-weight: 800; flex-shrink: 0;">${numero}</div>
-        <div style="flex: 1; font-size: 10px; color: #374151; line-height: 1.5;">${esc(linha.trim())}</div>
+        <div style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: ${bgColor}; color: #fff; font-size: 11px; font-weight: 800; flex-shrink: 0;">${stepNum}</div>
+        <div style="flex: 1; font-size: 10px; color: #374151; line-height: 1.5;">${esc(trimmed)}</div>
         ${!isLast ? `<div style="color: ${arrowColor}; font-size: 16px; font-weight: 800; margin-left: -4px;">→</div>` : ''}
       </div>
     `;
-  }).join('');
+  }
+  return html;
 }
 
 // ────────────────────────────────────────
@@ -261,7 +285,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   const header = getHeader(d, logo, pdfMode);
   const footer = getFooter(d, pdfMode);
 
-  // Compute values — Contador uses honorario (cost), Cliente uses honorario_minimo_contador (sell price)
+  // Compute values
   const getCustoTrevo = (item: OrcamentoItem) => (item.honorario || 0) * item.quantidade;
   const getPrecoCliente = (item: OrcamentoItem) => ((item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
 
@@ -271,7 +295,6 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   const totalTaxaMax = d.itens.reduce((s, i) => s + i.taxa_max, 0);
   const hasTaxas = totalTaxaMin > 0 || totalTaxaMax > 0;
 
-  // For cover and summary: use appropriate values per mode
   const totalHonorariosCapa = isCliente ? totalPrecoCliente : totalCustoTrevo;
   const descontoValorCapa = totalHonorariosCapa * (d.desconto_pct / 100);
   const honorarioFinalCapa = totalHonorariosCapa - descontoValorCapa;
@@ -281,36 +304,99 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     ? `${fmt(investimentoMin)} a ${fmt(investimentoMax)}`
     : fmt(honorarioFinalCapa);
 
+  // Contador-specific cover values
+  const custoTrevoFinalCapa = totalCustoTrevo * (1 - d.desconto_pct / 100);
+  const precoClienteFinalCapa = totalPrecoCliente * (1 - d.desconto_pct / 100);
+  const margemCapa = precoClienteFinalCapa - custoTrevoFinalCapa;
+  const margemCapaPct = custoTrevoFinalCapa > 0 ? (((precoClienteFinalCapa / custoTrevoFinalCapa) - 1) * 100).toFixed(0) : '0';
+
   const accentColor = isCliente ? '#3b82f6' : '#22c55e';
   const accentColorLight = isCliente ? '#93c5fd' : '#4ade80';
   const accentBg = isCliente ? '#eff6ff' : '#f0fdf4';
   const accentBorder = isCliente ? '#3b82f6' : '#22c55e';
   const accentText = isCliente ? '#1e40af' : '#166534';
 
+  // FIX 8 — Display name: Title Case if ALL CAPS
+  const displayName = toTitleCase(d.prospect_nome);
+  const nomeEmpresaCurto = displayName.split(' ').slice(0, 3).join(' ');
+
   // --- PAGE 1: Cover ---
   const modoBadge = !isCliente
     ? `<div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 16px; margin-bottom: 20px; font-size: 9px; font-weight: 700; color: #92400e; text-align: center; letter-spacing: 1px;">📊 PROPOSTA INTERNA — USO EXCLUSIVO DA CONTABILIDADE</div>`
     : '';
 
+  // FIX 3 — Cover value boxes: dual for Contador, single for Cliente
+  let coverValueBoxHtml = '';
+  if (!isCliente) {
+    // CONTADOR: two stacked boxes
+    coverValueBoxHtml = `
+      <div style="margin-top: 40px; width: 100%; max-width: 460px;">
+        <div style="padding: 16px 30px; background: #f8f8f8; border: 1px solid #d1d5db; border-radius: 12px 12px 0 0; text-align: center;">
+          <div style="font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">SEU CUSTO TREVO (honorários)</div>
+          <div style="font-size: 22px; font-weight: 700; color: #374151;">${fmt(custoTrevoFinalCapa)}</div>
+        </div>
+        <div style="padding: 18px 30px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 0 0 12px 12px; text-align: center;">
+          <div style="font-size: 9px; color: ${accentText}; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">COBRAR DO CLIENTE (total estimado)</div>
+          <div style="font-size: 28px; font-weight: 900; color: ${accentText};">${valorCapa}</div>
+          <div style="font-size: 8px; color: #9ca3af; margin-top: 4px;">Honorários${hasTaxas ? ' + taxas governamentais estimadas' : ''}</div>
+        </div>
+      </div>
+    `;
+  } else {
+    // CLIENTE: single box (unchanged)
+    coverValueBoxHtml = `
+      <div style="margin-top: 40px; padding: 20px 40px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 16px; text-align: center;">
+        <div style="font-size: 10px; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px;">Investimento Estimado</div>
+        <div style="font-size: ${hasTaxas ? '26' : '36'}px; font-weight: 900; color: ${accentText};">${valorCapa}</div>
+      </div>
+      <div style="font-size: 8px; color: #9ca3af; margin-top: 8px; letter-spacing: 0.3px;">
+        Honorários profissionais${hasTaxas ? ' + taxas governamentais estimadas' : ''}
+      </div>
+    `;
+  }
+
+  // FIX 7 — Cover context bullets below value box
+  const itemCount = d.itens.filter(i => i.descricao.trim()).length;
+  let coverBulletsHtml = '';
+  if (!isCliente) {
+    coverBulletsHtml = `
+      <div style="margin-top: 24px; border-top: 1px solid #e0e0e0; padding-top: 16px; width: 100%; max-width: 500px; text-align: center;">
+        <div style="font-size: 11px; color: #2d6a4f;">
+          💰 Custo Trevo: ${fmt(custoTrevoFinalCapa)} &nbsp;|&nbsp; 📈 Margem estimada: ${fmt(margemCapa)} (${margemCapaPct}%)
+        </div>
+        <div style="font-size: 11px; color: #555; margin-top: 6px;">
+          📋 ${itemCount} serviços &nbsp;|&nbsp; 🏢 Cliente: ${esc(displayName.substring(0, 30))}
+        </div>
+      </div>
+    `;
+  } else {
+    coverBulletsHtml = `
+      <div style="margin-top: 24px; border-top: 1px solid #e0e0e0; padding-top: 16px; width: 100%; max-width: 500px; text-align: center;">
+        <div style="font-size: 11px; color: #555;">
+          📋 ${itemCount} serviços incluídos &nbsp;|&nbsp; ⏱ 6 a 12 semanas
+        </div>
+        <div style="font-size: 10px; color: #888; margin-top: 6px;">
+          Válido por ${d.validade_dias} dias · ${esc((d.pagamento || 'Pagamento a combinar').substring(0, 60))}
+        </div>
+        ${d.data_emissao ? `<div style="font-size: 10px; color: #888; margin-top: 4px;">Proposta emitida em ${d.data_emissao}</div>` : ''}
+      </div>
+    `;
+  }
+
   pages.push(`
     <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; height: 1123px; background: white; position: relative; display: flex; flex-direction: column;">
       ${header}
-      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 60px;">
+      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px 60px;">
         ${modoBadge}
         <div style="font-size: 10px; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 4px; font-weight: 700; margin-bottom: 20px;">Proposta Comercial</div>
-        <div style="font-size: 32px; font-weight: 900; color: #1a1a2e; text-align: center; margin-bottom: 16px;">${esc(d.prospect_nome)}</div>
+        <div style="font-size: 28px; font-weight: 600; color: #1a1a2e; text-align: center; margin-bottom: 8px;">${esc(displayName)}</div>
         ${d.prospect_cnpj ? `<div style="font-size: 14px; color: #64748b;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
-        <div style="margin-top: 40px; padding: 20px 40px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 16px; text-align: center;">
-          <div style="font-size: 10px; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px;">Investimento Estimado</div>
-          <div style="font-size: ${hasTaxas ? '26' : '36'}px; font-weight: 900; color: ${accentText};">${valorCapa}</div>
-        </div>
-        <div style="font-size: 8px; color: #9ca3af; margin-top: 8px; letter-spacing: 0.3px;">
-          Honorários profissionais${hasTaxas ? ' + taxas governamentais estimadas' : ''}
-        </div>
-        <div style="margin-top: 24px; font-size: 12px; color: #94a3b8;">
+        ${coverValueBoxHtml}
+        ${coverBulletsHtml}
+        <div style="margin-top: 16px; font-size: 12px; color: #94a3b8;">
           Emissão: ${d.data_emissao} · Válida por ${d.validade_dias} dias
         </div>
-        ${!isCliente ? `<div style="margin-top: 40px; font-size: 8px; color: #9ca3af; letter-spacing: 0.5px; text-align: center;">
+        ${!isCliente ? `<div style="margin-top: 30px; font-size: 8px; color: #9ca3af; letter-spacing: 0.5px; text-align: center;">
           Desde 2018 · Referência nacional em regularização empresarial · Atuação em 27 estados
         </div>` : ''}
       </div>
@@ -322,13 +408,34 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   const temContexto = d.contexto && d.contexto.trim().length > 0;
   const temOrdem = d.ordem_execucao && d.ordem_execucao.trim().length > 0;
   if (temContexto || temOrdem) {
+    // FIX 4 — Risk box for client mode (before context)
+    const riskBoxHtml = isCliente ? `
+      <div style="background: #fff8e1; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
+        <div style="font-size: 11px; font-weight: 700; color: #92400e; margin-bottom: 8px;">⚠ SITUAÇÃO ATUAL — RISCOS DE OPERAÇÃO SEM REGULARIZAÇÃO</div>
+        <div style="font-size: 11px; color: #78350f; line-height: 1.8;">
+          • Multas de R$ 5.000 a R$ 50.000 por autuação da Vigilância Sanitária<br/>
+          • Risco de interdição imediata e embargo das atividades<br/>
+          • Bloqueio de convênios médicos e SUS sem CNES ativo
+        </div>
+      </div>
+    ` : '';
+
+    // MELHORIA C — Lead forte no cenário (cliente mode)
+    const leadForteHtml = isCliente && temContexto ? `
+      <div style="font-weight: 600; font-size: 13px; color: #1a4731; margin-bottom: 12px; line-height: 1.5;">
+        A regularização não é uma formalidade — é o que permite ${esc(nomeEmpresaCurto)} operar sem riscos e crescer com segurança.
+      </div>
+    ` : '';
+
     pages.push(`
       <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
         ${header}
         <div style="padding: 30px 40px;">
+          ${riskBoxHtml}
           ${temContexto ? `
             <div style="margin-bottom: 30px;">
               <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Cenário e Oportunidade</div>
+              ${leadForteHtml}
               <div style="background: #fafafa; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-top: 12px;">
                 <div style="font-size: 10.5px; line-height: 1.8; color: #4b5563; white-space: pre-line;">${esc(d.contexto)}</div>
               </div>
@@ -358,6 +465,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     sectionLabel?: string;
     sectionKey?: string;
     _injectSectionLabel?: string;
+    _compressed?: boolean; // FIX 5
   }
 
   const allEntries: ItemEntry[] = [];
@@ -374,16 +482,18 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     itemPages.push(allEntries.slice(i, i + ITEMS_PER_PAGE));
   }
 
-  // CORREÇÃO 2 — Smart pagination: merge lonely last item(s) into previous page
-  // Keep merging while the last page has fewer items than would overflow
+  // FIX 5 — Anti-orphan: merge lonely last item into previous page (compressed)
   while (itemPages.length >= 2) {
     const lastPage = itemPages[itemPages.length - 1];
     const prevPage = itemPages[itemPages.length - 2];
-    // Merge if last page has 1 item AND combined total ≤ 4
     if (lastPage.length === 1 && prevPage.length <= 3) {
       if (lastPage[0].sectionLabel && prevPage.some(e => e.sectionKey !== lastPage[0].sectionKey)) {
         lastPage[0]._injectSectionLabel = lastPage[0].sectionLabel;
         lastPage[0].sectionLabel = undefined;
+      }
+      // Mark as compressed if merging into a full page
+      if (prevPage.length === 3) {
+        lastPage[0]._compressed = true;
       }
       prevPage.push(lastPage[0]);
       itemPages.pop();
@@ -413,11 +523,12 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
       const hasTaxaItem = item.taxa_min > 0 || item.taxa_max > 0;
       const isObrigatorio = entry.sectionKey === 'obrigatorios';
       const borderColor = isObrigatorio ? '#22c55e' : (entry.sectionKey === 'opcionais' ? '#3b82f6' : '#e5e7eb');
+      const isCompressed = !!entry._compressed;
 
       // Build financial section based on PDF mode
       let financialHtml = '';
       if (!isCliente) {
-        // CONTADOR MODE: 4-column grid
+        // CONTADOR MODE: 4-column grid — FIX 9 distinct colors
         const hMin = item.honorario_minimo_contador || 0;
         const vMerc = item.valor_mercado || 0;
         const vPrem = item.valor_premium || 0;
@@ -430,25 +541,26 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
 
         if (hasContadorFields) {
           financialHtml = `
-            <div style="padding: 0 18px 12px;">
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px; background: #e5e7eb; border-radius: 12px; overflow: hidden; margin: 12px 0;">
-                <div style="padding: 10px; background: #ffffff; text-align: center;">
-                  <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">NOSSO CUSTO</div>
-                  <div style="font-size: 12px; font-weight: 800; color: #1a1a2e;">${fmt(item.honorario)}</div>
+            <div style="padding: 0 18px ${isCompressed ? '8' : '12'}px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px; background: #e5e7eb; border-radius: 12px; overflow: hidden; margin: ${isCompressed ? '8' : '12'}px 0;">
+                <div style="padding: ${isCompressed ? '8' : '10'}px; background: #f5f5f5; text-align: center;">
+                  <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #666666; margin-bottom: 4px;">NOSSO CUSTO</div>
+                  <div style="font-size: 12px; font-weight: 400; color: #666666;">${fmt(item.honorario)}</div>
                 </div>
-                <div style="padding: 10px; background: #f0fdf4; text-align: center;">
+                <div style="padding: ${isCompressed ? '8' : '10'}px; background: #e8f5e9; border: 1px solid #a5d6a7; text-align: center;">
                   <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">COBRAR NO MÍNIMO</div>
-                  <div style="font-size: 12px; font-weight: 800; color: #166534;">${hMin > 0 ? fmt(hMin) : '—'}</div>
-                  ${margemMin > 0 ? `<div style="font-size: 7px; color: #6b7280; margin-top: 2px;">Margem: ${fmt(margemMin)} (${margemMinPct}%)</div>` : ''}
+                  <div style="font-size: 12px; font-weight: 500; color: #2e7d32;">${hMin > 0 ? fmt(hMin) : '—'}</div>
+                  ${margemMin > 0 ? `<div style="font-size: 7px; color: #388e3c; margin-top: 2px;">Margem: ${fmt(margemMin)} (${margemMinPct}%)</div>` : ''}
                 </div>
-                <div style="padding: 10px; background: #eff6ff; text-align: center;">
+                <div style="padding: ${isCompressed ? '8' : '10'}px; background: #c8e6c9; border: 2px solid #4caf50; text-align: center;">
+                  <div style="font-size: 9px; color: #2e7d32; font-weight: 700; margin-bottom: 2px;">✓ IDEAL</div>
                   <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">VALOR DE MERCADO</div>
-                  <div style="font-size: 12px; font-weight: 800; color: #1e40af;">${vMerc > 0 ? fmt(vMerc) : '—'}</div>
-                  ${margemMerc > 0 ? `<div style="font-size: 7px; color: #6b7280; margin-top: 2px;">Margem: ${fmt(margemMerc)} (${margemMercPct}%)</div>` : ''}
+                  <div style="font-size: 12px; font-weight: 700; color: #1b5e20;">${vMerc > 0 ? fmt(vMerc) : '—'}</div>
+                  ${margemMerc > 0 ? `<div style="font-size: 7px; color: #2e7d32; font-weight: 600; margin-top: 2px;">Margem: ${fmt(margemMerc)} (${margemMercPct}%)</div>` : ''}
                 </div>
-                <div style="padding: 10px; background: #fef3c7; text-align: center;">
+                <div style="padding: ${isCompressed ? '8' : '10'}px; background: #fff3cd; border: 1px solid #ffc107; text-align: center;">
                   <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">ACIMA = CARO</div>
-                  <div style="font-size: 12px; font-weight: 800; color: #92400e;">${vPrem > 0 ? fmt(vPrem) : '—'}</div>
+                  <div style="font-size: 12px; font-weight: 400; color: #856404;">${vPrem > 0 ? fmt(vPrem) : '—'}</div>
                 </div>
               </div>
               ${hasTaxaItem ? `<div style="font-size: 8px; color: #6b7280; text-align: center; padding: 4px 0;">Taxas externas (pagas pelo cliente): ${fmt(item.taxa_min)} a ${fmt(item.taxa_max)}</div>` : ''}
@@ -456,7 +568,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           `;
         } else {
           financialHtml = `
-            <div style="padding: 12px 18px; background: #fafafa;">
+            <div style="padding: ${isCompressed ? '8' : '12'}px 18px; background: #fafafa;">
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 10px;">
                 <span style="color: #6b7280;">Honorário Trevo</span>
                 <span style="font-weight: 700; color: #1a1a2e;">${fmt(valorTotal)}</span>
@@ -477,7 +589,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
       } else {
         // CLIENTE MODE: clean, no Trevo mention
         financialHtml = `
-          <div style="padding: 12px 18px; background: #fafafa;">
+          <div style="padding: ${isCompressed ? '8' : '12'}px 18px; background: #fafafa;">
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 10px;">
               <span style="color: #6b7280;">Investimento</span>
               <span style="font-weight: 700; color: #1a1a2e;">${fmt(valorTotal)}</span>
@@ -496,17 +608,20 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
         `;
       }
 
+      // FIX 5 — Compressed mode: hide docs section
+      const showDocsSection = !isCompressed && (item.prazo || item.docs_necessarios);
+
       chunkHtml += `
-        <div style="border: 1px solid #e5e7eb; border-left: 4px solid ${borderColor}; border-radius: 16px; margin-bottom: 14px; overflow: hidden;">
-          <div style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
+        <div style="border: 1px solid #e5e7eb; border-left: 4px solid ${borderColor}; border-radius: 16px; margin-bottom: ${isCompressed ? '10' : '14'}px; overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 12px; padding: ${isCompressed ? '10' : '14'}px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
             <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 800; flex-shrink: 0;">${item.ordem || '•'}</div>
             <div style="flex: 1; min-width: 0;">
               <div style="font-size: 12px; font-weight: 700; color: #ffffff; line-height: 1.3;">${esc(item.descricao)}</div>
             </div>
             <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
           </div>
-          ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
-          ${(item.prazo || item.docs_necessarios) ? `
+          ${item.detalhes && !isCompressed ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
+          ${showDocsSection ? `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #f3f4f6; border-bottom: 1px solid #f3f4f6;">
               <div style="padding: 10px 18px; background: #ffffff;">
                 <div style="font-size: 7px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Prazo</div>
@@ -535,7 +650,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     `);
   }
 
-  // --- PACKAGES PAGE (CORREÇÃO 1) ---
+  // --- PACKAGES PAGE ---
   const validPacotes = d.pacotes.filter(p => p.nome && p.itens_ids.length > 0);
   if (validPacotes.length > 0) {
     let pacotesHtml = '';
@@ -543,32 +658,34 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
       const selected = d.itens.filter(i => pac.itens_ids.includes(i.id));
       const descontoPct = pac.desconto_pct / 100;
 
-      // Custo Trevo
       const custoSemDesconto = selected.reduce((s, i) => s + (i.honorario || 0) * i.quantidade, 0);
       const custoComDesconto = custoSemDesconto * (1 - descontoPct);
-
-      // Preço sugerido ao cliente
       const precoSemDesconto = selected.reduce((s, i) => s + ((i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0);
       const precoComDesconto = precoSemDesconto * (1 - descontoPct);
-
-      // Margem
       const margemValor = precoComDesconto - custoComDesconto;
       const margemPct = custoComDesconto > 0 ? ((margemValor / custoComDesconto) * 100).toFixed(0) : '0';
-
-      // Taxas
       const taxaMin = selected.reduce((s, i) => s + i.taxa_min, 0);
       const taxaMax = selected.reduce((s, i) => s + i.taxa_max, 0);
       const hasTaxaPac = taxaMin > 0 || taxaMax > 0;
 
       const itensNomes = selected.map(i => `✓ ${i.ordem}. ${i.descricao}`);
 
+      // MELHORIA A — "RECOMENDADO" badge on Completo package
+      const isCompleto = pac.nome.toLowerCase().includes('completo');
+      const recomendadoBadge = isCompleto
+        ? `<div style="background: #1a4731; color: #ffffff; font-size: 9px; padding: 3px 8px; border-radius: 4px; font-weight: 700;">★ RECOMENDADO</div>`
+        : '';
+      const pacBorder = isCompleto ? '2px solid #1a4731' : '1px solid #e5e7eb';
+
       if (!isCliente) {
-        // CONTADOR MODE — full breakdown with margins
         pacotesHtml += `
-          <div style="border: 1px solid #e5e7eb; border-radius: 16px; margin-bottom: 16px; overflow: hidden;">
+          <div style="border: ${pacBorder}; border-radius: 16px; margin-bottom: 16px; overflow: hidden;">
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
               <span style="font-size: 14px; font-weight: 800; color: #ffffff;">${esc(pac.nome)}</span>
-              <span style="font-size: 11px; color: #4ade80; font-weight: 700;">-${pac.desconto_pct}% de desconto</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                ${recomendadoBadge}
+                <span style="font-size: 11px; color: #4ade80; font-weight: 700;">-${pac.desconto_pct}% de desconto</span>
+              </div>
             </div>
             <div style="padding: 12px 18px; border-bottom: 1px solid #f3f4f6;">
               ${itensNomes.map(n => `<div style="font-size: 10px; color: #374151; padding: 2px 0;">${esc(n)}</div>`).join('')}
@@ -606,12 +723,15 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           </div>
         `;
       } else {
-        // CLIENTE MODE — clean, no cost or margin
+        // CLIENTE MODE
         pacotesHtml += `
-          <div style="border: 1px solid #e5e7eb; border-radius: 16px; margin-bottom: 16px; overflow: hidden;">
+          <div style="border: ${pacBorder}; border-radius: 16px; margin-bottom: 16px; overflow: hidden;">
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
               <span style="font-size: 14px; font-weight: 800; color: #ffffff;">${esc(pac.nome)}</span>
-              <span style="font-size: 11px; color: #93c5fd; font-weight: 700;">-${pac.desconto_pct}% de desconto</span>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                ${recomendadoBadge}
+                <span style="font-size: 11px; color: #93c5fd; font-weight: 700;">-${pac.desconto_pct}% de desconto</span>
+              </div>
             </div>
             <div style="padding: 12px 18px; border-bottom: 1px solid #f3f4f6;">
               ${itensNomes.map(n => `<div style="font-size: 10px; color: #374151; padding: 2px 0;">${esc(n)}</div>`).join('')}
@@ -654,7 +774,6 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   }
 
   // --- TOTALS + CONDITIONS + CTA PAGE ---
-  // CORREÇÃO 4 — Prazos with dots layout and shortName
   const prazosItens = d.itens.filter(i => i.prazo);
   let prazoHtml = '';
   if (prazosItens.length > 0) {
@@ -681,7 +800,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     `;
   }
 
-  // CORREÇÃO 6 — CTA per mode
+  // FIX 2 — CTA per mode with contador contact info
   const ctaSection = !isCliente ? `
     <div style="background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); border-radius: 16px; padding: 24px; text-align: center;">
       <div style="font-size: 11px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
@@ -692,17 +811,33 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
         <span>🌐 trevolegaliza.com.br</span>
       </div>
     </div>
-  ` : `
-    <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 16px; padding: 24px; text-align: center;">
-      <div style="font-size: 11px; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
-      <div style="font-size: 10px; color: rgba(255,255,255,0.7);">Para aprovar esta proposta ou esclarecer dúvidas, entre em contato com o escritório responsável.</div>
-    </div>
-  `;
+  ` : (() => {
+    // CLIENTE MODE: show contador contact if available
+    if (d.contadorNome) {
+      const contactLines: string[] = [];
+      if (d.contadorTelefone) contactLines.push(`<div style="font-size: 11px; color: #ffffff; margin-top: 6px;">📱 ${esc(d.contadorTelefone)}</div>`);
+      if (d.contadorEmail) contactLines.push(`<div style="font-size: 11px; color: #ffffff; margin-top: 4px;">✉️ ${esc(d.contadorEmail)}</div>`);
+      return `
+        <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 16px; padding: 24px; text-align: center;">
+          <div style="font-size: 11px; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
+          <div style="font-size: 10px; color: rgba(255,255,255,0.7); margin-bottom: 12px;">Esta proposta é válida por ${d.validade_dias} dias. Para avançar ou esclarecer dúvidas, entre em contato — estamos prontos para começar.</div>
+          <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 8px;">${esc(d.contadorNome)}</div>
+          ${contactLines.join('')}
+        </div>
+      `;
+    }
+    // Fallback: generic
+    return `
+      <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 16px; padding: 24px; text-align: center;">
+        <div style="font-size: 11px; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
+        <div style="font-size: 10px; color: rgba(255,255,255,0.7);">Esta proposta é válida por ${d.validade_dias} dias. Para avançar ou esclarecer dúvidas, entre em contato com o escritório responsável.</div>
+      </div>
+    `;
+  })();
 
-  // CORREÇÃO 8 — Resumo per mode
+  // Resumo per mode
   let resumoHtml = '';
   if (!isCliente) {
-    // CONTADOR: show cost + suggested price + margin
     const descontoCusto = totalCustoTrevo * (d.desconto_pct / 100);
     const custoFinal = totalCustoTrevo - descontoCusto;
     const descontoPreco = totalPrecoCliente * (d.desconto_pct / 100);
@@ -745,7 +880,6 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
       </div>
     `;
   } else {
-    // CLIENTE: simple — just investment + taxes + total
     resumoHtml = `
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
@@ -817,6 +951,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   return pages;
 }
 
+// FIX 1 — Reset scroll before each html2canvas capture
 async function renderPageToCanvas(html: string): Promise<HTMLCanvasElement> {
   const container = document.createElement('div');
   container.style.position = 'absolute';
@@ -824,6 +959,11 @@ async function renderPageToCanvas(html: string): Promise<HTMLCanvasElement> {
   container.innerHTML = html;
   document.body.appendChild(container);
   try {
+    // FIX 1: Reset scroll position before capture
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    await new Promise(resolve => setTimeout(resolve, 150));
+
     const el = container.firstElementChild as HTMLElement;
     return await html2canvas(el, { scale: 1.5, useCORS: true, logging: false, backgroundColor: '#ffffff' });
   } finally {
