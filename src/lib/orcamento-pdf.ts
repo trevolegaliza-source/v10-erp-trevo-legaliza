@@ -510,7 +510,32 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           ${d.prospect_cnpj ? `<div style="font-size: 14px; color: #64748b;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
           ${coverValueBoxHtml}
           ${coverBulletsHtml}
-          
+
+          <!-- FIX 4: 3 benefícios visuais + frase de impacto (cliente) -->
+          <div style="margin-top: 36px; width: 100%; max-width: 560px;">
+            <div style="border-top: 1px solid #e2e8f0; margin-bottom: 28px;"></div>
+            <div style="display: flex; gap: 16px; justify-content: center; margin-bottom: 28px;">
+              <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 22px; margin-bottom: 8px;">🛡️</div>
+                <div style="font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">Operação sem riscos</div>
+                <div style="font-size: 10px; color: #64748b; line-height: 1.4;">Elimina risco de multas, interdição e bloqueio de convênios</div>
+              </div>
+              <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f0fdf4; border-radius: 10px; border: 1px solid #bbf7d0;">
+                <div style="font-size: 22px; margin-bottom: 8px;">📋</div>
+                <div style="font-size: 11px; font-weight: 700; color: #15803d; margin-bottom: 4px;">Tudo incluído</div>
+                <div style="font-size: 10px; color: #4b5563; line-height: 1.4;">Expertise full-service — desde o protocolo até a licença em mãos</div>
+              </div>
+              <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 22px; margin-bottom: 8px;">⏱️</div>
+                <div style="font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">6 a 12 semanas</div>
+                <div style="font-size: 10px; color: #64748b; line-height: 1.4;">Prazo estimado para regularização completa</div>
+              </div>
+            </div>
+            <div style="text-align: center; font-size: 12px; font-style: italic; color: #475569; padding: 14px 20px; background: #f1f5f9; border-radius: 8px; line-height: 1.5;">
+              "Regularização não é burocracia — é o que permite sua empresa<br>
+              operar com segurança, contratar convênios e crescer sem sustos."
+            </div>
+          </div>
         </div>
         <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
       </div>
