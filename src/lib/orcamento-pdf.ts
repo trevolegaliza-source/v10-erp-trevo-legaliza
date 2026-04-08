@@ -343,7 +343,7 @@ function buildSimplesHTML(d: OrcamentoPDFData, logo: string | null): string {
 // ────────────────────────────────────────
 // DETALHADO MODE
 // ────────────────────────────────────────
-function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[] {
+async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Promise<string[]> {
   const pages: string[] = [];
   const pdfMode = resolvePDFMode(d);
   const isCliente = pdfMode === 'cliente';
