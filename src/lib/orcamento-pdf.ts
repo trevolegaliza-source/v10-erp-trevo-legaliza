@@ -207,22 +207,49 @@ function sanitizeFilename(name: string): string {
 
 function resolvePDFMode(d: OrcamentoPDFData): OrcamentoPDFMode {
   if (d.modoPDF) return d.modoPDF;
+  if (d.destinatario === 'cliente_via_contador') return 'cliente';
+  if (d.destinatario === 'cliente_direto') return 'direto';
   return d.modoContador ? 'cliente' : 'contador';
+}
+
+/** Resolve the escritório name from new or legacy fields */
+function getEscritorioNome(d: OrcamentoPDFData): string {
+  return d.escritorioNome || d.clienteNome || d.contadorNome || '';
+}
+
+function getNomeExibicao(d: OrcamentoPDFData, pdfMode: OrcamentoPDFMode, contexto: 'header' | 'capa_principal' | 'headline_cenario' | 'cta_final' | 'rodape'): string {
+  const escritorio = getEscritorioNome(d);
+  const empresa = toTitleCase(d.prospect_nome || '');
+
+  switch (pdfMode) {
+    case 'contador':
+      if (contexto === 'header' || contexto === 'rodape' || contexto === 'cta_final') return 'Trevo Legaliza';
+      if (contexto === 'capa_principal') return escritorio || empresa;
+      if (contexto === 'headline_cenario') return empresa;
+      break;
+    case 'cliente':
+      if (contexto === 'header' || contexto === 'rodape' || contexto === 'cta_final') return escritorio || empresa;
+      if (contexto === 'capa_principal' || contexto === 'headline_cenario') return empresa;
+      break;
+    case 'direto':
+      if (contexto === 'header' || contexto === 'rodape' || contexto === 'cta_final') return 'Trevo Legaliza';
+      if (contexto === 'capa_principal' || contexto === 'headline_cenario') return empresa;
+      break;
+  }
+  return empresa;
 }
 
 function getHeader(d: OrcamentoPDFData, logo: string | null, pdfMode: OrcamentoPDFMode): string {
   if (pdfMode === 'cliente') {
-    return HEADER_CLIENTE(d.numero, d.data_emissao, d.clienteNome || d.prospect_nome);
+    return HEADER_CLIENTE(d.numero, d.data_emissao, getNomeExibicao(d, pdfMode, 'header'));
   }
-  // 'contador' and 'direto' both use Trevo header
   return HEADER_TREVO(d.numero, d.data_emissao, logo);
 }
 
 function getFooter(d: OrcamentoPDFData, pdfMode: OrcamentoPDFMode): string {
   if (pdfMode === 'cliente') {
-    return FOOTER_CLIENTE(d.clienteNome || d.prospect_nome);
+    return FOOTER_CLIENTE(getNomeExibicao(d, pdfMode, 'rodape'));
   }
-  // 'contador' and 'direto' both use Trevo footer
   return FOOTER_TREVO;
 }
 
