@@ -709,9 +709,11 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       cardHtml += `<div style="font-size: 11px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid ${accentBg};">${esc(entry.sectionLabel)}</div>`;
     }
 
-    const valorExibido = isCliente
-      ? (item.honorario_minimo_contador || item.honorario)
-      : getItemValor(item);
+    const valorExibido = pdfMode === 'direto'
+      ? (item.valor_mercado || item.honorario_minimo_contador || item.honorario)
+      : isCliente
+        ? (item.honorario_minimo_contador || item.honorario)
+        : getItemValor(item);
     const valorTotal = valorExibido * item.quantidade;
     const totalMin = valorTotal + item.taxa_min;
     const totalMax = valorTotal + item.taxa_max;
