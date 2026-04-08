@@ -15,6 +15,7 @@ export interface OrcamentoItem {
   docs_necessarios: string;
   quantidade: number;
   isOptional?: boolean; // false = obrigatório (default), true = opcional
+  valorVendaDireto?: number; // valor de venda editável no modo direto (Trevo → Cliente Final)
   // legacy compat
   valor?: number;
 }
@@ -124,6 +125,7 @@ export function normalizeItem(raw: any): OrcamentoItem {
     docs_necessarios: raw.docs_necessarios || '',
     quantidade: Number(raw.quantidade) || 1,
     isOptional: raw.isOptional === true,
+    valorVendaDireto: raw.valorVendaDireto != null ? Number(raw.valorVendaDireto) : undefined,
     valor: Number(raw.valor) || undefined,
   };
 }
