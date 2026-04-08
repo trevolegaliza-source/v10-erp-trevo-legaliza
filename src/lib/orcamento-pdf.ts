@@ -355,8 +355,8 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
         </div>
 
         <!-- ZONA 3: Three financial cards -->
-        <div style="flex: 1; display: flex; align-items: center; padding: 0 40px;">
-          <div style="display: flex; gap: 16px; width: 100%;">
+        <div style="padding: 0 40px; flex-shrink: 0;">
+          <div style="display: flex; gap: 16px; width: 100%; margin-top: 24px;">
             <!-- Card 1: Custo Trevo -->
             <div style="flex: 1; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px 16px; text-align: center;">
               <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">SEU CUSTO TREVO</div>
