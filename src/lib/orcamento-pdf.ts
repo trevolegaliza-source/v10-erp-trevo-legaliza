@@ -868,9 +868,14 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
                   <span style="font-weight: 700; color: #166534;">${fmt(precoComDesconto)}</span>
                 </div>
               </div>
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6; background: #eff6ff;">
-                <div style="font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">SUA MARGEM NESTE PACOTE</div>
-                <div style="font-size: 11px; font-weight: 700; color: #1e40af;">${fmt(margemValor)} (${margemPct}%)</div>
+              <!-- FIX 2: Margin highlight card -->
+              <div style="margin: 14px 18px 10px; padding: 14px 20px; background: #f0fdf4; border: 1.5px solid #4ade80; border-radius: 10px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-size: 10px; font-weight: 600; color: #166534; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px;">Você ganha com este pacote</div>
+                  <div style="font-size: 22px; font-weight: 700; color: #15803d; line-height: 1;">${fmt(margemValor)}</div>
+                  <div style="font-size: 11px; color: #4ade80; margin-top: 3px; font-weight: 500;">${margemPct}% de lucro líquido</div>
+                </div>
+                <div style="width: 52px; height: 52px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px;">💰</div>
               </div>
               ${hasTaxaPac ? `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6;">
