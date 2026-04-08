@@ -111,6 +111,32 @@ async function preloadLogo(): Promise<string | null> {
   return null;
 }
 
+/**
+ * Measures the real rendered height of an HTML block in the DOM.
+ * Uses getBoundingClientRect() for pixel-accurate measurement.
+ */
+async function medirAlturaReal(html: string): Promise<number> {
+  const probe = document.createElement('div');
+  probe.style.cssText = `
+    position: absolute;
+    top: -99999px;
+    left: -99999px;
+    width: 722px;
+    visibility: hidden;
+    pointer-events: none;
+    box-sizing: border-box;
+  `;
+  probe.innerHTML = html;
+  document.body.appendChild(probe);
+
+  // Wait one frame for the browser to calculate layout
+  await new Promise(r => requestAnimationFrame(r));
+
+  const altura = probe.getBoundingClientRect().height;
+  document.body.removeChild(probe);
+  return Math.ceil(altura) + 24; // +24px safety margin
+}
+
 const HEADER_HEIGHT = 64;
 
 function logoHtml(logo: string | null, height = 36): string {
@@ -317,7 +343,7 @@ function buildSimplesHTML(d: OrcamentoPDFData, logo: string | null): string {
 // ────────────────────────────────────────
 // DETALHADO MODE
 // ────────────────────────────────────────
-function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[] {
+async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Promise<string[]> {
   const pages: string[] = [];
   const pdfMode = resolvePDFMode(d);
   const isCliente = pdfMode === 'cliente';
@@ -568,7 +594,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     pages.push(`
       <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
         ${header}
-        <div style="padding: 30px 40px;">
+        <div style="padding: 24px 36px; box-sizing: border-box;">
           ${riskBoxHtml}
           ${temContexto ? `
             <div style="margin-bottom: 30px;">
@@ -605,7 +631,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     `);
   }
 
-  // --- ITEMS PAGES (grouped by section, max 3 per page) ---
+  // --- ITEMS PAGES (grouped by section, REAL HEIGHT MEASUREMENT) ---
   const grouped = secoes
     .map(s => ({ ...s, items: d.itens.filter(i => i.secao === s.key).sort((a, b) => a.ordem - b.ordem) }))
     .filter(g => g.items.length > 0);
@@ -614,8 +640,6 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     item: OrcamentoItem;
     sectionLabel?: string;
     sectionKey?: string;
-    _injectSectionLabel?: string;
-    _compressed?: boolean; // FIX 5
   }
 
   const allEntries: ItemEntry[] = [];
@@ -626,131 +650,78 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     });
   }
 
-  // Pagination: max 3 items per page, with safe height estimation
-  // Each item ~300px, available height ~963px → max 3 items safely
-  const ITEMS_PER_PAGE = 3;
-  const itemPages: Array<ItemEntry[]> = [];
-  for (let i = 0; i < allEntries.length; i += ITEMS_PER_PAGE) {
-    itemPages.push(allEntries.slice(i, i + ITEMS_PER_PAGE));
-  }
+  // Build HTML for a single entry card (extracted for measurement)
+  function buildEntryHtml(entry: ItemEntry): string {
+    let cardHtml = '';
+    const item = entry.item;
 
-  // Anti-orphan: merge lonely last item into previous page ONLY if it has < 3 items
-  while (itemPages.length >= 2) {
-    const lastPage = itemPages[itemPages.length - 1];
-    const prevPage = itemPages[itemPages.length - 2];
-    // Only merge if previous page has room (max 2 items, so merging makes 3)
-    if (lastPage.length === 1 && prevPage.length <= 2) {
-      if (lastPage[0].sectionLabel && prevPage.some(e => e.sectionKey !== lastPage[0].sectionKey)) {
-        lastPage[0]._injectSectionLabel = lastPage[0].sectionLabel;
-        lastPage[0].sectionLabel = undefined;
-      }
-      prevPage.push(lastPage[0]);
-      itemPages.pop();
-    } else {
-      break;
+    if (entry.sectionLabel) {
+      cardHtml += `<div style="font-size: 11px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid ${accentBg};">${esc(entry.sectionLabel)}</div>`;
     }
-  }
 
-  for (const chunk of itemPages) {
-    let chunkHtml = '';
-    for (const entry of chunk) {
-      const item = entry.item;
+    const valorExibido = isCliente
+      ? (item.honorario_minimo_contador || item.honorario)
+      : getItemValor(item);
+    const valorTotal = valorExibido * item.quantidade;
+    const totalMin = valorTotal + item.taxa_min;
+    const totalMax = valorTotal + item.taxa_max;
+    const hasTaxaItem = item.taxa_min > 0 || item.taxa_max > 0;
+    const isOpcional = entry.sectionKey === 'opcionais' || (secoes.find(s => s.key === entry.sectionKey)?.label || '').toLowerCase().includes('opcional');
+    const isCNES = /cnes|altamente recomendado/i.test(item.descricao);
+    const borderColor = isOpcional
+      ? (isCNES ? '#10b981' : '#f59e0b')
+      : (entry.sectionKey === 'obrigatorios' ? '#22c55e' : '#e5e7eb');
+    const borderStyle = (isOpcional && !isCNES) ? 'dashed' : 'solid';
 
-      // Inject section label for merged items
-      if (entry._injectSectionLabel) {
-        chunkHtml += `<div style="font-size: 11px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin: 16px 0 10px; padding-bottom: 6px; border-bottom: 2px solid ${accentBg};">${esc(entry._injectSectionLabel)}</div>`;
-      } else if (entry.sectionLabel) {
-        chunkHtml += `<div style="font-size: 11px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 2px solid ${accentBg};">${esc(entry.sectionLabel)}</div>`;
-      }
+    // Financial section based on PDF mode
+    let financialHtml = '';
+    if (!isCliente) {
+      const hMin = item.honorario_minimo_contador || 0;
+      const vMerc = item.valor_mercado || 0;
+      const vPrem = item.valor_premium || 0;
+      const margemMin = hMin > 0 && item.honorario > 0 ? hMin - item.honorario : 0;
+      const margemMinPct = item.honorario > 0 && hMin > 0 ? ((hMin / item.honorario - 1) * 100).toFixed(0) : '0';
+      const margemMerc = vMerc > 0 && item.honorario > 0 ? vMerc - item.honorario : 0;
+      const margemMercPct = item.honorario > 0 && vMerc > 0 ? ((vMerc / item.honorario - 1) * 100).toFixed(0) : '0';
+      const hasContadorFields = hMin > 0 || vMerc > 0 || vPrem > 0;
 
-      const valorExibido = isCliente
-        ? (item.honorario_minimo_contador || item.honorario)
-        : getItemValor(item);
-      const valorTotal = valorExibido * item.quantidade;
-      const totalMin = valorTotal + item.taxa_min;
-      const totalMax = valorTotal + item.taxa_max;
-      const hasTaxaItem = item.taxa_min > 0 || item.taxa_max > 0;
-      const isObrigatorio = entry.sectionKey === 'obrigatorios';
-      const isOpcional = entry.sectionKey === 'opcionais' || (secoes.find(s => s.key === entry.sectionKey)?.label || '').toLowerCase().includes('opcional');
-      const isCNES = /cnes|altamente recomendado/i.test(item.descricao);
-      const borderColor = isOpcional
-        ? (isCNES ? '#10b981' : '#f59e0b')
-        : (isObrigatorio ? '#22c55e' : '#e5e7eb');
-      const borderStyle = (isOpcional && !isCNES) ? 'dashed' : 'solid';
-      const isCompressed = !!entry._compressed;
-
-      // Build financial section based on PDF mode
-      let financialHtml = '';
-      if (!isCliente) {
-        // CONTADOR MODE: 4-column grid — FIX 9 distinct colors
-        const hMin = item.honorario_minimo_contador || 0;
-        const vMerc = item.valor_mercado || 0;
-        const vPrem = item.valor_premium || 0;
-        const margemMin = hMin > 0 && item.honorario > 0 ? hMin - item.honorario : 0;
-        const margemMinPct = item.honorario > 0 && hMin > 0 ? ((hMin / item.honorario - 1) * 100).toFixed(0) : '0';
-        const margemMerc = vMerc > 0 && item.honorario > 0 ? vMerc - item.honorario : 0;
-        const margemMercPct = item.honorario > 0 && vMerc > 0 ? ((vMerc / item.honorario - 1) * 100).toFixed(0) : '0';
-
-        const hasContadorFields = hMin > 0 || vMerc > 0 || vPrem > 0;
-
-        if (hasContadorFields) {
-          financialHtml = `
-            <div style="padding: 0 18px ${isCompressed ? '8' : '12'}px;">
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px; background: #e5e7eb; border-radius: 12px; overflow: hidden; margin: ${isCompressed ? '8' : '12'}px 0;">
-                <div style="padding: ${isCompressed ? '8' : '10'}px; background: #f5f5f5; text-align: center;">
-                  <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #666666; margin-bottom: 4px;">NOSSO CUSTO</div>
-                  <div style="font-size: 12px; font-weight: 400; color: #666666;">${fmt(item.honorario)}</div>
-                </div>
-                <div style="padding: ${isCompressed ? '8' : '10'}px; background: #e8f5e9; border: 1px solid #a5d6a7; text-align: center;">
-                  <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">COBRAR NO MÍNIMO</div>
-                  <div style="font-size: 12px; font-weight: 500; color: #2e7d32;">${hMin > 0 ? fmt(hMin) : '—'}</div>
-                  ${margemMin > 0 ? `<div style="font-size: 7px; color: #388e3c; margin-top: 2px;">Margem: ${fmt(margemMin)} (${margemMinPct}%)</div>` : ''}
-                </div>
-                <div style="padding: ${isCompressed ? '8' : '10'}px; background: #c8e6c9; border: 2px solid #4caf50; text-align: center;">
-                  <div style="font-size: 9px; color: #2e7d32; font-weight: 700; margin-bottom: 2px;">✓ IDEAL</div>
-                  <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">VALOR DE MERCADO</div>
-                  <div style="font-size: 12px; font-weight: 700; color: #1b5e20;">${vMerc > 0 ? fmt(vMerc) : '—'}</div>
-                  ${margemMerc > 0 ? `<div style="font-size: 7px; color: #2e7d32; font-weight: 600; margin-top: 2px;">Margem: ${fmt(margemMerc)} (${margemMercPct}%)</div>` : ''}
-                </div>
-                <div style="padding: ${isCompressed ? '8' : '10'}px; background: #fff3cd; border: 1px solid #ffc107; text-align: center;">
-                  <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">ACIMA = CARO</div>
-                  <div style="font-size: 12px; font-weight: 400; color: #856404;">${vPrem > 0 ? fmt(vPrem) : '—'}</div>
-                </div>
-              </div>
-              ${hasTaxaItem ? `<div style="font-size: 8px; color: #6b7280; text-align: center; padding: 4px 0;">Taxas externas (pagas pelo cliente): ${fmt(item.taxa_min)} a ${fmt(item.taxa_max)}</div>` : ''}
-            </div>
-          `;
-        } else {
-          financialHtml = `
-            <div style="padding: ${isCompressed ? '8' : '12'}px 18px; background: #fafafa;">
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 10px;">
-                <span style="color: #6b7280;">Honorário Trevo</span>
-                <span style="font-weight: 700; color: #1a1a2e;">${fmt(valorTotal)}</span>
-              </div>
-              ${hasTaxaItem ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 10px;">
-                  <span style="color: #6b7280;">Taxas externas (estimativa)</span>
-                  <span style="font-weight: 500; color: #92400e;">${fmt(item.taxa_min)} a ${fmt(item.taxa_max)}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 10px;">
-                  <span style="font-weight: 700; color: #1a1a2e;">Total estimado</span>
-                  <span style="font-size: 11px; font-weight: 700; color: ${accentText};">${fmt(totalMin)} a ${fmt(totalMax)}</span>
-                </div>
-              ` : ''}
-            </div>
-          `;
-        }
-      } else {
-        // CLIENTE MODE: clean, no Trevo mention
+      if (hasContadorFields) {
         financialHtml = `
-          <div style="padding: ${isCompressed ? '8' : '12'}px 18px; background: #fafafa;">
+          <div style="padding: 0 18px 12px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px; background: #e5e7eb; border-radius: 12px; overflow: hidden; margin: 12px 0;">
+              <div style="padding: 10px; background: #f5f5f5; text-align: center;">
+                <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #666666; margin-bottom: 4px;">NOSSO CUSTO</div>
+                <div style="font-size: 12px; font-weight: 400; color: #666666;">${fmt(item.honorario)}</div>
+              </div>
+              <div style="padding: 10px; background: #e8f5e9; border: 1px solid #a5d6a7; text-align: center;">
+                <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">COBRAR NO MÍNIMO</div>
+                <div style="font-size: 12px; font-weight: 500; color: #2e7d32;">${hMin > 0 ? fmt(hMin) : '—'}</div>
+                ${margemMin > 0 ? `<div style="font-size: 7px; color: #388e3c; margin-top: 2px;">Margem: ${fmt(margemMin)} (${margemMinPct}%)</div>` : ''}
+              </div>
+              <div style="padding: 10px; background: #c8e6c9; border: 2px solid #4caf50; text-align: center;">
+                <div style="font-size: 9px; color: #2e7d32; font-weight: 700; margin-bottom: 2px;">✓ IDEAL</div>
+                <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">VALOR DE MERCADO</div>
+                <div style="font-size: 12px; font-weight: 700; color: #1b5e20;">${vMerc > 0 ? fmt(vMerc) : '—'}</div>
+                ${margemMerc > 0 ? `<div style="font-size: 7px; color: #2e7d32; font-weight: 600; margin-top: 2px;">Margem: ${fmt(margemMerc)} (${margemMercPct}%)</div>` : ''}
+              </div>
+              <div style="padding: 10px; background: #fff3cd; border: 1px solid #ffc107; text-align: center;">
+                <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">ACIMA = CARO</div>
+                <div style="font-size: 12px; font-weight: 400; color: #856404;">${vPrem > 0 ? fmt(vPrem) : '—'}</div>
+              </div>
+            </div>
+            ${hasTaxaItem ? `<div style="font-size: 8px; color: #6b7280; text-align: center; padding: 4px 0;">Taxas externas (pagas pelo cliente): ${fmt(item.taxa_min)} a ${fmt(item.taxa_max)}</div>` : ''}
+          </div>
+        `;
+      } else {
+        financialHtml = `
+          <div style="padding: 12px 18px; background: #fafafa;">
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 10px;">
-              <span style="color: #6b7280;">Investimento</span>
+              <span style="color: #6b7280;">Honorário Trevo</span>
               <span style="font-weight: 700; color: #1a1a2e;">${fmt(valorTotal)}</span>
             </div>
             ${hasTaxaItem ? `
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 10px;">
-                <span style="color: #6b7280;">Taxas governamentais (estimativa)</span>
+                <span style="color: #6b7280;">Taxas externas (estimativa)</span>
                 <span style="font-weight: 500; color: #92400e;">${fmt(item.taxa_min)} a ${fmt(item.taxa_max)}</span>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 10px;">
@@ -761,49 +732,92 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           </div>
         `;
       }
-
-      // FIX 5 — Compressed mode: hide docs section
-      const showDocsSection = !isCompressed && (item.prazo || item.docs_necessarios);
-
-      // FIX 1 — Optional badge
-      const opcionalBadge = isOpcional
-        ? (isCNES
-          ? `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#d1fae5;color:#064e3b;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">★ RECOMENDADO</span>`
-          : `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fef3c7;color:#92400e;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">OPCIONAL</span>`)
-        : '';
-
-      chunkHtml += `
-        <div style="border: 1px solid #e5e7eb; border-left: 4px ${borderStyle} ${borderColor}; border-radius: 16px; margin-bottom: ${isCompressed ? '10' : '14'}px; overflow: hidden;">
-          <div style="display: flex; align-items: center; gap: 12px; padding: ${isCompressed ? '10' : '14'}px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
-            <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 800; flex-shrink: 0;">${item.ordem || '•'}</div>
-            <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 12px; font-weight: 700; color: #ffffff; line-height: 1.3;">${esc(item.descricao)}</div>
-            </div>
-            ${opcionalBadge}
-            <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
+    } else {
+      financialHtml = `
+        <div style="padding: 12px 18px; background: #fafafa;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 10px;">
+            <span style="color: #6b7280;">Investimento</span>
+            <span style="font-weight: 700; color: #1a1a2e;">${fmt(valorTotal)}</span>
           </div>
-          ${item.detalhes ? `<div style="padding: ${isCompressed ? '8' : '12'}px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
-          ${showDocsSection ? `
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #f3f4f6; border-bottom: 1px solid #f3f4f6;">
-              <div style="padding: 10px 18px; background: #ffffff;">
-                <div style="font-size: 7px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Prazo</div>
-                <div style="font-size: 10px; color: #374151; font-weight: 500;">${esc(item.prazo || 'A definir')}</div>
-              </div>
-              <div style="padding: 10px 18px; background: #ffffff;">
-                <div style="font-size: 7px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Documentos necessários</div>
-                <div style="font-size: 10px; color: #374151; font-weight: 500;">${esc(item.docs_necessarios || '—')}</div>
-              </div>
+          ${hasTaxaItem ? `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 10px;">
+              <span style="color: #6b7280;">Taxas governamentais (estimativa)</span>
+              <span style="font-weight: 500; color: #92400e;">${fmt(item.taxa_min)} a ${fmt(item.taxa_max)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 8px; border-top: 1px solid #e5e7eb; font-size: 10px;">
+              <span style="font-weight: 700; color: #1a1a2e;">Total estimado</span>
+              <span style="font-size: 11px; font-weight: 700; color: ${accentText};">${fmt(totalMin)} a ${fmt(totalMax)}</span>
             </div>
           ` : ''}
-          ${financialHtml}
         </div>
       `;
     }
 
+    const showDocsSection = item.prazo || item.docs_necessarios;
+    const opcionalBadge = isOpcional
+      ? (isCNES
+        ? `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#d1fae5;color:#064e3b;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">★ RECOMENDADO</span>`
+        : `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fef3c7;color:#92400e;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">OPCIONAL</span>`)
+      : '';
+
+    cardHtml += `
+      <div style="border: 1px solid #e5e7eb; border-left: 4px ${borderStyle} ${borderColor}; border-radius: 16px; margin-bottom: 14px; overflow: hidden;">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
+          <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 800; flex-shrink: 0;">${item.ordem || '•'}</div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 12px; font-weight: 700; color: #ffffff; line-height: 1.3;">${esc(item.descricao)}</div>
+          </div>
+          ${opcionalBadge}
+          <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
+        </div>
+        ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
+        ${showDocsSection ? `
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #f3f4f6; border-bottom: 1px solid #f3f4f6;">
+            <div style="padding: 10px 18px; background: #ffffff;">
+              <div style="font-size: 7px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Prazo</div>
+              <div style="font-size: 10px; color: #374151; font-weight: 500;">${esc(item.prazo || 'A definir')}</div>
+            </div>
+            <div style="padding: 10px 18px; background: #ffffff;">
+              <div style="font-size: 7px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Documentos necessários</div>
+              <div style="font-size: 10px; color: #374151; font-weight: 500;">${esc(item.docs_necessarios || '—')}</div>
+            </div>
+          </div>
+        ` : ''}
+        ${financialHtml}
+      </div>
+    `;
+
+    return cardHtml;
+  }
+
+  // Generate HTML for every entry, then measure real heights
+  const entryHtmls = allEntries.map(e => buildEntryHtml(e));
+
+  const ALTURA_DISPONIVEL = 880; // 1123 - 64(header) - 48(footer) - 48(padding) - 48(section title) - 35(safety)
+  const entryHeights: number[] = [];
+  for (const html of entryHtmls) {
+    entryHeights.push(await medirAlturaReal(html));
+  }
+
+  // Paginate based on measured real heights — never split a card
+  const itemPageIndices: number[][] = [[]];
+  let alturaAcumulada = 0;
+  for (let i = 0; i < allEntries.length; i++) {
+    if (alturaAcumulada + entryHeights[i] > ALTURA_DISPONIVEL && itemPageIndices[itemPageIndices.length - 1].length > 0) {
+      itemPageIndices.push([]);
+      alturaAcumulada = 0;
+    }
+    itemPageIndices[itemPageIndices.length - 1].push(i);
+    alturaAcumulada += entryHeights[i];
+  }
+
+  // Build page divs from paginated indices
+  for (const indices of itemPageIndices) {
+    const chunkHtml = indices.map(i => entryHtmls[i]).join('');
     pages.push(`
       <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
         ${header}
-        <div style="padding: 24px 40px;">
+        <div style="padding: 24px 36px; box-sizing: border-box;">
           <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Escopo dos Serviços</div>
           ${chunkHtml}
         </div>
@@ -935,7 +949,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     pages.push(`
       <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
         ${header}
-        <div style="padding: 24px 40px;">
+        <div style="padding: 24px 36px; box-sizing: border-box;">
           <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Pacotes Disponíveis</div>
           ${pacotesHtml}
         </div>
@@ -1082,7 +1096,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   pages.push(`
     <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
       ${header}
-      <div style="padding: 30px 40px;">
+      <div style="padding: 24px 36px; box-sizing: border-box;">
         <!-- Totals -->
         <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Resumo do Investimento</div>
         ${resumoHtml}
@@ -1182,7 +1196,7 @@ export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<Blob> {
     return doc.output('blob');
   }
 
-  const pagesHtml = buildDetalhadoPages(data, logo);
+  const pagesHtml = await buildDetalhadoPages(data, logo);
   const doc = new jsPDF('p', 'mm', 'a4');
 
   for (let i = 0; i < pagesHtml.length; i++) {
