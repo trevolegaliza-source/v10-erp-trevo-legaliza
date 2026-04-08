@@ -562,8 +562,8 @@ export default function OrcamentoNovo() {
                           <Label className="text-xs text-emerald-700 font-medium">Valor de venda R$</Label>
                           <Input
                             type="number"
-                            value={item.valorVendaDireto ?? item.valor_mercado || item.honorario_minimo_contador || item.honorario || ''}
-                            onChange={e => updateItem(idx, 'valorVendaDireto' as keyof OrcamentoItem, parseFloat(e.target.value) || 0)}
+                            value={item.valorVendaDireto ?? (item.valor_mercado || item.honorario_minimo_contador || item.honorario) || ''}
+                            onChange={e => updateItem(idx, 'valorVendaDireto', parseFloat(e.target.value) || 0)}
                             placeholder="0,00"
                             className="text-right"
                           />
@@ -574,12 +574,16 @@ export default function OrcamentoNovo() {
                           </p>
                         ) : null}
                       </div>
-                      {item.honorario > 0 && (
-                        <p className="text-xs text-emerald-600 font-medium">
-                          Sua margem: {fmt((item.valorVendaDireto ?? item.valor_mercado ?? item.honorario_minimo_contador ?? item.honorario) - item.honorario)}{' '}
-                          ({Math.round((((item.valorVendaDireto ?? item.valor_mercado ?? item.honorario_minimo_contador ?? item.honorario) - item.honorario) / item.honorario) * 100)}%)
-                        </p>
-                      )}
+                      {item.honorario > 0 && (() => {
+                        const venda = item.valorVendaDireto ?? (item.valor_mercado || item.honorario_minimo_contador || item.honorario);
+                        const margem = venda - item.honorario;
+                        const pct = Math.round((margem / item.honorario) * 100);
+                        return (
+                          <p className="text-xs text-emerald-600 font-medium">
+                            Sua margem: {fmt(margem)} ({pct}%)
+                          </p>
+                        );
+                      })()}
                     </div>
                   )}
 

@@ -15,6 +15,7 @@ export interface OrcamentoItem {
   docs_necessarios: string;
   quantidade: number;
   isOptional?: boolean; // false = obrigatório (default), true = opcional
+  valorVendaDireto?: number; // valor de venda editável no modo direto (Trevo → Cliente Final)
   // legacy compat
   valor?: number;
 }
