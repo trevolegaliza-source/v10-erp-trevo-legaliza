@@ -1091,9 +1091,9 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             <span style="color: #b45309; font-weight: 600;">${fmt(totalTaxaMin)} a ${fmt(totalTaxaMax)}</span>
           </div>
         ` : ''}
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 10px; background: #eff6ff; border: 2px solid #3b82f6; border-radius: 12px;">
-          <span style="font-size: 12px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 1px;">${hasTaxas ? 'Investimento Total' : 'Total'}</span>
-          <span style="font-size: ${hasTaxas ? '22' : '28'}px; font-weight: 900; color: #1e40af;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 10px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 12px;">
+          <span style="font-size: 12px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 1px;">${hasTaxas ? 'Investimento Total' : 'Total'}</span>
+          <span style="font-size: ${hasTaxas ? '22' : '28'}px; font-weight: 900; color: ${accentText};">
             ${hasTaxas ? `${fmt(honorarioFinalCapa + totalTaxaMin)} a ${fmt(honorarioFinalCapa + totalTaxaMax)}` : fmt(honorarioFinalCapa)}
           </span>
         </div>
