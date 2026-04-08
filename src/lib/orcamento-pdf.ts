@@ -159,7 +159,7 @@ function logoHtml(logo: string | null, height = 36, width?: number): string {
 const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
   <div style="height:${HEADER_HEIGHT}px !important;min-height:${HEADER_HEIGHT}px !important;max-height:${HEADER_HEIGHT}px !important;overflow:hidden !important;flex-shrink:0;background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
     <div style="display:flex;align-items:center;gap:12px;">
-      ${logoHtml(logo, 36)}
+      ${logoHtml(logo, 36, 140)}
     </div>
     <div style="text-align: right;">
       <div style="font-size: 10px; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">PROPOSTA #${String(numero).padStart(3, '0')}</div>
