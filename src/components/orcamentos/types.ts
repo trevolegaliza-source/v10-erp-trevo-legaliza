@@ -14,6 +14,7 @@ export interface OrcamentoItem {
   prazo: string;
   docs_necessarios: string;
   quantidade: number;
+  isOptional?: boolean; // false = obrigatório (default), true = opcional
   // legacy compat
   valor?: number;
 }
