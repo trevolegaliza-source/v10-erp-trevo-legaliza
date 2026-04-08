@@ -34,12 +34,52 @@ export interface OrcamentoPDFData {
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
 
-// FIX 8 — Title Case for ALL CAPS names
+// FIX 5 — Title Case for ALL CAPS names (smart: keeps conjunctions lowercase)
 function toTitleCase(str: string): string {
-  if (str === str.toUpperCase() && str.length > 3) {
-    return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-  }
-  return str;
+  const minusculas = new Set([
+    'e', 'de', 'da', 'do', 'das', 'dos',
+    'em', 'no', 'na', 'nos', 'nas',
+    'por', 'para', 'com', 'sem', 'sob',
+    'a', 'o', 'as', 'os',
+    'um', 'uma',
+  ]);
+  const semEspacos = str.replace(/\s+/g, '');
+  if (semEspacos !== semEspacos.toUpperCase()) return str;
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map((word, index) => {
+      if (!word) return word;
+      if (index === 0) return word.charAt(0).toUpperCase() + word.slice(1);
+      if (minusculas.has(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
+// FIX 7 — Format contexto with highlighted risk words and monetary values
+function formatarContextoPDF(texto: string): string {
+  if (!texto) return '';
+  let html = texto
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  html = html.replace(
+    /(R\$[\s]?[\d.,kmKM\-]+)/g,
+    '<strong style="color: #b91c1c; font-weight: 700;">$1</strong>'
+  );
+  const palavrasRisco = [
+    'interdição', 'interditada', 'embargo', 'embargada',
+    'multa', 'multas', 'autuação', 'penalidade',
+    'bloqueio', 'bloqueada', 'suspensão',
+    'proibição', 'proibida', 'ilegal',
+  ];
+  palavrasRisco.forEach(palavra => {
+    const regex = new RegExp(`\\b(${palavra})\\b`, 'gi');
+    html = html.replace(regex, '<strong style="color: #b91c1c; font-weight: 700;">$1</strong>');
+  });
+  html = html.replace(/\n/g, '<br>');
+  return html;
 }
 
 const LOGO_URLS = [
@@ -316,8 +356,10 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   const accentBorder = isCliente ? '#3b82f6' : '#22c55e';
   const accentText = isCliente ? '#1e40af' : '#166534';
 
-  // FIX 8 — Display name: Title Case if ALL CAPS
-  const displayName = toTitleCase(d.prospect_nome);
+  // FIX 5+6 — Display name: use apelido if available, then Title Case
+  const displayName = d.clienteNome?.trim()
+    ? toTitleCase(d.clienteNome)
+    : toTitleCase(d.prospect_nome);
   const nomeEmpresaCurto = displayName.split(' ').slice(0, 3).join(' ');
 
 
@@ -381,8 +423,45 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           </div>
         </div>
 
+        <!-- FIX 3: Mini-cronograma de execução -->
+        <div style="padding: 0 48px; flex-shrink: 0; margin-top: 32px;">
+          <div style="border-top: 1px solid #e2e8f0; margin-bottom: 24px;"></div>
+          <div style="font-size: 10px; font-weight: 600; color: #64748b; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 14px;">Fluxo de execução estimado</div>
+          <div style="display: flex; align-items: center; gap: 0;">
+            <div style="flex: 1; text-align: center;">
+              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">1</div>
+              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">Bombeiros</div>
+              <div style="font-size: 9px; color: #64748b;">15–45 dias</div>
+            </div>
+            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
+            <div style="flex: 1; text-align: center;">
+              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">2</div>
+              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">Vigilância</div>
+              <div style="font-size: 9px; color: #64748b;">20–60 dias</div>
+            </div>
+            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
+            <div style="flex: 1; text-align: center;">
+              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">3</div>
+              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">Prefeitura</div>
+              <div style="font-size: 9px; color: #64748b;">5–15 dias</div>
+            </div>
+            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
+            <div style="flex: 1; text-align: center;">
+              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">4</div>
+              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">CRM / CNES</div>
+              <div style="font-size: 9px; color: #64748b;">15–40 dias</div>
+            </div>
+            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
+            <div style="flex: 1; text-align: center;">
+              <div style="width: 32px; height: 32px; background: #0f3d24; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #86efac; margin: 0 auto 6px auto;">✓</div>
+              <div style="font-size: 9px; font-weight: 700; color: #0f3d24;">Regular</div>
+              <div style="font-size: 9px; color: #64748b;">6–12 sem.</div>
+            </div>
+          </div>
+        </div>
+
         <!-- ZONA 4: Footer info -->
-        <div style="padding: 0 40px 20px; flex-shrink: 0;">
+        <div style="padding: 0 40px 20px; flex-shrink: 0; margin-top: 24px;">
           <div style="border-top: 1px solid #e0e0e0; padding-top: 12px; text-align: center;">
             <div style="font-size: 10px; color: #888;">
               📋 ${itemCount} serviços incluídos &nbsp;·&nbsp; Válido por ${d.validade_dias} dias &nbsp;·&nbsp; Emissão: ${d.data_emissao}
@@ -431,7 +510,32 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           ${d.prospect_cnpj ? `<div style="font-size: 14px; color: #64748b;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
           ${coverValueBoxHtml}
           ${coverBulletsHtml}
-          
+
+          <!-- FIX 4: 3 benefícios visuais + frase de impacto (cliente) -->
+          <div style="margin-top: 36px; width: 100%; max-width: 560px;">
+            <div style="border-top: 1px solid #e2e8f0; margin-bottom: 28px;"></div>
+            <div style="display: flex; gap: 16px; justify-content: center; margin-bottom: 28px;">
+              <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 22px; margin-bottom: 8px;">🛡️</div>
+                <div style="font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">Operação sem riscos</div>
+                <div style="font-size: 10px; color: #64748b; line-height: 1.4;">Elimina risco de multas, interdição e bloqueio de convênios</div>
+              </div>
+              <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f0fdf4; border-radius: 10px; border: 1px solid #bbf7d0;">
+                <div style="font-size: 22px; margin-bottom: 8px;">📋</div>
+                <div style="font-size: 11px; font-weight: 700; color: #15803d; margin-bottom: 4px;">Tudo incluído</div>
+                <div style="font-size: 10px; color: #4b5563; line-height: 1.4;">Expertise full-service — desde o protocolo até a licença em mãos</div>
+              </div>
+              <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <div style="font-size: 22px; margin-bottom: 8px;">⏱️</div>
+                <div style="font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">6 a 12 semanas</div>
+                <div style="font-size: 10px; color: #64748b; line-height: 1.4;">Prazo estimado para regularização completa</div>
+              </div>
+            </div>
+            <div style="text-align: center; font-size: 12px; font-style: italic; color: #475569; padding: 14px 20px; background: #f1f5f9; border-radius: 8px; line-height: 1.5;">
+              "Regularização não é burocracia — é o que permite sua empresa<br>
+              operar com segurança, contratar convênios e crescer sem sustos."
+            </div>
+          </div>
         </div>
         <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
       </div>
@@ -471,7 +575,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
               <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Cenário e Oportunidade</div>
               ${leadForteHtml}
               <div style="background: #fafafa; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-top: 12px;">
-                <div style="font-size: 10.5px; line-height: 1.8; color: #4b5563; white-space: pre-line;">${esc(d.contexto)}</div>
+                <div style="line-height: 1.7; font-size: 11px; color: #374151;">${formatarContextoPDF(d.contexto)}</div>
               </div>
             </div>
           ` : ''}
@@ -568,7 +672,12 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
       const totalMax = valorTotal + item.taxa_max;
       const hasTaxaItem = item.taxa_min > 0 || item.taxa_max > 0;
       const isObrigatorio = entry.sectionKey === 'obrigatorios';
-      const borderColor = isObrigatorio ? '#22c55e' : (entry.sectionKey === 'opcionais' ? '#3b82f6' : '#e5e7eb');
+      const isOpcional = entry.sectionKey === 'opcionais' || (secoes.find(s => s.key === entry.sectionKey)?.label || '').toLowerCase().includes('opcional');
+      const isCNES = /cnes|altamente recomendado/i.test(item.descricao);
+      const borderColor = isOpcional
+        ? (isCNES ? '#10b981' : '#f59e0b')
+        : (isObrigatorio ? '#22c55e' : '#e5e7eb');
+      const borderStyle = (isOpcional && !isCNES) ? 'dashed' : 'solid';
       const isCompressed = !!entry._compressed;
 
       // Build financial section based on PDF mode
@@ -657,13 +766,21 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
       // FIX 5 — Compressed mode: hide docs section
       const showDocsSection = !isCompressed && (item.prazo || item.docs_necessarios);
 
+      // FIX 1 — Optional badge
+      const opcionalBadge = isOpcional
+        ? (isCNES
+          ? `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#d1fae5;color:#064e3b;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">★ RECOMENDADO</span>`
+          : `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fef3c7;color:#92400e;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">OPCIONAL</span>`)
+        : '';
+
       chunkHtml += `
-        <div style="border: 1px solid #e5e7eb; border-left: 4px solid ${borderColor}; border-radius: 16px; margin-bottom: ${isCompressed ? '10' : '14'}px; overflow: hidden;">
+        <div style="border: 1px solid #e5e7eb; border-left: 4px ${borderStyle} ${borderColor}; border-radius: 16px; margin-bottom: ${isCompressed ? '10' : '14'}px; overflow: hidden;">
           <div style="display: flex; align-items: center; gap: 12px; padding: ${isCompressed ? '10' : '14'}px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
             <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 800; flex-shrink: 0;">${item.ordem || '•'}</div>
             <div style="flex: 1; min-width: 0;">
               <div style="font-size: 12px; font-weight: 700; color: #ffffff; line-height: 1.3;">${esc(item.descricao)}</div>
             </div>
+            ${opcionalBadge}
             <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
           </div>
           ${item.detalhes ? `<div style="padding: ${isCompressed ? '8' : '12'}px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
@@ -751,9 +868,14 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
                   <span style="font-weight: 700; color: #166534;">${fmt(precoComDesconto)}</span>
                 </div>
               </div>
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6; background: #eff6ff;">
-                <div style="font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">SUA MARGEM NESTE PACOTE</div>
-                <div style="font-size: 11px; font-weight: 700; color: #1e40af;">${fmt(margemValor)} (${margemPct}%)</div>
+              <!-- FIX 2: Margin highlight card -->
+              <div style="margin: 14px 18px 10px; padding: 14px 20px; background: #f0fdf4; border: 1.5px solid #4ade80; border-radius: 10px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <div style="font-size: 10px; font-weight: 600; color: #166534; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px;">Você ganha com este pacote</div>
+                  <div style="font-size: 22px; font-weight: 700; color: #15803d; line-height: 1;">${fmt(margemValor)}</div>
+                  <div style="font-size: 11px; color: #4ade80; margin-top: 3px; font-weight: 500;">${margemPct}% de lucro líquido</div>
+                </div>
+                <div style="width: 52px; height: 52px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px;">💰</div>
               </div>
               ${hasTaxaPac ? `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6;">
@@ -790,6 +912,10 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
               <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 10px;">
                 <span style="color: #1e40af; font-weight: 600;">Investimento com -${pac.desconto_pct}%</span>
                 <span style="color: #1e40af; font-weight: 700;">${fmt(precoComDesconto)}</span>
+              </div>
+              <!-- FIX 8: Economia em reais -->
+              <div style="font-size: 10px; color: #15803d; font-weight: 600; text-align: right; margin-top: -4px; margin-bottom: 8px; padding: 0 0;">
+                ↓ Economia de ${fmt(precoSemDesconto - precoComDesconto)} com este pacote
               </div>
               ${hasTaxaPac ? `
                 <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 10px;">

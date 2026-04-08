@@ -218,7 +218,7 @@ export default function OrcamentoNovo() {
 
   function buildPDFParams(modo?: 'contador' | 'cliente') {
     const selectedCliente = clientes?.find(c => c.id === form.cliente_id);
-    const clienteNome = selectedCliente?.nome || form.prospect_nome;
+    const clienteNome = selectedCliente?.apelido || selectedCliente?.nome || form.prospect_nome;
     const itensValidos = form.itens.filter(i => i.descricao.trim());
     return {
       modo: form.modo,
