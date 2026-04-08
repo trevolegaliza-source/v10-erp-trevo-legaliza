@@ -53,8 +53,39 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
   const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
   const [showDeferimentoAlert, setShowDeferimentoAlert] = useState(false);
   const [deferimentoAlertData, setDeferimentoAlertData] = useState<DeferimentoAlertData | null>(null);
+  const [showUndoDialog, setShowUndoDialog] = useState(false);
+  const [undoProcesso, setUndoProcesso] = useState<ProcessoFinanceiro | null>(null);
+  const [undoing, setUndoing] = useState(false);
   const qc = useQueryClient();
   const { salvarExtrato } = useExtratos();
+
+  async function handleDesfazerPagamento() {
+    if (!undoProcesso) return;
+    setUndoing(true);
+    try {
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({
+          status: 'pendente' as const,
+          etapa_financeiro: 'solicitacao_criada',
+          data_pagamento: null,
+        })
+        .eq('processo_id', undoProcesso.id)
+        .eq('status', 'pago');
+
+      if (error) throw error;
+
+      qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
+      qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+      toast.success('Pagamento revertido. Processo voltou para A Cobrar.');
+    } catch (err: any) {
+      toast.error('Erro ao desfazer pagamento: ' + err.message);
+    } finally {
+      setUndoing(false);
+      setShowUndoDialog(false);
+      setUndoProcesso(null);
+    }
+  }
 
   const allChecked = processos.length > 0 && selected.size === processos.length;
 
