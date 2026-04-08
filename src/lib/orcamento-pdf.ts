@@ -49,20 +49,24 @@ const LOGO_URLS = [
   'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png',
 ];
 
+async function preloadImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
 async function preloadLogo(): Promise<string | null> {
   for (const url of LOGO_URLS) {
-    try {
-      const res = await fetch(url, { mode: 'cors' });
-      if (res.ok) {
-        const blob = await res.blob();
-        return await new Promise<string | null>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(blob);
-        });
-      }
-    } catch { continue; }
+    const b64 = await preloadImageAsBase64(url);
+    if (b64) return b64;
   }
   return null;
 }
@@ -427,7 +431,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           ${d.prospect_cnpj ? `<div style="font-size: 14px; color: #64748b;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
           ${coverValueBoxHtml}
           ${coverBulletsHtml}
-          ${d.data_emissao ? `<div style="margin-top: 16px; font-size: 12px; color: #94a3b8;">Proposta emitida em ${d.data_emissao}</div>` : ''}
+          
         </div>
         <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
       </div>
@@ -993,24 +997,49 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   return pages;
 }
 
-// FIX 1 — Reset scroll before each html2canvas capture
+// FIX: Fresh DOM container per page + image preload + windowWidth
 async function renderPageToCanvas(html: string): Promise<HTMLCanvasElement> {
+  // 1. Remove any leftover container
+  const old = document.getElementById('orcamento-render-container');
+  if (old) old.parentNode?.removeChild(old);
+
+  // 2. Create a brand-new element
   const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
+  container.id = 'orcamento-render-container';
+  container.style.cssText = 'position:absolute;top:-9999px;left:-9999px;width:794px;overflow:hidden;';
   container.innerHTML = html;
   document.body.appendChild(container);
-  try {
-    // FIX 1: Reset scroll position before capture
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    await new Promise(resolve => setTimeout(resolve, 150));
 
-    const el = container.firstElementChild as HTMLElement;
-    return await html2canvas(el, { scale: 1.5, useCORS: true, logging: false, backgroundColor: '#ffffff' });
-  } finally {
-    document.body.removeChild(container);
-  }
+  // 3. Wait for ALL images (logo) to fully load
+  const images = container.querySelectorAll('img');
+  await Promise.all(Array.from(images).map(img =>
+    img.complete
+      ? Promise.resolve()
+      : new Promise<void>(resolve => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        })
+  ));
+
+  // 4. Extra reflow wait
+  window.scrollTo(0, 0);
+  await new Promise(resolve => setTimeout(resolve, 200));
+
+  // 5. Capture with explicit width to guarantee consistent layout
+  const el = container.firstElementChild as HTMLElement;
+  const canvas = await html2canvas(el, {
+    scale: 1.5,
+    useCORS: true,
+    allowTaint: false,
+    logging: false,
+    backgroundColor: '#ffffff',
+    width: 794,
+    windowWidth: 794,
+  });
+
+  // 6. Clean up
+  document.body.removeChild(container);
+  return canvas;
 }
 
 export async function gerarOrcamentoPDF(data: OrcamentoPDFData): Promise<Blob> {
