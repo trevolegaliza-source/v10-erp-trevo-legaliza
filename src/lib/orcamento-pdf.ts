@@ -705,7 +705,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const totalMin = valorTotal + item.taxa_min;
     const totalMax = valorTotal + item.taxa_max;
     const hasTaxaItem = item.taxa_min > 0 || item.taxa_max > 0;
-    const isOpcional = entry.sectionKey === 'opcionais' || (secoes.find(s => s.key === entry.sectionKey)?.label || '').toLowerCase().includes('opcional');
+    const isOpcional = item.isOptional === true || entry.sectionKey === 'opcionais' || (secoes.find(s => s.key === entry.sectionKey)?.label || '').toLowerCase().includes('opcional');
     const isCNES = /cnes|altamente recomendado/i.test(item.descricao);
     const borderColor = isOpcional
       ? (isCNES ? '#10b981' : '#f59e0b')
