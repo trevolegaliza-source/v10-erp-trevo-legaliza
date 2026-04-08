@@ -113,9 +113,9 @@ async function preloadLogo(): Promise<string | null> {
 
 const HEADER_HEIGHT = 64;
 
-function logoHtml(logo: string | null, height = 32): string {
+function logoHtml(logo: string | null, height = 36): string {
   return logo
-    ? `<img src="${logo}" style="height: ${height}px; width: auto; object-fit: contain; display: block;" crossorigin="anonymous" />`
+    ? `<img src="${logo}" style="height: ${height}px !important; width: auto !important; max-height: ${height}px !important; min-height: ${height}px !important; object-fit: contain !important; display: block !important; flex-shrink: 0 !important;" crossorigin="anonymous" />`
     : `<div style="font-size: 22px; font-weight: 800; line-height: 1.2;">
          <span style="color: #22c55e;">Trevo</span>
          <span style="color: #ffffff; font-weight: 400; font-size: 18px;"> Legaliza</span>
