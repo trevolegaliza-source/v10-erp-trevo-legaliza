@@ -581,17 +581,17 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             <div style="border-top: 1px solid #e2e8f0; margin-bottom: 28px;"></div>
             <div style="display: flex; gap: 16px; justify-content: center; margin-bottom: 28px;">
               <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
-                <div style="font-size: 22px; margin-bottom: 8px;">🛡️</div>
+                <div style="margin-bottom: 8px; display: flex; justify-content: center;"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
                 <div style="font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">Operação sem riscos</div>
                 <div style="font-size: 10px; color: #64748b; line-height: 1.4;">Elimina risco de multas, interdição e bloqueio de convênios</div>
               </div>
-              <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f0fdf4; border-radius: 10px; border: 1px solid #bbf7d0;">
-                <div style="font-size: 22px; margin-bottom: 8px;">📋</div>
-                <div style="font-size: 11px; font-weight: 700; color: #15803d; margin-bottom: 4px;">Tudo incluído</div>
+              <div style="flex: 1; text-align: center; padding: 16px 12px; background: ${accentBg}; border-radius: 10px; border: 1px solid ${useBlueTheme ? '#bfdbfe' : '#bbf7d0'};">
+                <div style="margin-bottom: 8px; display: flex; justify-content: center;"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="m9 14 2 2 4-4"/></svg></div>
+                <div style="font-size: 11px; font-weight: 700; color: ${accentText}; margin-bottom: 4px;">Tudo incluído</div>
                 <div style="font-size: 10px; color: #4b5563; line-height: 1.4;">Expertise full-service — desde o protocolo até a licença em mãos</div>
               </div>
               <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
-                <div style="font-size: 22px; margin-bottom: 8px;">⏱️</div>
+                <div style="margin-bottom: 8px; display: flex; justify-content: center;"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
                 <div style="font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">6 a 12 semanas</div>
                 <div style="font-size: 10px; color: #64748b; line-height: 1.4;">Prazo estimado para regularização completa</div>
               </div>
