@@ -118,7 +118,7 @@ function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const { salvarExtrato } = useExtratos();
   const qc = useQueryClient();
 
-  const lancSemExtrato = cliente.lancamentos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada');
+  const lancSemExtrato = cliente.lancamentos.filter(l => l.status !== 'pago' && l.etapa_financeiro !== 'honorario_pago');
   const totalSelecionado = lancSemExtrato.filter(l => selected.has(l.id)).reduce((s, l) => s + l.valor, 0);
 
   function toggleAll() {
