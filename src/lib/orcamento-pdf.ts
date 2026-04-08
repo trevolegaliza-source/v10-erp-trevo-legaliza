@@ -356,8 +356,10 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   const accentBorder = isCliente ? '#3b82f6' : '#22c55e';
   const accentText = isCliente ? '#1e40af' : '#166534';
 
-  // FIX 8 — Display name: Title Case if ALL CAPS
-  const displayName = toTitleCase(d.prospect_nome);
+  // FIX 5+6 — Display name: use apelido if available, then Title Case
+  const displayName = d.clienteNome?.trim()
+    ? toTitleCase(d.clienteNome)
+    : toTitleCase(d.prospect_nome);
   const nomeEmpresaCurto = displayName.split(' ').slice(0, 3).join(' ');
 
 
