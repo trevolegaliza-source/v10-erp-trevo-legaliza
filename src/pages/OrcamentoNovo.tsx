@@ -216,7 +216,7 @@ export default function OrcamentoNovo() {
     }
   }
 
-  function buildPDFParams(modo?: 'contador' | 'cliente') {
+  function buildPDFParams(modo?: OrcamentoPDFMode) {
     const selectedCliente = clientes?.find(c => c.id === form.cliente_id);
     const clienteNome = selectedCliente?.apelido || selectedCliente?.nome || form.prospect_nome;
     const itensValidos = form.itens.filter(i => i.descricao.trim());
@@ -247,10 +247,14 @@ export default function OrcamentoNovo() {
     };
   }
 
-  function buildFilename(modo: 'contador' | 'cliente') {
+  function buildFilename(modo: OrcamentoPDFMode) {
     const nome = sanitizeFilename(form.prospect_nome || 'proposta');
-    const sufixo = modo === 'contador' ? '_interno' : '_cliente';
-    return `Proposta_${nome}${sufixo}_${new Date().toISOString().split('T')[0]}.pdf`;
+    const sufixos: Record<OrcamentoPDFMode, string> = {
+      contador: '_interno',
+      cliente: '_cliente',
+      direto: '_direto_trevo',
+    };
+    return `Proposta_${nome}${sufixos[modo]}_${new Date().toISOString().split('T')[0]}.pdf`;
   }
 
   async function salvarOrcamento(): Promise<string> {
@@ -262,7 +266,7 @@ export default function OrcamentoNovo() {
     return id;
   }
 
-  async function handleGerarPDF(modo: 'contador' | 'cliente') {
+  async function handleGerarPDF(modo: OrcamentoPDFMode) {
     if (!form.prospect_nome.trim()) { toast.error('Preencha o nome do cliente'); return; }
     const itensValidos = form.itens.filter(i => i.descricao.trim());
     if (itensValidos.length === 0) { toast.error('Adicione pelo menos um item'); return; }
@@ -275,7 +279,12 @@ export default function OrcamentoNovo() {
 
       const result = await salvarPDF.mutateAsync({ blob, modo, orcamentoId: savedId, filename });
       downloadBlob(blob, filename);
-      toast.success(`Proposta ${modo === 'contador' ? 'interna' : 'do cliente'} gerada e salva! (v${result.versao})`);
+      const modoLabels: Record<OrcamentoPDFMode, string> = {
+        contador: 'interna',
+        cliente: 'do cliente',
+        direto: 'direta Trevo',
+      };
+      toast.success(`Proposta ${modoLabels[modo]} gerada e salva! (v${result.versao})`);
     } catch (err: any) {
       toast.error('Erro ao gerar PDF: ' + (err.message || ''));
       console.error(err);
@@ -455,22 +464,29 @@ export default function OrcamentoNovo() {
               {/* PDF Mode toggle (detailed only) */}
               {isDetalhado && (
                 <div className="space-y-3 pt-3 border-t">
-                  <div className="flex items-center gap-4 p-4 rounded-xl border border-border bg-card">
-                    <span className="text-sm font-medium">Gerar PDF para:</span>
-                    <div className="flex gap-2">
+                  <div className="flex flex-col gap-3 p-4 rounded-xl border border-border bg-card">
+                    <span className="text-sm font-medium">Destinatário do PDF:</span>
+                    <div className="flex gap-2 flex-wrap">
                       <Button
                         variant={modoPDF === 'contador' ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setModoPDF('contador')}
                       >
-                        📊 Contador (interno)
+                        📊 Contador (intermediário)
                       </Button>
                       <Button
                         variant={modoPDF === 'cliente' ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setModoPDF('cliente')}
                       >
-                        📄 Cliente Final
+                        📄 Cliente Final (via contador)
+                      </Button>
+                      <Button
+                        variant={modoPDF === 'direto' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setModoPDF('direto')}
+                      >
+                        🍀 Cliente Final (direto Trevo)
                       </Button>
                     </div>
                   </div>
@@ -614,12 +630,15 @@ export default function OrcamentoNovo() {
                     {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
                     {gerando ? 'Gerando...' : 'Gerar Ambas Propostas'}
                   </Button>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <Button variant="outline" size="sm" onClick={() => handleGerarPDF('contador')} disabled={gerando}>
-                      📊 Só Contador
+                      📊 Contador
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => handleGerarPDF('cliente')} disabled={gerando}>
-                      📄 Só Cliente
+                      📄 Via Contador
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleGerarPDF('direto')} disabled={gerando}>
+                      🍀 Direto Trevo
                     </Button>
                   </div>
                 </>
@@ -665,7 +684,7 @@ export default function OrcamentoNovo() {
                     >
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant={pdf.modo === 'contador' ? 'default' : 'secondary'} className="text-[10px]">
-                          {pdf.modo === 'contador' ? '📊 Interno' : '📄 Cliente'}
+                          {pdf.modo === 'contador' ? '📊 Interno' : pdf.modo === 'direto' ? '🍀 Direto' : '📄 Cliente'}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
                           v{pdf.versao} · {new Date(pdf.gerado_em).toLocaleDateString('pt-BR')} {new Date(pdf.gerado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}

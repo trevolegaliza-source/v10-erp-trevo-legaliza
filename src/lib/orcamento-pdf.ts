@@ -8,7 +8,7 @@ import {
 export interface OrcamentoPDFData {
   modo: OrcamentoModo;
   modoContador?: boolean; // legacy compat
-  modoPDF?: OrcamentoPDFMode; // new: 'contador' | 'cliente'
+  modoPDF?: OrcamentoPDFMode; // 'contador' | 'cliente' | 'direto'
   prospect_nome: string;
   prospect_cnpj: string | null;
   clienteNome?: string; // nome da contabilidade para modo cliente
@@ -207,6 +207,7 @@ function getHeader(d: OrcamentoPDFData, logo: string | null, pdfMode: OrcamentoP
   if (pdfMode === 'cliente') {
     return HEADER_CLIENTE(d.numero, d.data_emissao, d.clienteNome || d.prospect_nome);
   }
+  // 'contador' and 'direto' both use Trevo header
   return HEADER_TREVO(d.numero, d.data_emissao, logo);
 }
 
@@ -214,7 +215,13 @@ function getFooter(d: OrcamentoPDFData, pdfMode: OrcamentoPDFMode): string {
   if (pdfMode === 'cliente') {
     return FOOTER_CLIENTE(d.clienteNome || d.prospect_nome);
   }
+  // 'contador' and 'direto' both use Trevo footer
   return FOOTER_TREVO;
+}
+
+/** For rendering logic: 'direto' behaves like 'cliente' (no margins/costs) but with Trevo branding */
+function isClienteView(pdfMode: OrcamentoPDFMode): boolean {
+  return pdfMode === 'cliente' || pdfMode === 'direto';
 }
 
 // Short name for prazos
@@ -346,7 +353,7 @@ function buildSimplesHTML(d: OrcamentoPDFData, logo: string | null): string {
 async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Promise<string[]> {
   const pages: string[] = [];
   const pdfMode = resolvePDFMode(d);
-  const isCliente = pdfMode === 'cliente';
+  const isCliente = isClienteView(pdfMode); // true for 'cliente' and 'direto' (hides costs/margins)
   const secoes = d.secoes.length > 0 ? d.secoes : DEFAULT_SECOES;
   const header = getHeader(d, logo, pdfMode);
   const footer = getFooter(d, pdfMode);
@@ -376,11 +383,12 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   const margemCapa = precoClienteFinalCapa - custoTrevoFinalCapa;
   const margemCapaPct = custoTrevoFinalCapa > 0 ? (((precoClienteFinalCapa / custoTrevoFinalCapa) - 1) * 100).toFixed(0) : '0';
 
-  const accentColor = isCliente ? '#3b82f6' : '#22c55e';
-  const accentColorLight = isCliente ? '#93c5fd' : '#4ade80';
-  const accentBg = isCliente ? '#eff6ff' : '#f0fdf4';
-  const accentBorder = isCliente ? '#3b82f6' : '#22c55e';
-  const accentText = isCliente ? '#1e40af' : '#166534';
+  const useBlueTheme = pdfMode === 'cliente'; // only pure client mode uses blue; direto uses Trevo green
+  const accentColor = useBlueTheme ? '#3b82f6' : '#22c55e';
+  const accentColorLight = useBlueTheme ? '#93c5fd' : '#4ade80';
+  const accentBg = useBlueTheme ? '#eff6ff' : '#f0fdf4';
+  const accentBorder = useBlueTheme ? '#3b82f6' : '#22c55e';
+  const accentText = useBlueTheme ? '#1e40af' : '#166534';
 
   // FIX 5+6 — Display name: use apelido if available, then Title Case
   const displayName = d.clienteNome?.trim()
@@ -609,10 +617,10 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             <div>
               <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Ordem Sugerida de Execução</div>
               <div style="background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
-                ${formatarOrdemExecucao(d.ordem_execucao, isCliente)}
+                ${formatarOrdemExecucao(d.ordem_execucao, useBlueTheme)}
               </div>
             </div>
-            ${!isCliente ? `
+            ${(!isCliente || pdfMode === 'direto') ? `
               <div style="margin-top: 32px; padding: 20px 24px; background: #f0faf4; border-left: 4px solid #1a4731; border-radius: 0 8px 8px 0;">
                 <div style="font-size: 12px; font-weight: 700; color: #1a4731; margin-bottom: 12px;">Por que a Trevo Legaliza?</div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
@@ -621,7 +629,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
                   <div style="font-size: 11px; color: #333;">✓ Expertise full-service</div>
                   <div style="font-size: 11px; color: #333;">✓ Honorários fixos por item</div>
                 </div>
-                <div style="font-size: 10px; color: #555; font-style: italic; margin-top: 10px;">Você vende. A Trevo executa. Simples assim.</div>
+                <div style="font-size: 10px; color: #555; font-style: italic; margin-top: 10px;">${pdfMode === 'direto' ? 'Regularize sua empresa com quem entende do assunto.' : 'Você vende. A Trevo executa. Simples assim.'}</div>
               </div>
             ` : ''}
           ` : ''}
@@ -986,7 +994,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   }
 
   // FIX 2 — CTA per mode with contador contact info
-  const ctaSection = !isCliente ? `
+  const ctaSection = (!isCliente || pdfMode === 'direto') ? `
     <div style="background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); border-radius: 16px; padding: 24px; text-align: center;">
       <div style="font-size: 11px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
       <div style="font-size: 10px; color: rgba(255,255,255,0.7); margin-bottom: 16px;">Para aprovar esta proposta, entre em contato conosco:</div>
@@ -1083,9 +1091,9 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             <span style="color: #b45309; font-weight: 600;">${fmt(totalTaxaMin)} a ${fmt(totalTaxaMax)}</span>
           </div>
         ` : ''}
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 10px; background: #eff6ff; border: 2px solid #3b82f6; border-radius: 12px;">
-          <span style="font-size: 12px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 1px;">${hasTaxas ? 'Investimento Total' : 'Total'}</span>
-          <span style="font-size: ${hasTaxas ? '22' : '28'}px; font-weight: 900; color: #1e40af;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 10px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 12px;">
+          <span style="font-size: 12px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 1px;">${hasTaxas ? 'Investimento Total' : 'Total'}</span>
+          <span style="font-size: ${hasTaxas ? '22' : '28'}px; font-weight: 900; color: ${accentText};">
             ${hasTaxas ? `${fmt(honorarioFinalCapa + totalTaxaMin)} a ${fmt(honorarioFinalCapa + totalTaxaMax)}` : fmt(honorarioFinalCapa)}
           </span>
         </div>

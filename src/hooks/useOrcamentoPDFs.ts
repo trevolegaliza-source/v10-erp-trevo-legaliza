@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 export interface OrcamentoPDFRecord {
   id: string;
   orcamento_id: string;
-  modo: 'contador' | 'cliente';
+  modo: 'contador' | 'cliente' | 'direto';
   versao: number;
   status: 'ativo' | 'cancelado';
   url: string;
@@ -36,7 +36,7 @@ export function useOrcamentoPDFs(orcamentoId: string | null | undefined) {
   const salvarPDF = useMutation({
     mutationFn: async ({ blob, modo, orcamentoId: orcId, filename }: {
       blob: Blob;
-      modo: 'contador' | 'cliente';
+      modo: 'contador' | 'cliente' | 'direto';
       orcamentoId: string;
       filename: string;
     }) => {
