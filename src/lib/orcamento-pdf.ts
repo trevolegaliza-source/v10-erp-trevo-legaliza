@@ -440,9 +440,9 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   if (temContexto || temOrdem) {
     // FIX 4 — Risk box for client mode (before context)
     const riskBoxHtml = isCliente ? `
-      <div style="background: #fff8e1; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
-        <div style="font-size: 11px; font-weight: 700; color: #92400e; margin-bottom: 8px;">⚠ SITUAÇÃO ATUAL — RISCOS DE OPERAÇÃO SEM REGULARIZAÇÃO</div>
-        <div style="font-size: 11px; color: #78350f; line-height: 1.8;">
+      <div style="background: #FEF2F2; border-left: 4px solid #B03030; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
+        <div style="font-size: 11px; font-weight: 700; color: #7F1D1D; margin-bottom: 8px;">⛔ SITUAÇÃO ATUAL — RISCOS DE OPERAÇÃO SEM REGULARIZAÇÃO</div>
+        <div style="font-size: 11px; color: #991B1B; line-height: 1.8;">
           • Multas de R$ 5.000 a R$ 50.000 por autuação da Vigilância Sanitária<br/>
           • Risco de interdição imediata e embargo das atividades<br/>
           • Bloqueio de convênios médicos e SUS sem CNES ativo
