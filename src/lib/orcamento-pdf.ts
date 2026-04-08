@@ -423,8 +423,45 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           </div>
         </div>
 
+        <!-- FIX 3: Mini-cronograma de execução -->
+        <div style="padding: 0 48px; flex-shrink: 0; margin-top: 32px;">
+          <div style="border-top: 1px solid #e2e8f0; margin-bottom: 24px;"></div>
+          <div style="font-size: 10px; font-weight: 600; color: #64748b; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 14px;">Fluxo de execução estimado</div>
+          <div style="display: flex; align-items: center; gap: 0;">
+            <div style="flex: 1; text-align: center;">
+              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">1</div>
+              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">Bombeiros</div>
+              <div style="font-size: 9px; color: #64748b;">15–45 dias</div>
+            </div>
+            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
+            <div style="flex: 1; text-align: center;">
+              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">2</div>
+              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">Vigilância</div>
+              <div style="font-size: 9px; color: #64748b;">20–60 dias</div>
+            </div>
+            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
+            <div style="flex: 1; text-align: center;">
+              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">3</div>
+              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">Prefeitura</div>
+              <div style="font-size: 9px; color: #64748b;">5–15 dias</div>
+            </div>
+            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
+            <div style="flex: 1; text-align: center;">
+              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">4</div>
+              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">CRM / CNES</div>
+              <div style="font-size: 9px; color: #64748b;">15–40 dias</div>
+            </div>
+            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
+            <div style="flex: 1; text-align: center;">
+              <div style="width: 32px; height: 32px; background: #0f3d24; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #86efac; margin: 0 auto 6px auto;">✓</div>
+              <div style="font-size: 9px; font-weight: 700; color: #0f3d24;">Regular</div>
+              <div style="font-size: 9px; color: #64748b;">6–12 sem.</div>
+            </div>
+          </div>
+        </div>
+
         <!-- ZONA 4: Footer info -->
-        <div style="padding: 0 40px 20px; flex-shrink: 0;">
+        <div style="padding: 0 40px 20px; flex-shrink: 0; margin-top: 24px;">
           <div style="border-top: 1px solid #e0e0e0; padding-top: 12px; text-align: center;">
             <div style="font-size: 10px; color: #888;">
               📋 ${itemCount} serviços incluídos &nbsp;·&nbsp; Válido por ${d.validade_dias} dias &nbsp;·&nbsp; Emissão: ${d.data_emissao}
