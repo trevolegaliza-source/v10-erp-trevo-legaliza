@@ -141,7 +141,7 @@ async function medirAlturaReal(html: string): Promise<number> {
 
   const altura = probe.getBoundingClientRect().height;
   document.body.removeChild(probe);
-  return Math.ceil(altura) + 24; // +24px safety margin
+  return Math.ceil(altura) + 12; // +12px safety margin (reduced from 24 for better packing)
 }
 
 const HEADER_HEIGHT = 64;
