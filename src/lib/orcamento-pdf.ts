@@ -8,7 +8,7 @@ import {
 export interface OrcamentoPDFData {
   modo: OrcamentoModo;
   modoContador?: boolean; // legacy compat
-  modoPDF?: OrcamentoPDFMode; // new: 'contador' | 'cliente'
+  modoPDF?: OrcamentoPDFMode; // 'contador' | 'cliente' | 'direto'
   prospect_nome: string;
   prospect_cnpj: string | null;
   clienteNome?: string; // nome da contabilidade para modo cliente
