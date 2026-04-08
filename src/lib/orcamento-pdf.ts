@@ -478,6 +478,18 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
                 ${formatarOrdemExecucao(d.ordem_execucao, isCliente)}
               </div>
             </div>
+            ${!isCliente ? `
+              <div style="margin-top: 32px; padding: 20px 24px; background: #f0faf4; border-left: 4px solid #1a4731; border-radius: 0 8px 8px 0;">
+                <div style="font-size: 12px; font-weight: 700; color: #1a4731; margin-bottom: 12px;">Por que a Trevo Legaliza?</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
+                  <div style="font-size: 11px; color: #333;">✓ +8 anos de mercado</div>
+                  <div style="font-size: 11px; color: #333;">✓ 27 estados de atuação</div>
+                  <div style="font-size: 11px; color: #333;">✓ Expertise full-service</div>
+                  <div style="font-size: 11px; color: #333;">✓ Honorários fixos por item</div>
+                </div>
+                <div style="font-size: 10px; color: #555; font-style: italic; margin-top: 10px;">Você vende. A Trevo executa. Simples assim.</div>
+              </div>
+            ` : ''}
           ` : ''}
         </div>
         <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
