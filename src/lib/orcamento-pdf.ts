@@ -383,11 +383,12 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   const margemCapa = precoClienteFinalCapa - custoTrevoFinalCapa;
   const margemCapaPct = custoTrevoFinalCapa > 0 ? (((precoClienteFinalCapa / custoTrevoFinalCapa) - 1) * 100).toFixed(0) : '0';
 
-  const accentColor = isCliente ? '#3b82f6' : '#22c55e';
-  const accentColorLight = isCliente ? '#93c5fd' : '#4ade80';
-  const accentBg = isCliente ? '#eff6ff' : '#f0fdf4';
-  const accentBorder = isCliente ? '#3b82f6' : '#22c55e';
-  const accentText = isCliente ? '#1e40af' : '#166534';
+  const useBlueTheme = pdfMode === 'cliente'; // only pure client mode uses blue; direto uses Trevo green
+  const accentColor = useBlueTheme ? '#3b82f6' : '#22c55e';
+  const accentColorLight = useBlueTheme ? '#93c5fd' : '#4ade80';
+  const accentBg = useBlueTheme ? '#eff6ff' : '#f0fdf4';
+  const accentBorder = useBlueTheme ? '#3b82f6' : '#22c55e';
+  const accentText = useBlueTheme ? '#1e40af' : '#166534';
 
   // FIX 5+6 — Display name: use apelido if available, then Title Case
   const displayName = d.clienteNome?.trim()
