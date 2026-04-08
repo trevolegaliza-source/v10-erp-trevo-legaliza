@@ -79,7 +79,7 @@ function logoHtml(logo: string | null, height = 32): string {
 }
 
 const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
-  <div style="height:${HEADER_HEIGHT}px;min-height:${HEADER_HEIGHT}px;max-height:${HEADER_HEIGHT}px;overflow:hidden;flex-shrink:0;background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
+  <div style="height:${HEADER_HEIGHT}px !important;min-height:${HEADER_HEIGHT}px !important;max-height:${HEADER_HEIGHT}px !important;overflow:hidden !important;flex-shrink:0;background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
     <div style="display:flex;align-items:center;gap:12px;">
       ${logoHtml(logo, 32)}
     </div>
