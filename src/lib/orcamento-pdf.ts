@@ -799,8 +799,8 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const showDocsSection = item.prazo || item.docs_necessarios;
     const opcionalBadge = isOpcional
       ? (isCNES
-        ? `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#d1fae5;color:#064e3b;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">★ RECOMENDADO</span>`
-        : `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fef3c7;color:#92400e;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">OPCIONAL</span>`)
+        ? `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#d1fae5;color:#064e3b;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1;">★ RECOMENDADO</span>`
+        : `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fef3c7;color:#92400e;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1;">OPCIONAL</span>`)
       : '';
 
     cardHtml += `
