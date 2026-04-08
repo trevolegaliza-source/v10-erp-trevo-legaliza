@@ -49,20 +49,24 @@ const LOGO_URLS = [
   'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png',
 ];
 
+async function preloadImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
 async function preloadLogo(): Promise<string | null> {
   for (const url of LOGO_URLS) {
-    try {
-      const res = await fetch(url, { mode: 'cors' });
-      if (res.ok) {
-        const blob = await res.blob();
-        return await new Promise<string | null>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(blob);
-        });
-      }
-    } catch { continue; }
+    const b64 = await preloadImageAsBase64(url);
+    if (b64) return b64;
   }
   return null;
 }
