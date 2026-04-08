@@ -113,9 +113,9 @@ async function preloadLogo(): Promise<string | null> {
 
 const HEADER_HEIGHT = 64;
 
-function logoHtml(logo: string | null, height = 32): string {
+function logoHtml(logo: string | null, height = 36): string {
   return logo
-    ? `<img src="${logo}" style="height: ${height}px; width: auto; object-fit: contain; display: block;" crossorigin="anonymous" />`
+    ? `<img src="${logo}" style="height: ${height}px !important; width: auto !important; max-height: ${height}px !important; min-height: ${height}px !important; object-fit: contain !important; display: block !important; flex-shrink: 0 !important;" crossorigin="anonymous" />`
     : `<div style="font-size: 22px; font-weight: 800; line-height: 1.2;">
          <span style="color: #22c55e;">Trevo</span>
          <span style="color: #ffffff; font-weight: 400; font-size: 18px;"> Legaliza</span>
@@ -125,7 +125,7 @@ function logoHtml(logo: string | null, height = 32): string {
 const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
   <div style="height:${HEADER_HEIGHT}px !important;min-height:${HEADER_HEIGHT}px !important;max-height:${HEADER_HEIGHT}px !important;overflow:hidden !important;flex-shrink:0;background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
     <div style="display:flex;align-items:center;gap:12px;">
-      ${logoHtml(logo, 32)}
+      ${logoHtml(logo, 36)}
     </div>
     <div style="text-align: right;">
       <div style="font-size: 10px; color: #4ade80; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">PROPOSTA #${String(numero).padStart(3, '0')}</div>
@@ -626,24 +626,23 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
     });
   }
 
+  // Pagination: max 3 items per page, with safe height estimation
+  // Each item ~300px, available height ~963px → max 3 items safely
   const ITEMS_PER_PAGE = 3;
   const itemPages: Array<ItemEntry[]> = [];
   for (let i = 0; i < allEntries.length; i += ITEMS_PER_PAGE) {
     itemPages.push(allEntries.slice(i, i + ITEMS_PER_PAGE));
   }
 
-  // FIX 5 — Anti-orphan: merge lonely last item into previous page (compressed)
+  // Anti-orphan: merge lonely last item into previous page ONLY if it has < 3 items
   while (itemPages.length >= 2) {
     const lastPage = itemPages[itemPages.length - 1];
     const prevPage = itemPages[itemPages.length - 2];
-    if (lastPage.length === 1 && prevPage.length <= 3) {
+    // Only merge if previous page has room (max 2 items, so merging makes 3)
+    if (lastPage.length === 1 && prevPage.length <= 2) {
       if (lastPage[0].sectionLabel && prevPage.some(e => e.sectionKey !== lastPage[0].sectionKey)) {
         lastPage[0]._injectSectionLabel = lastPage[0].sectionLabel;
         lastPage[0].sectionLabel = undefined;
-      }
-      // Mark as compressed if merging into a full page
-      if (prevPage.length === 3) {
-        lastPage[0]._compressed = true;
       }
       prevPage.push(lastPage[0]);
       itemPages.pop();
