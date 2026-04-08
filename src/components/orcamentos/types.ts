@@ -125,6 +125,7 @@ export function normalizeItem(raw: any): OrcamentoItem {
     docs_necessarios: raw.docs_necessarios || '',
     quantidade: Number(raw.quantidade) || 1,
     isOptional: raw.isOptional === true,
+    valorVendaDireto: raw.valorVendaDireto != null ? Number(raw.valorVendaDireto) : undefined,
     valor: Number(raw.valor) || undefined,
   };
 }
