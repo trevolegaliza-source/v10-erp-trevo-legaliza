@@ -614,8 +614,8 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   const temContexto = d.contexto && d.contexto.trim().length > 0;
   const temOrdem = d.ordem_execucao && d.ordem_execucao.trim().length > 0;
   if (temContexto || temOrdem) {
-    // FIX 4 — Risk box for client mode (before context)
-    const riskBoxHtml = isCliente ? `
+    // FIX 4 — Risk box for ALL modes (before context)
+    const riskBoxHtml = `
       <div style="background: #FEF2F2; border-left: 4px solid #B03030; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
         <div style="font-size: 11px; font-weight: 700; color: #7F1D1D; margin-bottom: 8px;">⛔ SITUAÇÃO ATUAL — RISCOS DE OPERAÇÃO SEM REGULARIZAÇÃO</div>
         <div style="font-size: 11px; color: #991B1B; line-height: 1.8;">
@@ -624,7 +624,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           • Bloqueio de convênios médicos e SUS sem CNES ativo
         </div>
       </div>
-    ` : '';
+    `;
 
     // MELHORIA C — Lead forte no cenário (cliente mode)
     const leadForteHtml = isCliente && temContexto ? `
