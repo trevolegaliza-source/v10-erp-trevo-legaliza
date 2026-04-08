@@ -247,10 +247,14 @@ export default function OrcamentoNovo() {
     };
   }
 
-  function buildFilename(modo: 'contador' | 'cliente') {
+  function buildFilename(modo: OrcamentoPDFMode) {
     const nome = sanitizeFilename(form.prospect_nome || 'proposta');
-    const sufixo = modo === 'contador' ? '_interno' : '_cliente';
-    return `Proposta_${nome}${sufixo}_${new Date().toISOString().split('T')[0]}.pdf`;
+    const sufixos: Record<OrcamentoPDFMode, string> = {
+      contador: '_interno',
+      cliente: '_cliente',
+      direto: '_direto_trevo',
+    };
+    return `Proposta_${nome}${sufixos[modo]}_${new Date().toISOString().split('T')[0]}.pdf`;
   }
 
   async function salvarOrcamento(): Promise<string> {
