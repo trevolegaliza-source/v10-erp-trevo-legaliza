@@ -513,7 +513,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
               <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Cenário e Oportunidade</div>
               ${leadForteHtml}
               <div style="background: #fafafa; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-top: 12px;">
-                <div style="font-size: 10.5px; line-height: 1.8; color: #4b5563; white-space: pre-line;">${esc(d.contexto)}</div>
+                <div style="line-height: 1.7; font-size: 11px; color: #374151;">${formatarContextoPDF(d.contexto)}</div>
               </div>
             </div>
           ` : ''}
