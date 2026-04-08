@@ -36,7 +36,7 @@ export function useOrcamentoPDFs(orcamentoId: string | null | undefined) {
   const salvarPDF = useMutation({
     mutationFn: async ({ blob, modo, orcamentoId: orcId, filename }: {
       blob: Blob;
-      modo: 'contador' | 'cliente';
+      modo: 'contador' | 'cliente' | 'direto';
       orcamentoId: string;
       filename: string;
     }) => {
