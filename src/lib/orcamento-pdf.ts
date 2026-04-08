@@ -617,7 +617,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             <div>
               <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Ordem Sugerida de Execução</div>
               <div style="background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
-                ${formatarOrdemExecucao(d.ordem_execucao, isCliente)}
+                ${formatarOrdemExecucao(d.ordem_execucao, useBlueTheme)}
               </div>
             </div>
             ${(!isCliente || pdfMode === 'direto') ? `
