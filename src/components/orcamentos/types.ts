@@ -14,6 +14,7 @@ export interface OrcamentoItem {
   prazo: string;
   docs_necessarios: string;
   quantidade: number;
+  isOptional?: boolean; // false = obrigatório (default), true = opcional
   // legacy compat
   valor?: number;
 }
@@ -34,13 +35,19 @@ export interface OrcamentoSecao {
 
 export type OrcamentoModo = 'simples' | 'detalhado';
 export type OrcamentoPDFMode = 'contador' | 'cliente' | 'direto';
+export type OrcamentoDestinatario = 'contador' | 'cliente_via_contador' | 'cliente_direto';
 
 export interface OrcamentoForm {
+  destinatario: OrcamentoDestinatario;
   prospect_nome: string;
   prospect_cnpj: string;
   prospect_email: string;
   prospect_telefone: string;
   prospect_contato: string;
+  escritorio_nome: string;
+  escritorio_cnpj: string;
+  escritorio_email: string;
+  escritorio_telefone: string;
   cliente_id: string | null;
   modo: OrcamentoModo;
   contexto: string;
@@ -78,6 +85,7 @@ export function createItem(overrides?: Partial<OrcamentoItem>): OrcamentoItem {
     prazo: '',
     docs_necessarios: '',
     quantidade: 1,
+    isOptional: false,
     ...overrides,
   };
 }
@@ -115,6 +123,7 @@ export function normalizeItem(raw: any): OrcamentoItem {
     prazo: raw.prazo || '',
     docs_necessarios: raw.docs_necessarios || '',
     quantidade: Number(raw.quantidade) || 1,
+    isOptional: raw.isOptional === true,
     valor: Number(raw.valor) || undefined,
   };
 }

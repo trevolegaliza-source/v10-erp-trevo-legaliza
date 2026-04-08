@@ -854,6 +854,7 @@ export type Database = {
           desconto_progressivo_ativo: boolean | null
           desconto_progressivo_limite: number | null
           desconto_progressivo_pct: number | null
+          destinatario: string | null
           empresa_id: string | null
           escopo: Json
           id: string
@@ -892,6 +893,7 @@ export type Database = {
           desconto_progressivo_ativo?: boolean | null
           desconto_progressivo_limite?: number | null
           desconto_progressivo_pct?: number | null
+          destinatario?: string | null
           empresa_id?: string | null
           escopo?: Json
           id?: string
@@ -930,6 +932,7 @@ export type Database = {
           desconto_progressivo_ativo?: boolean | null
           desconto_progressivo_limite?: number | null
           desconto_progressivo_pct?: number | null
+          destinatario?: string | null
           empresa_id?: string | null
           escopo?: Json
           id?: string

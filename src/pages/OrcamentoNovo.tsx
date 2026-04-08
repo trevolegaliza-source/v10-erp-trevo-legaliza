@@ -10,16 +10,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
-  Plus, FileText, Save, FileDown, ArrowLeft, Copy, ExternalLink, Loader2,
+  Plus, FileText, Save, FileDown, ArrowLeft, Copy, ExternalLink, Loader2, ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import {
   type OrcamentoForm, type OrcamentoModo, type OrcamentoItem, type OrcamentoPDFMode,
+  type OrcamentoDestinatario,
   DEFAULT_SECOES, createItem, normalizeItem, getItemValor,
 } from '@/components/orcamentos/types';
 import { ItemCardSimples } from '@/components/orcamentos/ItemCardSimples';
@@ -30,11 +33,16 @@ import { PreviewDetalhado } from '@/components/orcamentos/PreviewDetalhado';
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const defaultForm = (): OrcamentoForm => ({
+  destinatario: 'contador',
   prospect_nome: '',
   prospect_cnpj: '',
   prospect_email: '',
   prospect_telefone: '',
   prospect_contato: '',
+  escritorio_nome: '',
+  escritorio_cnpj: '',
+  escritorio_email: '',
+  escritorio_telefone: '',
   cliente_id: null,
   modo: 'simples',
   contexto: '',
@@ -49,6 +57,12 @@ const defaultForm = (): OrcamentoForm => ({
   observacoes: '',
 });
 
+function destinatarioToModoPDF(d: OrcamentoDestinatario): OrcamentoPDFMode {
+  if (d === 'contador') return 'contador';
+  if (d === 'cliente_via_contador') return 'cliente';
+  return 'direto';
+}
+
 export default function OrcamentoNovo() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -57,10 +71,13 @@ export default function OrcamentoNovo() {
   const [form, setForm] = useState<OrcamentoForm>(defaultForm());
   const [orcamentoId, setOrcamentoId] = useState<string | null>(editId);
   const [orcamentoNumero, setOrcamentoNumero] = useState<number>(0);
-  const [modoPDF, setModoPDF] = useState<OrcamentoPDFMode>('contador');
+  const [pacotesOpen, setPacotesOpen] = useState(false);
   const saveMutation = useSaveOrcamento();
   const { pdfs, salvarPDF } = useOrcamentoPDFs(orcamentoId);
   const [gerando, setGerando] = useState(false);
+
+  const modoPDF = destinatarioToModoPDF(form.destinatario);
+  const isDetalhado = form.modo === 'detalhado';
 
   const { data: clientes } = useQuery({
     queryKey: ['clientes_select'],
@@ -76,7 +93,7 @@ export default function OrcamentoNovo() {
     (async () => {
       const { data } = await supabase.from('orcamentos').select('*').eq('id', editId).single();
       if (!data) return;
-      const orc = data as unknown as Orcamento & { contexto?: string; ordem_execucao?: string; pacotes?: any; secoes?: any };
+      const orc = data as unknown as Orcamento & { contexto?: string; ordem_execucao?: string; pacotes?: any; secoes?: any; destinatario?: string };
       setOrcamentoNumero(orc.numero);
 
       let itens: OrcamentoItem[] = [];
@@ -94,12 +111,20 @@ export default function OrcamentoNovo() {
       const rawPacotes = (orc as any).pacotes;
       const rawSecoes = (orc as any).secoes;
 
+      // Try to infer escritorio from selected client
+      const selectedCliente = clientes?.find(c => c.id === orc.cliente_id);
+
       setForm({
+        destinatario: ((orc as any).destinatario as OrcamentoDestinatario) || 'contador',
         prospect_nome: orc.prospect_nome,
         prospect_cnpj: orc.prospect_cnpj || '',
         prospect_email: orc.prospect_email || '',
         prospect_telefone: orc.prospect_telefone || '',
         prospect_contato: orc.prospect_contato || '',
+        escritorio_nome: selectedCliente?.apelido || selectedCliente?.nome || '',
+        escritorio_cnpj: selectedCliente?.cnpj || '',
+        escritorio_email: selectedCliente?.email || '',
+        escritorio_telefone: selectedCliente?.telefone || '',
         cliente_id: orc.cliente_id || null,
         modo,
         contexto: (orc as any).contexto || '',
@@ -114,9 +139,7 @@ export default function OrcamentoNovo() {
         observacoes: orc.observacoes || '',
       });
     })();
-  }, [editId]);
-
-  const isDetalhado = form.modo === 'detalhado';
+  }, [editId, clientes]);
 
   const subtotal = useMemo(() =>
     form.itens.reduce((s, i) => s + getItemValor(i) * i.quantidade, 0),
@@ -143,16 +166,16 @@ export default function OrcamentoNovo() {
     setForm(f => ({ ...f, itens: f.itens.filter((_, i) => i !== idx) }));
   }
 
-  function handleSelectCliente(clienteId: string) {
+  function handleSelectEscritorio(clienteId: string) {
     const c = clientes?.find(cl => cl.id === clienteId);
     if (!c) return;
     setForm(f => ({
       ...f,
       cliente_id: c.id,
-      prospect_nome: c.apelido || c.nome,
-      prospect_cnpj: c.cnpj || '',
-      prospect_email: c.email || '',
-      prospect_telefone: c.telefone || '',
+      escritorio_nome: c.apelido || c.nome,
+      escritorio_cnpj: c.cnpj || '',
+      escritorio_email: c.email || '',
+      escritorio_telefone: c.telefone || '',
     }));
   }
 
@@ -174,6 +197,7 @@ export default function OrcamentoNovo() {
       prospect_telefone: form.prospect_telefone || null,
       prospect_contato: form.prospect_contato || null,
       cliente_id: form.cliente_id,
+      destinatario: form.destinatario,
       servicos: form.itens as any,
       naturezas: [] as any,
       escopo: [] as any,
@@ -190,10 +214,10 @@ export default function OrcamentoNovo() {
       sla: null,
       observacoes: form.observacoes || null,
       prazo_execucao: form.prazo_execucao || null,
-      contexto: isDetalhado ? (form.contexto || null) : null,
-      ordem_execucao: isDetalhado ? (form.ordem_execucao || null) : null,
-      pacotes: isDetalhado ? (form.pacotes as any) : ([] as any),
-      secoes: isDetalhado ? (form.secoes as any) : ([] as any),
+      contexto: form.contexto || null,
+      ordem_execucao: form.ordem_execucao || null,
+      pacotes: form.pacotes as any,
+      secoes: form.secoes as any,
       status,
       created_by: null,
       pdf_url: null,
@@ -202,7 +226,7 @@ export default function OrcamentoNovo() {
 
   async function handleSave(status: string = 'rascunho') {
     if (!form.prospect_nome?.trim()) {
-      toast.error('Informe o nome do cliente');
+      toast.error('Informe o nome da empresa a regularizar');
       return;
     }
     try {
@@ -217,17 +241,20 @@ export default function OrcamentoNovo() {
   }
 
   function buildPDFParams(modo?: OrcamentoPDFMode) {
-    const selectedCliente = clientes?.find(c => c.id === form.cliente_id);
-    const clienteNome = selectedCliente?.apelido || selectedCliente?.nome || form.prospect_nome;
     const itensValidos = form.itens.filter(i => i.descricao.trim());
     return {
       modo: form.modo,
       modoPDF: modo || modoPDF,
-      clienteNome,
-      // FIX 2 — Pass contador contact info for client PDF CTA
-      contadorNome: selectedCliente?.nome || undefined,
-      contadorEmail: selectedCliente?.email || undefined,
-      contadorTelefone: selectedCliente?.telefone || undefined,
+      destinatario: form.destinatario,
+      escritorioNome: form.escritorio_nome,
+      escritorioEmail: form.escritorio_email,
+      escritorioTelefone: form.escritorio_telefone,
+      escritorioCnpj: form.escritorio_cnpj,
+      // Legacy compat
+      clienteNome: form.escritorio_nome,
+      contadorNome: form.escritorio_nome,
+      contadorEmail: form.escritorio_email,
+      contadorTelefone: form.escritorio_telefone,
       prospect_nome: form.prospect_nome,
       prospect_cnpj: form.prospect_cnpj,
       itens: itensValidos,
@@ -258,7 +285,7 @@ export default function OrcamentoNovo() {
   }
 
   async function salvarOrcamento(): Promise<string> {
-    if (!form.prospect_nome?.trim()) throw new Error('Informe o nome do cliente');
+    if (!form.prospect_nome?.trim()) throw new Error('Informe o nome da empresa');
     const payload: any = buildPayload('enviado');
     if (orcamentoId) payload.id = orcamentoId;
     const id = await saveMutation.mutateAsync(payload);
@@ -266,11 +293,12 @@ export default function OrcamentoNovo() {
     return id;
   }
 
-  async function handleGerarPDF(modo: OrcamentoPDFMode) {
-    if (!form.prospect_nome.trim()) { toast.error('Preencha o nome do cliente'); return; }
+  async function handleGerarPDF() {
+    if (!form.prospect_nome.trim()) { toast.error('Preencha o nome da empresa'); return; }
     const itensValidos = form.itens.filter(i => i.descricao.trim());
     if (itensValidos.length === 0) { toast.error('Adicione pelo menos um item'); return; }
 
+    const modo = modoPDF;
     setGerando(true);
     try {
       const savedId = await salvarOrcamento();
@@ -287,32 +315,6 @@ export default function OrcamentoNovo() {
       toast.success(`Proposta ${modoLabels[modo]} gerada e salva! (v${result.versao})`);
     } catch (err: any) {
       toast.error('Erro ao gerar PDF: ' + (err.message || ''));
-      console.error(err);
-    } finally {
-      setGerando(false);
-    }
-  }
-
-  async function handleGerarAmbos() {
-    if (!form.prospect_nome.trim()) { toast.error('Preencha o nome do cliente'); return; }
-    const itensValidos = form.itens.filter(i => i.descricao.trim());
-    if (itensValidos.length === 0) { toast.error('Adicione pelo menos um item'); return; }
-
-    setGerando(true);
-    try {
-      const savedId = await salvarOrcamento();
-
-      const blobContador = await gerarOrcamentoPDF(buildPDFParams('contador'));
-      await salvarPDF.mutateAsync({ blob: blobContador, modo: 'contador', orcamentoId: savedId, filename: buildFilename('contador') });
-      downloadBlob(blobContador, buildFilename('contador'));
-
-      const blobCliente = await gerarOrcamentoPDF(buildPDFParams('cliente'));
-      await salvarPDF.mutateAsync({ blob: blobCliente, modo: 'cliente', orcamentoId: savedId, filename: buildFilename('cliente') });
-      downloadBlob(blobCliente, buildFilename('cliente'));
-
-      toast.success('Ambas propostas geradas e salvas!');
-    } catch (err: any) {
-      toast.error('Erro: ' + (err.message || ''));
       console.error(err);
     } finally {
       setGerando(false);
@@ -374,6 +376,12 @@ export default function OrcamentoNovo() {
     </div>
   );
 
+  const destinatarioLabels: Record<OrcamentoDestinatario, { emoji: string; label: string }> = {
+    contador: { emoji: '📊', label: 'Interno' },
+    cliente_via_contador: { emoji: '📄', label: 'Cliente' },
+    cliente_direto: { emoji: '🍀', label: 'Direto' },
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -407,114 +415,115 @@ export default function OrcamentoNovo() {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* LEFT: Form (60%) */}
         <div className="lg:col-span-3 space-y-5">
-          {/* Cliente + Contexto */}
+
+          {/* SEÇÃO 1: Para quem é este orçamento? */}
           <Card className="p-5">
-            <h3 className="text-sm font-semibold mb-3">Cliente</h3>
-            <div className="space-y-3">
-              <Select onValueChange={handleSelectCliente} value={form.cliente_id || undefined}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecionar cliente existente (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clientes?.map(c => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.apelido || c.nome}{c.cnpj ? ` · ${c.cnpj}` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="grid grid-cols-2 gap-3">
+            <h3 className="text-sm font-semibold mb-3">Para quem é este orçamento?</h3>
+            <RadioGroup
+              value={form.destinatario}
+              onValueChange={(v: OrcamentoDestinatario) => setForm(f => ({ ...f, destinatario: v }))}
+              className="space-y-3"
+            >
+              <label htmlFor="dest-contador" className={cn(
+                "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                form.destinatario === 'contador' ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30'
+              )}>
+                <RadioGroupItem value="contador" id="dest-contador" className="mt-0.5" />
                 <div>
-                  <Label className="text-xs">Nome / Razão Social *</Label>
-                  <Input value={form.prospect_nome} onChange={e => setForm(f => ({ ...f, prospect_nome: e.target.value }))} placeholder="Nome do cliente" />
+                  <div className="font-medium text-sm">📊 Trevo → Contador</div>
+                  <div className="text-xs text-muted-foreground">Painel interno com margens e precificação</div>
                 </div>
+              </label>
+              <label htmlFor="dest-cliente-via" className={cn(
+                "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                form.destinatario === 'cliente_via_contador' ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30'
+              )}>
+                <RadioGroupItem value="cliente_via_contador" id="dest-cliente-via" className="mt-0.5" />
                 <div>
-                  <Label className="text-xs">CNPJ</Label>
-                  <Input value={form.prospect_cnpj} onChange={e => setForm(f => ({ ...f, prospect_cnpj: e.target.value }))} placeholder="00.000.000/0000-00" />
+                  <div className="font-medium text-sm">📄 Contador → Cliente Final</div>
+                  <div className="text-xs text-muted-foreground">White-label com branding do escritório</div>
                 </div>
+              </label>
+              <label htmlFor="dest-direto" className={cn(
+                "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                form.destinatario === 'cliente_direto' ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30'
+              )}>
+                <RadioGroupItem value="cliente_direto" id="dest-direto" className="mt-0.5" />
                 <div>
-                  <Label className="text-xs">Email</Label>
-                  <Input value={form.prospect_email} onChange={e => setForm(f => ({ ...f, prospect_email: e.target.value }))} placeholder="email@empresa.com" />
+                  <div className="font-medium text-sm">🍀 Trevo → Cliente Final</div>
+                  <div className="text-xs text-muted-foreground">Atendimento direto com branding Trevo</div>
                 </div>
-                <div>
-                  <Label className="text-xs">Telefone</Label>
-                  <Input value={form.prospect_telefone} onChange={e => setForm(f => ({ ...f, prospect_telefone: e.target.value }))} placeholder="(11) 99999-9999" />
-                </div>
-              </div>
+              </label>
+            </RadioGroup>
+          </Card>
 
-              {/* Modo toggle */}
-              <div className="pt-3 border-t">
-                <Label className="text-xs mb-2 block">Modo do orçamento</Label>
-                <RadioGroup
-                  value={form.modo}
-                  onValueChange={(v: OrcamentoModo) => setForm(f => ({ ...f, modo: v }))}
-                  className="flex gap-4"
-                >
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="simples" id="modo-simples" />
-                    <Label htmlFor="modo-simples" className="text-sm cursor-pointer">Simples</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <RadioGroupItem value="detalhado" id="modo-detalhado" />
-                    <Label htmlFor="modo-detalhado" className="text-sm cursor-pointer">Detalhado</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-
-              {/* PDF Mode toggle (detailed only) */}
-              {isDetalhado && (
-                <div className="space-y-3 pt-3 border-t">
-                  <div className="flex flex-col gap-3 p-4 rounded-xl border border-border bg-card">
-                    <span className="text-sm font-medium">Destinatário do PDF:</span>
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        variant={modoPDF === 'contador' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setModoPDF('contador')}
-                      >
-                        📊 Contador (intermediário)
-                      </Button>
-                      <Button
-                        variant={modoPDF === 'cliente' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setModoPDF('cliente')}
-                      >
-                        📄 Cliente Final (via contador)
-                      </Button>
-                      <Button
-                        variant={modoPDF === 'direto' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setModoPDF('direto')}
-                      >
-                        🍀 Cliente Final (direto Trevo)
-                      </Button>
-                    </div>
-                  </div>
-
+          {/* SEÇÃO 2: Escritório Contábil (oculto se direto) */}
+          {form.destinatario !== 'cliente_direto' && (
+            <Card className="p-5">
+              <h3 className="text-sm font-semibold mb-3">Escritório Contábil</h3>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs">Selecionar escritório cadastrado</Label>
+                  <Select onValueChange={handleSelectEscritorio} value={form.cliente_id || undefined}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Buscar escritório cadastrado..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientes?.map(c => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.apelido || c.nome}{c.cnpj ? ` · ${c.cnpj}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-xs">Contexto / Introdução</Label>
-                    <Textarea
-                      value={form.contexto}
-                      onChange={e => setForm(f => ({ ...f, contexto: e.target.value }))}
-                      placeholder="Descreva o cenário do cliente, riscos, urgência..."
-                      rows={4}
-                    />
+                    <Label className="text-xs">Nome do escritório *</Label>
+                    <Input value={form.escritorio_nome} onChange={e => setForm(f => ({ ...f, escritorio_nome: e.target.value }))} placeholder="Ex: AL Assessoria" />
                   </div>
                   <div>
-                    <Label className="text-xs">Ordem de Execução Sugerida</Label>
-                    <Textarea
-                      value={form.ordem_execucao}
-                      onChange={e => setForm(f => ({ ...f, ordem_execucao: e.target.value }))}
-                      placeholder="1. Bombeiros → 2. Vigilância → 3. Prefeitura..."
-                      rows={2}
-                    />
+                    <Label className="text-xs">CNPJ do escritório</Label>
+                    <Input value={form.escritorio_cnpj} onChange={e => setForm(f => ({ ...f, escritorio_cnpj: e.target.value }))} placeholder="00.000.000/0000-00" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Email do escritório</Label>
+                    <Input value={form.escritorio_email} onChange={e => setForm(f => ({ ...f, escritorio_email: e.target.value }))} placeholder="email@escritorio.com" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Telefone do escritório</Label>
+                    <Input value={form.escritorio_telefone} onChange={e => setForm(f => ({ ...f, escritorio_telefone: e.target.value }))} placeholder="(11) 99999-9999" />
                   </div>
                 </div>
-              )}
+              </div>
+            </Card>
+          )}
+
+          {/* SEÇÃO 3: Empresa a ser regularizada */}
+          <Card className="p-5">
+            <h3 className="text-sm font-semibold mb-1">Empresa a ser regularizada</h3>
+            <p className="text-xs text-muted-foreground mb-3">Esta é a empresa que receberá os serviços</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Razão social da empresa *</Label>
+                <Input value={form.prospect_nome} onChange={e => setForm(f => ({ ...f, prospect_nome: e.target.value }))} placeholder="Ex: Clínica Mater Senior Saúde e Longevidade Ltda" />
+              </div>
+              <div>
+                <Label className="text-xs">CNPJ</Label>
+                <Input value={form.prospect_cnpj} onChange={e => setForm(f => ({ ...f, prospect_cnpj: e.target.value }))} placeholder="00.000.000/0000-00" />
+              </div>
+              <div>
+                <Label className="text-xs">Email de contato</Label>
+                <Input value={form.prospect_email} onChange={e => setForm(f => ({ ...f, prospect_email: e.target.value }))} placeholder="email@empresa.com" />
+              </div>
+              <div>
+                <Label className="text-xs">Telefone</Label>
+                <Input value={form.prospect_telefone} onChange={e => setForm(f => ({ ...f, prospect_telefone: e.target.value }))} placeholder="(11) 99999-9999" />
+              </div>
             </div>
           </Card>
 
-          {/* Itens */}
+          {/* SEÇÃO 4: Itens da Proposta */}
           <Card className="p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold">Itens da Proposta</h3>
@@ -525,26 +534,37 @@ export default function OrcamentoNovo() {
 
             <div className="space-y-3">
               {form.itens.map((item, idx) => (
-                isDetalhado ? (
-                  <ItemCardDetalhado
-                    key={item.id}
-                    item={item}
-                    idx={idx}
-                    secoes={form.secoes}
-                    modoContador={modoPDF === 'contador'}
-                    onChange={updateItem}
-                    onRemove={removeItem}
-                    onAddSecao={handleAddSecao}
-                  />
-                ) : (
-                  <ItemCardSimples
-                    key={item.id}
-                    item={item}
-                    idx={idx}
-                    onChange={updateItem}
-                    onRemove={removeItem}
-                  />
-                )
+                <div key={item.id} className="space-y-2">
+                  {isDetalhado ? (
+                    <ItemCardDetalhado
+                      item={item}
+                      idx={idx}
+                      secoes={form.secoes}
+                      modoContador={modoPDF === 'contador'}
+                      onChange={updateItem}
+                      onRemove={removeItem}
+                      onAddSecao={handleAddSecao}
+                    />
+                  ) : (
+                    <ItemCardSimples
+                      item={item}
+                      idx={idx}
+                      onChange={updateItem}
+                      onRemove={removeItem}
+                    />
+                  )}
+                  {/* Toggle Obrigatório/Opcional */}
+                  <div className="flex items-center gap-2 pl-2">
+                    <Switch
+                      checked={item.isOptional || false}
+                      onCheckedChange={(checked) => updateItem(idx, 'isOptional', checked)}
+                      className="scale-75"
+                    />
+                    <span className={cn("text-xs", item.isOptional ? "text-amber-600 font-medium" : "text-muted-foreground")}>
+                      {item.isOptional ? 'Opcional' : 'Obrigatório'}
+                    </span>
+                  </div>
+                </div>
               ))}
 
               {form.itens.length === 0 && (
@@ -559,16 +579,49 @@ export default function OrcamentoNovo() {
             </div>
           </Card>
 
-          {/* Pacotes (detailed only) */}
-          {isDetalhado && (
-            <PacotesEditor
-              pacotes={form.pacotes}
-              itens={form.itens}
-              onChange={pacotes => setForm(f => ({ ...f, pacotes }))}
-            />
-          )}
+          {/* SEÇÃO 5: Pacotes (colapsável) */}
+          <Collapsible open={pacotesOpen} onOpenChange={setPacotesOpen}>
+            <Card className="p-5">
+              <CollapsibleTrigger className="flex items-center justify-between w-full">
+                <h3 className="text-sm font-semibold">Pacotes</h3>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", pacotesOpen && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <PacotesEditor
+                  pacotes={form.pacotes}
+                  itens={form.itens}
+                  onChange={pacotes => setForm(f => ({ ...f, pacotes }))}
+                />
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
-          {/* Condições */}
+          {/* SEÇÃO 6: Contexto e Apresentação */}
+          <Card className="p-5">
+            <h3 className="text-sm font-semibold mb-3">Contexto e Apresentação</h3>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs">Descreva a situação atual</Label>
+                <Textarea
+                  value={form.contexto}
+                  onChange={e => setForm(f => ({ ...f, contexto: e.target.value }))}
+                  placeholder={"Ex: Empresa sem Alvará Sanitário e sem CRM PJ.\nAtualmente em risco de interdição pela Vigilância Sanitária e\nbloqueio de convênios. Objetivo: regularização completa em\n6 a 12 semanas."}
+                  rows={4}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Ordem sugerida de execução</Label>
+                <Textarea
+                  value={form.ordem_execucao}
+                  onChange={e => setForm(f => ({ ...f, ordem_execucao: e.target.value }))}
+                  placeholder={"Ex: 1. Licença Bombeiros (base para tudo)\n2. Alvará Sanitário (depende do item 1)\n3. CRM PJ + Cadastro Técnico (paralelo)"}
+                  rows={3}
+                />
+              </div>
+            </div>
+          </Card>
+
+          {/* SEÇÃO 7: Condições */}
           <Card className="p-5">
             <h3 className="text-sm font-semibold mb-3">Condições</h3>
             <div className="space-y-3">
@@ -596,11 +649,43 @@ export default function OrcamentoNovo() {
               </div>
             </div>
           </Card>
+
+          {/* SEÇÃO 8: Formato do PDF */}
+          <Card className="p-5">
+            <h3 className="text-sm font-semibold mb-3">Formato de apresentação</h3>
+            <RadioGroup
+              value={form.modo}
+              onValueChange={(v: OrcamentoModo) => setForm(f => ({ ...f, modo: v }))}
+              className="flex gap-4"
+            >
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="simples" id="modo-simples" />
+                <Label htmlFor="modo-simples" className="text-sm cursor-pointer">
+                  Simples <span className="text-xs text-muted-foreground">— Lista de serviços com total</span>
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="detalhado" id="modo-detalhado" />
+                <Label htmlFor="modo-detalhado" className="text-sm cursor-pointer">
+                  Detalhado <span className="text-xs text-muted-foreground">— Cards completos com prazo, documentos e detalhes</span>
+                </Label>
+              </div>
+            </RadioGroup>
+          </Card>
         </div>
 
         {/* RIGHT: Preview (40%) */}
         <div className="lg:col-span-2">
           <div className="sticky top-20 space-y-4">
+            {/* Destinatário indicator */}
+            <div className="flex items-center gap-2">
+              <Badge variant={modoPDF === 'contador' ? 'default' : 'secondary'} className="text-xs">
+                {destinatarioLabels[form.destinatario].emoji} {destinatarioLabels[form.destinatario].label}
+              </Badge>
+              <span className="text-xs text-muted-foreground">·</span>
+              <span className="text-xs text-muted-foreground">{isDetalhado ? 'Detalhado' : 'Simples'}</span>
+            </div>
+
             <Card className="overflow-hidden">
               {isDetalhado ? (
                 <PreviewDetalhado
@@ -619,35 +704,20 @@ export default function OrcamentoNovo() {
 
             {/* Action Buttons */}
             <div className="space-y-2">
-              {isDetalhado ? (
-                <>
-                  <Button
-                    onClick={handleGerarAmbos}
-                    disabled={gerando}
-                    className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
-                    size="lg"
-                  >
-                    {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                    {gerando ? 'Gerando...' : 'Gerar Ambas Propostas'}
-                  </Button>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleGerarPDF('contador')} disabled={gerando}>
-                      📊 Contador
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleGerarPDF('cliente')} disabled={gerando}>
-                      📄 Via Contador
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleGerarPDF('direto')} disabled={gerando}>
-                      🍀 Direto Trevo
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <Button onClick={() => handleGerarPDF('contador')} className="w-full gap-2" disabled={gerando}>
-                  {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                  {gerando ? 'Gerando...' : 'Gerar PDF'}
-                </Button>
-              )}
+              <Button
+                onClick={handleGerarPDF}
+                disabled={gerando}
+                className={cn(
+                  "w-full gap-2",
+                  modoPDF === 'contador' ? 'bg-emerald-600 hover:bg-emerald-700' :
+                  modoPDF === 'direto' ? 'bg-emerald-600 hover:bg-emerald-700' :
+                  'bg-blue-600 hover:bg-blue-700'
+                )}
+                size="lg"
+              >
+                {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+                {gerando ? 'Gerando...' : `Gerar PDF ${destinatarioLabels[form.destinatario].emoji} ${destinatarioLabels[form.destinatario].label}`}
+              </Button>
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" onClick={() => handleSave('rascunho')} disabled={saveMutation.isPending} className="gap-1">
                   <Save className="h-4 w-4" /> Salvar
@@ -662,7 +732,7 @@ export default function OrcamentoNovo() {
             {pdfs && pdfs.some(p => p.modo === 'cliente' && p.status === 'ativo') && (
               <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
                 <p className="text-xs text-blue-400 font-medium">
-                  💡 Para atualizar valores do cliente: edite os campos "Sugestão Mínima" nos itens acima e clique "Só Cliente" para gerar nova versão.
+                  💡 Para atualizar valores do cliente: edite os campos "Sugestão Mínima" nos itens acima e gere nova versão.
                 </p>
               </div>
             )}

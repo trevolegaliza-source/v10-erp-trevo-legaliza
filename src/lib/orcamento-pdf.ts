@@ -9,12 +9,19 @@ export interface OrcamentoPDFData {
   modo: OrcamentoModo;
   modoContador?: boolean; // legacy compat
   modoPDF?: OrcamentoPDFMode; // 'contador' | 'cliente' | 'direto'
+  destinatario?: 'contador' | 'cliente_via_contador' | 'cliente_direto';
   prospect_nome: string;
   prospect_cnpj: string | null;
-  clienteNome?: string; // nome da contabilidade para modo cliente
-  contadorNome?: string;   // FIX 2
-  contadorEmail?: string;  // FIX 2
-  contadorTelefone?: string; // FIX 2
+  // Escritório contábil (used in contador and cliente_via_contador modes)
+  escritorioNome?: string;
+  escritorioEmail?: string;
+  escritorioTelefone?: string;
+  escritorioCnpj?: string;
+  // Legacy compat fields
+  clienteNome?: string;
+  contadorNome?: string;
+  contadorEmail?: string;
+  contadorTelefone?: string;
   itens: OrcamentoItem[];
   pacotes: OrcamentoPacote[];
   secoes: OrcamentoSecao[];
@@ -200,22 +207,49 @@ function sanitizeFilename(name: string): string {
 
 function resolvePDFMode(d: OrcamentoPDFData): OrcamentoPDFMode {
   if (d.modoPDF) return d.modoPDF;
+  if (d.destinatario === 'cliente_via_contador') return 'cliente';
+  if (d.destinatario === 'cliente_direto') return 'direto';
   return d.modoContador ? 'cliente' : 'contador';
+}
+
+/** Resolve the escritório name from new or legacy fields */
+function getEscritorioNome(d: OrcamentoPDFData): string {
+  return d.escritorioNome || d.clienteNome || d.contadorNome || '';
+}
+
+function getNomeExibicao(d: OrcamentoPDFData, pdfMode: OrcamentoPDFMode, contexto: 'header' | 'capa_principal' | 'headline_cenario' | 'cta_final' | 'rodape'): string {
+  const escritorio = getEscritorioNome(d);
+  const empresa = toTitleCase(d.prospect_nome || '');
+
+  switch (pdfMode) {
+    case 'contador':
+      if (contexto === 'header' || contexto === 'rodape' || contexto === 'cta_final') return 'Trevo Legaliza';
+      if (contexto === 'capa_principal') return escritorio || empresa;
+      if (contexto === 'headline_cenario') return empresa;
+      break;
+    case 'cliente':
+      if (contexto === 'header' || contexto === 'rodape' || contexto === 'cta_final') return escritorio || empresa;
+      if (contexto === 'capa_principal' || contexto === 'headline_cenario') return empresa;
+      break;
+    case 'direto':
+      if (contexto === 'header' || contexto === 'rodape' || contexto === 'cta_final') return 'Trevo Legaliza';
+      if (contexto === 'capa_principal' || contexto === 'headline_cenario') return empresa;
+      break;
+  }
+  return empresa;
 }
 
 function getHeader(d: OrcamentoPDFData, logo: string | null, pdfMode: OrcamentoPDFMode): string {
   if (pdfMode === 'cliente') {
-    return HEADER_CLIENTE(d.numero, d.data_emissao, d.clienteNome || d.prospect_nome);
+    return HEADER_CLIENTE(d.numero, d.data_emissao, getNomeExibicao(d, pdfMode, 'header'));
   }
-  // 'contador' and 'direto' both use Trevo header
   return HEADER_TREVO(d.numero, d.data_emissao, logo);
 }
 
 function getFooter(d: OrcamentoPDFData, pdfMode: OrcamentoPDFMode): string {
   if (pdfMode === 'cliente') {
-    return FOOTER_CLIENTE(d.clienteNome || d.prospect_nome);
+    return FOOTER_CLIENTE(getNomeExibicao(d, pdfMode, 'rodape'));
   }
-  // 'contador' and 'direto' both use Trevo footer
   return FOOTER_TREVO;
 }
 
@@ -390,18 +424,13 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   const accentBorder = useBlueTheme ? '#3b82f6' : '#22c55e';
   const accentText = useBlueTheme ? '#1e40af' : '#166534';
 
-  // FIX 5+6 — Display name logic:
-  // Internal mode: displayName = contador name (clienteNome) for partner panel
-  // Client/Direto modes: displayName = prospect (final client) name — clienteNome is only for header/footer
-  const displayName = isCliente
-    ? toTitleCase(d.prospect_nome)
-    : (d.clienteNome?.trim() ? toTitleCase(d.clienteNome) : toTitleCase(d.prospect_nome));
-  const nomeEmpresaCurto = displayName.split(' ').slice(0, 3).join(' ');
-
+  // Display name via getNomeExibicao
+  const displayName = getNomeExibicao(d, pdfMode, 'capa_principal');
+  const nomeEmpresaCurto = getNomeExibicao(d, pdfMode, 'headline_cenario').split(' ').slice(0, 3).join(' ');
 
   // --- PAGE 1: Cover ---
   const itemCount = d.itens.filter(i => i.descricao.trim()).length;
-  const escritorioNome = d.clienteNome || '';
+  const escritorioNome = getEscritorioNome(d);
 
   if (!isCliente) {
     // ═══════════════════════════════════════════
@@ -676,7 +705,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const totalMin = valorTotal + item.taxa_min;
     const totalMax = valorTotal + item.taxa_max;
     const hasTaxaItem = item.taxa_min > 0 || item.taxa_max > 0;
-    const isOpcional = entry.sectionKey === 'opcionais' || (secoes.find(s => s.key === entry.sectionKey)?.label || '').toLowerCase().includes('opcional');
+    const isOpcional = item.isOptional === true || entry.sectionKey === 'opcionais' || (secoes.find(s => s.key === entry.sectionKey)?.label || '').toLowerCase().includes('opcional');
     const isCNES = /cnes|altamente recomendado/i.test(item.descricao);
     const borderColor = isOpcional
       ? (isCNES ? '#10b981' : '#f59e0b')
@@ -1007,16 +1036,19 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       </div>
     </div>
   ` : (() => {
-    // CLIENTE MODE: show contador contact if available
-    if (d.contadorNome) {
+    // CLIENTE MODE: show escritório/contador contact if available
+    const ctaNome = d.escritorioNome || d.contadorNome || '';
+    const ctaTelefone = d.escritorioTelefone || d.contadorTelefone || '';
+    const ctaEmail = d.escritorioEmail || d.contadorEmail || '';
+    if (ctaNome) {
       const contactLines: string[] = [];
-      if (d.contadorTelefone) contactLines.push(`<div style="font-size: 11px; color: #ffffff; margin-top: 6px;">📱 ${esc(d.contadorTelefone)}</div>`);
-      if (d.contadorEmail) contactLines.push(`<div style="font-size: 11px; color: #ffffff; margin-top: 4px;">✉️ ${esc(d.contadorEmail)}</div>`);
+      if (ctaTelefone) contactLines.push(`<div style="font-size: 11px; color: #ffffff; margin-top: 6px;">📱 ${esc(ctaTelefone)}</div>`);
+      if (ctaEmail) contactLines.push(`<div style="font-size: 11px; color: #ffffff; margin-top: 4px;">✉️ ${esc(ctaEmail)}</div>`);
       return `
         <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 16px; padding: 24px; text-align: center;">
           <div style="font-size: 11px; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
           <div style="font-size: 10px; color: rgba(255,255,255,0.7); margin-bottom: 12px;">Esta proposta é válida por ${d.validade_dias} dias. Para avançar ou esclarecer dúvidas, entre em contato — estamos prontos para começar.</div>
-          <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 8px;">${esc(d.contadorNome)}</div>
+          <div style="font-size: 14px; font-weight: 700; color: #ffffff; margin-top: 8px;">${esc(ctaNome)}</div>
           ${contactLines.join('')}
         </div>
       `;
