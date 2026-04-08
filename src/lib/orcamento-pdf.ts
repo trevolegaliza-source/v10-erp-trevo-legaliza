@@ -490,8 +490,8 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             <!-- Card 3: Sua Margem -->
             <div style="flex: 1; background: #1a4731; border-radius: 8px; padding: 20px 16px; text-align: center;">
               <div style="font-size: 9px; color: #86efac; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">SUA MARGEM</div>
-              <div style="font-size: 24px; font-weight: 700; color: #ffffff;">${fmt(margemCapa)}</div>
-              <div style="font-size: 12px; color: #86efac; margin-top: 6px;">${margemCapaPct}% de lucro</div>
+              <div style="font-size: ${temMargemFaixa ? '18' : '24'}px; font-weight: 700; color: #ffffff;">${temMargemFaixa ? `${fmt(margemCapaMin)} a ${fmt(margemCapaIdeal)}` : fmt(margemCapaMin)}</div>
+              <div style="font-size: 11px; color: #86efac; margin-top: 6px;">${temMargemFaixa ? `${margemCapaMinPct}% a ${margemCapaIdealPct}%` : `${margemCapaMinPct}%`} de lucro</div>
             </div>
           </div>
         </div>
