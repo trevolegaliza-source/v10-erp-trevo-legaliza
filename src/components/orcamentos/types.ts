@@ -85,6 +85,7 @@ export function createItem(overrides?: Partial<OrcamentoItem>): OrcamentoItem {
     prazo: '',
     docs_necessarios: '',
     quantidade: 1,
+    isOptional: false,
     ...overrides,
   };
 }
