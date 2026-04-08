@@ -684,7 +684,7 @@ export default function OrcamentoNovo() {
                     >
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant={pdf.modo === 'contador' ? 'default' : 'secondary'} className="text-[10px]">
-                          {pdf.modo === 'contador' ? '📊 Interno' : '📄 Cliente'}
+                          {pdf.modo === 'contador' ? '📊 Interno' : pdf.modo === 'direto' ? '🍀 Direto' : '📄 Cliente'}
                         </Badge>
                         <span className="text-xs text-muted-foreground">
                           v{pdf.versao} · {new Date(pdf.gerado_em).toLocaleDateString('pt-BR')} {new Date(pdf.gerado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
