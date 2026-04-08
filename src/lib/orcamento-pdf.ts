@@ -427,7 +427,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
           ${d.prospect_cnpj ? `<div style="font-size: 14px; color: #64748b;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
           ${coverValueBoxHtml}
           ${coverBulletsHtml}
-          ${d.data_emissao ? `<div style="margin-top: 16px; font-size: 12px; color: #94a3b8;">Proposta emitida em ${d.data_emissao}</div>` : ''}
+          
         </div>
         <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
       </div>
