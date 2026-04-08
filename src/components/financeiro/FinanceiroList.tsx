@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { AlertTriangle, FileText, Clock } from 'lucide-react';
+import { AlertTriangle, FileText, Clock, MoreHorizontal, Undo2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { EtapaFinanceiro } from '@/types/financial';
 import { ETAPA_FINANCEIRO_LABELS, STATUS_LABELS, STATUS_STYLES } from '@/types/financial';
 import type { StatusFinanceiro } from '@/types/financial';
@@ -47,8 +53,39 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
   const [editProcesso, setEditProcesso] = useState<ProcessoFinanceiro | null>(null);
   const [showDeferimentoAlert, setShowDeferimentoAlert] = useState(false);
   const [deferimentoAlertData, setDeferimentoAlertData] = useState<DeferimentoAlertData | null>(null);
+  const [showUndoDialog, setShowUndoDialog] = useState(false);
+  const [undoProcesso, setUndoProcesso] = useState<ProcessoFinanceiro | null>(null);
+  const [undoing, setUndoing] = useState(false);
   const qc = useQueryClient();
   const { salvarExtrato } = useExtratos();
+
+  async function handleDesfazerPagamento() {
+    if (!undoProcesso) return;
+    setUndoing(true);
+    try {
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({
+          status: 'pendente' as const,
+          etapa_financeiro: 'solicitacao_criada',
+          data_pagamento: null,
+        })
+        .eq('processo_id', undoProcesso.id)
+        .eq('status', 'pago');
+
+      if (error) throw error;
+
+      qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
+      qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
+      toast.success('Pagamento revertido. Processo voltou para A Cobrar.');
+    } catch (err: any) {
+      toast.error('Erro ao desfazer pagamento: ' + err.message);
+    } finally {
+      setUndoing(false);
+      setShowUndoDialog(false);
+      setUndoProcesso(null);
+    }
+  }
 
   const allChecked = processos.length > 0 && selected.size === processos.length;
 
@@ -259,6 +296,7 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
               <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Vencimento</th>
               <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Etapa</th>
               <th className="px-4 py-2.5 text-xs font-semibold text-muted-foreground">Status</th>
+              <th className="px-3 py-2.5 w-10"></th>
             </tr>
           </thead>
           <tbody>
@@ -307,12 +345,36 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
                       {STATUS_LABELS[status]}
                     </Badge>
                   </td>
+                  <td className="px-3 py-2.5">
+                    {p.etapa_financeiro === 'honorario_pago' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUndoProcesso(p);
+                              setShowUndoDialog(true);
+                            }}
+                          >
+                            <Undo2 className="h-4 w-4 mr-2" />
+                            Desfazer Pagamento
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </td>
                 </tr>
               );
             })}
             {processos.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                <td colSpan={8} className="text-center py-8 text-muted-foreground">
                   Nenhum processo encontrado.
                 </td>
               </tr>
@@ -373,6 +435,28 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
             </Button>
             <AlertDialogAction onClick={handleDeferimentoTodos}>
               Gerar Todos Mesmo Assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Undo payment dialog */}
+      <AlertDialog open={showUndoDialog} onOpenChange={setShowUndoDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desfazer pagamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O processo voltará para "A Cobrar" e a data de pagamento será removida. Esta ação não pode ser desfeita automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDesfazerPagamento}
+              disabled={undoing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {undoing ? 'Revertendo...' : 'Sim, desfazer'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
