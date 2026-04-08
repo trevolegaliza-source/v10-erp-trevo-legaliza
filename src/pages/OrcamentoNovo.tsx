@@ -553,6 +553,36 @@ export default function OrcamentoNovo() {
                       onRemove={removeItem}
                     />
                   )}
+
+                  {/* Valor de venda editável — modo direto */}
+                  {form.destinatario === 'cliente_direto' && (
+                    <div className="pl-2 space-y-1">
+                      <div className="flex items-center gap-3">
+                        <div className="w-44">
+                          <Label className="text-xs text-emerald-700 font-medium">Valor de venda R$</Label>
+                          <Input
+                            type="number"
+                            value={item.valorVendaDireto ?? item.valor_mercado || item.honorario_minimo_contador || item.honorario || ''}
+                            onChange={e => updateItem(idx, 'valorVendaDireto' as keyof OrcamentoItem, parseFloat(e.target.value) || 0)}
+                            placeholder="0,00"
+                            className="text-right"
+                          />
+                        </div>
+                        {(item.valor_mercado || item.honorario_minimo_contador) ? (
+                          <p className="text-xs text-muted-foreground mt-5">
+                            Sugestão: {fmt(item.valor_mercado || item.honorario_minimo_contador || 0)} (mercado)
+                          </p>
+                        ) : null}
+                      </div>
+                      {item.honorario > 0 && (
+                        <p className="text-xs text-emerald-600 font-medium">
+                          Sua margem: {fmt((item.valorVendaDireto ?? item.valor_mercado ?? item.honorario_minimo_contador ?? item.honorario) - item.honorario)}{' '}
+                          ({Math.round((((item.valorVendaDireto ?? item.valor_mercado ?? item.honorario_minimo_contador ?? item.honorario) - item.honorario) / item.honorario) * 100)}%)
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Toggle Obrigatório/Opcional */}
                   <div className="flex items-center gap-2 pl-2">
                     <Switch
