@@ -396,14 +396,16 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   // Compute values
   const getCustoTrevo = (item: OrcamentoItem) => (item.honorario || 0) * item.quantidade;
   const getPrecoCliente = (item: OrcamentoItem) => ((item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
+  const getPrecoDireto = (item: OrcamentoItem) => ((item.valor_mercado || item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
 
   const totalCustoTrevo = d.itens.reduce((s, i) => s + getCustoTrevo(i), 0);
   const totalPrecoCliente = d.itens.reduce((s, i) => s + getPrecoCliente(i), 0);
+  const totalPrecoDireto = d.itens.reduce((s, i) => s + getPrecoDireto(i), 0);
   const totalTaxaMin = d.itens.reduce((s, i) => s + i.taxa_min, 0);
   const totalTaxaMax = d.itens.reduce((s, i) => s + i.taxa_max, 0);
   const hasTaxas = totalTaxaMin > 0 || totalTaxaMax > 0;
 
-  const totalHonorariosCapa = isCliente ? totalPrecoCliente : totalCustoTrevo;
+  const totalHonorariosCapa = pdfMode === 'direto' ? totalPrecoDireto : isCliente ? totalPrecoCliente : totalCustoTrevo;
   const descontoValorCapa = totalHonorariosCapa * (d.desconto_pct / 100);
   const honorarioFinalCapa = totalHonorariosCapa - descontoValorCapa;
   const investimentoMin = honorarioFinalCapa + totalTaxaMin;
