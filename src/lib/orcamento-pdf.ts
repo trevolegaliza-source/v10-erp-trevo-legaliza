@@ -92,7 +92,7 @@ const HEADER_TREVO = (numero: number, data: string, logo: string | null) => `
 `;
 
 const HEADER_CLIENTE = (numero: number, data: string, nomeContabilidade: string) => `
-  <div style="height:${HEADER_HEIGHT}px;min-height:${HEADER_HEIGHT}px;max-height:${HEADER_HEIGHT}px;overflow:hidden;flex-shrink:0;background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
+  <div style="height:${HEADER_HEIGHT}px !important;min-height:${HEADER_HEIGHT}px !important;max-height:${HEADER_HEIGHT}px !important;overflow:hidden !important;flex-shrink:0;background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 0 32px; position:relative; display:flex; align-items:center; justify-content:space-between;">
     <div>
       <div style="font-size: 20px; font-weight: 800; color: #ffffff;">${esc(nomeContabilidade)}</div>
       <div style="font-size: 9px; color: rgba(255,255,255,0.5); margin-top: 2px;">Assessoria empresarial</div>
