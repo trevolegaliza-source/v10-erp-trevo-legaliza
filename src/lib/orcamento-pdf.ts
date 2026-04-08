@@ -111,6 +111,32 @@ async function preloadLogo(): Promise<string | null> {
   return null;
 }
 
+/**
+ * Measures the real rendered height of an HTML block in the DOM.
+ * Uses getBoundingClientRect() for pixel-accurate measurement.
+ */
+async function medirAlturaReal(html: string): Promise<number> {
+  const probe = document.createElement('div');
+  probe.style.cssText = `
+    position: absolute;
+    top: -99999px;
+    left: -99999px;
+    width: 722px;
+    visibility: hidden;
+    pointer-events: none;
+    box-sizing: border-box;
+  `;
+  probe.innerHTML = html;
+  document.body.appendChild(probe);
+
+  // Wait one frame for the browser to calculate layout
+  await new Promise(r => requestAnimationFrame(r));
+
+  const altura = probe.getBoundingClientRect().height;
+  document.body.removeChild(probe);
+  return Math.ceil(altura) + 24; // +24px safety margin
+}
+
 const HEADER_HEIGHT = 64;
 
 function logoHtml(logo: string | null, height = 36): string {
