@@ -704,13 +704,21 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
       // FIX 5 — Compressed mode: hide docs section
       const showDocsSection = !isCompressed && (item.prazo || item.docs_necessarios);
 
+      // FIX 1 — Optional badge
+      const opcionalBadge = isOpcional
+        ? (isCNES
+          ? `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#d1fae5;color:#064e3b;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">★ RECOMENDADO</span>`
+          : `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fef3c7;color:#92400e;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;vertical-align:middle;">OPCIONAL</span>`)
+        : '';
+
       chunkHtml += `
-        <div style="border: 1px solid #e5e7eb; border-left: 4px solid ${borderColor}; border-radius: 16px; margin-bottom: ${isCompressed ? '10' : '14'}px; overflow: hidden;">
+        <div style="border: 1px solid #e5e7eb; border-left: 4px ${borderStyle} ${borderColor}; border-radius: 16px; margin-bottom: ${isCompressed ? '10' : '14'}px; overflow: hidden;">
           <div style="display: flex; align-items: center; gap: 12px; padding: ${isCompressed ? '10' : '14'}px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
             <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 800; flex-shrink: 0;">${item.ordem || '•'}</div>
             <div style="flex: 1; min-width: 0;">
               <div style="font-size: 12px; font-weight: 700; color: #ffffff; line-height: 1.3;">${esc(item.descricao)}</div>
             </div>
+            ${opcionalBadge}
             <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
           </div>
           ${item.detalhes ? `<div style="padding: ${isCompressed ? '8' : '12'}px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
