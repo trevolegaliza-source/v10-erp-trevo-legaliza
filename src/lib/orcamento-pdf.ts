@@ -559,8 +559,11 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
         <div style="font-size: 11px; color: #555;">
           📋 ${itemCount} serviços incluídos &nbsp;|&nbsp; ⏱ 6 a 12 semanas
         </div>
-        <div style="font-size: 10px; color: #888; margin-top: 6px;">
-          Válido por ${d.validade_dias} dias · ${esc((d.pagamento || 'Pagamento a combinar').substring(0, 60))}
+        <div style="font-size: 10px; color: #888; margin-top: 6px; word-wrap: break-word; overflow-wrap: break-word;">
+          Válido por ${d.validade_dias} dias
+        </div>
+        <div style="font-size: 10px; color: #888; margin-top: 4px; word-wrap: break-word; overflow-wrap: break-word;">
+          ${esc(d.pagamento || 'Pagamento à vista via PIX/boleto bancário ou parcelamento')}
         </div>
         ${d.data_emissao ? `<div style="font-size: 10px; color: #888; margin-top: 4px;">Proposta emitida em ${d.data_emissao}</div>` : ''}
       </div>
