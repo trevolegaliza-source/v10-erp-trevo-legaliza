@@ -650,7 +650,7 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
             </div>
             <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
           </div>
-          ${item.detalhes && !isCompressed ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
+          ${item.detalhes ? `<div style="padding: ${isCompressed ? '8' : '12'}px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
           ${showDocsSection ? `
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #f3f4f6; border-bottom: 1px solid #f3f4f6;">
               <div style="padding: 10px 18px; background: #ffffff;">
