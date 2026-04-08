@@ -316,31 +316,87 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
   const displayName = toTitleCase(d.prospect_nome);
   const nomeEmpresaCurto = displayName.split(' ').slice(0, 3).join(' ');
 
-  // --- PAGE 1: Cover ---
-  const modoBadge = !isCliente
-    ? `<div style="background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 16px; margin-bottom: 20px; font-size: 9px; font-weight: 700; color: #92400e; text-align: center; letter-spacing: 1px;">📊 PROPOSTA INTERNA — USO EXCLUSIVO DA CONTABILIDADE</div>`
-    : '';
 
-  // FIX 3 — Cover value boxes: dual for Contador, single for Cliente
-  let coverValueBoxHtml = '';
+  // --- PAGE 1: Cover ---
+  const itemCount = d.itens.filter(i => i.descricao.trim()).length;
+  const escritorioNome = d.clienteNome || '';
+
   if (!isCliente) {
-    // CONTADOR: two stacked boxes
-    coverValueBoxHtml = `
-      <div style="margin-top: 40px; width: 100%; max-width: 460px;">
-        <div style="padding: 16px 30px; background: #f8f8f8; border: 1px solid #d1d5db; border-radius: 12px 12px 0 0; text-align: center;">
-          <div style="font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">SEU CUSTO TREVO (honorários)</div>
-          <div style="font-size: 22px; font-weight: 700; color: #374151;">${fmt(custoTrevoFinalCapa)}</div>
+    // ═══════════════════════════════════════════
+    // INTERNAL COVER — 4 zones: Identity header, Client ID, 3 financial cards, Footer info
+    // ═══════════════════════════════════════════
+    const badgeNome = escritorioNome || 'USO EXCLUSIVO DA CONTABILIDADE';
+
+    pages.push(`
+      <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; height: 1123px; background: white; position: relative; display: flex; flex-direction: column;">
+
+        <!-- ZONA 1: Identity header (dark green, ~30%) -->
+        <div style="background: #0f3d24; padding: 48px 40px 36px; position: relative; flex-shrink: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              ${logoHtml(logo, 48)}
+              <div style="font-size: 13px; color: #86efac; margin-top: 10px;">Seu Departamento Societário Completo</div>
+              <div style="font-size: 9px; color: #6ee7b7; font-style: italic; margin-top: 6px; opacity: 0.8;">🤝 PAINEL DO PARCEIRO — ${esc(badgeNome)}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 10px; color: #ffffff; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">PROPOSTA #${String(d.numero).padStart(3, '0')}</div>
+              <div style="font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 4px;">${d.data_emissao}</div>
+              <div style="font-size: 9px; color: #6ee7b7; font-style: italic; margin-top: 16px;">Desde 2018 · 27 estados · Referência nacional</div>
+            </div>
+          </div>
         </div>
-        <div style="padding: 18px 30px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 0 0 12px 12px; text-align: center;">
-          <div style="font-size: 9px; color: ${accentText}; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">COBRAR DO CLIENTE (total estimado)</div>
-          <div style="font-size: 28px; font-weight: 900; color: ${accentText};">${valorCapa}</div>
-          <div style="font-size: 8px; color: #9ca3af; margin-top: 4px;">Honorários${hasTaxas ? ' + taxas governamentais estimadas' : ''}</div>
+
+        <!-- ZONA 2: Client identification -->
+        <div style="padding: 32px 40px 24px; flex-shrink: 0;">
+          <div style="font-size: 9px; color: #0f3d24; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin-bottom: 10px;">PAINEL DO PARCEIRO — PROPOSTA #${String(d.numero).padStart(3, '0')}</div>
+          <div style="font-size: 22px; font-weight: 700; color: #0f3d24; margin-bottom: 6px;">${esc(escritorioNome || toTitleCase(d.prospect_nome))}</div>
+          ${escritorioNome ? `<div style="font-size: 12px; color: #6b7280;">Para: ${esc(toTitleCase(d.prospect_nome))}</div>` : ''}
+          ${d.prospect_cnpj ? `<div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
         </div>
+
+        <!-- ZONA 3: Three financial cards -->
+        <div style="flex: 1; display: flex; align-items: center; padding: 0 40px;">
+          <div style="display: flex; gap: 16px; width: 100%;">
+            <!-- Card 1: Custo Trevo -->
+            <div style="flex: 1; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px 16px; text-align: center;">
+              <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">SEU CUSTO TREVO</div>
+              <div style="font-size: 20px; font-weight: 700; color: #333;">${fmt(custoTrevoFinalCapa)}</div>
+            </div>
+            <!-- Card 2: Cobrar do Cliente (highlight) -->
+            <div style="flex: 1; background: #e8f5e9; border: 2px solid #2d6a4f; border-radius: 8px; padding: 20px 16px; text-align: center;">
+              <div style="font-size: 9px; color: #1a4731; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">COBRAR DO CLIENTE</div>
+              <div style="font-size: 24px; font-weight: 700; color: #0f3d24;">${valorCapa}</div>
+              <div style="font-size: 9px; color: #555; margin-top: 6px;">honorários${hasTaxas ? ' + taxas gov. estimadas' : ''}</div>
+            </div>
+            <!-- Card 3: Sua Margem -->
+            <div style="flex: 1; background: #1a4731; border-radius: 8px; padding: 20px 16px; text-align: center;">
+              <div style="font-size: 9px; color: #86efac; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">SUA MARGEM</div>
+              <div style="font-size: 24px; font-weight: 700; color: #ffffff;">${fmt(margemCapa)}</div>
+              <div style="font-size: 12px; color: #86efac; margin-top: 6px;">${margemCapaPct}% de lucro</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ZONA 4: Footer info -->
+        <div style="padding: 0 40px 20px; flex-shrink: 0;">
+          <div style="border-top: 1px solid #e0e0e0; padding-top: 12px; text-align: center;">
+            <div style="font-size: 10px; color: #888;">
+              📋 ${itemCount} serviços incluídos &nbsp;·&nbsp; Válido por ${d.validade_dias} dias &nbsp;·&nbsp; Emissão: ${d.data_emissao}
+            </div>
+            <div style="font-size: 9px; color: #aaa; font-style: italic; margin-top: 6px;">
+              Desde 2018 · Referência nacional em regularização empresarial · Atuação em 27 estados
+            </div>
+          </div>
+        </div>
+
+        <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
       </div>
-    `;
+    `);
   } else {
-    // CLIENTE: single box (unchanged)
-    coverValueBoxHtml = `
+    // ═══════════════════════════════════════════
+    // CLIENT COVER — unchanged layout
+    // ═══════════════════════════════════════════
+    const coverValueBoxHtml = `
       <div style="margin-top: 40px; padding: 20px 40px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 16px; text-align: center;">
         <div style="font-size: 10px; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px;">Investimento Estimado</div>
         <div style="font-size: ${hasTaxas ? '26' : '36'}px; font-weight: 900; color: ${accentText};">${valorCapa}</div>
@@ -349,24 +405,8 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
         Honorários profissionais${hasTaxas ? ' + taxas governamentais estimadas' : ''}
       </div>
     `;
-  }
 
-  // FIX 7 — Cover context bullets below value box
-  const itemCount = d.itens.filter(i => i.descricao.trim()).length;
-  let coverBulletsHtml = '';
-  if (!isCliente) {
-    coverBulletsHtml = `
-      <div style="margin-top: 24px; border-top: 1px solid #e0e0e0; padding-top: 16px; width: 100%; max-width: 500px; text-align: center;">
-        <div style="font-size: 11px; color: #2d6a4f;">
-          💰 Custo Trevo: ${fmt(custoTrevoFinalCapa)} &nbsp;|&nbsp; 📈 Margem estimada: ${fmt(margemCapa)} (${margemCapaPct}%)
-        </div>
-        <div style="font-size: 11px; color: #555; margin-top: 6px;">
-          📋 ${itemCount} serviços &nbsp;|&nbsp; 🏢 Cliente: ${esc(displayName.substring(0, 30))}
-        </div>
-      </div>
-    `;
-  } else {
-    coverBulletsHtml = `
+    const coverBulletsHtml = `
       <div style="margin-top: 24px; border-top: 1px solid #e0e0e0; padding-top: 16px; width: 100%; max-width: 500px; text-align: center;">
         <div style="font-size: 11px; color: #555;">
           📋 ${itemCount} serviços incluídos &nbsp;|&nbsp; ⏱ 6 a 12 semanas
@@ -377,28 +417,24 @@ function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): string[]
         ${d.data_emissao ? `<div style="font-size: 10px; color: #888; margin-top: 4px;">Proposta emitida em ${d.data_emissao}</div>` : ''}
       </div>
     `;
-  }
 
-  pages.push(`
-    <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; height: 1123px; background: white; position: relative; display: flex; flex-direction: column;">
-      ${header}
-      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px 60px;">
-        ${modoBadge}
-        <div style="font-size: 10px; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 4px; font-weight: 700; margin-bottom: 20px;">Proposta Comercial</div>
-        <div style="font-size: 28px; font-weight: 600; color: #1a1a2e; text-align: center; margin-bottom: 8px;">${esc(displayName)}</div>
-        ${d.prospect_cnpj ? `<div style="font-size: 14px; color: #64748b;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
-        ${coverValueBoxHtml}
-        ${coverBulletsHtml}
-        <div style="margin-top: 16px; font-size: 12px; color: #94a3b8;">
-          Emissão: ${d.data_emissao} · Válida por ${d.validade_dias} dias
+    pages.push(`
+      <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; height: 1123px; background: white; position: relative; display: flex; flex-direction: column;">
+        ${header}
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 40px 60px;">
+          <div style="font-size: 10px; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 4px; font-weight: 700; margin-bottom: 20px;">Proposta Comercial</div>
+          <div style="font-size: 28px; font-weight: 600; color: #1a1a2e; text-align: center; margin-bottom: 8px;">${esc(displayName)}</div>
+          ${d.prospect_cnpj ? `<div style="font-size: 14px; color: #64748b;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
+          ${coverValueBoxHtml}
+          ${coverBulletsHtml}
+          <div style="margin-top: 16px; font-size: 12px; color: #94a3b8;">
+            Emissão: ${d.data_emissao} · Válida por ${d.validade_dias} dias
+          </div>
         </div>
-        ${!isCliente ? `<div style="margin-top: 30px; font-size: 8px; color: #9ca3af; letter-spacing: 0.5px; text-align: center;">
-          Desde 2018 · Referência nacional em regularização empresarial · Atuação em 27 estados
-        </div>` : ''}
+        <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
       </div>
-      <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
-    </div>
-  `);
+    `);
+  }
 
   // --- PAGE 2: Context (if filled) ---
   const temContexto = d.contexto && d.contexto.trim().length > 0;
