@@ -38,11 +38,16 @@ export type OrcamentoPDFMode = 'contador' | 'cliente' | 'direto';
 export type OrcamentoDestinatario = 'contador' | 'cliente_via_contador' | 'cliente_direto';
 
 export interface OrcamentoForm {
+  destinatario: OrcamentoDestinatario;
   prospect_nome: string;
   prospect_cnpj: string;
   prospect_email: string;
   prospect_telefone: string;
   prospect_contato: string;
+  escritorio_nome: string;
+  escritorio_cnpj: string;
+  escritorio_email: string;
+  escritorio_telefone: string;
   cliente_id: string | null;
   modo: OrcamentoModo;
   contexto: string;
