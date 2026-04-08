@@ -630,12 +630,15 @@ export default function OrcamentoNovo() {
                     {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
                     {gerando ? 'Gerando...' : 'Gerar Ambas Propostas'}
                   </Button>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <Button variant="outline" size="sm" onClick={() => handleGerarPDF('contador')} disabled={gerando}>
-                      📊 Só Contador
+                      📊 Contador
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => handleGerarPDF('cliente')} disabled={gerando}>
-                      📄 Só Cliente
+                      📄 Via Contador
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleGerarPDF('direto')} disabled={gerando}>
+                      🍀 Direto Trevo
                     </Button>
                   </div>
                 </>
