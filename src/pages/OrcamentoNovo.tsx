@@ -266,7 +266,7 @@ export default function OrcamentoNovo() {
     return id;
   }
 
-  async function handleGerarPDF(modo: 'contador' | 'cliente') {
+  async function handleGerarPDF(modo: OrcamentoPDFMode) {
     if (!form.prospect_nome.trim()) { toast.error('Preencha o nome do cliente'); return; }
     const itensValidos = form.itens.filter(i => i.descricao.trim());
     if (itensValidos.length === 0) { toast.error('Adicione pelo menos um item'); return; }
@@ -279,7 +279,12 @@ export default function OrcamentoNovo() {
 
       const result = await salvarPDF.mutateAsync({ blob, modo, orcamentoId: savedId, filename });
       downloadBlob(blob, filename);
-      toast.success(`Proposta ${modo === 'contador' ? 'interna' : 'do cliente'} gerada e salva! (v${result.versao})`);
+      const modoLabels: Record<OrcamentoPDFMode, string> = {
+        contador: 'interna',
+        cliente: 'do cliente',
+        direto: 'direta Trevo',
+      };
+      toast.success(`Proposta ${modoLabels[modo]} gerada e salva! (v${result.versao})`);
     } catch (err: any) {
       toast.error('Erro ao gerar PDF: ' + (err.message || ''));
       console.error(err);
