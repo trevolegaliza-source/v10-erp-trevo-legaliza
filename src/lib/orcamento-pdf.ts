@@ -3,7 +3,8 @@ import html2canvas from 'html2canvas';
 import {
   type OrcamentoItem, type OrcamentoPacote, type OrcamentoSecao,
   type OrcamentoModo, type OrcamentoPDFMode, type RiscoOperacao,
-  type EtapaFluxo, type BeneficioCapa, getItemValor, DEFAULT_SECOES,
+  type EtapaFluxo, type BeneficioCapa, type CenarioOrcamento,
+  getItemValor, DEFAULT_SECOES,
 } from '@/components/orcamentos/types';
 
 export interface OrcamentoPDFData {
@@ -42,6 +43,7 @@ export interface OrcamentoPDFData {
   etapas_fluxo?: EtapaFluxo[];
   beneficios_capa?: BeneficioCapa[];
   headline_cenario?: string;
+  cenarios?: CenarioOrcamento[];
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
