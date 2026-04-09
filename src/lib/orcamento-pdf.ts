@@ -561,7 +561,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const coverBulletsHtml = `
       <div style="margin-top: 24px; border-top: 1px solid #e0e0e0; padding-top: 16px; width: 100%; max-width: 500px; text-align: center;">
         <div style="font-size: 11px; color: #555;">
-          📋 ${itemCount} serviços incluídos &nbsp;|&nbsp; ⏱ 6 a 12 semanas
+          📋 ${itemCount} serviços incluídos
         </div>
         <div style="font-size: 10px; color: #888; margin-top: 6px; word-wrap: break-word; overflow-wrap: break-word;">
           Válido por ${d.validade_dias} dias
