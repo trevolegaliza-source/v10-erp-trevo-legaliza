@@ -1364,7 +1364,12 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const totalHonResumo = pdfMode === 'direto' ? totalPrecoDireto : totalPrecoCliente;
     const descontoResumo = totalHonResumo * (d.desconto_pct / 100);
     const honFinalResumo = totalHonResumo - descontoResumo;
-    resumoHtml = `
+    resumoHtml = temCenarios ? `
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 10px; color: #6b7280; margin-bottom: 12px;">Escolha o cenário que melhor se adequa à sua necessidade:</div>
+        ${cenarioResumoHtml}
+      </div>
+    ` : `
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
           <span style="color: #64748b;">Investimento (honorários)</span>
