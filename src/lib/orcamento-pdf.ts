@@ -197,15 +197,18 @@ async function medirAlturaReal(html: string): Promise<number> {
     pointer-events: none;
     box-sizing: border-box;
   `;
-  probe.innerHTML = html;
+  // Match the exact same CSS context as the render container for accurate measurement
+  probe.innerHTML = `<div style="width:722px;"><style>* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; } body, div, p, span, td, th, li { font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; }</style>${html}</div>`;
   document.body.appendChild(probe);
 
   // Wait one frame for the browser to calculate layout
   await new Promise(r => requestAnimationFrame(r));
 
-  const altura = probe.getBoundingClientRect().height;
+  const altura = probe.firstElementChild
+    ? (probe.firstElementChild as HTMLElement).getBoundingClientRect().height
+    : probe.getBoundingClientRect().height;
   document.body.removeChild(probe);
-  return Math.ceil(altura) + 4; // +4px safety margin (tight packing for better page utilization)
+  return Math.ceil(altura) + 2; // +2px tight safety margin for optimal page utilization
 }
 
 const HEADER_HEIGHT = 64;
@@ -1409,7 +1412,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   // ═══════════════════════════════════════════════════════
   const FOOTER_HEIGHT = 60;
   const PADDING_VERTICAL = 48; // 24px top + 24px bottom padding
-  const MARGEM_SEGURANCA = 30;
+  const MARGEM_SEGURANCA = 10; // Reduced from 30 — accurate measurement allows tighter packing
   const ALTURA_DISPONIVEL = 1123 - HEADER_HEIGHT - FOOTER_HEIGHT - PADDING_VERTICAL - MARGEM_SEGURANCA;
 
   const pageGroups: number[][] = [[]];
