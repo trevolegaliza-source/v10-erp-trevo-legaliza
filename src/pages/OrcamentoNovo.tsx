@@ -683,6 +683,29 @@ export default function OrcamentoNovo() {
                       {item.isOptional ? 'Opcional' : 'Obrigatório'}
                     </span>
                   </div>
+
+                  {/* Cenário selector (only if cenários exist) */}
+                  {form.cenarios.length > 0 && (
+                    <div className="flex items-center gap-2 pl-2">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Cenário:</Label>
+                      <Select
+                        value={item.cenarioId || '_none'}
+                        onValueChange={(v) => updateItem(idx, 'cenarioId', v === '_none' ? undefined : v)}
+                      >
+                        <SelectTrigger className="h-8 text-xs w-48">
+                          <SelectValue placeholder="Sem cenário" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_none">Sem cenário (avulso)</SelectItem>
+                          {form.cenarios.map((cen, ci) => (
+                            <SelectItem key={cen.id} value={cen.id}>
+                              {String.fromCharCode(65 + ci)} — {cen.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               ))}
 

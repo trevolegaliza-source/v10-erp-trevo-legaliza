@@ -159,6 +159,7 @@ export function normalizeItem(raw: any): OrcamentoItem {
     quantidade: Number(raw.quantidade) || 1,
     isOptional: raw.isOptional === true,
     valorVendaDireto: raw.valorVendaDireto != null ? Number(raw.valorVendaDireto) : undefined,
+    cenarioId: raw.cenarioId || undefined,
     valor: Number(raw.valor) || undefined,
   };
 }
