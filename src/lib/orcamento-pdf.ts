@@ -3,7 +3,8 @@ import html2canvas from 'html2canvas';
 import {
   type OrcamentoItem, type OrcamentoPacote, type OrcamentoSecao,
   type OrcamentoModo, type OrcamentoPDFMode, type RiscoOperacao,
-  type EtapaFluxo, type BeneficioCapa, getItemValor, DEFAULT_SECOES,
+  type EtapaFluxo, type BeneficioCapa, type CenarioOrcamento,
+  getItemValor, DEFAULT_SECOES,
 } from '@/components/orcamentos/types';
 
 export interface OrcamentoPDFData {
@@ -42,6 +43,7 @@ export interface OrcamentoPDFData {
   etapas_fluxo?: EtapaFluxo[];
   beneficios_capa?: BeneficioCapa[];
   headline_cenario?: string;
+  cenarios?: CenarioOrcamento[];
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -460,6 +462,26 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   const getPrecoCliente = (item: OrcamentoItem) => ((item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
   const getPrecoDireto = (item: OrcamentoItem) => ((item.valorVendaDireto || item.valor_mercado || item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
 
+  // Scenario support
+  const cenarios = (d.cenarios || []).filter(c => c.nome.trim());
+  const temCenarios = cenarios.length > 0;
+  // Items without a scenario (always included)
+  const itensAvulsos = d.itens.filter(i => !i.cenarioId);
+  // Helper: get items for a specific scenario (avulsos + scenario items)
+  const getItensCenario = (cenarioId: string) => [
+    ...itensAvulsos,
+    ...d.itens.filter(i => i.cenarioId === cenarioId),
+  ];
+  // Helper: compute totals for a set of items
+  const computeTotals = (items: OrcamentoItem[]) => {
+    const custoTrevo = items.reduce((s, i) => s + getCustoTrevo(i), 0);
+    const precoCliente = items.reduce((s, i) => s + getPrecoCliente(i), 0);
+    const precoDireto = items.reduce((s, i) => s + getPrecoDireto(i), 0);
+    const taxaMin = items.reduce((s, i) => s + i.taxa_min, 0);
+    const taxaMax = items.reduce((s, i) => s + i.taxa_max, 0);
+    return { custoTrevo, precoCliente, precoDireto, taxaMin, taxaMax };
+  };
+
   const totalCustoTrevo = d.itens.reduce((s, i) => s + getCustoTrevo(i), 0);
   const totalPrecoCliente = d.itens.reduce((s, i) => s + getPrecoCliente(i), 0);
   const totalPrecoDireto = d.itens.reduce((s, i) => s + getPrecoDireto(i), 0);
@@ -537,8 +559,43 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           ${d.prospect_cnpj ? `<div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
         </div>
 
-        <!-- ZONA 3: Three financial cards -->
+        <!-- ZONA 3: Financial cards -->
         <div style="padding: 0 40px; flex-shrink: 0;">
+          ${temCenarios ? `
+          <!-- Per-scenario financial cards -->
+          <div style="font-size: 9px; color: #0f3d24; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-top: 20px; margin-bottom: 10px;">COMPARATIVO POR CENÁRIO</div>
+          ${cenarios.map((cen, ci) => {
+            const items = getItensCenario(cen.id);
+            const t = computeTotals(items);
+            const custoFinal = t.custoTrevo * (1 - d.desconto_pct / 100);
+            const precoFinal = t.precoCliente * (1 - d.desconto_pct / 100);
+            const margem = precoFinal - custoFinal;
+            const margemPct = custoFinal > 0 ? (((precoFinal / custoFinal) - 1) * 100).toFixed(0) : '0';
+            const hasTx = t.taxaMin > 0 || t.taxaMax > 0;
+            const investVal = hasTx ? `${fmt(precoFinal + t.taxaMin)} a ${fmt(precoFinal + t.taxaMax)}` : fmt(precoFinal);
+            return `
+              <div style="display: flex; gap: 12px; width: 100%; margin-bottom: 12px;">
+                <div style="width: 28px; height: 28px; background: #0f3d24; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #86efac; font-size: 13px; font-weight: 800; flex-shrink: 0; margin-top: 12px;">${String.fromCharCode(65 + ci)}</div>
+                <div style="flex: 1; display: flex; gap: 10px;">
+                  <div style="flex: 1; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">CUSTO TREVO</div>
+                    <div style="font-size: 16px; font-weight: 700; color: #333;">${fmt(custoFinal)}</div>
+                  </div>
+                  <div style="flex: 1; background: #e8f5e9; border: 2px solid #2d6a4f; border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 8px; color: #1a4731; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">COBRAR DO CLIENTE</div>
+                    <div style="font-size: 16px; font-weight: 700; color: #0f3d24;">${investVal}</div>
+                  </div>
+                  <div style="flex: 1; background: #1a4731; border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 8px; color: #86efac; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">MARGEM</div>
+                    <div style="font-size: 16px; font-weight: 700; color: #ffffff;">${fmt(margem)}</div>
+                    <div style="font-size: 9px; color: #86efac; margin-top: 2px;">${margemPct}%</div>
+                  </div>
+                </div>
+              </div>
+              <div style="font-size: 9px; color: #666; margin-left: 40px; margin-top: -8px; margin-bottom: 8px;">${esc(cen.nome)}${cen.descricao ? ' — ' + esc(cen.descricao) : ''}</div>
+            `;
+          }).join('')}
+          ` : `
           <div style="display: flex; gap: 16px; width: 100%; margin-top: 24px;">
             <!-- Card 1: Custo Trevo -->
             <div style="flex: 1; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px 16px; text-align: center;">
@@ -558,6 +615,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               <div style="font-size: 11px; color: #86efac; margin-top: 6px;">${temMargemFaixa ? `${margemCapaMinPct}% a ${margemCapaIdealPct}%` : `${margemCapaMinPct}%`} de lucro</div>
             </div>
           </div>
+          `}
         </div>
 
         ${(d.etapas_fluxo && d.etapas_fluxo.length > 0) ? `
@@ -604,7 +662,36 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     // ═══════════════════════════════════════════
     // CLIENT COVER — unchanged layout
     // ═══════════════════════════════════════════
-    const coverValueBoxHtml = `
+    const coverValueBoxHtml = temCenarios ? (() => {
+      // Show per-scenario values
+      return `
+        <div style="margin-top: 40px; width: 100%;">
+          <div style="font-size: 10px; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; text-align: center;">Investimento por Cenário</div>
+          <div style="display: flex; gap: 12px; justify-content: center;">
+            ${cenarios.map((cen, ci) => {
+              const items = getItensCenario(cen.id);
+              const t = computeTotals(items);
+              const hon = pdfMode === 'direto' ? t.precoDireto : t.precoCliente;
+              const honFinal = hon * (1 - d.desconto_pct / 100);
+              const valMin = honFinal + t.taxaMin;
+              const valMax = honFinal + t.taxaMax;
+              const hasTx = t.taxaMin > 0 || t.taxaMax > 0;
+              const val = hasTx ? `${fmt(valMin)} a ${fmt(valMax)}` : fmt(honFinal);
+              return `
+                <div style="flex: 1; max-width: 260px; padding: 16px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 12px; text-align: center;">
+                  <div style="font-size: 9px; font-weight: 700; color: ${accentText}; letter-spacing: 1px; margin-bottom: 6px;">${String.fromCharCode(65 + ci)} — ${esc(cen.nome)}</div>
+                  ${cen.descricao ? `<div style="font-size: 8px; color: #6b7280; margin-bottom: 8px;">${esc(cen.descricao)}</div>` : ''}
+                  <div style="font-size: ${hasTx ? '20' : '26'}px; font-weight: 900; color: ${accentText};">${val}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div style="font-size: 8px; color: #9ca3af; margin-top: 8px; letter-spacing: 0.3px; text-align: center;">
+            O cliente escolhe um dos cenários acima. Honorários profissionais${hasTaxas ? ' + taxas governamentais estimadas' : ''}
+          </div>
+        </div>
+      `;
+    })() : `
       <div style="margin-top: 40px; padding: 20px 40px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 16px; text-align: center;">
         <div style="font-size: 10px; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px;">Investimento Estimado</div>
         <div style="font-size: ${hasTaxas ? '26' : '36'}px; font-weight: 900; color: ${accentText};">${valorCapa}</div>
@@ -901,6 +988,11 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     }
 
     const showDocsSection = item.prazo || item.docs_necessarios;
+    const cenarioDoItem = temCenarios && item.cenarioId ? cenarios.find(c => c.id === item.cenarioId) : null;
+    const cenarioIdx = cenarioDoItem ? cenarios.indexOf(cenarioDoItem) : -1;
+    const cenarioBadge = cenarioDoItem
+      ? `<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;background-color:#6366f1;color:#ffffff;letter-spacing:0.5px;margin-right:6px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1.4;">${String.fromCharCode(65 + cenarioIdx)}</span>`
+      : '';
     const opcionalBadge = isOpcional
       ? (isCNES
         ? `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background-color:#16a34a;color:#ffffff;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1.4;">★ RECOMENDADO</span>`
@@ -914,7 +1006,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           <div style="flex: 1; min-width: 0;">
             <div style="font-size: 12px; font-weight: 700; color: #ffffff; line-height: 1.3;">${esc(item.descricao)}</div>
           </div>
-          ${opcionalBadge}
+          ${cenarioBadge}${opcionalBadge}
           <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
         </div>
         ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${sanitizeRichHtml(item.detalhes)}</div>` : ''}
@@ -1174,6 +1266,53 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
 
   // Resumo per mode
   let resumoHtml = '';
+
+  // Per-scenario summary block (used in both modes when scenarios exist)
+  const cenarioResumoHtml = temCenarios ? (() => {
+    return cenarios.map((cen, ci) => {
+      const items = getItensCenario(cen.id);
+      const t = computeTotals(items);
+      const honTotal = pdfMode === 'direto' ? t.precoDireto : isCliente ? t.precoCliente : t.custoTrevo;
+      const honFinal = honTotal * (1 - d.desconto_pct / 100);
+      const hasTx = t.taxaMin > 0 || t.taxaMax > 0;
+      const precoC = t.precoCliente * (1 - d.desconto_pct / 100);
+      const custoT = t.custoTrevo * (1 - d.desconto_pct / 100);
+      const margem = precoC - custoT;
+      const margemPct = custoT > 0 ? (((precoC / custoT) - 1) * 100).toFixed(0) : '0';
+      const totalVal = hasTx ? `${fmt(honFinal + t.taxaMin)} a ${fmt(honFinal + t.taxaMax)}` : fmt(honFinal);
+      const letter = String.fromCharCode(65 + ci);
+      return `
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#6366f1;color:#fff;font-size:12px;font-weight:800;">${letter}</span>
+            <span style="font-size: 13px; font-weight: 700; color: #1a1a2e;">${esc(cen.nome)}</span>
+            ${cen.descricao ? `<span style="font-size: 10px; color: #6b7280;">— ${esc(cen.descricao)}</span>` : ''}
+          </div>
+          ${!isCliente ? `
+            <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;">
+              <span style="color: #64748b;">Custo Trevo</span><span style="font-weight: 600;">${fmt(custoT)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; color: #166534;">
+              <span>Sugestão cliente</span><span style="font-weight: 700;">${fmt(precoC)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; color: #1e40af;">
+              <span>Margem</span><span style="font-weight: 700;">${fmt(margem)} (${margemPct}%)</span>
+            </div>
+          ` : `
+            <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;">
+              <span style="color: #64748b;">Honorários</span><span style="font-weight: 600;">${fmt(honFinal)}</span>
+            </div>
+          `}
+          ${hasTx ? `<div style="display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; color: #b45309;"><span>Taxas estimadas</span><span>${fmt(t.taxaMin)} a ${fmt(t.taxaMax)}</span></div>` : ''}
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; margin-top: 8px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 10px;">
+            <span style="font-size: 11px; font-weight: 700; color: ${accentText}; text-transform: uppercase;">Total Cenário ${letter}</span>
+            <span style="font-size: 20px; font-weight: 900; color: ${accentText};">${totalVal}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  })() : '';
+
   if (!isCliente) {
     const descontoCusto = totalCustoTrevo * (d.desconto_pct / 100);
     const custoFinal = totalCustoTrevo - descontoCusto;
@@ -1182,7 +1321,12 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const margemTotal = precoFinal - custoFinal;
     const margemTotalPct = custoFinal > 0 ? (((precoFinal / custoFinal) - 1) * 100).toFixed(0) : '0';
 
-    resumoHtml = `
+    resumoHtml = temCenarios ? `
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 10px; color: #6b7280; margin-bottom: 12px;">O cliente escolhe um dos cenários abaixo:</div>
+        ${cenarioResumoHtml}
+      </div>
+    ` : `
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
           <span style="color: #64748b;">Seu custo Trevo (honorários)</span>
@@ -1220,7 +1364,12 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const totalHonResumo = pdfMode === 'direto' ? totalPrecoDireto : totalPrecoCliente;
     const descontoResumo = totalHonResumo * (d.desconto_pct / 100);
     const honFinalResumo = totalHonResumo - descontoResumo;
-    resumoHtml = `
+    resumoHtml = temCenarios ? `
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 10px; color: #6b7280; margin-bottom: 12px;">Escolha o cenário que melhor se adequa à sua necessidade:</div>
+        ${cenarioResumoHtml}
+      </div>
+    ` : `
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
           <span style="color: #64748b;">Investimento (honorários)</span>

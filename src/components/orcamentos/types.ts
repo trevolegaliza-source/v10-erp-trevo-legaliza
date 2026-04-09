@@ -16,6 +16,7 @@ export interface OrcamentoItem {
   quantidade: number;
   isOptional?: boolean; // false = obrigatório (default), true = opcional
   valorVendaDireto?: number; // valor de venda editável no modo direto (Trevo → Cliente Final)
+  cenarioId?: string; // se undefined/null = item avulso (sem cenário)
   // legacy compat
   valor?: number;
 }
@@ -32,6 +33,13 @@ export interface OrcamentoSecao {
   key: string;
   label: string;
   descricao: string;
+}
+
+export interface CenarioOrcamento {
+  id: string;
+  nome: string;        // ex: "Opção 1 — Subsidiária Brasileira"
+  descricao?: string;   // ex: "Ágil, econômica; ideal para holdings/comércio"
+  ordem: number;        // 1, 2, 3...
 }
 
 export interface RiscoOperacao {
@@ -85,6 +93,7 @@ export interface OrcamentoForm {
   riscos: RiscoOperacao[];
   beneficios_capa: BeneficioCapa[];
   etapas_fluxo: EtapaFluxo[];
+  cenarios: CenarioOrcamento[];
 }
 
 export const DEFAULT_SECOES: OrcamentoSecao[] = [
@@ -150,6 +159,7 @@ export function normalizeItem(raw: any): OrcamentoItem {
     quantidade: Number(raw.quantidade) || 1,
     isOptional: raw.isOptional === true,
     valorVendaDireto: raw.valorVendaDireto != null ? Number(raw.valorVendaDireto) : undefined,
+    cenarioId: raw.cenarioId || undefined,
     valor: Number(raw.valor) || undefined,
   };
 }

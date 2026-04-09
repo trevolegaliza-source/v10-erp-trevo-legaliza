@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import {
   type OrcamentoForm, type OrcamentoModo, type OrcamentoItem, type OrcamentoPDFMode,
   type OrcamentoDestinatario, type RiscoOperacao, type EtapaFluxo, type BeneficioCapa,
-  DEFAULT_SECOES, createItem, normalizeItem, getItemValor,
+  type CenarioOrcamento, DEFAULT_SECOES, createItem, normalizeItem, getItemValor,
 } from '@/components/orcamentos/types';
 import { ItemCardSimples } from '@/components/orcamentos/ItemCardSimples';
 import { ItemCardDetalhado } from '@/components/orcamentos/ItemCardDetalhado';
@@ -59,6 +59,7 @@ const defaultForm = (): OrcamentoForm => ({
   riscos: [],
   beneficios_capa: [],
   etapas_fluxo: [],
+  cenarios: [],
 });
 
 function destinatarioToModoPDF(d: OrcamentoDestinatario): OrcamentoPDFMode {
@@ -145,6 +146,7 @@ export default function OrcamentoNovo() {
         riscos: Array.isArray((orc as any).riscos) ? (orc as any).riscos : [],
         beneficios_capa: Array.isArray((orc as any).beneficios_capa) ? (orc as any).beneficios_capa : [],
         etapas_fluxo: Array.isArray((orc as any).etapas_fluxo) ? (orc as any).etapas_fluxo : [],
+        cenarios: Array.isArray((orc as any).cenarios) ? (orc as any).cenarios : [],
       });
     })();
   }, [editId, clientes]);
@@ -230,6 +232,7 @@ export default function OrcamentoNovo() {
       etapas_fluxo: form.etapas_fluxo as any,
       beneficios_capa: form.beneficios_capa as any,
       headline_cenario: form.headline_cenario || null,
+      cenarios: form.cenarios as any,
       status,
       created_by: null,
       pdf_url: null,
@@ -287,6 +290,7 @@ export default function OrcamentoNovo() {
       etapas_fluxo: form.etapas_fluxo,
       beneficios_capa: form.beneficios_capa,
       headline_cenario: form.headline_cenario,
+      cenarios: form.cenarios,
     };
   }
 
@@ -539,6 +543,71 @@ export default function OrcamentoNovo() {
             </div>
           </Card>
 
+          {/* SEÇÃO: Cenários (Opções mutuamente exclusivas) */}
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-semibold">Cenários</h3>
+              <Button variant="outline" size="sm" onClick={() => {
+                setForm(f => ({
+                  ...f,
+                  cenarios: [...f.cenarios, {
+                    id: crypto.randomUUID(),
+                    nome: `Opção ${String.fromCharCode(65 + f.cenarios.length)}`,
+                    descricao: '',
+                    ordem: f.cenarios.length + 1,
+                  }],
+                }));
+              }}>
+                <Plus className="h-4 w-4 mr-1" /> Adicionar Cenário
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Use cenários quando o cliente deve escolher entre opções mutuamente exclusivas (ex: Subsidiária vs Filial). Itens sem cenário serão somados em todos.
+            </p>
+            {form.cenarios.length === 0 && (
+              <p className="text-xs text-muted-foreground italic">Nenhum cenário criado — todos os itens serão somados juntos.</p>
+            )}
+            <div className="space-y-2">
+              {form.cenarios.map((cen, idx) => (
+                <div key={cen.id} className="flex items-start gap-2 p-3 rounded-lg border">
+                  <Badge variant="outline" className="mt-1 shrink-0 font-bold">{String.fromCharCode(65 + idx)}</Badge>
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    <Input
+                      value={cen.nome}
+                      onChange={e => {
+                        const updated = [...form.cenarios];
+                        updated[idx] = { ...updated[idx], nome: e.target.value };
+                        setForm(f => ({ ...f, cenarios: updated }));
+                      }}
+                      placeholder="Nome do cenário (ex: Opção A — Subsidiária)"
+                      className="text-sm font-medium"
+                    />
+                    <Input
+                      value={cen.descricao || ''}
+                      onChange={e => {
+                        const updated = [...form.cenarios];
+                        updated[idx] = { ...updated[idx], descricao: e.target.value };
+                        setForm(f => ({ ...f, cenarios: updated }));
+                      }}
+                      placeholder="Descrição curta (ex: Ágil e econômica)"
+                      className="text-sm"
+                    />
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => {
+                    const cenId = cen.id;
+                    setForm(f => ({
+                      ...f,
+                      cenarios: f.cenarios.filter((_, i) => i !== idx).map((c, i) => ({ ...c, ordem: i + 1 })),
+                      itens: f.itens.map(item => item.cenarioId === cenId ? { ...item, cenarioId: undefined } : item),
+                    }));
+                  }}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </Card>
+
           {/* SEÇÃO 4: Itens da Proposta */}
           <Card className="p-5">
             <div className="flex items-center justify-between mb-3">
@@ -614,6 +683,29 @@ export default function OrcamentoNovo() {
                       {item.isOptional ? 'Opcional' : 'Obrigatório'}
                     </span>
                   </div>
+
+                  {/* Cenário selector (only if cenários exist) */}
+                  {form.cenarios.length > 0 && (
+                    <div className="flex items-center gap-2 pl-2">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Cenário:</Label>
+                      <Select
+                        value={item.cenarioId || '_none'}
+                        onValueChange={(v) => updateItem(idx, 'cenarioId', v === '_none' ? undefined : v)}
+                      >
+                        <SelectTrigger className="h-8 text-xs w-48">
+                          <SelectValue placeholder="Sem cenário" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_none">Sem cenário (avulso)</SelectItem>
+                          {form.cenarios.map((cen, ci) => (
+                            <SelectItem key={cen.id} value={cen.id}>
+                              {String.fromCharCode(65 + ci)} — {cen.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
               ))}
 

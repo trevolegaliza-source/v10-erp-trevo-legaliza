@@ -930,6 +930,7 @@ export type Database = {
         Row: {
           aprovado_em: string | null
           beneficios_capa: Json | null
+          cenarios: Json | null
           cliente_id: string | null
           contexto: string | null
           convertido_em: string | null
@@ -975,6 +976,7 @@ export type Database = {
         Insert: {
           aprovado_em?: string | null
           beneficios_capa?: Json | null
+          cenarios?: Json | null
           cliente_id?: string | null
           contexto?: string | null
           convertido_em?: string | null
@@ -1020,6 +1022,7 @@ export type Database = {
         Update: {
           aprovado_em?: string | null
           beneficios_capa?: Json | null
+          cenarios?: Json | null
           cliente_id?: string | null
           contexto?: string | null
           convertido_em?: string | null
