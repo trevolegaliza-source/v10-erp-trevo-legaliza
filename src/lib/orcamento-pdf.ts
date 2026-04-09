@@ -409,7 +409,7 @@ function buildSimplesHTML(d: OrcamentoPDFData, logo: string | null): string {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
             <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Pagamento</div>
-            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${esc(d.pagamento || 'A combinar')}</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${sanitizeRichHtml(d.pagamento || 'A combinar')}</div>
           </div>
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
             <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Prazo de Execução</div>
