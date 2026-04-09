@@ -559,8 +559,43 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           ${d.prospect_cnpj ? `<div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">CNPJ: ${esc(d.prospect_cnpj)}</div>` : ''}
         </div>
 
-        <!-- ZONA 3: Three financial cards -->
+        <!-- ZONA 3: Financial cards -->
         <div style="padding: 0 40px; flex-shrink: 0;">
+          ${temCenarios ? `
+          <!-- Per-scenario financial cards -->
+          <div style="font-size: 9px; color: #0f3d24; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; margin-top: 20px; margin-bottom: 10px;">COMPARATIVO POR CENÁRIO</div>
+          ${cenarios.map((cen, ci) => {
+            const items = getItensCenario(cen.id);
+            const t = computeTotals(items);
+            const custoFinal = t.custoTrevo * (1 - d.desconto_pct / 100);
+            const precoFinal = t.precoCliente * (1 - d.desconto_pct / 100);
+            const margem = precoFinal - custoFinal;
+            const margemPct = custoFinal > 0 ? (((precoFinal / custoFinal) - 1) * 100).toFixed(0) : '0';
+            const hasTx = t.taxaMin > 0 || t.taxaMax > 0;
+            const investVal = hasTx ? `${fmt(precoFinal + t.taxaMin)} a ${fmt(precoFinal + t.taxaMax)}` : fmt(precoFinal);
+            return `
+              <div style="display: flex; gap: 12px; width: 100%; margin-bottom: 12px;">
+                <div style="width: 28px; height: 28px; background: #0f3d24; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #86efac; font-size: 13px; font-weight: 800; flex-shrink: 0; margin-top: 12px;">${String.fromCharCode(65 + ci)}</div>
+                <div style="flex: 1; display: flex; gap: 10px;">
+                  <div style="flex: 1; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 8px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">CUSTO TREVO</div>
+                    <div style="font-size: 16px; font-weight: 700; color: #333;">${fmt(custoFinal)}</div>
+                  </div>
+                  <div style="flex: 1; background: #e8f5e9; border: 2px solid #2d6a4f; border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 8px; color: #1a4731; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">COBRAR DO CLIENTE</div>
+                    <div style="font-size: 16px; font-weight: 700; color: #0f3d24;">${investVal}</div>
+                  </div>
+                  <div style="flex: 1; background: #1a4731; border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 8px; color: #86efac; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">MARGEM</div>
+                    <div style="font-size: 16px; font-weight: 700; color: #ffffff;">${fmt(margem)}</div>
+                    <div style="font-size: 9px; color: #86efac; margin-top: 2px;">${margemPct}%</div>
+                  </div>
+                </div>
+              </div>
+              <div style="font-size: 9px; color: #666; margin-left: 40px; margin-top: -8px; margin-bottom: 8px;">${esc(cen.nome)}${cen.descricao ? ' — ' + esc(cen.descricao) : ''}</div>
+            `;
+          }).join('')}
+          ` : `
           <div style="display: flex; gap: 16px; width: 100%; margin-top: 24px;">
             <!-- Card 1: Custo Trevo -->
             <div style="flex: 1; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px 16px; text-align: center;">
@@ -580,6 +615,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               <div style="font-size: 11px; color: #86efac; margin-top: 6px;">${temMargemFaixa ? `${margemCapaMinPct}% a ${margemCapaIdealPct}%` : `${margemCapaMinPct}%`} de lucro</div>
             </div>
           </div>
+          `}
         </div>
 
         ${(d.etapas_fluxo && d.etapas_fluxo.length > 0) ? `
