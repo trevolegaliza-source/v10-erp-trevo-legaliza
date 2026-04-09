@@ -321,6 +321,25 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     },
   });
 
+  const desfazerPagamento = useMutation({
+    mutationFn: async ({ lancamentoIds }: { lancamentoIds: string[] }) => {
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({
+          etapa_financeiro: 'cobranca_enviada',
+          status: 'pendente' as const,
+          data_pagamento: null,
+          confirmado_recebimento: false,
+        })
+        .in('id', lancamentoIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateFinanceiro(queryClient);
+      toast.success('Pagamento desfeito! Lançamento voltou para "Aguardando".');
+    },
+  });
+
   const clientes = query.data || [];
 
   // Correct KPI calculations
@@ -420,6 +439,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     isVencido: isLancamentoVencidoReal,
     marcarEnviado,
     marcarPago,
+    desfazerPagamento,
     refetch: query.refetch,
   };
 }
