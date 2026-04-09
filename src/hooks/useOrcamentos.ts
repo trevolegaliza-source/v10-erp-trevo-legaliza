@@ -38,6 +38,12 @@ export interface Orcamento {
   ordem_execucao?: string | null;
   pacotes?: any;
   secoes?: any;
+  destinatario?: string | null;
+  riscos?: any;
+  etapas_fluxo?: any;
+  beneficios_capa?: any;
+  headline_cenario?: string | null;
+  cenarios?: any;
 }
 
 export type OrcamentoInsert = Omit<Orcamento, 'id' | 'numero' | 'share_token' | 'created_at' | 'updated_at'>;

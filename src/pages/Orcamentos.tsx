@@ -148,8 +148,46 @@ export default function Orcamentos() {
       const desc = sub * (f.desconto_pct / 100);
       const hasDetailed = itens.some((i: any) => i.taxa_min > 0 || i.taxa_max > 0 || i.prazo || i.docs_necessarios);
       const orcAny = orc as any;
+
+      // Resolver dados do escritório
+      let escritorioNome = orcAny.escritorio_nome || '';
+      let escritorioCnpj = orcAny.escritorio_cnpj || '';
+      let escritorioEmail = orcAny.escritorio_email || '';
+      let escritorioTelefone = orcAny.escritorio_telefone || '';
+
+      if (!escritorioNome && orc.cliente_id) {
+        const { data: clienteData } = await supabase
+          .from('clientes')
+          .select('nome, apelido, cnpj, email, telefone')
+          .eq('id', orc.cliente_id)
+          .single();
+        if (clienteData) {
+          escritorioNome = clienteData.apelido || clienteData.nome || '';
+          escritorioCnpj = clienteData.cnpj || '';
+          escritorioEmail = clienteData.email || '';
+          escritorioTelefone = clienteData.telefone || '';
+        }
+      }
+
+      // Resolver destinatário e modo PDF
+      const destinatario = orcAny.destinatario || 'contador';
+      let modoPDF: 'contador' | 'cliente' | 'direto';
+      if (destinatario === 'cliente_via_contador') modoPDF = 'cliente';
+      else if (destinatario === 'cliente_direto') modoPDF = 'direto';
+      else modoPDF = 'contador';
+
       const doc = await gerarOrcamentoPDF({
         modo: hasDetailed || orcAny.contexto ? 'detalhado' : 'simples',
+        modoPDF,
+        destinatario,
+        escritorioNome,
+        escritorioCnpj,
+        escritorioEmail,
+        escritorioTelefone,
+        clienteNome: escritorioNome,
+        contadorNome: escritorioNome,
+        contadorEmail: escritorioEmail,
+        contadorTelefone: escritorioTelefone,
         prospect_nome: orc.prospect_nome,
         prospect_cnpj: orc.prospect_cnpj,
         itens,
@@ -166,9 +204,20 @@ export default function Orcamentos() {
         observacoes: orc.observacoes,
         numero: orc.numero,
         data_emissao: new Date(orc.created_at).toLocaleDateString('pt-BR'),
+        riscos: Array.isArray(orcAny.riscos) ? orcAny.riscos : [],
+        etapas_fluxo: Array.isArray(orcAny.etapas_fluxo) ? orcAny.etapas_fluxo : [],
+        beneficios_capa: Array.isArray(orcAny.beneficios_capa) ? orcAny.beneficios_capa : [],
+        headline_cenario: orcAny.headline_cenario || '',
+        cenarios: Array.isArray(orcAny.cenarios) ? orcAny.cenarios : [],
       });
+
+      const sufixos: Record<string, string> = {
+        contador: '_interno',
+        cliente: '_cliente',
+        direto: '_direto_trevo',
+      };
       const clienteName = (orc.prospect_nome || 'proposta').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 50);
-      const filename = `Proposta_${clienteName}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = `Proposta_${clienteName}${sufixos[modoPDF] || ''}_${new Date().toISOString().split('T')[0]}.pdf`;
       const { downloadBlob } = await import('@/lib/orcamento-pdf');
       downloadBlob(doc, filename);
       toast.success('PDF gerado!');
