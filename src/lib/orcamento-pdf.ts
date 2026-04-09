@@ -948,13 +948,13 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               <div style="padding: 10px; background: #e8f5e9; border: 1px solid #a5d6a7; text-align: center;">
                 <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">COBRAR NO MÍNIMO</div>
                 <div style="font-size: 12px; font-weight: 500; color: #2e7d32;">${hMin > 0 ? fmt(hMin) : '—'}</div>
-                ${margemMin > 0 ? `<div style="font-size: 7px; color: #388e3c; margin-top: 2px;">Margem: ${fmt(margemMin)} (${margemMinPct}%)</div>` : ''}
+                ${margemMin > 0 ? `<div style="font-size: 8px; color: #388e3c; margin-top: 2px;">Margem: ${fmt(margemMin)} (${margemMinPct}%)</div>` : ''}
               </div>
               <div style="padding: 10px; background: #c8e6c9; border: 2px solid #4caf50; text-align: center;">
                 <div style="font-size: 9px; color: #2e7d32; font-weight: 700; margin-bottom: 2px;">✓ IDEAL</div>
                 <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">VALOR DE MERCADO</div>
                 <div style="font-size: 12px; font-weight: 700; color: #1b5e20;">${vMerc > 0 ? fmt(vMerc) : '—'}</div>
-                ${margemMerc > 0 ? `<div style="font-size: 7px; color: #2e7d32; font-weight: 600; margin-top: 2px;">Margem: ${fmt(margemMerc)} (${margemMercPct}%)</div>` : ''}
+                ${margemMerc > 0 ? `<div style="font-size: 8px; color: #2e7d32; font-weight: 600; margin-top: 2px;">Margem: ${fmt(margemMerc)} (${margemMercPct}%)</div>` : ''}
               </div>
               <div style="padding: 10px; background: #fff3cd; border: 1px solid #ffc107; text-align: center;">
                 <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">ACIMA = CARO</div>
