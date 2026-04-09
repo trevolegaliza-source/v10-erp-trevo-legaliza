@@ -105,9 +105,30 @@ function toTitleCase(str: string): string {
     .join(' ');
 }
 
-// FIX 7 — Format contexto with highlighted risk words and monetary values
+// FIX 7 — Format contexto: handles both plain text and rich HTML from editor
 function formatarContextoPDF(texto: string): string {
   if (!texto) return '';
+  // If it's already HTML from the rich text editor, sanitize and return
+  if (/<[a-z][\s\S]*>/i.test(texto)) {
+    let html = sanitizeRichHtml(texto);
+    // Still highlight risk words and monetary values within the HTML text nodes
+    html = html.replace(
+      /(R\$[\s]?[\d.,kmKM\-]+)/g,
+      '<strong style="color: #b91c1c; font-weight: 700;">$1</strong>'
+    );
+    const palavrasRisco = [
+      'interdição', 'interditada', 'embargo', 'embargada',
+      'multa', 'multas', 'autuação', 'penalidade',
+      'bloqueio', 'bloqueada', 'suspensão',
+      'proibição', 'proibida', 'ilegal',
+    ];
+    palavrasRisco.forEach(palavra => {
+      const regex = new RegExp(`\\b(${palavra})\\b`, 'gi');
+      html = html.replace(regex, '<strong style="color: #b91c1c; font-weight: 700;">$1</strong>');
+    });
+    return html;
+  }
+  // Plain text fallback (legacy data)
   let html = texto
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
