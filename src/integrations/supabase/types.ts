@@ -429,6 +429,89 @@ export type Database = {
         }
         Relationships: []
       }
+      contratos: {
+        Row: {
+          cidade_contrato: string | null
+          contratada_cnpj: string | null
+          contratada_endereco: string | null
+          contratada_nome: string | null
+          contratada_representante: string | null
+          contratada_representante_cpf: string | null
+          contratada_representante_qualificacao: string | null
+          contratante_cnpj_cpf: string
+          contratante_endereco: string
+          contratante_nome: string
+          contratante_representante: string
+          contratante_representante_cpf: string
+          contratante_representante_qualificacao: string | null
+          contratante_tipo: string | null
+          created_at: string | null
+          data_contrato: string | null
+          empresa_id: string | null
+          id: string
+          numero_contrato: string
+          orcamento_id: string | null
+          pdf_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cidade_contrato?: string | null
+          contratada_cnpj?: string | null
+          contratada_endereco?: string | null
+          contratada_nome?: string | null
+          contratada_representante?: string | null
+          contratada_representante_cpf?: string | null
+          contratada_representante_qualificacao?: string | null
+          contratante_cnpj_cpf: string
+          contratante_endereco: string
+          contratante_nome: string
+          contratante_representante: string
+          contratante_representante_cpf: string
+          contratante_representante_qualificacao?: string | null
+          contratante_tipo?: string | null
+          created_at?: string | null
+          data_contrato?: string | null
+          empresa_id?: string | null
+          id?: string
+          numero_contrato: string
+          orcamento_id?: string | null
+          pdf_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cidade_contrato?: string | null
+          contratada_cnpj?: string | null
+          contratada_endereco?: string | null
+          contratada_nome?: string | null
+          contratada_representante?: string | null
+          contratada_representante_cpf?: string | null
+          contratada_representante_qualificacao?: string | null
+          contratante_cnpj_cpf?: string
+          contratante_endereco?: string
+          contratante_nome?: string
+          contratante_representante?: string
+          contratante_representante_cpf?: string
+          contratante_representante_qualificacao?: string | null
+          contratante_tipo?: string | null
+          created_at?: string | null
+          data_contrato?: string | null
+          empresa_id?: string | null
+          id?: string
+          numero_contrato?: string
+          orcamento_id?: string | null
+          pdf_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contratos_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       despesas_recorrentes: {
         Row: {
           ativo: boolean
@@ -845,6 +928,7 @@ export type Database = {
       }
       orcamentos: {
         Row: {
+          aprovado_em: string | null
           beneficios_capa: Json | null
           cliente_id: string | null
           contexto: string | null
@@ -857,6 +941,7 @@ export type Database = {
           desconto_progressivo_pct: number | null
           destinatario: string | null
           empresa_id: string | null
+          enviado_em: string | null
           escopo: Json
           etapas_fluxo: Json | null
           headline_cenario: string | null
@@ -888,6 +973,7 @@ export type Database = {
           valor_final: number
         }
         Insert: {
+          aprovado_em?: string | null
           beneficios_capa?: Json | null
           cliente_id?: string | null
           contexto?: string | null
@@ -900,6 +986,7 @@ export type Database = {
           desconto_progressivo_pct?: number | null
           destinatario?: string | null
           empresa_id?: string | null
+          enviado_em?: string | null
           escopo?: Json
           etapas_fluxo?: Json | null
           headline_cenario?: string | null
@@ -931,6 +1018,7 @@ export type Database = {
           valor_final?: number
         }
         Update: {
+          aprovado_em?: string | null
           beneficios_capa?: Json | null
           cliente_id?: string | null
           contexto?: string | null
@@ -943,6 +1031,7 @@ export type Database = {
           desconto_progressivo_pct?: number | null
           destinatario?: string | null
           empresa_id?: string | null
+          enviado_em?: string | null
           escopo?: Json
           etapas_fluxo?: Json | null
           headline_cenario?: string | null

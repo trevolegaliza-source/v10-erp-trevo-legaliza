@@ -1,19 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrcamentos, useOrcamentoKPIs, useDeleteOrcamento, type Orcamento } from '@/hooks/useOrcamentos';
 import { gerarOrcamentoPDF } from '@/lib/orcamento-pdf';
 import { normalizeItem, DEFAULT_SECOES } from '@/components/orcamentos/types';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   Plus, FileText, Send, CheckCircle, TrendingUp, MoreHorizontal,
-  Copy, Download, Trash2, Pencil, Link as LinkIcon,
+  Copy, Download, Trash2, Pencil, Link as LinkIcon, ArrowLeft, FileCheck, Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
+import ContratoModal from '@/components/orcamentos/ContratoModal';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -23,15 +27,38 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   aprovado: { label: 'Aprovado', color: 'bg-primary/10 text-primary' },
   recusado: { label: 'Recusado', color: 'bg-destructive/10 text-destructive' },
   expirado: { label: 'Expirado', color: 'bg-amber-500/10 text-amber-500' },
-  convertido: { label: 'Convertido', color: 'bg-primary/10 text-primary' },
+  convertido: { label: 'Convertido', color: 'bg-violet-500/10 text-violet-500' },
 };
 
 export default function Orcamentos() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [tab, setTab] = useState('todos');
   const { data: orcamentos, isLoading } = useOrcamentos(tab);
   const { data: kpis } = useOrcamentoKPIs();
   const deleteMutation = useDeleteOrcamento();
+
+  // Status counts
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    (async () => {
+      const statuses = ['rascunho', 'enviado', 'aprovado', 'convertido'];
+      const results: Record<string, number> = {};
+      await Promise.all(statuses.map(async (s) => {
+        const { count } = await supabase.from('orcamentos')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', s);
+        results[s] = count || 0;
+      }));
+      setCounts(results);
+    })();
+  }, [orcamentos]);
+
+  // Contrato modal
+  const [contratoOrc, setContratoOrc] = useState<Orcamento | null>(null);
+
+  // Edit confirm for approved
+  const [editConfirm, setEditConfirm] = useState<Orcamento | null>(null);
 
   // Ctrl+O shortcut
   useEffect(() => {
@@ -44,6 +71,63 @@ export default function Orcamentos() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [navigate]);
+
+  const invalidate = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ['orcamentos'] });
+    qc.invalidateQueries({ queryKey: ['orcamento_kpis'] });
+    qc.invalidateQueries({ queryKey: ['sidebar_counts'] });
+  }, [qc]);
+
+  // Status actions
+  async function marcarComoEnviado(id: string) {
+    const { error } = await supabase.from('orcamentos')
+      .update({ status: 'enviado', enviado_em: new Date().toISOString() } as any)
+      .eq('id', id);
+    if (!error) { toast.success('Orçamento marcado como enviado'); invalidate(); }
+    else toast.error('Erro: ' + error.message);
+  }
+
+  async function marcarComoAprovado(id: string) {
+    const { error } = await supabase.from('orcamentos')
+      .update({ status: 'aprovado', aprovado_em: new Date().toISOString() } as any)
+      .eq('id', id);
+    if (!error) { toast.success('Orçamento aprovado! Use "Gerar contrato" quando estiver pronto.'); invalidate(); }
+    else toast.error('Erro: ' + error.message);
+  }
+
+  async function voltarParaRascunho(id: string) {
+    const { error } = await supabase.from('orcamentos')
+      .update({ status: 'rascunho', enviado_em: null, aprovado_em: null } as any)
+      .eq('id', id);
+    if (!error) { toast.success('Orçamento revertido para rascunho'); invalidate(); }
+    else toast.error('Erro: ' + error.message);
+  }
+
+  async function voltarParaEnviado(id: string) {
+    const { error } = await supabase.from('orcamentos')
+      .update({ status: 'enviado', aprovado_em: null } as any)
+      .eq('id', id);
+    if (!error) { toast.success('Orçamento revertido para enviado'); invalidate(); }
+    else toast.error('Erro: ' + error.message);
+  }
+
+  async function verContrato(orcId: string) {
+    const { data } = await supabase.from('contratos')
+      .select('pdf_url, numero_contrato')
+      .eq('orcamento_id', orcId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (data && data.length > 0 && data[0].pdf_url) {
+      const { data: urlData } = await supabase.storage.from('contratos').createSignedUrl(data[0].pdf_url, 3600);
+      if (urlData?.signedUrl) {
+        window.open(urlData.signedUrl, '_blank');
+      } else {
+        toast.error('Erro ao obter URL do contrato');
+      }
+    } else {
+      toast.error('Contrato não encontrado. Tente regenerar.');
+    }
+  }
 
   function formFromOrcamento(orc: Orcamento) {
     let itens: any[] = [];
@@ -99,6 +183,99 @@ export default function Orcamentos() {
     toast.success('Link copiado!');
   }
 
+  function handleEditApproved(orc: Orcamento) {
+    setEditConfirm(orc);
+  }
+
+  async function confirmEditApproved() {
+    if (!editConfirm) return;
+    await voltarParaRascunho(editConfirm.id);
+    navigate(`/orcamentos/novo?id=${editConfirm.id}`);
+    setEditConfirm(null);
+  }
+
+  const isWhiteLabel = (orc: Orcamento) => (orc as any).destinatario === 'cliente_via_contador';
+
+  function renderActions(orc: Orcamento) {
+    const status = orc.status || 'rascunho';
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {/* Edit */}
+          {status !== 'convertido' && (
+            <DropdownMenuItem onClick={() => {
+              if (status === 'aprovado') handleEditApproved(orc);
+              else navigate(`/orcamentos/novo?id=${orc.id}`);
+            }}>
+              <Pencil className="h-3.5 w-3.5 mr-2" />Editar
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuItem onClick={() => navigate(`/orcamentos/novo?duplicate=${orc.id}`)}>
+            <Copy className="h-3.5 w-3.5 mr-2" />Duplicar
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleCopyLink(orc)}>
+            <LinkIcon className="h-3.5 w-3.5 mr-2" />Copiar Link
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleDownloadPDF(orc)}>
+            <Download className="h-3.5 w-3.5 mr-2" />Baixar PDF
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          {/* Status-specific actions */}
+          {status === 'rascunho' && (
+            <DropdownMenuItem onClick={() => marcarComoEnviado(orc.id)}>
+              <Send className="h-3.5 w-3.5 mr-2" />Marcar como enviado
+            </DropdownMenuItem>
+          )}
+
+          {status === 'enviado' && (
+            <>
+              <DropdownMenuItem onClick={() => marcarComoAprovado(orc.id)}>
+                <CheckCircle className="h-3.5 w-3.5 mr-2" />Marcar como aprovado
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => voltarParaRascunho(orc.id)}>
+                <ArrowLeft className="h-3.5 w-3.5 mr-2" />Voltar para rascunho
+              </DropdownMenuItem>
+            </>
+          )}
+
+          {status === 'aprovado' && (
+            <>
+              {isWhiteLabel(orc) ? (
+                <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+                  Contrato indisponível — orçamento white-label
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => setContratoOrc(orc)}>
+                  <FileCheck className="h-3.5 w-3.5 mr-2" />Gerar contrato
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => voltarParaEnviado(orc.id)}>
+                <ArrowLeft className="h-3.5 w-3.5 mr-2" />Voltar para enviado
+              </DropdownMenuItem>
+            </>
+          )}
+
+          {status === 'convertido' && (
+            <DropdownMenuItem onClick={() => verContrato(orc.id)}>
+              <Eye className="h-3.5 w-3.5 mr-2" />Ver contrato
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => deleteMutation.mutate(orc.id)} className="text-destructive">
+            <Trash2 className="h-3.5 w-3.5 mr-2" />Excluir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -133,10 +310,10 @@ export default function Orcamentos() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="todos">Todos</TabsTrigger>
-          <TabsTrigger value="rascunho">Rascunhos</TabsTrigger>
-          <TabsTrigger value="enviado">Enviados</TabsTrigger>
-          <TabsTrigger value="aprovado">Aprovados</TabsTrigger>
-          <TabsTrigger value="convertido">Convertidos</TabsTrigger>
+          <TabsTrigger value="rascunho">Rascunhos {counts.rascunho ? `(${counts.rascunho})` : ''}</TabsTrigger>
+          <TabsTrigger value="enviado">Enviados {counts.enviado ? `(${counts.enviado})` : ''}</TabsTrigger>
+          <TabsTrigger value="aprovado">Aprovados {counts.aprovado ? `(${counts.aprovado})` : ''}</TabsTrigger>
+          <TabsTrigger value="convertido">Convertidos {counts.convertido ? `(${counts.convertido})` : ''}</TabsTrigger>
         </TabsList>
 
         <TabsContent value={tab} className="mt-4">
@@ -156,7 +333,10 @@ export default function Orcamentos() {
                 const st = STATUS_MAP[orc.status] || STATUS_MAP.rascunho;
                 const itemCount = Array.isArray(orc.servicos) ? orc.servicos.length : 0;
                 return (
-                  <Card key={orc.id} className="p-4 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => navigate(`/orcamentos/novo?id=${orc.id}`)}>
+                  <Card key={orc.id} className="p-4 hover:border-primary/30 transition-colors cursor-pointer" onClick={() => {
+                    if (orc.status === 'aprovado') handleEditApproved(orc);
+                    else if (orc.status !== 'convertido') navigate(`/orcamentos/novo?id=${orc.id}`);
+                  }}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <span className="text-xs font-mono text-muted-foreground">#{String(orc.numero).padStart(3, '0')}</span>
@@ -170,30 +350,7 @@ export default function Orcamentos() {
                       <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
                         <p className="text-sm font-bold">{fmt(orc.valor_final)}</p>
                         <Badge className={`text-[10px] ${st.color}`}>{st.label}</Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/orcamentos/novo?id=${orc.id}`)}>
-                              <Pencil className="h-3.5 w-3.5 mr-2" />Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              navigate(`/orcamentos/novo?duplicate=${orc.id}`);
-                            }}>
-                              <Copy className="h-3.5 w-3.5 mr-2" />Duplicar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleCopyLink(orc)}>
-                              <LinkIcon className="h-3.5 w-3.5 mr-2" />Copiar Link
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadPDF(orc)}>
-                              <Download className="h-3.5 w-3.5 mr-2" />Baixar PDF
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => deleteMutation.mutate(orc.id)} className="text-destructive">
-                              <Trash2 className="h-3.5 w-3.5 mr-2" />Excluir
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {renderActions(orc)}
                       </div>
                     </div>
                   </Card>
@@ -203,6 +360,32 @@ export default function Orcamentos() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Contrato modal */}
+      {contratoOrc && (
+        <ContratoModal
+          open={!!contratoOrc}
+          onOpenChange={(open) => { if (!open) setContratoOrc(null); }}
+          orcamento={contratoOrc}
+          onSuccess={invalidate}
+        />
+      )}
+
+      {/* Edit approved confirmation */}
+      <AlertDialog open={!!editConfirm} onOpenChange={(open) => { if (!open) setEditConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Editar orçamento aprovado?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Editar este orçamento reverterá o status para rascunho. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmEditApproved}>Continuar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
