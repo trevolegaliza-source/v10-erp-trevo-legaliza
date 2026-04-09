@@ -462,6 +462,26 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   const getPrecoCliente = (item: OrcamentoItem) => ((item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
   const getPrecoDireto = (item: OrcamentoItem) => ((item.valorVendaDireto || item.valor_mercado || item.honorario_minimo_contador || item.honorario || 0)) * item.quantidade;
 
+  // Scenario support
+  const cenarios = (d.cenarios || []).filter(c => c.nome.trim());
+  const temCenarios = cenarios.length > 0;
+  // Items without a scenario (always included)
+  const itensAvulsos = d.itens.filter(i => !i.cenarioId);
+  // Helper: get items for a specific scenario (avulsos + scenario items)
+  const getItensCenario = (cenarioId: string) => [
+    ...itensAvulsos,
+    ...d.itens.filter(i => i.cenarioId === cenarioId),
+  ];
+  // Helper: compute totals for a set of items
+  const computeTotals = (items: OrcamentoItem[]) => {
+    const custoTrevo = items.reduce((s, i) => s + getCustoTrevo(i), 0);
+    const precoCliente = items.reduce((s, i) => s + getPrecoCliente(i), 0);
+    const precoDireto = items.reduce((s, i) => s + getPrecoDireto(i), 0);
+    const taxaMin = items.reduce((s, i) => s + i.taxa_min, 0);
+    const taxaMax = items.reduce((s, i) => s + i.taxa_max, 0);
+    return { custoTrevo, precoCliente, precoDireto, taxaMin, taxaMax };
+  };
+
   const totalCustoTrevo = d.itens.reduce((s, i) => s + getCustoTrevo(i), 0);
   const totalPrecoCliente = d.itens.reduce((s, i) => s + getPrecoCliente(i), 0);
   const totalPrecoDireto = d.itens.reduce((s, i) => s + getPrecoDireto(i), 0);
