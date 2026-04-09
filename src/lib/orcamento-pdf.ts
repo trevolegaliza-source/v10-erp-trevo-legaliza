@@ -629,25 +629,55 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   // --- PAGE 2: Context (if filled) ---
   const temContexto = d.contexto && d.contexto.trim().length > 0;
   const temOrdem = d.ordem_execucao && d.ordem_execucao.trim().length > 0;
-  if (temContexto || temOrdem) {
-    // FIX 4 — Risk box for ALL modes (before context)
-    const riskBoxHtml = `
+  const temRiscos = d.riscos && d.riscos.length > 0 && d.riscos.some(r => r.penalidade.trim());
+  const temEtapasFluxo = d.etapas_fluxo && d.etapas_fluxo.length > 0 && d.etapas_fluxo.some(e => e.nome.trim());
+  const temHeadline = d.headline_cenario && d.headline_cenario.trim().length > 0;
+
+  if (temContexto || temOrdem || temRiscos || temEtapasFluxo) {
+    // Dynamic risk box from form data
+    const riskBoxHtml = temRiscos ? `
       <div style="background: #FEF2F2; border-left: 4px solid #B03030; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
         <div style="font-size: 11px; font-weight: 700; color: #7F1D1D; margin-bottom: 8px;">⛔ SITUAÇÃO ATUAL — RISCOS DE OPERAÇÃO SEM REGULARIZAÇÃO</div>
         <div style="font-size: 11px; color: #991B1B; line-height: 1.8;">
-          • Multas de R$ 5.000 a R$ 50.000 por autuação da Vigilância Sanitária<br/>
-          • Risco de interdição imediata e embargo das atividades<br/>
-          • Bloqueio de convênios médicos e SUS sem CNES ativo
+          ${d.riscos!.filter(r => r.penalidade.trim()).map(r =>
+            `• ${esc(r.penalidade)}${r.condicao ? ': ' + esc(r.condicao) : ''}`
+          ).join('<br/>')}
         </div>
       </div>
-    `;
+    ` : '';
 
-    // MELHORIA C — Lead forte no cenário (cliente mode)
-    const leadForteHtml = isCliente && temContexto ? `
+    // Dynamic headline from form data
+    const leadForteHtml = temHeadline && temContexto ? `
       <div style="font-weight: 600; font-size: 13px; color: #1a4731; margin-bottom: 12px; line-height: 1.5;">
-        A regularização não é uma formalidade — é o que permite ${esc(nomeEmpresaCurto)} operar sem riscos e crescer com segurança.
+        ${esc(d.headline_cenario!)}
       </div>
     ` : '';
+
+    // Dynamic flow from form data (for page 2, cliente/direto modes)
+    const fluxoPage2Html = temEtapasFluxo && isCliente ? (() => {
+      const etapas = d.etapas_fluxo!.filter(e => e.nome.trim());
+      return `
+        <div style="margin-top: 24px;">
+          <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Fluxo de Execução Estimado</div>
+          <div style="display: flex; align-items: center; gap: 0; padding: 12px 0;">
+            ${etapas.map((etapa, idx) => {
+              const isLast = idx === etapas.length - 1;
+              const circleContent = isLast ? '✓' : String(idx + 1);
+              const bgColor = useBlueTheme ? (isLast ? '#1e40af' : '#3b82f6') : (isLast ? '#0f3d24' : '#1a4731');
+              const textColor = isLast ? (useBlueTheme ? '#93c5fd' : '#86efac') : 'white';
+              return `
+                <div style="flex: 1; text-align: center;">
+                  <div style="width: 32px; height: 32px; background: ${bgColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${textColor}; margin: 0 auto 6px auto;">${circleContent}</div>
+                  <div style="font-size: 9px; font-weight: 600; color: #374151;">${esc(etapa.nome)}</div>
+                  ${etapa.prazo ? `<div style="font-size: 9px; color: #64748b;">${esc(etapa.prazo)}</div>` : ''}
+                </div>
+                ${!isLast ? `<div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>` : ''}
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    })() : '';
 
     pages.push(`
       <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
@@ -663,6 +693,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               </div>
             </div>
           ` : ''}
+          ${fluxoPage2Html}
           ${temOrdem ? `
             <div>
               <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Ordem Sugerida de Execução</div>
