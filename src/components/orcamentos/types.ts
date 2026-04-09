@@ -34,6 +34,25 @@ export interface OrcamentoSecao {
   descricao: string;
 }
 
+export interface RiscoOperacao {
+  id: string;
+  penalidade: string;
+  condicao?: string;
+}
+
+export interface EtapaFluxo {
+  id: string;
+  nome: string;
+  prazo?: string;
+  ordem: number;
+}
+
+export interface BeneficioCapa {
+  id: string;
+  titulo: string;
+  descricao: string;
+}
+
 export type OrcamentoModo = 'simples' | 'detalhado';
 export type OrcamentoPDFMode = 'contador' | 'cliente' | 'direto';
 export type OrcamentoDestinatario = 'contador' | 'cliente_via_contador' | 'cliente_direto';
@@ -61,6 +80,11 @@ export interface OrcamentoForm {
   prazo_execucao: string;
   pagamento: string;
   observacoes: string;
+  // Dynamic fields
+  headline_cenario: string;
+  riscos: RiscoOperacao[];
+  beneficios_capa: BeneficioCapa[];
+  etapas_fluxo: EtapaFluxo[];
 }
 
 export const DEFAULT_SECOES: OrcamentoSecao[] = [
