@@ -22,7 +22,7 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import {
   type OrcamentoForm, type OrcamentoModo, type OrcamentoItem, type OrcamentoPDFMode,
-  type OrcamentoDestinatario,
+  type OrcamentoDestinatario, type RiscoOperacao, type EtapaFluxo, type BeneficioCapa,
   DEFAULT_SECOES, createItem, normalizeItem, getItemValor,
 } from '@/components/orcamentos/types';
 import { ItemCardSimples } from '@/components/orcamentos/ItemCardSimples';
