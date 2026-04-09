@@ -232,6 +232,7 @@ export default function OrcamentoNovo() {
       etapas_fluxo: form.etapas_fluxo as any,
       beneficios_capa: form.beneficios_capa as any,
       headline_cenario: form.headline_cenario || null,
+      cenarios: form.cenarios as any,
       status,
       created_by: null,
       pdf_url: null,
@@ -289,6 +290,7 @@ export default function OrcamentoNovo() {
       etapas_fluxo: form.etapas_fluxo,
       beneficios_capa: form.beneficios_capa,
       headline_cenario: form.headline_cenario,
+      cenarios: form.cenarios,
     };
   }
 
