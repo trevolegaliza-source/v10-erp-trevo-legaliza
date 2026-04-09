@@ -1418,12 +1418,38 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   const pageGroups: number[][] = [[]];
   let alturaAcumulada = 0;
 
+  // Helper: check if a block is a "title-only" block (section header, scenario header)
+  // These should never be the last block on a page — always bring at least 1 content block with them
+  function isTitleBlock(blockHtml: string): boolean {
+    const trimmed = blockHtml.trim();
+    // Short blocks that are section titles or scenario headers
+    return (
+      (trimmed.includes('text-transform: uppercase') && trimmed.includes('letter-spacing: 2px') && trimmed.length < 500) ||
+      trimmed.includes('CENÁRIO') && trimmed.includes('border-radius: 8px') && !trimmed.includes('border-left: 4px')
+    );
+  }
+
   for (let i = 0; i < contentBlocks.length; i++) {
     const blockH = contentBlocks[i].height;
     // If adding this block exceeds available height AND current page is not empty, start new page
     if (alturaAcumulada + blockH > ALTURA_DISPONIVEL && pageGroups[pageGroups.length - 1].length > 0) {
-      pageGroups.push([]);
-      alturaAcumulada = 0;
+      // Anti-orphan: if the LAST block on current page is a title, move it to the new page
+      const currentPage = pageGroups[pageGroups.length - 1];
+      if (currentPage.length > 0) {
+        const lastIdx = currentPage[currentPage.length - 1];
+        if (isTitleBlock(contentBlocks[lastIdx].html)) {
+          currentPage.pop();
+          alturaAcumulada = 0;
+          pageGroups.push([lastIdx]);
+          alturaAcumulada += contentBlocks[lastIdx].height;
+        } else {
+          pageGroups.push([]);
+          alturaAcumulada = 0;
+        }
+      } else {
+        pageGroups.push([]);
+        alturaAcumulada = 0;
+      }
     }
     pageGroups[pageGroups.length - 1].push(i);
     alturaAcumulada += blockH;
