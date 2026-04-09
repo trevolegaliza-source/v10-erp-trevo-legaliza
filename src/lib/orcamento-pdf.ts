@@ -2,7 +2,8 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
   type OrcamentoItem, type OrcamentoPacote, type OrcamentoSecao,
-  type OrcamentoModo, type OrcamentoPDFMode, getItemValor, DEFAULT_SECOES,
+  type OrcamentoModo, type OrcamentoPDFMode, type RiscoOperacao,
+  type EtapaFluxo, type BeneficioCapa, getItemValor, DEFAULT_SECOES,
 } from '@/components/orcamentos/types';
 
 export interface OrcamentoPDFData {
@@ -36,6 +37,11 @@ export interface OrcamentoPDFData {
   observacoes: string;
   numero: number;
   data_emissao: string;
+  // Dynamic fields
+  riscos?: RiscoOperacao[];
+  etapas_fluxo?: EtapaFluxo[];
+  beneficios_capa?: BeneficioCapa[];
+  headline_cenario?: string;
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -455,7 +461,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
         <div style="background: #0f3d24; padding: 48px 40px 36px; position: relative; flex-shrink: 0;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start;">
             <div>
-              ${logoHtml(logo, 48)}
+              ${logoHtml(logo, 48, 140)}
               <div style="font-size: 13px; color: #86efac; margin-top: 10px;">Seu Departamento Societário Completo</div>
               <div style="font-size: 9px; color: #6ee7b7; font-style: italic; margin-top: 6px; opacity: 0.8;">🤝 PAINEL DO PARCEIRO — ${esc(badgeNome)}</div>
             </div>
@@ -498,42 +504,30 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           </div>
         </div>
 
-        <!-- FIX 3: Mini-cronograma de execução -->
+        ${(d.etapas_fluxo && d.etapas_fluxo.length > 0) ? `
+        <!-- Dynamic flow from form -->
         <div style="padding: 0 48px; flex-shrink: 0; margin-top: 32px;">
           <div style="border-top: 1px solid #e2e8f0; margin-bottom: 24px;"></div>
           <div style="font-size: 10px; font-weight: 600; color: #64748b; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 14px;">Fluxo de execução estimado</div>
           <div style="display: flex; align-items: center; gap: 0;">
-            <div style="flex: 1; text-align: center;">
-              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">1</div>
-              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">Bombeiros</div>
-              <div style="font-size: 9px; color: #64748b;">15–45 dias</div>
-            </div>
-            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
-            <div style="flex: 1; text-align: center;">
-              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">2</div>
-              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">Vigilância</div>
-              <div style="font-size: 9px; color: #64748b;">20–60 dias</div>
-            </div>
-            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
-            <div style="flex: 1; text-align: center;">
-              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">3</div>
-              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">Prefeitura</div>
-              <div style="font-size: 9px; color: #64748b;">5–15 dias</div>
-            </div>
-            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
-            <div style="flex: 1; text-align: center;">
-              <div style="width: 32px; height: 32px; background: #1a4731; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; margin: 0 auto 6px auto;">4</div>
-              <div style="font-size: 9px; font-weight: 600; color: #1a4731;">CRM / CNES</div>
-              <div style="font-size: 9px; color: #64748b;">15–40 dias</div>
-            </div>
-            <div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>
-            <div style="flex: 1; text-align: center;">
-              <div style="width: 32px; height: 32px; background: #0f3d24; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #86efac; margin: 0 auto 6px auto;">✓</div>
-              <div style="font-size: 9px; font-weight: 700; color: #0f3d24;">Regular</div>
-              <div style="font-size: 9px; color: #64748b;">6–12 sem.</div>
-            </div>
+            ${d.etapas_fluxo.map((etapa, idx, arr) => {
+              const isLast = idx === arr.length - 1;
+              const circleContent = isLast ? '✓' : String(idx + 1);
+              const circleBg = isLast ? '#0f3d24' : '#1a4731';
+              const circleColor = isLast ? '#86efac' : 'white';
+              const labelWeight = isLast ? '700' : '600';
+              return `
+                <div style="flex: 1; text-align: center;">
+                  <div style="width: 32px; height: 32px; background: ${circleBg}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${circleColor}; margin: 0 auto 6px auto;">${circleContent}</div>
+                  <div style="font-size: 9px; font-weight: ${labelWeight}; color: #1a4731;">${esc(etapa.nome)}</div>
+                  ${etapa.prazo ? `<div style="font-size: 9px; color: #64748b;">${esc(etapa.prazo)}</div>` : ''}
+                </div>
+                ${!isLast ? '<div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>' : ''}
+              `;
+            }).join('')}
           </div>
         </div>
+        ` : ''}
 
         <!-- ZONA 4: Footer info -->
         <div style="padding: 0 40px 20px; flex-shrink: 0; margin-top: 24px;">
@@ -567,7 +561,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const coverBulletsHtml = `
       <div style="margin-top: 24px; border-top: 1px solid #e0e0e0; padding-top: 16px; width: 100%; max-width: 500px; text-align: center;">
         <div style="font-size: 11px; color: #555;">
-          📋 ${itemCount} serviços incluídos &nbsp;|&nbsp; ⏱ 6 a 12 semanas
+          📋 ${itemCount} serviços incluídos
         </div>
         <div style="font-size: 10px; color: #888; margin-top: 6px; word-wrap: break-word; overflow-wrap: break-word;">
           Válido por ${d.validade_dias} dias
@@ -589,31 +583,43 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           ${coverValueBoxHtml}
           ${coverBulletsHtml}
 
-          <!-- FIX 4: 3 benefícios visuais + frase de impacto (cliente) -->
+          ${(d.beneficios_capa && d.beneficios_capa.length > 0) ? `
+          <!-- Dynamic benefits from form -->
           <div style="margin-top: 36px; width: 100%; max-width: 560px;">
             <div style="border-top: 1px solid #e2e8f0; margin-bottom: 28px;"></div>
             <div style="display: flex; gap: 16px; justify-content: center; margin-bottom: 28px;">
-              <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
-                <div style="margin-bottom: 8px; display: flex; justify-content: center;"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
-                <div style="font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">Operação sem riscos</div>
-                <div style="font-size: 10px; color: #64748b; line-height: 1.4;">Elimina risco de multas, interdição e bloqueio de convênios</div>
-              </div>
-              <div style="flex: 1; text-align: center; padding: 16px 12px; background: ${accentBg}; border-radius: 10px; border: 1px solid ${useBlueTheme ? '#bfdbfe' : '#bbf7d0'};">
-                <div style="margin-bottom: 8px; display: flex; justify-content: center;"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="m9 14 2 2 4-4"/></svg></div>
-                <div style="font-size: 11px; font-weight: 700; color: ${accentText}; margin-bottom: 4px;">Tudo incluído</div>
-                <div style="font-size: 10px; color: #4b5563; line-height: 1.4;">Expertise full-service — desde o protocolo até a licença em mãos</div>
-              </div>
-              <div style="flex: 1; text-align: center; padding: 16px 12px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
-                <div style="margin-bottom: 8px; display: flex; justify-content: center;"><svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-                <div style="font-size: 11px; font-weight: 700; color: #1e293b; margin-bottom: 4px;">6 a 12 semanas</div>
-                <div style="font-size: 10px; color: #64748b; line-height: 1.4;">Prazo estimado para regularização completa</div>
-              </div>
+              ${d.beneficios_capa.map((ben, idx) => {
+                const svgIcons = [
+                  `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`,
+                  `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="m9 14 2 2 4-4"/></svg>`,
+                  `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="${accentColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+                ];
+                const isMiddle = idx === 1 && d.beneficios_capa!.length >= 2;
+                const bgStyle = isMiddle ? `background: ${accentBg}; border: 1px solid ${useBlueTheme ? '#bfdbfe' : '#bbf7d0'};` : 'background: #f8fafc; border: 1px solid #e2e8f0;';
+                const titleColor = isMiddle ? accentText : '#1e293b';
+                return `
+                  <div style="flex: 1; text-align: center; padding: 16px 12px; ${bgStyle} border-radius: 10px;">
+                    <div style="margin-bottom: 8px; display: flex; justify-content: center;">${svgIcons[idx % 3]}</div>
+                    <div style="font-size: 11px; font-weight: 700; color: ${titleColor}; margin-bottom: 4px;">${esc(ben.titulo)}</div>
+                    <div style="font-size: 10px; color: #64748b; line-height: 1.4;">${esc(ben.descricao)}</div>
+                  </div>
+                `;
+              }).join('')}
             </div>
+            ${d.headline_cenario ? `
             <div style="text-align: center; font-size: 12px; font-style: italic; color: #475569; padding: 14px 20px; background: #f1f5f9; border-radius: 8px; line-height: 1.5;">
-              "Regularização não é burocracia — é o que permite sua empresa<br>
-              operar com segurança, contratar convênios e crescer sem sustos."
+              "${esc(d.headline_cenario)}"
+            </div>
+            ` : ''}
+          </div>
+          ` : (d.headline_cenario ? `
+          <div style="margin-top: 36px; width: 100%; max-width: 560px;">
+            <div style="border-top: 1px solid #e2e8f0; margin-bottom: 28px;"></div>
+            <div style="text-align: center; font-size: 12px; font-style: italic; color: #475569; padding: 14px 20px; background: #f1f5f9; border-radius: 8px; line-height: 1.5;">
+              "${esc(d.headline_cenario)}"
             </div>
           </div>
+          ` : '')}
         </div>
         <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
       </div>
@@ -623,25 +629,55 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   // --- PAGE 2: Context (if filled) ---
   const temContexto = d.contexto && d.contexto.trim().length > 0;
   const temOrdem = d.ordem_execucao && d.ordem_execucao.trim().length > 0;
-  if (temContexto || temOrdem) {
-    // FIX 4 — Risk box for ALL modes (before context)
-    const riskBoxHtml = `
+  const temRiscos = d.riscos && d.riscos.length > 0 && d.riscos.some(r => r.penalidade.trim());
+  const temEtapasFluxo = d.etapas_fluxo && d.etapas_fluxo.length > 0 && d.etapas_fluxo.some(e => e.nome.trim());
+  const temHeadline = d.headline_cenario && d.headline_cenario.trim().length > 0;
+
+  if (temContexto || temOrdem || temRiscos || temEtapasFluxo) {
+    // Dynamic risk box from form data
+    const riskBoxHtml = temRiscos ? `
       <div style="background: #FEF2F2; border-left: 4px solid #B03030; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
         <div style="font-size: 11px; font-weight: 700; color: #7F1D1D; margin-bottom: 8px;">⛔ SITUAÇÃO ATUAL — RISCOS DE OPERAÇÃO SEM REGULARIZAÇÃO</div>
         <div style="font-size: 11px; color: #991B1B; line-height: 1.8;">
-          • Multas de R$ 5.000 a R$ 50.000 por autuação da Vigilância Sanitária<br/>
-          • Risco de interdição imediata e embargo das atividades<br/>
-          • Bloqueio de convênios médicos e SUS sem CNES ativo
+          ${d.riscos!.filter(r => r.penalidade.trim()).map(r =>
+            `• ${esc(r.penalidade)}${r.condicao ? ': ' + esc(r.condicao) : ''}`
+          ).join('<br/>')}
         </div>
       </div>
-    `;
+    ` : '';
 
-    // MELHORIA C — Lead forte no cenário (cliente mode)
-    const leadForteHtml = isCliente && temContexto ? `
+    // Dynamic headline from form data
+    const leadForteHtml = temHeadline && temContexto ? `
       <div style="font-weight: 600; font-size: 13px; color: #1a4731; margin-bottom: 12px; line-height: 1.5;">
-        A regularização não é uma formalidade — é o que permite ${esc(nomeEmpresaCurto)} operar sem riscos e crescer com segurança.
+        ${esc(d.headline_cenario!)}
       </div>
     ` : '';
+
+    // Dynamic flow from form data (for page 2, cliente/direto modes)
+    const fluxoPage2Html = temEtapasFluxo && isCliente ? (() => {
+      const etapas = d.etapas_fluxo!.filter(e => e.nome.trim());
+      return `
+        <div style="margin-top: 24px;">
+          <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Fluxo de Execução Estimado</div>
+          <div style="display: flex; align-items: center; gap: 0; padding: 12px 0;">
+            ${etapas.map((etapa, idx) => {
+              const isLast = idx === etapas.length - 1;
+              const circleContent = isLast ? '✓' : String(idx + 1);
+              const bgColor = useBlueTheme ? (isLast ? '#1e40af' : '#3b82f6') : (isLast ? '#0f3d24' : '#1a4731');
+              const textColor = isLast ? (useBlueTheme ? '#93c5fd' : '#86efac') : 'white';
+              return `
+                <div style="flex: 1; text-align: center;">
+                  <div style="width: 32px; height: 32px; background: ${bgColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${textColor}; margin: 0 auto 6px auto;">${circleContent}</div>
+                  <div style="font-size: 9px; font-weight: 600; color: #374151;">${esc(etapa.nome)}</div>
+                  ${etapa.prazo ? `<div style="font-size: 9px; color: #64748b;">${esc(etapa.prazo)}</div>` : ''}
+                </div>
+                ${!isLast ? `<div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>` : ''}
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    })() : '';
 
     pages.push(`
       <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
@@ -657,6 +693,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               </div>
             </div>
           ` : ''}
+          ${fluxoPage2Html}
           ${temOrdem ? `
             <div>
               <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Ordem Sugerida de Execução</div>
