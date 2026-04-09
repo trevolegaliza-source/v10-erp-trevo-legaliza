@@ -47,6 +47,41 @@ export interface OrcamentoPDFData {
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
 
+/** Sanitize rich-text HTML from TipTap editor — allow only safe tags */
+function sanitizeRichHtml(html: string): string {
+  if (!html) return '';
+  // If it looks like plain text (no HTML tags), escape and convert newlines
+  if (!/<[a-z][\s\S]*>/i.test(html)) return esc(html);
+  // Remove dangerous tags/attributes
+  let safe = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<img[^>]*>/gi, '')
+    .replace(/\s*on\w+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\s*on\w+\s*=\s*'[^']*'/gi, '');
+  return safe;
+}
+
+/** Wrap rich HTML with inline styles for PDF rendering */
+function richHtmlForPdf(html: string, fontSize = '11px', color = '#374151'): string {
+  if (!html) return '';
+  const sanitized = sanitizeRichHtml(html);
+  return `<div style="font-size: ${fontSize}; color: ${color}; line-height: 1.6;">
+    <style>
+      .rte p { margin-bottom: 6px; }
+      .rte strong { font-weight: 700; }
+      .rte em { font-style: italic; }
+      .rte u { text-decoration: underline; }
+      .rte ul { margin-left: 18px; margin-bottom: 6px; list-style-type: disc; }
+      .rte ol { margin-left: 18px; margin-bottom: 6px; list-style-type: decimal; }
+      .rte li { margin-bottom: 3px; }
+      .rte a { color: #2563eb; text-decoration: underline; }
+    </style>
+    <div class="rte">${sanitized}</div>
+  </div>`;
+}
+
 // FIX 5 — Title Case for ALL CAPS names (smart: keeps conjunctions lowercase)
 function toTitleCase(str: string): string {
   const minusculas = new Set([
