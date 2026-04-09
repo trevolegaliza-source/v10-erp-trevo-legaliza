@@ -988,6 +988,11 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     }
 
     const showDocsSection = item.prazo || item.docs_necessarios;
+    const cenarioDoItem = temCenarios && item.cenarioId ? cenarios.find(c => c.id === item.cenarioId) : null;
+    const cenarioIdx = cenarioDoItem ? cenarios.indexOf(cenarioDoItem) : -1;
+    const cenarioBadge = cenarioDoItem
+      ? `<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;background-color:#6366f1;color:#ffffff;letter-spacing:0.5px;margin-right:6px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1.4;">${String.fromCharCode(65 + cenarioIdx)}</span>`
+      : '';
     const opcionalBadge = isOpcional
       ? (isCNES
         ? `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background-color:#16a34a;color:#ffffff;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1.4;">★ RECOMENDADO</span>`
@@ -1001,7 +1006,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           <div style="flex: 1; min-width: 0;">
             <div style="font-size: 12px; font-weight: 700; color: #ffffff; line-height: 1.3;">${esc(item.descricao)}</div>
           </div>
-          ${opcionalBadge}
+          ${cenarioBadge}${opcionalBadge}
           <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
         </div>
         ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${sanitizeRichHtml(item.detalhes)}</div>` : ''}
