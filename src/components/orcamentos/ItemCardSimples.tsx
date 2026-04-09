@@ -1,5 +1,5 @@
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import { type OrcamentoItem, getItemValor } from './types';
@@ -47,12 +47,11 @@ export function ItemCardSimples({ item, idx, onChange, onRemove }: Props) {
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
-      <Textarea
+      <RichTextEditor
         value={item.detalhes}
-        onChange={e => onChange(idx, 'detalhes', e.target.value)}
+        onChange={(html) => onChange(idx, 'detalhes', html)}
         placeholder="Detalhes, escopo, o que está incluso... (opcional)"
-        rows={2}
-        className="text-sm"
+        minHeight="80px"
       />
       <p className="text-right text-sm font-bold text-primary">
         Subtotal: {fmt(getItemValor(item) * item.quantidade)}

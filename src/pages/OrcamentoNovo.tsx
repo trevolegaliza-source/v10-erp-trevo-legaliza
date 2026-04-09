@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -665,11 +665,11 @@ export default function OrcamentoNovo() {
               {/* 2. Situação atual */}
               <div>
                 <Label className="text-xs">Descreva a situação atual</Label>
-                <Textarea
+                <RichTextEditor
                   value={form.contexto}
-                  onChange={e => setForm(f => ({ ...f, contexto: e.target.value }))}
-                  placeholder={"Ex: Empresa sem Alvará Sanitário e sem CRM PJ.\nAtualmente em risco de interdição pela Vigilância Sanitária e\nbloqueio de convênios. Objetivo: regularização completa em\n6 a 12 semanas."}
-                  rows={4}
+                  onChange={(html) => setForm(f => ({ ...f, contexto: html }))}
+                  placeholder="Ex: Empresa sem Alvará Sanitário e sem CRM PJ. Atualmente em risco de interdição..."
+                  minHeight="100px"
                 />
               </div>
 
@@ -847,11 +847,21 @@ export default function OrcamentoNovo() {
               </div>
               <div>
                 <Label className="text-xs">Condições de pagamento</Label>
-                <Textarea value={form.pagamento} onChange={e => setForm(f => ({ ...f, pagamento: e.target.value }))} rows={2} />
+                <RichTextEditor
+                  value={form.pagamento}
+                  onChange={(html) => setForm(f => ({ ...f, pagamento: html }))}
+                  placeholder="Ex: Pagamento à vista via PIX ou boleto bancário."
+                  minHeight="80px"
+                />
               </div>
               <div>
                 <Label className="text-xs">Observações</Label>
-                <Textarea value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} rows={3} placeholder="Taxas governamentais não inclusas, documentação necessária, etc." />
+                <RichTextEditor
+                  value={form.observacoes}
+                  onChange={(html) => setForm(f => ({ ...f, observacoes: html }))}
+                  placeholder="Taxas governamentais não inclusas, documentação necessária, etc."
+                  minHeight="80px"
+                />
               </div>
             </div>
           </Card>

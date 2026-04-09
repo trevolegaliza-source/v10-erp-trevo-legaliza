@@ -1,5 +1,5 @@
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -71,12 +71,11 @@ export function ItemCardDetalhado({ item, idx, secoes, modoContador, onChange, o
       {/* Detalhes */}
       <div>
         <Label className="text-xs">Detalhes / Escopo</Label>
-        <Textarea
+        <RichTextEditor
           value={item.detalhes}
-          onChange={e => onChange(idx, 'detalhes', e.target.value)}
+          onChange={(html) => onChange(idx, 'detalhes', html)}
           placeholder="Inclui adequações, questionário, vistorias..."
-          rows={2}
-          className="text-sm"
+          minHeight="80px"
         />
       </div>
 
