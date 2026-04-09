@@ -361,7 +361,7 @@ function buildSimplesHTML(d: OrcamentoPDFData, logo: string | null): string {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 0; ${idx > 0 ? 'border-top: 1px solid #e2e8f0;' : ''}">
       <div style="flex: 1; padding-right: 20px;">
         <div style="font-size: 13px; font-weight: 700; color: #1a1a2e;">${idx + 1}. ${esc(item.descricao)}${item.quantidade > 1 ? ` (×${item.quantidade})` : ''}</div>
-        ${item.detalhes ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.4;">${esc(item.detalhes)}</div>` : ''}
+        ${item.detalhes ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.4;">${sanitizeRichHtml(item.detalhes)}</div>` : ''}
       </div>
       <div style="font-size: 14px; font-weight: 800; color: #166534; white-space: nowrap;">${fmt(getItemValor(item) * item.quantidade)}</div>
     </div>
@@ -376,7 +376,7 @@ function buildSimplesHTML(d: OrcamentoPDFData, logo: string | null): string {
   const observacoesHtml = d.observacoes
     ? `<div style="margin-top: 20px;">
         <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Observações</div>
-        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${esc(d.observacoes)}</div>
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${sanitizeRichHtml(d.observacoes)}</div>
        </div>` : '';
 
   return `
