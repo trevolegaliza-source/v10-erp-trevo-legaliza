@@ -283,6 +283,10 @@ export default function OrcamentoNovo() {
       observacoes: form.observacoes,
       numero: orcamentoNumero || 0,
       data_emissao: new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }),
+      riscos: form.riscos,
+      etapas_fluxo: form.etapas_fluxo,
+      beneficios_capa: form.beneficios_capa,
+      headline_cenario: form.headline_cenario,
     };
   }
 
