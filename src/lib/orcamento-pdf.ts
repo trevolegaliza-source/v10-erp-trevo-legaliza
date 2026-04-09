@@ -774,16 +774,28 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     `);
   }
 
-  // --- PAGE 2: Context (if filled) ---
+  // ═══════════════════════════════════════════════════════════════
+  // SMART PAGINATION: All content after the cover is collected as
+  // "blocks" (HTML fragments), measured for real height, then packed
+  // into pages using height accumulation — no forced page breaks.
+  // ═══════════════════════════════════════════════════════════════
+  interface ContentBlock { html: string; height: number; }
+  const contentBlocks: ContentBlock[] = [];
+
+  async function addBlock(html: string) {
+    const h = await medirAlturaReal(html);
+    contentBlocks.push({ html, height: h });
+  }
+
+  // --- CONTEXT / RISKS / FLOW BLOCKS ---
   const temContexto = d.contexto && d.contexto.trim().length > 0;
   const temOrdem = d.ordem_execucao && d.ordem_execucao.trim().length > 0;
   const temRiscos = d.riscos && d.riscos.length > 0 && d.riscos.some(r => r.penalidade.trim());
   const temEtapasFluxo = d.etapas_fluxo && d.etapas_fluxo.length > 0 && d.etapas_fluxo.some(e => e.nome.trim());
   const temHeadline = d.headline_cenario && d.headline_cenario.trim().length > 0;
 
-  if (temContexto || temOrdem || temRiscos || temEtapasFluxo) {
-    // Dynamic risk box from form data
-    const riskBoxHtml = temRiscos ? `
+  if (temRiscos) {
+    await addBlock(`
       <div style="background: #FEF2F2; border-left: 4px solid #B03030; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
         <div style="font-size: 11px; font-weight: 700; color: #7F1D1D; margin-bottom: 8px;">⛔ SITUAÇÃO ATUAL — RISCOS DE OPERAÇÃO SEM REGULARIZAÇÃO</div>
         <div style="font-size: 11px; color: #991B1B; line-height: 1.8;">
@@ -792,83 +804,77 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           ).join('<br/>')}
         </div>
       </div>
-    ` : '';
+    `);
+  }
 
-    // Dynamic headline from form data
-    const leadForteHtml = temHeadline && temContexto ? `
+  if (temContexto) {
+    const leadForteHtml = temHeadline ? `
       <div style="font-weight: 600; font-size: 13px; color: #1a4731; margin-bottom: 12px; line-height: 1.5;">
         ${esc(d.headline_cenario!)}
       </div>
     ` : '';
-
-    // Dynamic flow from form data (for page 2, cliente/direto modes)
-    const fluxoPage2Html = temEtapasFluxo && isCliente ? (() => {
-      const etapas = d.etapas_fluxo!.filter(e => e.nome.trim());
-      return `
-        <div style="margin-top: 24px;">
-          <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Fluxo de Execução Estimado</div>
-          <div style="display: flex; align-items: flex-start; justify-content: center; gap: 8px; padding: 16px 0;">
-            ${etapas.map((etapa, idx) => {
-              const isLast = idx === etapas.length - 1;
-              const circleContent = isLast ? '✓' : String(idx + 1);
-              const bgColor = useBlueTheme ? (isLast ? '#1e40af' : '#3b82f6') : (isLast ? '#0f3d24' : '#1a4731');
-              const textColor = isLast ? (useBlueTheme ? '#93c5fd' : '#86efac') : 'white';
-              return `
-                <div style="flex: 1; text-align: center; max-width: 160px; flex-shrink: 0;">
-                  <div style="width: 32px; height: 32px; background: ${bgColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${textColor}; margin: 0 auto 6px auto;">${circleContent}</div>
-                  <div style="font-weight: 600; font-size: 11px; color: #111827; line-height: 1.3; max-height: 42px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">${esc(etapa.nome)}</div>
-                  ${etapa.prazo ? `<div style="font-size: 10px; color: #6b7280; margin-top: 4px; max-height: 28px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${esc(etapa.prazo)}</div>` : ''}
-                </div>
-                ${!isLast ? `<div style="font-size: 18px; color: #9ca3af; margin-top: 14px; flex-shrink: 0;">→</div>` : ''}
-              `;
-            }).join('')}
-          </div>
+    await addBlock(`
+      <div style="margin-bottom: 30px;">
+        <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Cenário e Oportunidade</div>
+        ${leadForteHtml}
+        <div style="background: #fafafa; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-top: 12px;">
+          <div style="line-height: 1.7; font-size: 11px; color: #374151;">${formatarContextoPDF(d.contexto)}</div>
         </div>
-      `;
-    })() : '';
-
-    pages.push(`
-      <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
-        ${header}
-        <div style="padding: 24px 36px; box-sizing: border-box;">
-          ${riskBoxHtml}
-          ${temContexto ? `
-            <div style="margin-bottom: 30px;">
-              <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Cenário e Oportunidade</div>
-              ${leadForteHtml}
-              <div style="background: #fafafa; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-top: 12px;">
-                <div style="line-height: 1.7; font-size: 11px; color: #374151;">${formatarContextoPDF(d.contexto)}</div>
-              </div>
-            </div>
-          ` : ''}
-          ${fluxoPage2Html}
-          ${temOrdem ? `
-            <div>
-              <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Ordem Sugerida de Execução</div>
-              <div style="background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
-                ${formatarOrdemExecucao(d.ordem_execucao, useBlueTheme)}
-              </div>
-            </div>
-            ${(!isCliente || pdfMode === 'direto') ? `
-              <div style="margin-top: 32px; padding: 20px 24px; background: #f0faf4; border-left: 4px solid #1a4731; border-radius: 0 8px 8px 0;">
-                <div style="font-size: 12px; font-weight: 700; color: #1a4731; margin-bottom: 12px;">Por que a Trevo Legaliza?</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
-                  <div style="font-size: 11px; color: #333;">✓ +8 anos de mercado</div>
-                  <div style="font-size: 11px; color: #333;">✓ 27 estados de atuação</div>
-                  <div style="font-size: 11px; color: #333;">✓ Expertise full-service</div>
-                  <div style="font-size: 11px; color: #333;">✓ Honorários fixos por item</div>
-                </div>
-                <div style="font-size: 10px; color: #555; font-style: italic; margin-top: 10px;">${pdfMode === 'direto' ? 'Regularize sua empresa com quem entende do assunto.' : 'Você vende. A Trevo executa. Simples assim.'}</div>
-              </div>
-            ` : ''}
-          ` : ''}
-        </div>
-        <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
       </div>
     `);
   }
 
-  // --- ITEMS PAGES (grouped by section, REAL HEIGHT MEASUREMENT) ---
+  if (temEtapasFluxo && isCliente) {
+    const etapas = d.etapas_fluxo!.filter(e => e.nome.trim());
+    await addBlock(`
+      <div style="margin-top: 24px; margin-bottom: 20px;">
+        <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Fluxo de Execução Estimado</div>
+        <div style="display: flex; align-items: flex-start; justify-content: center; gap: 8px; padding: 16px 0;">
+          ${etapas.map((etapa, idx) => {
+            const isLast = idx === etapas.length - 1;
+            const circleContent = isLast ? '✓' : String(idx + 1);
+            const bgColor = useBlueTheme ? (isLast ? '#1e40af' : '#3b82f6') : (isLast ? '#0f3d24' : '#1a4731');
+            const textColor = isLast ? (useBlueTheme ? '#93c5fd' : '#86efac') : 'white';
+            return `
+              <div style="flex: 1; text-align: center; max-width: 160px; flex-shrink: 0;">
+                <div style="width: 32px; height: 32px; background: ${bgColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${textColor}; margin: 0 auto 6px auto;">${circleContent}</div>
+                <div style="font-weight: 600; font-size: 11px; color: #111827; line-height: 1.3; max-height: 42px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">${esc(etapa.nome)}</div>
+                ${etapa.prazo ? `<div style="font-size: 10px; color: #6b7280; margin-top: 4px; max-height: 28px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${esc(etapa.prazo)}</div>` : ''}
+              </div>
+              ${!isLast ? `<div style="font-size: 18px; color: #9ca3af; margin-top: 14px; flex-shrink: 0;">→</div>` : ''}
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `);
+  }
+
+  if (temOrdem) {
+    await addBlock(`
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Ordem Sugerida de Execução</div>
+        <div style="background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+          ${formatarOrdemExecucao(d.ordem_execucao, useBlueTheme)}
+        </div>
+      </div>
+    `);
+    if (!isCliente || pdfMode === 'direto') {
+      await addBlock(`
+        <div style="margin-bottom: 20px; padding: 20px 24px; background: #f0faf4; border-left: 4px solid #1a4731; border-radius: 0 8px 8px 0;">
+          <div style="font-size: 12px; font-weight: 700; color: #1a4731; margin-bottom: 12px;">Por que a Trevo Legaliza?</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;">
+            <div style="font-size: 11px; color: #333;">✓ +8 anos de mercado</div>
+            <div style="font-size: 11px; color: #333;">✓ 27 estados de atuação</div>
+            <div style="font-size: 11px; color: #333;">✓ Expertise full-service</div>
+            <div style="font-size: 11px; color: #333;">✓ Honorários fixos por item</div>
+          </div>
+          <div style="font-size: 10px; color: #555; font-style: italic; margin-top: 10px;">${pdfMode === 'direto' ? 'Regularize sua empresa com quem entende do assunto.' : 'Você vende. A Trevo executa. Simples assim.'}</div>
+        </div>
+      `);
+    }
+  }
+
+  // --- SCOPE ITEMS BLOCKS ---
   const grouped = secoes
     .map(s => ({ ...s, items: d.itens.filter(i => i.secao === s.key).sort((a, b) => a.ordem - b.ordem) }))
     .filter(g => g.items.length > 0);
@@ -885,6 +891,13 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     group.items.forEach((item, i) => {
       allEntries.push({ item, sectionLabel: i === 0 ? label : undefined, sectionKey: group.key });
     });
+  }
+
+  // Add scope section title as its own block (only once, before first item)
+  if (allEntries.length > 0) {
+    await addBlock(`
+      <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Escopo dos Serviços</div>
+    `);
   }
 
   // Build HTML for a single entry card (extracted for measurement)
@@ -995,7 +1008,6 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const showDocsSection = item.prazo || item.docs_necessarios;
     const cenarioDoItem = temCenarios && item.cenarioId ? cenarios.find(c => c.id === item.cenarioId) : null;
     const cenarioIdx = cenarioDoItem ? cenarios.indexOf(cenarioDoItem) : -1;
-    // Badges are now rendered inline in the header flex container below
 
     const numeroItem = item.ordem || (allEntries.indexOf(entry) + 1);
     cardHtml += `
@@ -1027,50 +1039,21 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     return cardHtml;
   }
 
-  // Generate HTML for every entry, then measure real heights
-  const entryHtmls = allEntries.map(e => buildEntryHtml(e));
-
-  const ALTURA_DISPONIVEL = 880; // 1123 - 64(header) - 48(footer) - 48(padding) - 48(section title) - 35(safety)
-  const entryHeights: number[] = [];
-  for (const html of entryHtmls) {
-    entryHeights.push(await medirAlturaReal(html));
+  // Add each item as a block
+  for (const entry of allEntries) {
+    await addBlock(buildEntryHtml(entry));
   }
 
-  // Paginate based on measured real heights — never split a card
-  const itemPageIndices: number[][] = [[]];
-  let alturaAcumulada = 0;
-  for (let i = 0; i < allEntries.length; i++) {
-    if (alturaAcumulada + entryHeights[i] > ALTURA_DISPONIVEL && itemPageIndices[itemPageIndices.length - 1].length > 0) {
-      itemPageIndices.push([]);
-      alturaAcumulada = 0;
-    }
-    itemPageIndices[itemPageIndices.length - 1].push(i);
-    alturaAcumulada += entryHeights[i];
-  }
-
-  // Build page divs from paginated indices
-  for (const indices of itemPageIndices) {
-    const chunkHtml = indices.map(i => entryHtmls[i]).join('');
-    pages.push(`
-      <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
-        ${header}
-        <div style="padding: 24px 36px; box-sizing: border-box;">
-          <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Escopo dos Serviços</div>
-          ${chunkHtml}
-        </div>
-        <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
-      </div>
-    `);
-  }
-
-  // --- PACKAGES PAGE ---
+  // --- PACKAGES BLOCKS ---
   const validPacotes = d.pacotes.filter(p => p.nome && p.itens_ids.length > 0);
   if (validPacotes.length > 0) {
-    let pacotesHtml = '';
+    await addBlock(`
+      <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Pacotes Disponíveis</div>
+    `);
+
     for (const pac of validPacotes) {
       const selected = d.itens.filter(i => pac.itens_ids.includes(i.id));
       const descontoPct = pac.desconto_pct / 100;
-
       const custoSemDesconto = selected.reduce((s, i) => s + (i.honorario || 0) * i.quantidade, 0);
       const custoComDesconto = custoSemDesconto * (1 - descontoPct);
       const precoSemDescontoCliente = selected.reduce((s, i) => s + ((i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0);
@@ -1082,10 +1065,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       const taxaMin = selected.reduce((s, i) => s + i.taxa_min, 0);
       const taxaMax = selected.reduce((s, i) => s + i.taxa_max, 0);
       const hasTaxaPac = taxaMin > 0 || taxaMax > 0;
-
       const itensNomes = selected.map(i => `✓ ${i.ordem}. ${i.descricao}`);
-
-      // MELHORIA A — "RECOMENDADO" badge on Completo package
       const isCompleto = pac.nome.toLowerCase().includes('completo');
       const recomendadoBadge = isCompleto
         ? `<div style="background: #1a4731; color: #ffffff; font-size: 9px; padding: 3px 8px; border-radius: 4px; font-weight: 700;">★ RECOMENDADO</div>`
@@ -1093,7 +1073,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       const pacBorder = isCompleto ? '2px solid #1a4731' : '1px solid #e5e7eb';
 
       if (!isCliente) {
-        pacotesHtml += `
+        await addBlock(`
           <div style="border: ${pacBorder}; border-radius: 16px; margin-bottom: 16px; overflow: hidden;">
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
               <span style="font-size: 14px; font-weight: 800; color: #ffffff;">${esc(pac.nome)}</span>
@@ -1120,7 +1100,6 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
                   <span style="font-weight: 700; color: #166534;">${fmt(precoComDesconto)}</span>
                 </div>
               </div>
-              <!-- FIX 2: Margin highlight card -->
               <div style="margin: 14px 18px 10px; padding: 14px 20px; background: #f0fdf4; border: 1.5px solid #4ade80; border-radius: 10px; display: flex; align-items: center; justify-content: space-between;">
                 <div>
                   <div style="font-size: 10px; font-weight: 600; color: #166534; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px;">Você ganha com este pacote</div>
@@ -1141,10 +1120,9 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               </div>
             </div>
           </div>
-        `;
+        `);
       } else {
-        // CLIENTE MODE
-        pacotesHtml += `
+        await addBlock(`
           <div style="border: ${pacBorder}; border-radius: 16px; margin-bottom: 16px; overflow: hidden;">
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: linear-gradient(135deg, #1e293b 0%, #334155 100%);">
               <span style="font-size: 14px; font-weight: 800; color: #ffffff;">${esc(pac.nome)}</span>
@@ -1165,7 +1143,6 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
                 <span style="color: #1e40af; font-weight: 600;">Investimento com -${pac.desconto_pct}%</span>
                 <span style="color: #1e40af; font-weight: 700;">${fmt(precoComDesconto)}</span>
               </div>
-              <!-- FIX 8: Economia em reais -->
               <div style="font-size: 10px; color: #15803d; font-weight: 600; text-align: right; margin-top: -4px; margin-bottom: 8px; padding: 0 0;">
                 ↓ Economia de ${fmt(precoSemDesconto - precoComDesconto)} com este pacote
               </div>
@@ -1181,23 +1158,12 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               </div>
             </div>
           </div>
-        `;
+        `);
       }
     }
-
-    pages.push(`
-      <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
-        ${header}
-        <div style="padding: 24px 36px; box-sizing: border-box;">
-          <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Pacotes Disponíveis</div>
-          ${pacotesHtml}
-        </div>
-        <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
-      </div>
-    `);
   }
 
-  // --- TOTALS + CONDITIONS + CTA PAGE ---
+  // --- SUMMARY / CONDITIONS / CTA BLOCKS ---
   const prazosItens = d.itens.filter(i => i.prazo);
   let prazoHtml = '';
   if (prazosItens.length > 0) {
@@ -1224,7 +1190,6 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     `;
   }
 
-  // FIX 2 — CTA per mode with contador contact info
   const ctaSection = (!isCliente || pdfMode === 'direto') ? `
     <div style="background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%); border-radius: 16px; padding: 24px; text-align: center;">
       <div style="font-size: 11px; font-weight: 700; color: #4ade80; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
@@ -1236,7 +1201,6 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       </div>
     </div>
   ` : (() => {
-    // CLIENTE MODE: show escritório/contador contact if available
     const ctaNome = d.escritorioNome || d.contadorNome || '';
     const ctaTelefone = d.escritorioTelefone || d.contadorTelefone || '';
     const ctaEmail = d.escritorioEmail || d.contadorEmail || '';
@@ -1253,7 +1217,6 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
         </div>
       `;
     }
-    // Fallback: generic
     return `
       <div style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius: 16px; padding: 24px; text-align: center;">
         <div style="font-size: 11px; font-weight: 700; color: #93c5fd; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Próximo Passo</div>
@@ -1264,8 +1227,6 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
 
   // Resumo per mode
   let resumoHtml = '';
-
-  // Per-scenario summary block (used in both modes when scenarios exist)
   const cenarioResumoHtml = temCenarios ? (() => {
     return cenarios.map((cen, ci) => {
       const items = getItensCenario(cen.id);
@@ -1275,7 +1236,6 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       const hasTx = t.taxaMin > 0 || t.taxaMax > 0;
       const precoC = t.precoCliente * (1 - d.desconto_pct / 100);
       const custoT = t.custoTrevo * (1 - d.desconto_pct / 100);
-      // Margin as range (min = honorario_minimo, ideal = valor_mercado)
       const precoIdealRes = items.reduce((s, i) => s + ((i.valor_mercado || i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0) * (1 - d.desconto_pct / 100);
       const margemMin = precoC - custoT;
       const margemIdeal = precoIdealRes - custoT;
@@ -1400,45 +1360,85 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     `;
   }
 
-  pages.push(`
-    <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
-      ${header}
-      <div style="padding: 24px 36px; box-sizing: border-box;">
-        <!-- Totals -->
-        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Resumo do Investimento</div>
-        ${resumoHtml}
+  // Add summary section title + content as blocks
+  await addBlock(`
+    <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Resumo do Investimento</div>
+    ${resumoHtml}
+  `);
 
-        <!-- Conditions -->
-        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Condições</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
-          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Validade</div>
-            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${d.validade_dias} dias</div>
-          </div>
-          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Pagamento</div>
-            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${sanitizeRichHtml(d.pagamento || 'A combinar')}</div>
-          </div>
-        </div>
-        ${prazoHtml}
-        ${d.observacoes ? `
-          <div style="margin-bottom: 16px;">
-            <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Observações</div>
-            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${sanitizeRichHtml(d.observacoes)}</div>
-          </div>
-        ` : ''}
-
-        <!-- Disclaimer -->
-        <div style="font-size: 7px; color: #9ca3af; line-height: 1.6; margin-bottom: 24px; padding: 10px; background: #f8fafc; border-radius: 6px;">
-          * Taxas governamentais são estimativas baseadas em tabelas vigentes em 2026 e podem sofrer alterações pelos órgãos competentes. Valores de honorários são fixos e não sofrem reajuste durante a execução do projeto.
-        </div>
-
-        <!-- CTA -->
-        ${ctaSection}
+  // Conditions block
+  await addBlock(`
+    <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">Condições</div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+        <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Validade</div>
+        <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${d.validade_dias} dias</div>
       </div>
-      <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
+        <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Pagamento</div>
+        <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${sanitizeRichHtml(d.pagamento || 'A combinar')}</div>
+      </div>
     </div>
   `);
+
+  if (prazoHtml) {
+    await addBlock(prazoHtml);
+  }
+
+  if (d.observacoes) {
+    await addBlock(`
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Observações</div>
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${sanitizeRichHtml(d.observacoes)}</div>
+      </div>
+    `);
+  }
+
+  // Disclaimer
+  await addBlock(`
+    <div style="font-size: 7px; color: #9ca3af; line-height: 1.6; margin-bottom: 24px; padding: 10px; background: #f8fafc; border-radius: 6px;">
+      * Taxas governamentais são estimativas baseadas em tabelas vigentes em 2026 e podem sofrer alterações pelos órgãos competentes. Valores de honorários são fixos e não sofrem reajuste durante a execução do projeto.
+    </div>
+  `);
+
+  // CTA
+  await addBlock(ctaSection);
+
+  // ═══════════════════════════════════════════════════════
+  // PAGINATE: pack all contentBlocks into pages by height
+  // ═══════════════════════════════════════════════════════
+  const FOOTER_HEIGHT = 60;
+  const PADDING_VERTICAL = 48; // 24px top + 24px bottom padding
+  const MARGEM_SEGURANCA = 30;
+  const ALTURA_DISPONIVEL = 1123 - HEADER_HEIGHT - FOOTER_HEIGHT - PADDING_VERTICAL - MARGEM_SEGURANCA;
+
+  const pageGroups: number[][] = [[]];
+  let alturaAcumulada = 0;
+
+  for (let i = 0; i < contentBlocks.length; i++) {
+    const blockH = contentBlocks[i].height;
+    // If adding this block exceeds available height AND current page is not empty, start new page
+    if (alturaAcumulada + blockH > ALTURA_DISPONIVEL && pageGroups[pageGroups.length - 1].length > 0) {
+      pageGroups.push([]);
+      alturaAcumulada = 0;
+    }
+    pageGroups[pageGroups.length - 1].push(i);
+    alturaAcumulada += blockH;
+  }
+
+  // Build page HTML from each group
+  for (const group of pageGroups) {
+    const blocksHtml = group.map(i => contentBlocks[i].html).join('');
+    pages.push(`
+      <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
+        ${header}
+        <div style="padding: 24px 36px; box-sizing: border-box;">
+          ${blocksHtml}
+        </div>
+        <div style="position: absolute; bottom: 0; left: 0; right: 0;">${footer}</div>
+      </div>
+    `);
+  }
 
   return pages;
 }
