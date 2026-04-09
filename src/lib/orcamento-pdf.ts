@@ -639,10 +639,10 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               const circleColor = isLast ? '#86efac' : 'white';
               const labelWeight = isLast ? '700' : '600';
               return `
-                <div style="flex: 1; text-align: center; max-width: 160px; flex-shrink: 0;">
+                <div style="flex: 1; text-align: center; max-width: 180px; flex-shrink: 1; min-width: 0;">
                   <div style="width: 32px; height: 32px; background: ${circleBg}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${circleColor}; margin: 0 auto 6px auto;">${circleContent}</div>
-                  <div style="font-weight: ${labelWeight}; font-size: 11px; color: #111827; line-height: 1.3; max-height: 42px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">${esc(etapa.nome)}</div>
-                  ${etapa.prazo ? `<div style="font-size: 10px; color: #6b7280; margin-top: 4px; max-height: 28px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${esc(etapa.prazo)}</div>` : ''}
+                  <div style="font-weight: ${labelWeight}; font-size: 10px; color: #111827; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">${esc(etapa.nome)}</div>
+                  ${etapa.prazo ? `<div style="font-size: 9px; color: #6b7280; margin-top: 4px; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">${esc(etapa.prazo)}</div>` : ''}
                 </div>
                 ${!isLast ? '<div style="font-size: 18px; color: #9ca3af; margin-top: 14px; flex-shrink: 0;">→</div>' : ''}
               `;
@@ -839,10 +839,10 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             const bgColor = useBlueTheme ? (isLast ? '#1e40af' : '#3b82f6') : (isLast ? '#0f3d24' : '#1a4731');
             const textColor = isLast ? (useBlueTheme ? '#93c5fd' : '#86efac') : 'white';
             return `
-              <div style="flex: 1; text-align: center; max-width: 160px; flex-shrink: 0;">
+              <div style="flex: 1; text-align: center; max-width: 180px; flex-shrink: 1; min-width: 0;">
                 <div style="width: 32px; height: 32px; background: ${bgColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${textColor}; margin: 0 auto 6px auto;">${circleContent}</div>
-                <div style="font-weight: 600; font-size: 11px; color: #111827; line-height: 1.3; max-height: 42px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">${esc(etapa.nome)}</div>
-                ${etapa.prazo ? `<div style="font-size: 10px; color: #6b7280; margin-top: 4px; max-height: 28px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${esc(etapa.prazo)}</div>` : ''}
+                <div style="font-weight: 600; font-size: 10px; color: #111827; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">${esc(etapa.nome)}</div>
+                ${etapa.prazo ? `<div style="font-size: 9px; color: #6b7280; margin-top: 4px; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">${esc(etapa.prazo)}</div>` : ''}
               </div>
               ${!isLast ? `<div style="font-size: 18px; color: #9ca3af; margin-top: 14px; flex-shrink: 0;">→</div>` : ''}
             `;
@@ -924,9 +924,9 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const isOpcional = item.isOptional === true || entry.sectionKey === 'opcionais' || (secoes.find(s => s.key === entry.sectionKey)?.label || '').toLowerCase().includes('opcional');
     const isCNES = /cnes|altamente recomendado/i.test(item.descricao);
     const borderColor = isOpcional
-      ? (isCNES ? '#10b981' : '#f59e0b')
+      ? (isCNES ? '#10b981' : '#e5e7eb')
       : (entry.sectionKey === 'obrigatorios' ? '#22c55e' : '#e5e7eb');
-    const borderStyle = (isOpcional && !isCNES) ? 'dashed' : 'solid';
+    const borderStyle = 'solid';
 
     // Financial section based on PDF mode
     let financialHtml = '';
@@ -1015,12 +1015,12 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const numeroItem = item.ordem || (allEntries.indexOf(entry) + 1);
     cardHtml += `
       <div style="border: 1px solid #e5e7eb; border-left: 4px ${borderStyle} ${borderColor}; border-radius: 16px; margin-bottom: 14px; overflow: hidden;">
-        <div style="display: flex; align-items: center; background: linear-gradient(135deg, #1a3a2a 0%, #2d5a3d 100%); padding: 14px 20px; border-radius: 8px 8px 0 0; gap: 12px; min-height: 56px;">
-          <div style="width: 36px; height: 36px; min-width: 36px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 15px;">${numeroItem}</div>
-          <div style="flex: 1; color: white; font-weight: 700; font-size: 13px; line-height: 1.3;">${esc(item.descricao)}</div>
-          ${cenarioDoItem ? `<div style="width: 28px; height: 28px; min-width: 28px; border-radius: 6px; background: ${cenarioIdx === 0 ? '#3b82f6' : cenarioIdx === 1 ? '#10b981' : '#8b5cf6'}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 13px;">${String.fromCharCode(65 + cenarioIdx)}</div>` : ''}
-          ${isOpcional ? `<div style="padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; white-space: nowrap; background: ${isCNES ? '#16a34a' : '#b45309'}; color: white;">${isCNES ? '★ RECOMENDADO' : 'OPCIONAL'}</div>` : ''}
-          <div style="color: #1a1a1a; font-weight: 800; font-size: 18px; white-space: nowrap; background: rgba(255,255,255,0.95); padding: 6px 16px; border-radius: 6px;">${fmt(valorTotal)}</div>
+        <div style="display: flex; align-items: center; background: linear-gradient(135deg, #1a3a2a 0%, #2d5a3d 100%); padding: 10px 16px; gap: 10px; min-height: 48px;">
+          <div style="width: 32px; height: 32px; min-width: 32px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 14px; flex-shrink: 0;">${numeroItem}</div>
+          <div style="flex: 1; min-width: 0; color: white; font-weight: 600; font-size: 12px; line-height: 1.4;">${esc(item.descricao)}</div>
+          ${cenarioDoItem ? `<div style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; min-width: 24px; border-radius: 4px; background: rgba(255,255,255,0.2); color: white; font-weight: 800; font-size: 11px; flex-shrink: 0;">${String.fromCharCode(65 + cenarioIdx)}</div>` : ''}
+          ${isOpcional ? `<div style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 3px; font-size: 9px; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap; flex-shrink: 0; background: rgba(255,255,255,0.15); color: ${isCNES ? '#4ade80' : '#fbbf24'};">${isCNES ? '★ RECOMENDADO' : 'OPCIONAL'}</div>` : ''}
+          <div style="font-weight: 800; font-size: 15px; white-space: nowrap; color: white; flex-shrink: 0;">${fmt(valorTotal)}</div>
         </div>
         ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${sanitizeRichHtml(item.detalhes)}</div>` : ''}
         ${showDocsSection ? `
