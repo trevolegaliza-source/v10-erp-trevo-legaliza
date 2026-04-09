@@ -141,7 +141,7 @@ async function medirAlturaReal(html: string): Promise<number> {
 
   const altura = probe.getBoundingClientRect().height;
   document.body.removeChild(probe);
-  return Math.ceil(altura) + 12; // +12px safety margin (reduced from 24 for better packing)
+  return Math.ceil(altura) + 4; // +4px safety margin (tight packing for better page utilization)
 }
 
 const HEADER_HEIGHT = 64;
@@ -810,8 +810,8 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const showDocsSection = item.prazo || item.docs_necessarios;
     const opcionalBadge = isOpcional
       ? (isCNES
-        ? `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#d1fae5;color:#064e3b;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1;">★ RECOMENDADO</span>`
-        : `<span style="font-size:9px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fef3c7;color:#92400e;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1;">OPCIONAL</span>`)
+        ? `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background-color:#16a34a;color:#ffffff;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1.4;">★ RECOMENDADO</span>`
+        : `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background-color:#b45309;color:#ffffff;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1.4;">OPCIONAL</span>`)
       : '';
 
     cardHtml += `
@@ -890,7 +890,9 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
 
       const custoSemDesconto = selected.reduce((s, i) => s + (i.honorario || 0) * i.quantidade, 0);
       const custoComDesconto = custoSemDesconto * (1 - descontoPct);
-      const precoSemDesconto = selected.reduce((s, i) => s + ((i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0);
+      const precoSemDescontoCliente = selected.reduce((s, i) => s + ((i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0);
+      const precoSemDescontoDireto = selected.reduce((s, i) => s + ((i.valorVendaDireto || i.valor_mercado || i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0);
+      const precoSemDesconto = pdfMode === 'direto' ? precoSemDescontoDireto : precoSemDescontoCliente;
       const precoComDesconto = precoSemDesconto * (1 - descontoPct);
       const margemValor = precoComDesconto - custoComDesconto;
       const margemPct = custoComDesconto > 0 ? ((margemValor / custoComDesconto) * 100).toFixed(0) : '0';
@@ -1122,16 +1124,19 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       </div>
     `;
   } else {
+    const totalHonResumo = pdfMode === 'direto' ? totalPrecoDireto : totalPrecoCliente;
+    const descontoResumo = totalHonResumo * (d.desconto_pct / 100);
+    const honFinalResumo = totalHonResumo - descontoResumo;
     resumoHtml = `
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
           <span style="color: #64748b;">Investimento (honorários)</span>
-          <span style="font-weight: 600;">${fmt(totalPrecoCliente)}</span>
+          <span style="font-weight: 600;">${fmt(totalHonResumo)}</span>
         </div>
         ${d.desconto_pct > 0 ? `
           <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; color: #dc2626;">
             <span>Desconto (${d.desconto_pct}%)</span>
-            <span style="font-weight: 600;">- ${fmt(totalPrecoCliente * d.desconto_pct / 100)}</span>
+            <span style="font-weight: 600;">- ${fmt(descontoResumo)}</span>
           </div>
         ` : ''}
         ${hasTaxas ? `
@@ -1143,7 +1148,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 10px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 12px;">
           <span style="font-size: 12px; font-weight: 700; color: ${accentText}; text-transform: uppercase; letter-spacing: 1px;">${hasTaxas ? 'Investimento Total' : 'Total'}</span>
           <span style="font-size: ${hasTaxas ? '22' : '28'}px; font-weight: 900; color: ${accentText};">
-            ${hasTaxas ? `${fmt(honorarioFinalCapa + totalTaxaMin)} a ${fmt(honorarioFinalCapa + totalTaxaMax)}` : fmt(honorarioFinalCapa)}
+            ${hasTaxas ? `${fmt(honFinalResumo + totalTaxaMin)} a ${fmt(honFinalResumo + totalTaxaMax)}` : fmt(honFinalResumo)}
           </span>
         </div>
       </div>
