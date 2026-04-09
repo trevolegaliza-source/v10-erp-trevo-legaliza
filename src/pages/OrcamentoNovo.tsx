@@ -77,6 +77,10 @@ export default function OrcamentoNovo() {
   const [orcamentoId, setOrcamentoId] = useState<string | null>(editId);
   const [orcamentoNumero, setOrcamentoNumero] = useState<number>(0);
   const [pacotesOpen, setPacotesOpen] = useState(false);
+  const [cenariosOpen, setCenariosOpen] = useState(false);
+  const [fluxoOpen, setFluxoOpen] = useState(false);
+  const [riscosOpen, setRiscosOpen] = useState(false);
+  const [beneficiosOpen, setBeneficiosOpen] = useState(false);
   const saveMutation = useSaveOrcamento();
   const { pdfs, salvarPDF } = useOrcamentoPDFs(orcamentoId);
   const [gerando, setGerando] = useState(false);
