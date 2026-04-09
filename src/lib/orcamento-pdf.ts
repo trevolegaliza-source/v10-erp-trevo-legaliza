@@ -47,6 +47,41 @@ export interface OrcamentoPDFData {
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
 
+/** Sanitize rich-text HTML from TipTap editor — allow only safe tags */
+function sanitizeRichHtml(html: string): string {
+  if (!html) return '';
+  // If it looks like plain text (no HTML tags), escape and convert newlines
+  if (!/<[a-z][\s\S]*>/i.test(html)) return esc(html);
+  // Remove dangerous tags/attributes
+  let safe = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<img[^>]*>/gi, '')
+    .replace(/\s*on\w+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\s*on\w+\s*=\s*'[^']*'/gi, '');
+  return safe;
+}
+
+/** Wrap rich HTML with inline styles for PDF rendering */
+function richHtmlForPdf(html: string, fontSize = '11px', color = '#374151'): string {
+  if (!html) return '';
+  const sanitized = sanitizeRichHtml(html);
+  return `<div style="font-size: ${fontSize}; color: ${color}; line-height: 1.6;">
+    <style>
+      .rte p { margin-bottom: 6px; }
+      .rte strong { font-weight: 700; }
+      .rte em { font-style: italic; }
+      .rte u { text-decoration: underline; }
+      .rte ul { margin-left: 18px; margin-bottom: 6px; list-style-type: disc; }
+      .rte ol { margin-left: 18px; margin-bottom: 6px; list-style-type: decimal; }
+      .rte li { margin-bottom: 3px; }
+      .rte a { color: #2563eb; text-decoration: underline; }
+    </style>
+    <div class="rte">${sanitized}</div>
+  </div>`;
+}
+
 // FIX 5 — Title Case for ALL CAPS names (smart: keeps conjunctions lowercase)
 function toTitleCase(str: string): string {
   const minusculas = new Set([
@@ -70,9 +105,30 @@ function toTitleCase(str: string): string {
     .join(' ');
 }
 
-// FIX 7 — Format contexto with highlighted risk words and monetary values
+// FIX 7 — Format contexto: handles both plain text and rich HTML from editor
 function formatarContextoPDF(texto: string): string {
   if (!texto) return '';
+  // If it's already HTML from the rich text editor, sanitize and return
+  if (/<[a-z][\s\S]*>/i.test(texto)) {
+    let html = sanitizeRichHtml(texto);
+    // Still highlight risk words and monetary values within the HTML text nodes
+    html = html.replace(
+      /(R\$[\s]?[\d.,kmKM\-]+)/g,
+      '<strong style="color: #b91c1c; font-weight: 700;">$1</strong>'
+    );
+    const palavrasRisco = [
+      'interdição', 'interditada', 'embargo', 'embargada',
+      'multa', 'multas', 'autuação', 'penalidade',
+      'bloqueio', 'bloqueada', 'suspensão',
+      'proibição', 'proibida', 'ilegal',
+    ];
+    palavrasRisco.forEach(palavra => {
+      const regex = new RegExp(`\\b(${palavra})\\b`, 'gi');
+      html = html.replace(regex, '<strong style="color: #b91c1c; font-weight: 700;">$1</strong>');
+    });
+    return html;
+  }
+  // Plain text fallback (legacy data)
   let html = texto
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -326,7 +382,7 @@ function buildSimplesHTML(d: OrcamentoPDFData, logo: string | null): string {
     <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 14px 0; ${idx > 0 ? 'border-top: 1px solid #e2e8f0;' : ''}">
       <div style="flex: 1; padding-right: 20px;">
         <div style="font-size: 13px; font-weight: 700; color: #1a1a2e;">${idx + 1}. ${esc(item.descricao)}${item.quantidade > 1 ? ` (×${item.quantidade})` : ''}</div>
-        ${item.detalhes ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.4;">${esc(item.detalhes)}</div>` : ''}
+        ${item.detalhes ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px; line-height: 1.4;">${sanitizeRichHtml(item.detalhes)}</div>` : ''}
       </div>
       <div style="font-size: 14px; font-weight: 800; color: #166534; white-space: nowrap;">${fmt(getItemValor(item) * item.quantidade)}</div>
     </div>
@@ -341,7 +397,7 @@ function buildSimplesHTML(d: OrcamentoPDFData, logo: string | null): string {
   const observacoesHtml = d.observacoes
     ? `<div style="margin-top: 20px;">
         <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Observações</div>
-        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${esc(d.observacoes)}</div>
+        <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${sanitizeRichHtml(d.observacoes)}</div>
        </div>` : '';
 
   return `
@@ -374,7 +430,7 @@ function buildSimplesHTML(d: OrcamentoPDFData, logo: string | null): string {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
             <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Pagamento</div>
-            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${esc(d.pagamento || 'A combinar')}</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${sanitizeRichHtml(d.pagamento || 'A combinar')}</div>
           </div>
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
             <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Prazo de Execução</div>
@@ -567,7 +623,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           Válido por ${d.validade_dias} dias
         </div>
         <div style="font-size: 10px; color: #888; margin-top: 4px; word-wrap: break-word; overflow-wrap: break-word;">
-          ${esc(d.pagamento || 'Pagamento à vista via PIX/boleto bancário ou parcelamento')}
+          ${sanitizeRichHtml(d.pagamento || 'Pagamento à vista via PIX/boleto bancário ou parcelamento')}
         </div>
         ${d.data_emissao ? `<div style="font-size: 10px; color: #888; margin-top: 4px;">Proposta emitida em ${d.data_emissao}</div>` : ''}
       </div>
@@ -861,7 +917,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           ${opcionalBadge}
           <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
         </div>
-        ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
+        ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${sanitizeRichHtml(item.detalhes)}</div>` : ''}
         ${showDocsSection ? `
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #f3f4f6; border-bottom: 1px solid #f3f4f6;">
             <div style="padding: 10px 18px; background: #ffffff;">
@@ -1209,14 +1265,14 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           </div>
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
             <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Pagamento</div>
-            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${esc(d.pagamento || 'A combinar')}</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${sanitizeRichHtml(d.pagamento || 'A combinar')}</div>
           </div>
         </div>
         ${prazoHtml}
         ${d.observacoes ? `
           <div style="margin-bottom: 16px;">
             <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Observações</div>
-            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${esc(d.observacoes)}</div>
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${sanitizeRichHtml(d.observacoes)}</div>
           </div>
         ` : ''}
 
