@@ -1428,6 +1428,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
 
   // Build page HTML from each group
   for (const group of pageGroups) {
+    if (group.length === 0) continue; // skip empty pages
     const blocksHtml = group.map(i => contentBlocks[i].html).join('');
     pages.push(`
       <div style="font-family: Arial, Helvetica, sans-serif; width: 794px; min-height: 1123px; background: white; position: relative;">
