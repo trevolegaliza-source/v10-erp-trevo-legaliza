@@ -55,6 +55,10 @@ const defaultForm = (): OrcamentoForm => ({
   prazo_execucao: 'Prazo de execução: até 15 dias úteis após recebimento da documentação completa.',
   pagamento: 'Pagamento à vista via PIX ou boleto bancário.',
   observacoes: '',
+  headline_cenario: '',
+  riscos: [],
+  beneficios_capa: [],
+  etapas_fluxo: [],
 });
 
 function destinatarioToModoPDF(d: OrcamentoDestinatario): OrcamentoPDFMode {
