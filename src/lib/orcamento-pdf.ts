@@ -626,7 +626,36 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     // ═══════════════════════════════════════════
     // CLIENT COVER — unchanged layout
     // ═══════════════════════════════════════════
-    const coverValueBoxHtml = `
+    const coverValueBoxHtml = temCenarios ? (() => {
+      // Show per-scenario values
+      return `
+        <div style="margin-top: 40px; width: 100%;">
+          <div style="font-size: 10px; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; text-align: center;">Investimento por Cenário</div>
+          <div style="display: flex; gap: 12px; justify-content: center;">
+            ${cenarios.map((cen, ci) => {
+              const items = getItensCenario(cen.id);
+              const t = computeTotals(items);
+              const hon = pdfMode === 'direto' ? t.precoDireto : t.precoCliente;
+              const honFinal = hon * (1 - d.desconto_pct / 100);
+              const valMin = honFinal + t.taxaMin;
+              const valMax = honFinal + t.taxaMax;
+              const hasTx = t.taxaMin > 0 || t.taxaMax > 0;
+              const val = hasTx ? `${fmt(valMin)} a ${fmt(valMax)}` : fmt(honFinal);
+              return `
+                <div style="flex: 1; max-width: 260px; padding: 16px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 12px; text-align: center;">
+                  <div style="font-size: 9px; font-weight: 700; color: ${accentText}; letter-spacing: 1px; margin-bottom: 6px;">${String.fromCharCode(65 + ci)} — ${esc(cen.nome)}</div>
+                  ${cen.descricao ? `<div style="font-size: 8px; color: #6b7280; margin-bottom: 8px;">${esc(cen.descricao)}</div>` : ''}
+                  <div style="font-size: ${hasTx ? '20' : '26'}px; font-weight: 900; color: ${accentText};">${val}</div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div style="font-size: 8px; color: #9ca3af; margin-top: 8px; letter-spacing: 0.3px; text-align: center;">
+            O cliente escolhe um dos cenários acima. Honorários profissionais${hasTaxas ? ' + taxas governamentais estimadas' : ''}
+          </div>
+        </div>
+      `;
+    })() : `
       <div style="margin-top: 40px; padding: 20px 40px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 16px; text-align: center;">
         <div style="font-size: 10px; color: ${accentText}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px;">Investimento Estimado</div>
         <div style="font-size: ${hasTaxas ? '26' : '36'}px; font-weight: 900; color: ${accentText};">${valorCapa}</div>
