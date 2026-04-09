@@ -141,6 +141,10 @@ export default function OrcamentoNovo() {
         prazo_execucao: orc.prazo_execucao || '',
         pagamento: orc.pagamento || '',
         observacoes: orc.observacoes || '',
+        headline_cenario: (orc as any).headline_cenario || '',
+        riscos: Array.isArray((orc as any).riscos) ? (orc as any).riscos : [],
+        beneficios_capa: Array.isArray((orc as any).beneficios_capa) ? (orc as any).beneficios_capa : [],
+        etapas_fluxo: Array.isArray((orc as any).etapas_fluxo) ? (orc as any).etapas_fluxo : [],
       });
     })();
   }, [editId, clientes]);
