@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import {
   type OrcamentoForm, type OrcamentoModo, type OrcamentoItem, type OrcamentoPDFMode,
   type OrcamentoDestinatario, type RiscoOperacao, type EtapaFluxo, type BeneficioCapa,
-  DEFAULT_SECOES, createItem, normalizeItem, getItemValor,
+  type CenarioOrcamento, DEFAULT_SECOES, createItem, normalizeItem, getItemValor,
 } from '@/components/orcamentos/types';
 import { ItemCardSimples } from '@/components/orcamentos/ItemCardSimples';
 import { ItemCardDetalhado } from '@/components/orcamentos/ItemCardDetalhado';
@@ -59,6 +59,7 @@ const defaultForm = (): OrcamentoForm => ({
   riscos: [],
   beneficios_capa: [],
   etapas_fluxo: [],
+  cenarios: [],
 });
 
 function destinatarioToModoPDF(d: OrcamentoDestinatario): OrcamentoPDFMode {
@@ -145,6 +146,7 @@ export default function OrcamentoNovo() {
         riscos: Array.isArray((orc as any).riscos) ? (orc as any).riscos : [],
         beneficios_capa: Array.isArray((orc as any).beneficios_capa) ? (orc as any).beneficios_capa : [],
         etapas_fluxo: Array.isArray((orc as any).etapas_fluxo) ? (orc as any).etapas_fluxo : [],
+        cenarios: Array.isArray((orc as any).cenarios) ? (orc as any).cenarios : [],
       });
     })();
   }, [editId, clientes]);
