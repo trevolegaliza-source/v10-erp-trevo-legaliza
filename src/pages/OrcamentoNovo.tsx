@@ -649,7 +649,20 @@ export default function OrcamentoNovo() {
           {/* SEÇÃO 6: Contexto e Apresentação */}
           <Card className="p-5">
             <h3 className="text-sm font-semibold mb-3">Contexto e Apresentação</h3>
-            <div className="space-y-3">
+            <div className="space-y-5">
+
+              {/* 1. Headline do cenário */}
+              <div>
+                <Label className="text-xs">Headline do cenário (opcional)</Label>
+                <Input
+                  value={form.headline_cenario}
+                  onChange={e => setForm(f => ({ ...f, headline_cenario: e.target.value }))}
+                  placeholder="Ex: A regularização não é uma formalidade — é o que permite a empresa operar sem riscos."
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">Se vazio, não aparecerá no PDF.</p>
+              </div>
+
+              {/* 2. Situação atual */}
               <div>
                 <Label className="text-xs">Descreva a situação atual</Label>
                 <Textarea
@@ -659,15 +672,158 @@ export default function OrcamentoNovo() {
                   rows={4}
                 />
               </div>
+
+              {/* 3. Riscos da operação */}
               <div>
-                <Label className="text-xs">Ordem sugerida de execução</Label>
-                <Textarea
-                  value={form.ordem_execucao}
-                  onChange={e => setForm(f => ({ ...f, ordem_execucao: e.target.value }))}
-                  placeholder={"Ex: 1. Licença Bombeiros (base para tudo)\n2. Alvará Sanitário (depende do item 1)\n3. CRM PJ + Cadastro Técnico (paralelo)"}
-                  rows={3}
-                />
+                <Label className="text-xs font-semibold">Riscos da operação sem regularização</Label>
+                <p className="text-[10px] text-muted-foreground mb-2">Deixe vazio se não houver riscos aplicáveis. Se vazio, o box de riscos NÃO aparecerá no PDF.</p>
+                <div className="space-y-2">
+                  {form.riscos.map((risco, idx) => (
+                    <div key={risco.id} className="flex items-start gap-2">
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <Input
+                          value={risco.penalidade}
+                          onChange={e => {
+                            const updated = [...form.riscos];
+                            updated[idx] = { ...updated[idx], penalidade: e.target.value };
+                            setForm(f => ({ ...f, riscos: updated }));
+                          }}
+                          placeholder="Penalidade (ex: Multa por autuação)"
+                          className="text-sm"
+                        />
+                        <Input
+                          value={risco.condicao || ''}
+                          onChange={e => {
+                            const updated = [...form.riscos];
+                            updated[idx] = { ...updated[idx], condicao: e.target.value };
+                            setForm(f => ({ ...f, riscos: updated }));
+                          }}
+                          placeholder="Condição/Valor (ex: R$ 5.000 a R$ 50.000)"
+                          className="text-sm"
+                        />
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => {
+                        setForm(f => ({ ...f, riscos: f.riscos.filter((_, i) => i !== idx) }));
+                      }}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" size="sm" className="mt-2 gap-1" onClick={() => {
+                  setForm(f => ({ ...f, riscos: [...f.riscos, { id: crypto.randomUUID(), penalidade: '', condicao: '' }] }));
+                }}>
+                  <Plus className="h-3 w-3" /> Adicionar risco
+                </Button>
               </div>
+
+              {/* 4. Benefícios destacados na capa */}
+              <div>
+                <Label className="text-xs font-semibold">Benefícios destacados na capa</Label>
+                <p className="text-[10px] text-muted-foreground mb-2">Até 3 benefícios que aparecem na capa do PDF. Deixe vazio para não exibir.</p>
+                <div className="space-y-2">
+                  {form.beneficios_capa.map((ben, idx) => (
+                    <div key={ben.id} className="flex items-start gap-2">
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <Input
+                          value={ben.titulo}
+                          onChange={e => {
+                            const updated = [...form.beneficios_capa];
+                            updated[idx] = { ...updated[idx], titulo: e.target.value };
+                            setForm(f => ({ ...f, beneficios_capa: updated }));
+                          }}
+                          placeholder="Título (ex: Operação sem riscos)"
+                          maxLength={30}
+                          className="text-sm"
+                        />
+                        <Input
+                          value={ben.descricao}
+                          onChange={e => {
+                            const updated = [...form.beneficios_capa];
+                            updated[idx] = { ...updated[idx], descricao: e.target.value };
+                            setForm(f => ({ ...f, beneficios_capa: updated }));
+                          }}
+                          placeholder="Descrição (ex: Elimina risco de multas)"
+                          maxLength={80}
+                          className="text-sm"
+                        />
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => {
+                        setForm(f => ({ ...f, beneficios_capa: f.beneficios_capa.filter((_, i) => i !== idx) }));
+                      }}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 gap-1"
+                  disabled={form.beneficios_capa.length >= 3}
+                  onClick={() => {
+                    setForm(f => ({ ...f, beneficios_capa: [...f.beneficios_capa, { id: crypto.randomUUID(), titulo: '', descricao: '' }] }));
+                  }}
+                >
+                  <Plus className="h-3 w-3" /> Adicionar benefício {form.beneficios_capa.length >= 3 && '(máx 3)'}
+                </Button>
+              </div>
+
+              {/* 5. Fluxo de execução */}
+              <div>
+                <Label className="text-xs font-semibold">Fluxo de execução</Label>
+                <p className="text-[10px] text-muted-foreground mb-2">Deixe vazio se não quiser incluir o fluxo visual no PDF.</p>
+                <div className="space-y-2">
+                  {form.etapas_fluxo.map((etapa, idx) => (
+                    <div key={etapa.id} className="flex items-start gap-2">
+                      <span className="flex items-center justify-center h-9 w-9 shrink-0 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                        {idx + 1}
+                      </span>
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <Input
+                          value={etapa.nome}
+                          onChange={e => {
+                            const updated = [...form.etapas_fluxo];
+                            updated[idx] = { ...updated[idx], nome: e.target.value, ordem: idx + 1 };
+                            setForm(f => ({ ...f, etapas_fluxo: updated }));
+                          }}
+                          placeholder="Nome (ex: Licença Bombeiros)"
+                          className="text-sm"
+                        />
+                        <Input
+                          value={etapa.prazo || ''}
+                          onChange={e => {
+                            const updated = [...form.etapas_fluxo];
+                            updated[idx] = { ...updated[idx], prazo: e.target.value };
+                            setForm(f => ({ ...f, etapas_fluxo: updated }));
+                          }}
+                          placeholder="Prazo (ex: 15-45 dias)"
+                          className="text-sm"
+                        />
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => {
+                        setForm(f => ({
+                          ...f,
+                          etapas_fluxo: f.etapas_fluxo
+                            .filter((_, i) => i !== idx)
+                            .map((et, i) => ({ ...et, ordem: i + 1 })),
+                        }));
+                      }}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" size="sm" className="mt-2 gap-1" onClick={() => {
+                  setForm(f => ({
+                    ...f,
+                    etapas_fluxo: [...f.etapas_fluxo, { id: crypto.randomUUID(), nome: '', prazo: '', ordem: f.etapas_fluxo.length + 1 }],
+                  }));
+                }}>
+                  <Plus className="h-3 w-3" /> Adicionar etapa
+                </Button>
+              </div>
+
             </div>
           </Card>
 
