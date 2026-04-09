@@ -80,6 +80,11 @@ export interface OrcamentoForm {
   prazo_execucao: string;
   pagamento: string;
   observacoes: string;
+  // Dynamic fields
+  headline_cenario: string;
+  riscos: RiscoOperacao[];
+  beneficios_capa: BeneficioCapa[];
+  etapas_fluxo: EtapaFluxo[];
 }
 
 export const DEFAULT_SECOES: OrcamentoSecao[] = [
