@@ -568,11 +568,16 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             const items = getItensCenario(cen.id);
             const t = computeTotals(items);
             const custoFinal = t.custoTrevo * (1 - d.desconto_pct / 100);
-            const precoFinal = t.precoCliente * (1 - d.desconto_pct / 100);
-            const margem = precoFinal - custoFinal;
-            const margemPct = custoFinal > 0 ? (((precoFinal / custoFinal) - 1) * 100).toFixed(0) : '0';
+            const precoMinFinal = t.precoCliente * (1 - d.desconto_pct / 100);
+            // Ideal price (valor_mercado) for margin range
+            const precoIdealCen = items.reduce((s, i) => s + ((i.valor_mercado || i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0) * (1 - d.desconto_pct / 100);
+            const margemMin = precoMinFinal - custoFinal;
+            const margemIdeal = precoIdealCen - custoFinal;
+            const margemMinPct = custoFinal > 0 ? (((precoMinFinal / custoFinal) - 1) * 100).toFixed(0) : '0';
+            const margemIdealPct = custoFinal > 0 ? (((precoIdealCen / custoFinal) - 1) * 100).toFixed(0) : '0';
+            const temFaixa = margemIdeal > margemMin && precoIdealCen > precoMinFinal;
             const hasTx = t.taxaMin > 0 || t.taxaMax > 0;
-            const investVal = hasTx ? `${fmt(precoFinal + t.taxaMin)} a ${fmt(precoFinal + t.taxaMax)}` : fmt(precoFinal);
+            const investVal = hasTx ? `${fmt(precoMinFinal + t.taxaMin)} a ${fmt(precoMinFinal + t.taxaMax)}` : fmt(precoMinFinal);
             return `
               <div style="display: flex; gap: 12px; width: 100%; margin-bottom: 12px;">
                 <div style="width: 28px; height: 28px; background: #0f3d24; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #86efac; font-size: 13px; font-weight: 800; flex-shrink: 0; margin-top: 12px;">${String.fromCharCode(65 + ci)}</div>
@@ -587,8 +592,8 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
                   </div>
                   <div style="flex: 1; background: #1a4731; border-radius: 8px; padding: 12px; text-align: center;">
                     <div style="font-size: 8px; color: #86efac; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">MARGEM</div>
-                    <div style="font-size: 16px; font-weight: 700; color: #ffffff;">${fmt(margem)}</div>
-                    <div style="font-size: 9px; color: #86efac; margin-top: 2px;">${margemPct}%</div>
+                    <div style="font-size: ${temFaixa ? '13' : '16'}px; font-weight: 700; color: #ffffff;">${temFaixa ? `${fmt(margemMin)} a ${fmt(margemIdeal)}` : fmt(margemMin)}</div>
+                    <div style="font-size: 9px; color: #86efac; margin-top: 2px;">${temFaixa ? `${margemMinPct}% a ${margemIdealPct}%` : `${margemMinPct}%`}</div>
                   </div>
                 </div>
               </div>
@@ -623,7 +628,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
         <div style="padding: 0 48px; flex-shrink: 0; margin-top: 32px;">
           <div style="border-top: 1px solid #e2e8f0; margin-bottom: 24px;"></div>
           <div style="font-size: 10px; font-weight: 600; color: #64748b; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 14px;">Fluxo de execução estimado</div>
-          <div style="display: flex; align-items: center; gap: 0;">
+          <div style="display: flex; align-items: flex-start; justify-content: center; gap: 8px; padding: 16px 0;">
             ${d.etapas_fluxo.map((etapa, idx, arr) => {
               const isLast = idx === arr.length - 1;
               const circleContent = isLast ? '✓' : String(idx + 1);
@@ -631,12 +636,12 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               const circleColor = isLast ? '#86efac' : 'white';
               const labelWeight = isLast ? '700' : '600';
               return `
-                <div style="flex: 1; text-align: center;">
+                <div style="flex: 1; text-align: center; max-width: 160px; flex-shrink: 0;">
                   <div style="width: 32px; height: 32px; background: ${circleBg}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${circleColor}; margin: 0 auto 6px auto;">${circleContent}</div>
-                  <div style="font-size: 9px; font-weight: ${labelWeight}; color: #1a4731;">${esc(etapa.nome)}</div>
-                  ${etapa.prazo ? `<div style="font-size: 9px; color: #64748b;">${esc(etapa.prazo)}</div>` : ''}
+                  <div style="font-weight: ${labelWeight}; font-size: 11px; color: #111827; line-height: 1.3; max-height: 42px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">${esc(etapa.nome)}</div>
+                  ${etapa.prazo ? `<div style="font-size: 10px; color: #6b7280; margin-top: 4px; max-height: 28px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${esc(etapa.prazo)}</div>` : ''}
                 </div>
-                ${!isLast ? '<div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>' : ''}
+                ${!isLast ? '<div style="font-size: 18px; color: #9ca3af; margin-top: 14px; flex-shrink: 0;">→</div>' : ''}
               `;
             }).join('')}
           </div>
@@ -802,19 +807,19 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       return `
         <div style="margin-top: 24px;">
           <div style="font-size: 10px; font-weight: 700; color: ${accentColorLight}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; border-bottom: 2px solid ${accentBg}; padding-bottom: 8px;">Fluxo de Execução Estimado</div>
-          <div style="display: flex; align-items: center; gap: 0; padding: 12px 0;">
+          <div style="display: flex; align-items: flex-start; justify-content: center; gap: 8px; padding: 16px 0;">
             ${etapas.map((etapa, idx) => {
               const isLast = idx === etapas.length - 1;
               const circleContent = isLast ? '✓' : String(idx + 1);
               const bgColor = useBlueTheme ? (isLast ? '#1e40af' : '#3b82f6') : (isLast ? '#0f3d24' : '#1a4731');
               const textColor = isLast ? (useBlueTheme ? '#93c5fd' : '#86efac') : 'white';
               return `
-                <div style="flex: 1; text-align: center;">
+                <div style="flex: 1; text-align: center; max-width: 160px; flex-shrink: 0;">
                   <div style="width: 32px; height: 32px; background: ${bgColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${textColor}; margin: 0 auto 6px auto;">${circleContent}</div>
-                  <div style="font-size: 9px; font-weight: 600; color: #374151;">${esc(etapa.nome)}</div>
-                  ${etapa.prazo ? `<div style="font-size: 9px; color: #64748b;">${esc(etapa.prazo)}</div>` : ''}
+                  <div style="font-weight: 600; font-size: 11px; color: #111827; line-height: 1.3; max-height: 42px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">${esc(etapa.nome)}</div>
+                  ${etapa.prazo ? `<div style="font-size: 10px; color: #6b7280; margin-top: 4px; max-height: 28px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${esc(etapa.prazo)}</div>` : ''}
                 </div>
-                ${!isLast ? `<div style="font-size: 16px; color: #94a3b8; padding: 0 2px; margin-bottom: 16px;">→</div>` : ''}
+                ${!isLast ? `<div style="font-size: 18px; color: #9ca3af; margin-top: 14px; flex-shrink: 0;">→</div>` : ''}
               `;
             }).join('')}
           </div>
@@ -990,24 +995,17 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const showDocsSection = item.prazo || item.docs_necessarios;
     const cenarioDoItem = temCenarios && item.cenarioId ? cenarios.find(c => c.id === item.cenarioId) : null;
     const cenarioIdx = cenarioDoItem ? cenarios.indexOf(cenarioDoItem) : -1;
-    const cenarioBadge = cenarioDoItem
-      ? `<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:4px;background-color:#6366f1;color:#ffffff;letter-spacing:0.5px;margin-right:6px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1.4;">${String.fromCharCode(65 + cenarioIdx)}</span>`
-      : '';
-    const opcionalBadge = isOpcional
-      ? (isCNES
-        ? `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background-color:#16a34a;color:#ffffff;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1.4;">★ RECOMENDADO</span>`
-        : `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;background-color:#b45309;color:#ffffff;letter-spacing:0.5px;margin-right:10px;white-space:nowrap;display:inline-flex;align-items:center;flex-shrink:0;line-height:1.4;">OPCIONAL</span>`)
-      : '';
+    // Badges are now rendered inline in the header flex container below
 
+    const numeroItem = item.ordem || (allEntries.indexOf(entry) + 1);
     cardHtml += `
       <div style="border: 1px solid #e5e7eb; border-left: 4px ${borderStyle} ${borderColor}; border-radius: 16px; margin-bottom: 14px; overflow: hidden;">
-        <div style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; background: linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%);">
-          <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(255,255,255,0.15); color: #fff; font-size: 13px; font-weight: 800; flex-shrink: 0;">${item.ordem || '•'}</div>
-          <div style="flex: 1; min-width: 0;">
-            <div style="font-size: 12px; font-weight: 700; color: #ffffff; line-height: 1.3;">${esc(item.descricao)}</div>
-          </div>
-          ${cenarioBadge}${opcionalBadge}
-          <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
+        <div style="display: flex; align-items: center; background: linear-gradient(135deg, #1a3a2a 0%, #2d5a3d 100%); padding: 14px 20px; border-radius: 8px 8px 0 0; gap: 12px; min-height: 56px;">
+          <div style="width: 36px; height: 36px; min-width: 36px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 15px;">${numeroItem}</div>
+          <div style="flex: 1; color: white; font-weight: 700; font-size: 13px; line-height: 1.3;">${esc(item.descricao)}</div>
+          ${cenarioDoItem ? `<div style="width: 28px; height: 28px; min-width: 28px; border-radius: 6px; background: ${cenarioIdx === 0 ? '#3b82f6' : cenarioIdx === 1 ? '#10b981' : '#8b5cf6'}; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 13px;">${String.fromCharCode(65 + cenarioIdx)}</div>` : ''}
+          ${isOpcional ? `<div style="padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; white-space: nowrap; background: ${isCNES ? '#16a34a' : '#b45309'}; color: white;">${isCNES ? '★ RECOMENDADO' : 'OPCIONAL'}</div>` : ''}
+          <div style="color: #1a1a1a; font-weight: 800; font-size: 18px; white-space: nowrap; background: rgba(255,255,255,0.95); padding: 6px 16px; border-radius: 6px;">${fmt(valorTotal)}</div>
         </div>
         ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${sanitizeRichHtml(item.detalhes)}</div>` : ''}
         ${showDocsSection ? `
@@ -1277,8 +1275,13 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
       const hasTx = t.taxaMin > 0 || t.taxaMax > 0;
       const precoC = t.precoCliente * (1 - d.desconto_pct / 100);
       const custoT = t.custoTrevo * (1 - d.desconto_pct / 100);
-      const margem = precoC - custoT;
-      const margemPct = custoT > 0 ? (((precoC / custoT) - 1) * 100).toFixed(0) : '0';
+      // Margin as range (min = honorario_minimo, ideal = valor_mercado)
+      const precoIdealRes = items.reduce((s, i) => s + ((i.valor_mercado || i.honorario_minimo_contador || i.honorario || 0)) * i.quantidade, 0) * (1 - d.desconto_pct / 100);
+      const margemMin = precoC - custoT;
+      const margemIdeal = precoIdealRes - custoT;
+      const margemMinPct = custoT > 0 ? (((precoC / custoT) - 1) * 100).toFixed(0) : '0';
+      const margemIdealPct = custoT > 0 ? (((precoIdealRes / custoT) - 1) * 100).toFixed(0) : '0';
+      const temFaixaRes = margemIdeal > margemMin && precoIdealRes > precoC;
       const totalVal = hasTx ? `${fmt(honFinal + t.taxaMin)} a ${fmt(honFinal + t.taxaMax)}` : fmt(honFinal);
       const letter = String.fromCharCode(65 + ci);
       return `
@@ -1296,7 +1299,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               <span>Sugestão cliente</span><span style="font-weight: 700;">${fmt(precoC)}</span>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; color: #1e40af;">
-              <span>Margem</span><span style="font-weight: 700;">${fmt(margem)} (${margemPct}%)</span>
+              <span>Margem</span><span style="font-weight: 700;">${temFaixaRes ? `${fmt(margemMin)} a ${fmt(margemIdeal)} (${margemMinPct}% a ${margemIdealPct}%)` : `${fmt(margemMin)} (${margemMinPct}%)`}</span>
             </div>
           ` : `
             <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;">
@@ -1450,7 +1453,7 @@ async function renderPageToCanvas(html: string): Promise<HTMLCanvasElement> {
   const container = document.createElement('div');
   container.id = 'orcamento-render-container';
   container.style.cssText = 'position:absolute;top:-9999px;left:-9999px;width:794px;overflow:hidden;';
-  container.innerHTML = html;
+  container.innerHTML = `<style>* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; } body, div, p, span, td, th, li { font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; }</style>${html}`;
   document.body.appendChild(container);
 
   // 3. Wait for ALL images (logo) to fully load
