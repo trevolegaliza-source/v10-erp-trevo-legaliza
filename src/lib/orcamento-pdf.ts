@@ -1453,7 +1453,8 @@ async function renderPageToCanvas(html: string): Promise<HTMLCanvasElement> {
   const container = document.createElement('div');
   container.id = 'orcamento-render-container';
   container.style.cssText = 'position:absolute;top:-9999px;left:-9999px;width:794px;overflow:hidden;';
-  container.innerHTML = `<style>* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; } body, div, p, span, td, th, li { font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; }</style>${html}`;
+  // Wrap content in a div so firstElementChild is always the renderable element
+  container.innerHTML = `<div style="width:794px;"><style>* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; } body, div, p, span, td, th, li { font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; }</style>${html}</div>`;
   document.body.appendChild(container);
 
   // 3. Wait for ALL images (logo) to fully load
@@ -1527,12 +1528,17 @@ export function downloadBlob(blob: Blob, filename: string) {
 function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
   const pdfW = doc.internal.pageSize.getWidth();
   const pdfH = doc.internal.pageSize.getHeight();
-  const imgData = canvas.toDataURL('image/jpeg', 0.82);
+  // Guard against zero-dimension canvas
+  if (!canvas.width || !canvas.height) {
+    console.warn('Skipping empty canvas page:', canvas.width, canvas.height);
+    return;
+  }
+  const imgData = canvas.toDataURL('image/jpeg', 0.85);
   let imgW = pdfW;
   let imgH = (canvas.height / canvas.width) * pdfW;
   if (imgH > pdfH) {
-    const scale = pdfH / imgH;
-    imgW = pdfW * scale;
+    const ratio = pdfH / imgH;
+    imgW = pdfW * ratio;
     imgH = pdfH;
   }
   const offsetX = (pdfW - imgW) / 2;
