@@ -1266,6 +1266,53 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
 
   // Resumo per mode
   let resumoHtml = '';
+
+  // Per-scenario summary block (used in both modes when scenarios exist)
+  const cenarioResumoHtml = temCenarios ? (() => {
+    return cenarios.map((cen, ci) => {
+      const items = getItensCenario(cen.id);
+      const t = computeTotals(items);
+      const honTotal = pdfMode === 'direto' ? t.precoDireto : isCliente ? t.precoCliente : t.custoTrevo;
+      const honFinal = honTotal * (1 - d.desconto_pct / 100);
+      const hasTx = t.taxaMin > 0 || t.taxaMax > 0;
+      const precoC = t.precoCliente * (1 - d.desconto_pct / 100);
+      const custoT = t.custoTrevo * (1 - d.desconto_pct / 100);
+      const margem = precoC - custoT;
+      const margemPct = custoT > 0 ? (((precoC / custoT) - 1) * 100).toFixed(0) : '0';
+      const totalVal = hasTx ? `${fmt(honFinal + t.taxaMin)} a ${fmt(honFinal + t.taxaMax)}` : fmt(honFinal);
+      const letter = String.fromCharCode(65 + ci);
+      return `
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 20px; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#6366f1;color:#fff;font-size:12px;font-weight:800;">${letter}</span>
+            <span style="font-size: 13px; font-weight: 700; color: #1a1a2e;">${esc(cen.nome)}</span>
+            ${cen.descricao ? `<span style="font-size: 10px; color: #6b7280;">— ${esc(cen.descricao)}</span>` : ''}
+          </div>
+          ${!isCliente ? `
+            <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;">
+              <span style="color: #64748b;">Custo Trevo</span><span style="font-weight: 600;">${fmt(custoT)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; color: #166534;">
+              <span>Sugestão cliente</span><span style="font-weight: 700;">${fmt(precoC)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; color: #1e40af;">
+              <span>Margem</span><span style="font-weight: 700;">${fmt(margem)} (${margemPct}%)</span>
+            </div>
+          ` : `
+            <div style="display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;">
+              <span style="color: #64748b;">Honorários</span><span style="font-weight: 600;">${fmt(honFinal)}</span>
+            </div>
+          `}
+          ${hasTx ? `<div style="display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; color: #b45309;"><span>Taxas estimadas</span><span>${fmt(t.taxaMin)} a ${fmt(t.taxaMax)}</span></div>` : ''}
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; margin-top: 8px; background: ${accentBg}; border: 2px solid ${accentBorder}; border-radius: 10px;">
+            <span style="font-size: 11px; font-weight: 700; color: ${accentText}; text-transform: uppercase;">Total Cenário ${letter}</span>
+            <span style="font-size: 20px; font-weight: 900; color: ${accentText};">${totalVal}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  })() : '';
+
   if (!isCliente) {
     const descontoCusto = totalCustoTrevo * (d.desconto_pct / 100);
     const custoFinal = totalCustoTrevo - descontoCusto;
@@ -1274,7 +1321,12 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
     const margemTotal = precoFinal - custoFinal;
     const margemTotalPct = custoFinal > 0 ? (((precoFinal / custoFinal) - 1) * 100).toFixed(0) : '0';
 
-    resumoHtml = `
+    resumoHtml = temCenarios ? `
+      <div style="margin-bottom: 16px;">
+        <div style="font-size: 10px; color: #6b7280; margin-bottom: 12px;">O cliente escolhe um dos cenários abaixo:</div>
+        ${cenarioResumoHtml}
+      </div>
+    ` : `
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
           <span style="color: #64748b;">Seu custo Trevo (honorários)</span>
