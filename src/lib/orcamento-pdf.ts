@@ -602,7 +602,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           Válido por ${d.validade_dias} dias
         </div>
         <div style="font-size: 10px; color: #888; margin-top: 4px; word-wrap: break-word; overflow-wrap: break-word;">
-          ${esc(d.pagamento || 'Pagamento à vista via PIX/boleto bancário ou parcelamento')}
+          ${sanitizeRichHtml(d.pagamento || 'Pagamento à vista via PIX/boleto bancário ou parcelamento')}
         </div>
         ${d.data_emissao ? `<div style="font-size: 10px; color: #888; margin-top: 4px;">Proposta emitida em ${d.data_emissao}</div>` : ''}
       </div>
@@ -896,7 +896,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           ${opcionalBadge}
           <div style="font-size: 16px; font-weight: 800; color: #ffffff; white-space: nowrap;">${fmt(valorTotal)}</div>
         </div>
-        ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${esc(item.detalhes)}</div>` : ''}
+        ${item.detalhes ? `<div style="padding: 12px 18px; font-size: 10.5px; line-height: 1.6; color: #6b7280; border-bottom: 1px solid #f3f4f6;">${sanitizeRichHtml(item.detalhes)}</div>` : ''}
         ${showDocsSection ? `
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #f3f4f6; border-bottom: 1px solid #f3f4f6;">
             <div style="padding: 10px 18px; background: #ffffff;">
@@ -1244,14 +1244,14 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           </div>
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
             <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Pagamento</div>
-            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${esc(d.pagamento || 'A combinar')}</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1e293b; margin-top: 4px;">${sanitizeRichHtml(d.pagamento || 'A combinar')}</div>
           </div>
         </div>
         ${prazoHtml}
         ${d.observacoes ? `
           <div style="margin-bottom: 16px;">
             <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Observações</div>
-            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${esc(d.observacoes)}</div>
+            <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 11px; color: #92400e; line-height: 1.5;">${sanitizeRichHtml(d.observacoes)}</div>
           </div>
         ` : ''}
 
