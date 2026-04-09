@@ -942,22 +942,22 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           <div style="padding: 0 18px 12px;">
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px; background: #e5e7eb; border-radius: 12px; overflow: hidden; margin: 12px 0;">
               <div style="padding: 10px; background: #f5f5f5; text-align: center;">
-                <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #666666; margin-bottom: 4px;">NOSSO CUSTO</div>
+                <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #666666; margin-bottom: 4px;">NOSSO CUSTO</div>
                 <div style="font-size: 12px; font-weight: 400; color: #666666;">${fmt(item.honorario)}</div>
               </div>
               <div style="padding: 10px; background: #e8f5e9; border: 1px solid #a5d6a7; text-align: center;">
-                <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">COBRAR NO MÍNIMO</div>
+                <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">COBRAR NO MÍNIMO</div>
                 <div style="font-size: 12px; font-weight: 500; color: #2e7d32;">${hMin > 0 ? fmt(hMin) : '—'}</div>
-                ${margemMin > 0 ? `<div style="font-size: 7px; color: #388e3c; margin-top: 2px;">Margem: ${fmt(margemMin)} (${margemMinPct}%)</div>` : ''}
+                ${margemMin > 0 ? `<div style="font-size: 8px; color: #388e3c; margin-top: 2px;">Margem: ${fmt(margemMin)} (${margemMinPct}%)</div>` : ''}
               </div>
               <div style="padding: 10px; background: #c8e6c9; border: 2px solid #4caf50; text-align: center;">
                 <div style="font-size: 9px; color: #2e7d32; font-weight: 700; margin-bottom: 2px;">✓ IDEAL</div>
-                <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">VALOR DE MERCADO</div>
+                <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">VALOR DE MERCADO</div>
                 <div style="font-size: 12px; font-weight: 700; color: #1b5e20;">${vMerc > 0 ? fmt(vMerc) : '—'}</div>
-                ${margemMerc > 0 ? `<div style="font-size: 7px; color: #2e7d32; font-weight: 600; margin-top: 2px;">Margem: ${fmt(margemMerc)} (${margemMercPct}%)</div>` : ''}
+                ${margemMerc > 0 ? `<div style="font-size: 8px; color: #2e7d32; font-weight: 600; margin-top: 2px;">Margem: ${fmt(margemMerc)} (${margemMercPct}%)</div>` : ''}
               </div>
               <div style="padding: 10px; background: #fff3cd; border: 1px solid #ffc107; text-align: center;">
-                <div style="font-size: 6.5px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">ACIMA = CARO</div>
+                <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; color: #9ca3af; margin-bottom: 4px;">ACIMA = CARO</div>
                 <div style="font-size: 12px; font-weight: 400; color: #856404;">${vPrem > 0 ? fmt(vPrem) : '—'}</div>
               </div>
             </div>
@@ -1023,11 +1023,11 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
         ${showDocsSection ? `
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #f3f4f6; border-bottom: 1px solid #f3f4f6;">
             <div style="padding: 10px 18px; background: #ffffff;">
-              <div style="font-size: 7px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Prazo</div>
+              <div style="font-size: 8px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Prazo</div>
               <div style="font-size: 10px; color: #374151; font-weight: 500;">${esc(item.prazo || 'A definir')}</div>
             </div>
             <div style="padding: 10px 18px; background: #ffffff;">
-              <div style="font-size: 7px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Documentos necessários</div>
+              <div style="font-size: 8px; font-weight: 800; color: #9ca3af; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 4px;">Documentos necessários</div>
               <div style="font-size: 10px; color: #374151; font-weight: 500;">${esc(item.docs_necessarios || '—')}</div>
             </div>
           </div>
@@ -1087,14 +1087,14 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             </div>
             <div style="border-top: 1px solid #e5e7eb;">
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6;">
-                <div style="font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">SEU CUSTO TREVO</div>
+                <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">SEU CUSTO TREVO</div>
                 <div style="text-align: right; font-size: 11px;">
                   <span style="text-decoration: line-through; color: #9ca3af; margin-right: 8px; font-size: 9px;">${fmt(custoSemDesconto)}</span>
                   <span style="font-weight: 700;">${fmt(custoComDesconto)}</span>
                 </div>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6; background: #f0fdf4;">
-                <div style="font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">SUGESTÃO PARA SEU CLIENTE</div>
+                <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">SUGESTÃO PARA SEU CLIENTE</div>
                 <div style="text-align: right; font-size: 11px;">
                   <span style="text-decoration: line-through; color: #9ca3af; margin-right: 8px; font-size: 9px;">${fmt(precoSemDesconto)}</span>
                   <span style="font-weight: 700; color: #166534;">${fmt(precoComDesconto)}</span>
@@ -1110,7 +1110,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               </div>
               ${hasTaxaPac ? `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f3f4f6;">
-                  <div style="font-size: 7px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">TAXAS EXTERNAS</div>
+                  <div style="font-size: 8px; font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: #9ca3af;">TAXAS EXTERNAS</div>
                   <div style="font-size: 11px;">${fmt(taxaMin)} a ${fmt(taxaMax)}</div>
                 </div>
               ` : ''}
@@ -1396,7 +1396,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
 
   // Disclaimer
   await addBlock(`
-    <div style="font-size: 7px; color: #9ca3af; line-height: 1.6; margin-bottom: 24px; padding: 10px; background: #f8fafc; border-radius: 6px;">
+    <div style="font-size: 8px; color: #9ca3af; line-height: 1.6; margin-bottom: 24px; padding: 10px; background: #f8fafc; border-radius: 6px;">
       * Taxas governamentais são estimativas baseadas em tabelas vigentes em 2026 e podem sofrer alterações pelos órgãos competentes. Valores de honorários são fixos e não sofrem reajuste durante a execução do projeto.
     </div>
   `);
