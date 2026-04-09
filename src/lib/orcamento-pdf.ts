@@ -2,7 +2,8 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
   type OrcamentoItem, type OrcamentoPacote, type OrcamentoSecao,
-  type OrcamentoModo, type OrcamentoPDFMode, getItemValor, DEFAULT_SECOES,
+  type OrcamentoModo, type OrcamentoPDFMode, type RiscoOperacao,
+  type EtapaFluxo, type BeneficioCapa, getItemValor, DEFAULT_SECOES,
 } from '@/components/orcamentos/types';
 
 export interface OrcamentoPDFData {
@@ -36,6 +37,11 @@ export interface OrcamentoPDFData {
   observacoes: string;
   numero: number;
   data_emissao: string;
+  // Dynamic fields
+  riscos?: RiscoOperacao[];
+  etapas_fluxo?: EtapaFluxo[];
+  beneficios_capa?: BeneficioCapa[];
+  headline_cenario?: string;
 }
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
