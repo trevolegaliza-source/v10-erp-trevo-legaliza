@@ -845,6 +845,7 @@ export type Database = {
       }
       orcamentos: {
         Row: {
+          beneficios_capa: Json | null
           cliente_id: string | null
           contexto: string | null
           convertido_em: string | null
@@ -857,6 +858,8 @@ export type Database = {
           destinatario: string | null
           empresa_id: string | null
           escopo: Json
+          etapas_fluxo: Json | null
+          headline_cenario: string | null
           id: string
           naturezas: Json
           numero: number
@@ -872,6 +875,7 @@ export type Database = {
           prospect_nome: string
           prospect_telefone: string | null
           qtd_processos: number | null
+          riscos: Json | null
           secoes: Json | null
           servicos: Json
           share_token: string | null
@@ -884,6 +888,7 @@ export type Database = {
           valor_final: number
         }
         Insert: {
+          beneficios_capa?: Json | null
           cliente_id?: string | null
           contexto?: string | null
           convertido_em?: string | null
@@ -896,6 +901,8 @@ export type Database = {
           destinatario?: string | null
           empresa_id?: string | null
           escopo?: Json
+          etapas_fluxo?: Json | null
+          headline_cenario?: string | null
           id?: string
           naturezas?: Json
           numero?: number
@@ -911,6 +918,7 @@ export type Database = {
           prospect_nome: string
           prospect_telefone?: string | null
           qtd_processos?: number | null
+          riscos?: Json | null
           secoes?: Json | null
           servicos?: Json
           share_token?: string | null
@@ -923,6 +931,7 @@ export type Database = {
           valor_final?: number
         }
         Update: {
+          beneficios_capa?: Json | null
           cliente_id?: string | null
           contexto?: string | null
           convertido_em?: string | null
@@ -935,6 +944,8 @@ export type Database = {
           destinatario?: string | null
           empresa_id?: string | null
           escopo?: Json
+          etapas_fluxo?: Json | null
+          headline_cenario?: string | null
           id?: string
           naturezas?: Json
           numero?: number
@@ -950,6 +961,7 @@ export type Database = {
           prospect_nome?: string
           prospect_telefone?: string | null
           qtd_processos?: number | null
+          riscos?: Json | null
           secoes?: Json | null
           servicos?: Json
           share_token?: string | null

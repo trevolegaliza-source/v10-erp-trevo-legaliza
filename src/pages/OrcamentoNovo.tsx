@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
-  Plus, FileText, Save, FileDown, ArrowLeft, Copy, ExternalLink, Loader2, ChevronDown,
+  Plus, FileText, Save, FileDown, ArrowLeft, Copy, ExternalLink, Loader2, ChevronDown, Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
