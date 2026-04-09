@@ -77,6 +77,10 @@ export default function OrcamentoNovo() {
   const [orcamentoId, setOrcamentoId] = useState<string | null>(editId);
   const [orcamentoNumero, setOrcamentoNumero] = useState<number>(0);
   const [pacotesOpen, setPacotesOpen] = useState(false);
+  const [cenariosOpen, setCenariosOpen] = useState(false);
+  const [fluxoOpen, setFluxoOpen] = useState(false);
+  const [riscosOpen, setRiscosOpen] = useState(false);
+  const [beneficiosOpen, setBeneficiosOpen] = useState(false);
   const saveMutation = useSaveOrcamento();
   const { pdfs, salvarPDF } = useOrcamentoPDFs(orcamentoId);
   const [gerando, setGerando] = useState(false);
@@ -543,72 +547,104 @@ export default function OrcamentoNovo() {
             </div>
           </Card>
 
-          {/* SEÇÃO: Cenários (Opções mutuamente exclusivas) */}
+          {/* SEÇÃO 4: Contexto e Apresentação */}
           <Card className="p-5">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-sm font-semibold">Cenários</h3>
-              <Button variant="outline" size="sm" onClick={() => {
-                setForm(f => ({
-                  ...f,
-                  cenarios: [...f.cenarios, {
-                    id: crypto.randomUUID(),
-                    nome: `Opção ${String.fromCharCode(65 + f.cenarios.length)}`,
-                    descricao: '',
-                    ordem: f.cenarios.length + 1,
-                  }],
-                }));
-              }}>
-                <Plus className="h-4 w-4 mr-1" /> Adicionar Cenário
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground mb-3">
-              Use cenários quando o cliente deve escolher entre opções mutuamente exclusivas (ex: Subsidiária vs Filial). Itens sem cenário serão somados em todos.
-            </p>
-            {form.cenarios.length === 0 && (
-              <p className="text-xs text-muted-foreground italic">Nenhum cenário criado — todos os itens serão somados juntos.</p>
-            )}
-            <div className="space-y-2">
-              {form.cenarios.map((cen, idx) => (
-                <div key={cen.id} className="flex items-start gap-2 p-3 rounded-lg border">
-                  <Badge variant="outline" className="mt-1 shrink-0 font-bold">{String.fromCharCode(65 + idx)}</Badge>
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <Input
-                      value={cen.nome}
-                      onChange={e => {
-                        const updated = [...form.cenarios];
-                        updated[idx] = { ...updated[idx], nome: e.target.value };
-                        setForm(f => ({ ...f, cenarios: updated }));
-                      }}
-                      placeholder="Nome do cenário (ex: Opção A — Subsidiária)"
-                      className="text-sm font-medium"
-                    />
-                    <Input
-                      value={cen.descricao || ''}
-                      onChange={e => {
-                        const updated = [...form.cenarios];
-                        updated[idx] = { ...updated[idx], descricao: e.target.value };
-                        setForm(f => ({ ...f, cenarios: updated }));
-                      }}
-                      placeholder="Descrição curta (ex: Ágil e econômica)"
-                      className="text-sm"
-                    />
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => {
-                    const cenId = cen.id;
-                    setForm(f => ({
-                      ...f,
-                      cenarios: f.cenarios.filter((_, i) => i !== idx).map((c, i) => ({ ...c, ordem: i + 1 })),
-                      itens: f.itens.map(item => item.cenarioId === cenId ? { ...item, cenarioId: undefined } : item),
-                    }));
-                  }}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              ))}
+            <h3 className="text-sm font-semibold mb-3">Contexto e Apresentação</h3>
+            <div className="space-y-5">
+              <div>
+                <Label className="text-xs">Headline do cenário (opcional)</Label>
+                <Input
+                  value={form.headline_cenario}
+                  onChange={e => setForm(f => ({ ...f, headline_cenario: e.target.value }))}
+                  placeholder="Ex: A regularização não é uma formalidade — é o que permite a empresa operar sem riscos."
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">Se vazio, não aparecerá no PDF.</p>
+              </div>
+              <div>
+                <Label className="text-xs">Descreva a situação atual</Label>
+                <RichTextEditor
+                  value={form.contexto}
+                  onChange={(html) => setForm(f => ({ ...f, contexto: html }))}
+                  placeholder="Ex: Empresa sem Alvará Sanitário e sem CRM PJ. Atualmente em risco de interdição..."
+                  minHeight="100px"
+                />
+              </div>
             </div>
           </Card>
 
-          {/* SEÇÃO 4: Itens da Proposta */}
+          {/* SEÇÃO 5: Cenários (colapsável) */}
+          <Collapsible open={cenariosOpen} onOpenChange={setCenariosOpen}>
+            <Card className="p-5">
+              <CollapsibleTrigger className="flex items-center justify-between w-full">
+                <h3 className="text-sm font-semibold">Cenários</h3>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", cenariosOpen && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-muted-foreground">
+                    Use cenários quando o cliente deve escolher entre opções mutuamente exclusivas (ex: Subsidiária vs Filial). Itens sem cenário serão somados em todos.
+                  </p>
+                  <Button variant="outline" size="sm" className="shrink-0 ml-2" onClick={() => {
+                    setForm(f => ({
+                      ...f,
+                      cenarios: [...f.cenarios, {
+                        id: crypto.randomUUID(),
+                        nome: `Opção ${String.fromCharCode(65 + f.cenarios.length)}`,
+                        descricao: '',
+                        ordem: f.cenarios.length + 1,
+                      }],
+                    }));
+                  }}>
+                    <Plus className="h-4 w-4 mr-1" /> Adicionar Cenário
+                  </Button>
+                </div>
+                {form.cenarios.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">Nenhum cenário criado — todos os itens serão somados juntos.</p>
+                )}
+                <div className="space-y-2">
+                  {form.cenarios.map((cen, idx) => (
+                    <div key={cen.id} className="flex items-start gap-2 p-3 rounded-lg border">
+                      <Badge variant="outline" className="mt-1 shrink-0 font-bold">{String.fromCharCode(65 + idx)}</Badge>
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <Input
+                          value={cen.nome}
+                          onChange={e => {
+                            const updated = [...form.cenarios];
+                            updated[idx] = { ...updated[idx], nome: e.target.value };
+                            setForm(f => ({ ...f, cenarios: updated }));
+                          }}
+                          placeholder="Nome do cenário (ex: Opção A — Subsidiária)"
+                          className="text-sm font-medium"
+                        />
+                        <Input
+                          value={cen.descricao || ''}
+                          onChange={e => {
+                            const updated = [...form.cenarios];
+                            updated[idx] = { ...updated[idx], descricao: e.target.value };
+                            setForm(f => ({ ...f, cenarios: updated }));
+                          }}
+                          placeholder="Descrição curta (ex: Ágil e econômica)"
+                          className="text-sm"
+                        />
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => {
+                        const cenId = cen.id;
+                        setForm(f => ({
+                          ...f,
+                          cenarios: f.cenarios.filter((_, i) => i !== idx).map((c, i) => ({ ...c, ordem: i + 1 })),
+                          itens: f.itens.map(item => item.cenarioId === cenId ? { ...item, cenarioId: undefined } : item),
+                        }));
+                      }}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
+          {/* SEÇÃO 6: Itens da Proposta */}
           <Card className="p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold">Itens da Proposta</h3>
@@ -721,149 +757,14 @@ export default function OrcamentoNovo() {
             </div>
           </Card>
 
-          {/* SEÇÃO 5: Pacotes (colapsável) */}
-          <Collapsible open={pacotesOpen} onOpenChange={setPacotesOpen}>
+          {/* SEÇÃO 7: Fluxo de Execução (colapsável) */}
+          <Collapsible open={fluxoOpen} onOpenChange={setFluxoOpen}>
             <Card className="p-5">
               <CollapsibleTrigger className="flex items-center justify-between w-full">
-                <h3 className="text-sm font-semibold">Pacotes</h3>
-                <ChevronDown className={cn("h-4 w-4 transition-transform", pacotesOpen && "rotate-180")} />
+                <h3 className="text-sm font-semibold">Fluxo de Execução</h3>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", fluxoOpen && "rotate-180")} />
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3">
-                <PacotesEditor
-                  pacotes={form.pacotes}
-                  itens={form.itens}
-                  onChange={pacotes => setForm(f => ({ ...f, pacotes }))}
-                />
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-
-          {/* SEÇÃO 6: Contexto e Apresentação */}
-          <Card className="p-5">
-            <h3 className="text-sm font-semibold mb-3">Contexto e Apresentação</h3>
-            <div className="space-y-5">
-
-              {/* 1. Headline do cenário */}
-              <div>
-                <Label className="text-xs">Headline do cenário (opcional)</Label>
-                <Input
-                  value={form.headline_cenario}
-                  onChange={e => setForm(f => ({ ...f, headline_cenario: e.target.value }))}
-                  placeholder="Ex: A regularização não é uma formalidade — é o que permite a empresa operar sem riscos."
-                />
-                <p className="text-[10px] text-muted-foreground mt-1">Se vazio, não aparecerá no PDF.</p>
-              </div>
-
-              {/* 2. Situação atual */}
-              <div>
-                <Label className="text-xs">Descreva a situação atual</Label>
-                <RichTextEditor
-                  value={form.contexto}
-                  onChange={(html) => setForm(f => ({ ...f, contexto: html }))}
-                  placeholder="Ex: Empresa sem Alvará Sanitário e sem CRM PJ. Atualmente em risco de interdição..."
-                  minHeight="100px"
-                />
-              </div>
-
-              {/* 3. Riscos da operação */}
-              <div>
-                <Label className="text-xs font-semibold">Riscos da operação sem regularização</Label>
-                <p className="text-[10px] text-muted-foreground mb-2">Deixe vazio se não houver riscos aplicáveis. Se vazio, o box de riscos NÃO aparecerá no PDF.</p>
-                <div className="space-y-2">
-                  {form.riscos.map((risco, idx) => (
-                    <div key={risco.id} className="flex items-start gap-2">
-                      <div className="flex-1 grid grid-cols-2 gap-2">
-                        <Input
-                          value={risco.penalidade}
-                          onChange={e => {
-                            const updated = [...form.riscos];
-                            updated[idx] = { ...updated[idx], penalidade: e.target.value };
-                            setForm(f => ({ ...f, riscos: updated }));
-                          }}
-                          placeholder="Penalidade (ex: Multa por autuação)"
-                          className="text-sm"
-                        />
-                        <Input
-                          value={risco.condicao || ''}
-                          onChange={e => {
-                            const updated = [...form.riscos];
-                            updated[idx] = { ...updated[idx], condicao: e.target.value };
-                            setForm(f => ({ ...f, riscos: updated }));
-                          }}
-                          placeholder="Condição/Valor (ex: R$ 5.000 a R$ 50.000)"
-                          className="text-sm"
-                        />
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => {
-                        setForm(f => ({ ...f, riscos: f.riscos.filter((_, i) => i !== idx) }));
-                      }}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" size="sm" className="mt-2 gap-1" onClick={() => {
-                  setForm(f => ({ ...f, riscos: [...f.riscos, { id: crypto.randomUUID(), penalidade: '', condicao: '' }] }));
-                }}>
-                  <Plus className="h-3 w-3" /> Adicionar risco
-                </Button>
-              </div>
-
-              {/* 4. Benefícios destacados na capa */}
-              <div>
-                <Label className="text-xs font-semibold">Benefícios destacados na capa</Label>
-                <p className="text-[10px] text-muted-foreground mb-2">Até 3 benefícios que aparecem na capa do PDF. Deixe vazio para não exibir.</p>
-                <div className="space-y-2">
-                  {form.beneficios_capa.map((ben, idx) => (
-                    <div key={ben.id} className="flex items-start gap-2">
-                      <div className="flex-1 grid grid-cols-2 gap-2">
-                        <Input
-                          value={ben.titulo}
-                          onChange={e => {
-                            const updated = [...form.beneficios_capa];
-                            updated[idx] = { ...updated[idx], titulo: e.target.value };
-                            setForm(f => ({ ...f, beneficios_capa: updated }));
-                          }}
-                          placeholder="Título (ex: Operação sem riscos)"
-                          maxLength={30}
-                          className="text-sm"
-                        />
-                        <Input
-                          value={ben.descricao}
-                          onChange={e => {
-                            const updated = [...form.beneficios_capa];
-                            updated[idx] = { ...updated[idx], descricao: e.target.value };
-                            setForm(f => ({ ...f, beneficios_capa: updated }));
-                          }}
-                          placeholder="Descrição (ex: Elimina risco de multas)"
-                          maxLength={80}
-                          className="text-sm"
-                        />
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => {
-                        setForm(f => ({ ...f, beneficios_capa: f.beneficios_capa.filter((_, i) => i !== idx) }));
-                      }}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2 gap-1"
-                  disabled={form.beneficios_capa.length >= 3}
-                  onClick={() => {
-                    setForm(f => ({ ...f, beneficios_capa: [...f.beneficios_capa, { id: crypto.randomUUID(), titulo: '', descricao: '' }] }));
-                  }}
-                >
-                  <Plus className="h-3 w-3" /> Adicionar benefício {form.beneficios_capa.length >= 3 && '(máx 3)'}
-                </Button>
-              </div>
-
-              {/* 5. Fluxo de execução */}
-              <div>
-                <Label className="text-xs font-semibold">Fluxo de execução</Label>
                 <p className="text-[10px] text-muted-foreground mb-2">Deixe vazio se não quiser incluir o fluxo visual no PDF.</p>
                 <div className="space-y-2">
                   {form.etapas_fluxo.map((etapa, idx) => (
@@ -914,12 +815,138 @@ export default function OrcamentoNovo() {
                 }}>
                   <Plus className="h-3 w-3" /> Adicionar etapa
                 </Button>
-              </div>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
-            </div>
-          </Card>
+          {/* SEÇÃO 8: Riscos (colapsável) */}
+          <Collapsible open={riscosOpen} onOpenChange={setRiscosOpen}>
+            <Card className="p-5">
+              <CollapsibleTrigger className="flex items-center justify-between w-full">
+                <h3 className="text-sm font-semibold">Riscos da Operação</h3>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", riscosOpen && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <p className="text-[10px] text-muted-foreground mb-2">Deixe vazio se não houver riscos aplicáveis. Se vazio, o box de riscos NÃO aparecerá no PDF.</p>
+                <div className="space-y-2">
+                  {form.riscos.map((risco, idx) => (
+                    <div key={risco.id} className="flex items-start gap-2">
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <Input
+                          value={risco.penalidade}
+                          onChange={e => {
+                            const updated = [...form.riscos];
+                            updated[idx] = { ...updated[idx], penalidade: e.target.value };
+                            setForm(f => ({ ...f, riscos: updated }));
+                          }}
+                          placeholder="Penalidade (ex: Multa por autuação)"
+                          className="text-sm"
+                        />
+                        <Input
+                          value={risco.condicao || ''}
+                          onChange={e => {
+                            const updated = [...form.riscos];
+                            updated[idx] = { ...updated[idx], condicao: e.target.value };
+                            setForm(f => ({ ...f, riscos: updated }));
+                          }}
+                          placeholder="Condição (ex: Até R$ 50.000)"
+                          className="text-sm"
+                        />
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => {
+                        setForm(f => ({ ...f, riscos: f.riscos.filter((_, i) => i !== idx) }));
+                      }}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="outline" size="sm" className="mt-2 gap-1" onClick={() => {
+                  setForm(f => ({ ...f, riscos: [...f.riscos, { id: crypto.randomUUID(), penalidade: '', condicao: '' }] }));
+                }}>
+                  <Plus className="h-3 w-3" /> Adicionar risco
+                </Button>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
-          {/* SEÇÃO 7: Condições */}
+          {/* SEÇÃO 9: Benefícios (colapsável) */}
+          <Collapsible open={beneficiosOpen} onOpenChange={setBeneficiosOpen}>
+            <Card className="p-5">
+              <CollapsibleTrigger className="flex items-center justify-between w-full">
+                <h3 className="text-sm font-semibold">Benefícios da Capa</h3>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", beneficiosOpen && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <p className="text-[10px] text-muted-foreground mb-2">Até 3 benefícios que aparecem na capa do PDF. Deixe vazio para não exibir.</p>
+                <div className="space-y-2">
+                  {form.beneficios_capa.map((ben, idx) => (
+                    <div key={ben.id} className="flex items-start gap-2">
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <Input
+                          value={ben.titulo}
+                          onChange={e => {
+                            const updated = [...form.beneficios_capa];
+                            updated[idx] = { ...updated[idx], titulo: e.target.value };
+                            setForm(f => ({ ...f, beneficios_capa: updated }));
+                          }}
+                          placeholder="Título (ex: Operação sem riscos)"
+                          maxLength={30}
+                          className="text-sm"
+                        />
+                        <Input
+                          value={ben.descricao}
+                          onChange={e => {
+                            const updated = [...form.beneficios_capa];
+                            updated[idx] = { ...updated[idx], descricao: e.target.value };
+                            setForm(f => ({ ...f, beneficios_capa: updated }));
+                          }}
+                          placeholder="Descrição (ex: Elimina risco de multas)"
+                          maxLength={80}
+                          className="text-sm"
+                        />
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => {
+                        setForm(f => ({ ...f, beneficios_capa: f.beneficios_capa.filter((_, i) => i !== idx) }));
+                      }}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2 gap-1"
+                  disabled={form.beneficios_capa.length >= 3}
+                  onClick={() => {
+                    setForm(f => ({ ...f, beneficios_capa: [...f.beneficios_capa, { id: crypto.randomUUID(), titulo: '', descricao: '' }] }));
+                  }}
+                >
+                  <Plus className="h-3 w-3" /> Adicionar benefício {form.beneficios_capa.length >= 3 && '(máx 3)'}
+                </Button>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
+          {/* SEÇÃO 10: Pacotes (colapsável) */}
+          <Collapsible open={pacotesOpen} onOpenChange={setPacotesOpen}>
+            <Card className="p-5">
+              <CollapsibleTrigger className="flex items-center justify-between w-full">
+                <h3 className="text-sm font-semibold">Pacotes</h3>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", pacotesOpen && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <PacotesEditor
+                  pacotes={form.pacotes}
+                  itens={form.itens}
+                  onChange={pacotes => setForm(f => ({ ...f, pacotes }))}
+                />
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
+          {/* SEÇÃO 11: Condições */}
           <Card className="p-5">
             <h3 className="text-sm font-semibold mb-3">Condições</h3>
             <div className="space-y-3">
