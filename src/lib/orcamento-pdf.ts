@@ -652,7 +652,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
               const labelWeight = isLast ? '700' : '600';
               return `
                 <div style="flex: 1; text-align: center; max-width: 180px; flex-shrink: 1; min-width: 0;">
-                  <div style="width: 32px; height: 32px; background: ${circleBg}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${circleColor}; margin: 0 auto 6px auto;">${circleContent}</div>
+                  <div style="width: 32px; height: 32px; background: ${circleBg}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${circleColor}; margin: 0 auto 6px auto; line-height: 1; text-align: center;">${circleContent}</div>
                   <div style="font-weight: ${labelWeight}; font-size: 10px; color: #111827; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">${esc(etapa.nome)}</div>
                   ${etapa.prazo ? `<div style="font-size: 9px; color: #6b7280; margin-top: 4px; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">${esc(etapa.prazo)}</div>` : ''}
                 </div>
@@ -852,7 +852,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             const textColor = isLast ? (useBlueTheme ? '#93c5fd' : '#86efac') : 'white';
             return `
               <div style="flex: 1; text-align: center; max-width: 180px; flex-shrink: 1; min-width: 0;">
-                <div style="width: 32px; height: 32px; background: ${bgColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${textColor}; margin: 0 auto 6px auto;">${circleContent}</div>
+                <div style="width: 32px; height: 32px; background: ${bgColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${isLast ? '11' : '13'}px; font-weight: 700; color: ${textColor}; margin: 0 auto 6px auto; line-height: 1; text-align: center;">${circleContent}</div>
                 <div style="font-weight: 600; font-size: 10px; color: #111827; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">${esc(etapa.nome)}</div>
                 ${etapa.prazo ? `<div style="font-size: 9px; color: #6b7280; margin-top: 4px; line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">${esc(etapa.prazo)}</div>` : ''}
               </div>
