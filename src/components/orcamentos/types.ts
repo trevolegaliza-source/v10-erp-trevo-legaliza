@@ -94,6 +94,7 @@ export interface OrcamentoForm {
   beneficios_capa: BeneficioCapa[];
   etapas_fluxo: EtapaFluxo[];
   cenarios: CenarioOrcamento[];
+  senha_link: string;
 }
 
 export const DEFAULT_SECOES: OrcamentoSecao[] = [

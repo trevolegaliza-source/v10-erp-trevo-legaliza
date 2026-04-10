@@ -1,18 +1,25 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, CheckCircle, XCircle, Lock } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { normalizeItem, type OrcamentoItem, type CenarioOrcamento } from '@/components/orcamentos/types';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+const anonHeaders = {
+  'apikey': SUPABASE_KEY,
+  'Authorization': `Bearer ${SUPABASE_KEY}`,
+  'Content-Type': 'application/json',
+};
+
+// Inline style helpers — no Tailwind theme dependency
+const cardStyle: React.CSSProperties = { background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' };
+const cardPad: React.CSSProperties = { padding: '24px' };
+const muted: React.CSSProperties = { color: '#6b7280' };
+const fg: React.CSSProperties = { color: '#1a1a2e' };
 
 export default function PropostaPublica() {
   const { token } = useParams<{ token: string }>();
@@ -20,7 +27,7 @@ export default function PropostaPublica() {
   const [error, setError] = useState<string | null>(null);
   const [orc, setOrc] = useState<any>(null);
   const [itens, setItens] = useState<OrcamentoItem[]>([]);
-  
+
   const [senhaRequerida, setSenhaRequerida] = useState(false);
   const [senhaInput, setSenhaInput] = useState('');
   const [senhaErro, setSenhaErro] = useState(false);
@@ -32,56 +39,75 @@ export default function PropostaPublica() {
   const [processando, setProcessando] = useState(false);
   const [statusFinal, setStatusFinal] = useState<'aprovado' | 'recusado' | null>(null);
 
+  // Force light theme on public page
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
+    return () => {
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
+    };
+  }, []);
+
+  // Load proposal via raw fetch (bypass AuthContext)
   useEffect(() => {
     if (!token) { setError('Link inválido'); setLoading(false); return; }
     (async () => {
-      const { data, error: err } = await supabase
-        .from('orcamentos')
-        .select('*')
-        .eq('share_token', token)
-        .maybeSingle();
-      
-      if (err || !data) {
-        setError('Proposta não encontrada ou link expirado.');
-        setLoading(false);
-        return;
-      }
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/orcamentos?share_token=eq.${token}&select=*`,
+          { headers: anonHeaders }
+        );
+        if (!response.ok) { setError('Erro ao carregar proposta.'); setLoading(false); return; }
 
-      const orcData = data as any;
-
-      if (orcData.validade_dias && orcData.created_at) {
-        const criacao = new Date(orcData.created_at);
-        const expira = new Date(criacao.getTime() + orcData.validade_dias * 86400000);
-        if (new Date() > expira) {
-          setError('Esta proposta expirou. Entre em contato para solicitar uma nova.');
+        const results = await response.json();
+        if (!results || results.length === 0) {
+          setError('Proposta não encontrada ou link expirado.');
           setLoading(false);
           return;
         }
+
+        const orcData = results[0];
+
+        if (orcData.validade_dias && orcData.created_at) {
+          const criacao = new Date(orcData.created_at);
+          const expira = new Date(criacao.getTime() + orcData.validade_dias * 86400000);
+          if (new Date() > expira) {
+            setError('Esta proposta expirou. Entre em contato para solicitar uma nova.');
+            setLoading(false);
+            return;
+          }
+        }
+
+        if (['aguardando_pagamento', 'convertido'].includes(orcData.status)) {
+          setStatusFinal('aprovado');
+        } else if (orcData.status === 'recusado') {
+          setStatusFinal('recusado');
+        }
+
+        if (orcData.destinatario === 'contador' && orcData.senha_link) {
+          setSenhaRequerida(true);
+        } else {
+          setAutenticado(true);
+        }
+
+        const rawItens = Array.isArray(orcData.servicos) ? orcData.servicos.map(normalizeItem) : [];
+        setItens(rawItens);
+        setOrc(orcData);
+
+        // Log view event (fire-and-forget)
+        fetch(`${SUPABASE_URL}/rest/v1/proposta_eventos`, {
+          method: 'POST',
+          headers: anonHeaders,
+          body: JSON.stringify({ orcamento_id: orcData.id, tipo: 'visualizou', dados: { token } }),
+        }).catch(() => {});
+
+        setLoading(false);
+      } catch (err) {
+        console.error(err);
+        setError('Erro ao carregar proposta.');
+        setLoading(false);
       }
-
-      if (['aguardando_pagamento', 'convertido'].includes(orcData.status)) {
-        setStatusFinal('aprovado');
-      } else if (orcData.status === 'recusado') {
-        setStatusFinal('recusado');
-      }
-
-      if (orcData.destinatario === 'contador' && orcData.senha_link) {
-        setSenhaRequerida(true);
-      } else {
-        setAutenticado(true);
-      }
-
-      const rawItens = Array.isArray(orcData.servicos) ? orcData.servicos.map(normalizeItem) : [];
-      setItens(rawItens);
-      setOrc(orcData);
-
-      await supabase.from('proposta_eventos').insert({
-        orcamento_id: orcData.id,
-        tipo: 'visualizou',
-        dados: { token },
-      } as any);
-
-      setLoading(false);
     })();
   }, [token]);
 
@@ -97,9 +123,8 @@ export default function PropostaPublica() {
   const modoPDF = orc?.destinatario === 'cliente_direto' ? 'direto' : orc?.destinatario === 'cliente_via_contador' ? 'cliente' : 'contador';
   const isContador = modoPDF === 'contador';
   const accentColor = isContador ? '#22c55e' : '#3b82f6';
-
   const escritorioNome = orc?.escritorio_nome || '';
-  
+
   const cenarios: CenarioOrcamento[] = Array.isArray(orc?.cenarios) ? orc.cenarios : [];
   const temCenarios = cenarios.length > 0;
 
@@ -112,25 +137,28 @@ export default function PropostaPublica() {
   async function handleAprovar() {
     setProcessando(true);
     try {
-      await supabase.from('orcamentos')
-        .update({ 
-          status: 'aguardando_pagamento', 
-          aprovado_em: new Date().toISOString() 
-        } as any)
-        .eq('id', orc.id);
+      await fetch(`${SUPABASE_URL}/rest/v1/orcamentos?id=eq.${orc.id}`, {
+        method: 'PATCH',
+        headers: { ...anonHeaders, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ status: 'aguardando_pagamento', aprovado_em: new Date().toISOString() }),
+      });
 
-      await supabase.from('notificacoes').insert({
-        tipo: 'aprovacao',
-        titulo: '🟢 PROPOSTA APROVADA',
-        mensagem: `${orc.prospect_nome} aprovou a proposta #${String(orc.numero).padStart(3, '0')} no valor de ${fmt(total)}. Aguardando pagamento.`,
-        orcamento_id: orc.id,
-      } as any);
+      await fetch(`${SUPABASE_URL}/rest/v1/notificacoes`, {
+        method: 'POST',
+        headers: anonHeaders,
+        body: JSON.stringify({
+          tipo: 'aprovacao',
+          titulo: '🟢 PROPOSTA APROVADA',
+          mensagem: `${orc.prospect_nome} aprovou a proposta #${String(orc.numero).padStart(3, '0')} no valor de ${fmt(total)}. Aguardando pagamento.`,
+          orcamento_id: orc.id,
+        }),
+      });
 
-      await supabase.from('proposta_eventos').insert({
-        orcamento_id: orc.id,
-        tipo: 'aprovou',
-        dados: { total, itens_count: itens.length },
-      } as any);
+      fetch(`${SUPABASE_URL}/rest/v1/proposta_eventos`, {
+        method: 'POST',
+        headers: anonHeaders,
+        body: JSON.stringify({ orcamento_id: orc.id, tipo: 'aprovou', dados: { total, itens_count: itens.length } }),
+      }).catch(() => {});
 
       setStatusFinal('aprovado');
       setShowAprovacao(false);
@@ -145,26 +173,28 @@ export default function PropostaPublica() {
     if (!motivoRecusa.trim()) return;
     setProcessando(true);
     try {
-      await supabase.from('orcamentos')
-        .update({ 
-          status: 'recusado', 
-          recusado_em: new Date().toISOString(),
-          observacoes_recusa: motivoRecusa 
-        } as any)
-        .eq('id', orc.id);
+      await fetch(`${SUPABASE_URL}/rest/v1/orcamentos?id=eq.${orc.id}`, {
+        method: 'PATCH',
+        headers: { ...anonHeaders, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ status: 'recusado', recusado_em: new Date().toISOString(), observacoes_recusa: motivoRecusa }),
+      });
 
-      await supabase.from('notificacoes').insert({
-        tipo: 'recusa',
-        titulo: '🔴 PROPOSTA RECUSADA',
-        mensagem: `${orc.prospect_nome} recusou a proposta #${String(orc.numero).padStart(3, '0')}. Motivo: ${motivoRecusa}`,
-        orcamento_id: orc.id,
-      } as any);
+      await fetch(`${SUPABASE_URL}/rest/v1/notificacoes`, {
+        method: 'POST',
+        headers: anonHeaders,
+        body: JSON.stringify({
+          tipo: 'recusa',
+          titulo: '🔴 PROPOSTA RECUSADA',
+          mensagem: `${orc.prospect_nome} recusou a proposta #${String(orc.numero).padStart(3, '0')}. Motivo: ${motivoRecusa}`,
+          orcamento_id: orc.id,
+        }),
+      });
 
-      await supabase.from('proposta_eventos').insert({
-        orcamento_id: orc.id,
-        tipo: 'recusou',
-        dados: { motivo: motivoRecusa },
-      } as any);
+      fetch(`${SUPABASE_URL}/rest/v1/proposta_eventos`, {
+        method: 'POST',
+        headers: anonHeaders,
+        body: JSON.stringify({ orcamento_id: orc.id, tipo: 'recusou', dados: { motivo: motivoRecusa } }),
+      }).catch(() => {});
 
       setStatusFinal('recusado');
       setShowRecusa(false);
@@ -175,179 +205,199 @@ export default function PropostaPublica() {
     }
   }
 
+  // ─── LOADING ───
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+        <Loader2 style={{ height: 32, width: 32, color: '#9ca3af' }} className="animate-spin" />
       </div>
     );
   }
 
+  // ─── ERROR ───
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="p-8 text-center">
-            <XCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <h2 className="text-lg font-bold mb-2">Proposta Indisponível</h2>
-            <p className="text-sm text-muted-foreground">{error}</p>
-          </CardContent>
-        </Card>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: 16 }}>
+        <div style={{ ...cardStyle, maxWidth: 448, width: '100%' }}>
+          <div style={{ ...cardPad, textAlign: 'center' }}>
+            <XCircle style={{ height: 48, width: 48, color: '#dc2626', margin: '0 auto 16px' }} />
+            <h2 style={{ ...fg, fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Proposta Indisponível</h2>
+            <p style={{ ...muted, fontSize: 14 }}>{error}</p>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // ─── PASSWORD SCREEN ───
   if (senhaRequerida && !autenticado) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <Card className="max-w-sm w-full">
-          <CardContent className="p-8">
-            <div className="text-center mb-6">
-              <Lock className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <h2 className="text-lg font-bold">Acesso Protegido</h2>
-              <p className="text-sm text-muted-foreground mt-1">Insira a senha para acessar esta proposta.</p>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: 16 }}>
+        <div style={{ ...cardStyle, maxWidth: 384, width: '100%' }}>
+          <div style={cardPad}>
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <Lock style={{ height: 40, width: 40, color: '#6b7280', margin: '0 auto 12px' }} />
+              <h2 style={{ ...fg, fontSize: 18, fontWeight: 700 }}>Acesso Protegido</h2>
+              <p style={{ ...muted, fontSize: 14, marginTop: 4 }}>Insira a senha para acessar esta proposta.</p>
             </div>
-            <div className="space-y-3">
-              <Input 
-                type="password" 
-                placeholder="Senha" 
-                value={senhaInput} 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input
+                type="password"
+                placeholder="Senha"
+                value={senhaInput}
                 onChange={e => { setSenhaInput(e.target.value); setSenhaErro(false); }}
                 onKeyDown={e => e.key === 'Enter' && verificarSenha()}
+                style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', color: '#1a1a2e' }}
               />
-              {senhaErro && <p className="text-xs text-destructive">Senha incorreta.</p>}
-              <Button className="w-full" onClick={verificarSenha}>Acessar Proposta</Button>
+              {senhaErro && <p style={{ fontSize: 12, color: '#dc2626' }}>Senha incorreta.</p>}
+              <button
+                onClick={verificarSenha}
+                style={{ padding: '10px 16px', background: accentColor, color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 14, border: 'none', cursor: 'pointer' }}
+              >
+                Acessar Proposta
+              </button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // ─── STATUS FINAL ───
   if (statusFinal) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="p-8 text-center">
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: 16 }}>
+        <div style={{ ...cardStyle, maxWidth: 448, width: '100%' }}>
+          <div style={{ ...cardPad, textAlign: 'center' }}>
             {statusFinal === 'aprovado' ? (
               <>
-                <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-emerald-700 mb-2">Proposta Aprovada!</h2>
-                <p className="text-sm text-muted-foreground">
+                <CheckCircle style={{ height: 64, width: 64, color: '#22c55e', margin: '0 auto 16px' }} />
+                <h2 style={{ fontSize: 20, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>Proposta Aprovada!</h2>
+                <p style={{ ...muted, fontSize: 14 }}>
                   Obrigado por aprovar. Nossa equipe entrará em contato para os próximos passos.
                 </p>
               </>
             ) : (
               <>
-                <XCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-destructive mb-2">Proposta Recusada</h2>
-                <p className="text-sm text-muted-foreground">
+                <XCircle style={{ height: 64, width: 64, color: '#dc2626', margin: '0 auto 16px' }} />
+                <h2 style={{ fontSize: 20, fontWeight: 700, color: '#dc2626', marginBottom: 8 }}>Proposta Recusada</h2>
+                <p style={{ ...muted, fontSize: 14 }}>
                   Recebemos sua resposta. Caso mude de ideia, este link ainda estará disponível durante o prazo de validade.
                 </p>
                 {orc?.status === 'recusado' && (
-                  <Button className="mt-4" variant="outline" onClick={() => setStatusFinal(null)}>
+                  <button
+                    style={{ marginTop: 16, padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14, color: '#1a1a2e' }}
+                    onClick={() => setStatusFinal(null)}
+                  >
                     Revisar proposta novamente
-                  </Button>
+                  </button>
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // ─── MAIN PROPOSAL ───
   const riscos = Array.isArray(orc?.riscos) ? orc.riscos : [];
   const etapasFluxo = Array.isArray(orc?.etapas_fluxo) ? orc.etapas_fluxo : [];
   const contexto = orc?.contexto || '';
   const headline = orc?.headline_cenario || '';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div style={{ background: isContador ? 'linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%)' : 'linear-gradient(135deg, #1e293b 0%, #334155 100%)' }} className="px-6 py-4 text-white">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div className="font-bold text-lg">
+    <div style={{ minHeight: '100vh', background: '#f8fafc', colorScheme: 'light' }} data-theme="light">
+      {/* HEADER */}
+      <div style={{ background: isContador ? 'linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%)' : 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', padding: '16px 24px', color: '#fff' }}>
+        <div style={{ maxWidth: 768, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontWeight: 700, fontSize: 18 }}>
             {isContador ? '🍀 Trevo Legaliza' : (escritorioNome || '🍀 Trevo Legaliza')}
           </div>
-          <div className="text-right text-sm opacity-70">
+          <div style={{ textAlign: 'right', fontSize: 14, opacity: 0.7 }}>
             Proposta #{String(orc?.numero || 0).padStart(3, '0')}
           </div>
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-        
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2">Proposta Comercial</p>
-            <h1 className="text-2xl font-bold mb-1">{orc?.prospect_nome}</h1>
-            {orc?.prospect_cnpj && <p className="text-sm text-muted-foreground">CNPJ: {orc.prospect_cnpj}</p>}
-            
-            <div className="mt-6 inline-block px-8 py-4 rounded-xl" style={{ background: isContador ? '#f0fdf4' : '#eff6ff', border: `2px solid ${accentColor}` }}>
-              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: accentColor }}>Investimento Estimado</p>
-              <p className="text-3xl font-black" style={{ color: accentColor }}>
-                {totalTaxaMin > 0 || totalTaxaMax > 0 
+      <div style={{ maxWidth: 768, margin: '0 auto', padding: '32px 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+        {/* CAPA */}
+        <div style={cardStyle}>
+          <div style={{ ...cardPad, textAlign: 'center' }}>
+            <p style={{ ...muted, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Proposta Comercial</p>
+            <h1 style={{ ...fg, fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{orc?.prospect_nome}</h1>
+            {orc?.prospect_cnpj && <p style={{ ...muted, fontSize: 14 }}>CNPJ: {orc.prospect_cnpj}</p>}
+
+            <div style={{ marginTop: 24, display: 'inline-block', padding: '16px 32px', borderRadius: 12, background: isContador ? '#f0fdf4' : '#eff6ff', border: `2px solid ${accentColor}` }}>
+              <p style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, color: accentColor }}>Investimento Estimado</p>
+              <p style={{ fontSize: 28, fontWeight: 900, color: accentColor }}>
+                {totalTaxaMin > 0 || totalTaxaMax > 0
                   ? `${fmt(total + totalTaxaMin)} a ${fmt(total + totalTaxaMax)}`
                   : fmt(total)
                 }
               </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
+        {/* CONTEXTO */}
         {contexto && (
-          <Card>
-            <CardContent className="p-6">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Cenário e Oportunidade</h2>
-              {headline && <p className="font-semibold text-base mb-3">{headline}</p>}
-              <div className="bg-gray-50 rounded-xl p-4 text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: contexto }} />
-            </CardContent>
-          </Card>
+          <div style={cardStyle}>
+            <div style={cardPad}>
+              <h2 style={{ ...muted, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Cenário e Oportunidade</h2>
+              {headline && <p style={{ ...fg, fontWeight: 600, fontSize: 16, marginBottom: 12 }}>{headline}</p>}
+              <div style={{ background: '#f8fafc', borderRadius: 12, padding: 16, fontSize: 14, lineHeight: 1.6, color: '#374151' }} dangerouslySetInnerHTML={{ __html: contexto }} />
+            </div>
+          </div>
         )}
 
+        {/* RISCOS */}
         {riscos.length > 0 && (
-          <Card className="border-red-200 bg-red-50/50">
-            <CardContent className="p-6">
-              <h2 className="text-sm font-bold text-red-800 mb-3">⛔ Riscos da Operação Sem Regularização</h2>
-              <ul className="space-y-2">
+          <div style={{ ...cardStyle, borderColor: '#fecaca', background: '#fef2f2' }}>
+            <div style={cardPad}>
+              <h2 style={{ fontSize: 13, fontWeight: 700, color: '#991b1b', marginBottom: 12 }}>⛔ Riscos da Operação Sem Regularização</h2>
+              <ul style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {riscos.map((r: any) => (
-                  <li key={r.id} className="text-sm text-red-700">
+                  <li key={r.id} style={{ fontSize: 14, color: '#b91c1c' }}>
                     • {r.penalidade}{r.condicao ? `: ${r.condicao}` : ''}
                   </li>
                 ))}
               </ul>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
+        {/* FLUXO */}
         {etapasFluxo.length > 0 && (
-          <Card>
-            <CardContent className="p-6">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Fluxo de Execução</h2>
-              <div className="flex items-start gap-2 overflow-x-auto pb-2">
+          <div style={cardStyle}>
+            <div style={cardPad}>
+              <h2 style={{ ...muted, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>Fluxo de Execução</h2>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, overflowX: 'auto', paddingBottom: 8 }}>
                 {etapasFluxo.map((e: any, i: number) => (
-                  <div key={e.id} className="flex items-start gap-2">
-                    <div className="flex flex-col items-center text-center min-w-[100px]">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ background: accentColor }}>
+                  <div key={e.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', minWidth: 100 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, background: accentColor }}>
                         {i === etapasFluxo.length - 1 ? '✓' : i + 1}
                       </div>
-                      <p className="text-xs font-medium mt-2 leading-tight">{e.nome}</p>
-                      {e.prazo && <p className="text-[10px] text-muted-foreground mt-1">{e.prazo}</p>}
+                      <p style={{ fontSize: 12, fontWeight: 500, marginTop: 8, lineHeight: 1.3, color: '#374151' }}>{e.nome}</p>
+                      {e.prazo && <p style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>{e.prazo}</p>}
                     </div>
                     {i < etapasFluxo.length - 1 && (
-                      <div className="text-muted-foreground mt-2 text-lg">→</div>
+                      <div style={{ color: '#9ca3af', marginTop: 8, fontSize: 18 }}>→</div>
                     )}
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Escopo dos Serviços</h2>
-            <div className="space-y-3">
+        {/* ITENS */}
+        <div style={cardStyle}>
+          <div style={cardPad}>
+            <h2 style={{ ...muted, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>Escopo dos Serviços</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {itens.filter(i => i.descricao.trim()).map((item, idx) => {
                 const valorExibido = isContador ? item.honorario : (item.honorario_minimo_contador || item.honorario);
                 const valorTotal = valorExibido * item.quantidade;
@@ -356,61 +406,62 @@ export default function PropostaPublica() {
                 const cenarioIdx = cenario ? cenarios.indexOf(cenario) : -1;
 
                 return (
-                  <div key={item.id} className="border rounded-xl overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-3" style={{ background: isContador ? '#f0fdf4' : '#eff6ff' }}>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-bold">{idx + 1}.</span>
-                        <span className="text-sm font-semibold">{item.descricao}</span>
+                  <div key={item.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: isContador ? '#f0fdf4' : '#eff6ff' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>{idx + 1}.</span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#1a1a2e' }}>{item.descricao}</span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         {cenario && (
-                          <Badge variant="outline" className="text-xs">{String.fromCharCode(65 + cenarioIdx)}</Badge>
+                          <span style={{ fontSize: 12, padding: '2px 6px', border: '1px solid #d1d5db', borderRadius: 4, color: '#374151' }}>{String.fromCharCode(65 + cenarioIdx)}</span>
                         )}
                         {item.isOptional && (
-                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">Opcional</Badge>
+                          <span style={{ fontSize: 12, padding: '2px 6px', border: '1px solid #fcd34d', borderRadius: 4, color: '#d97706' }}>Opcional</span>
                         )}
-                        <span className="font-bold text-sm">{fmt(valorTotal)}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e' }}>{fmt(valorTotal)}</span>
                       </div>
                     </div>
                     {item.detalhes && (
-                      <div className="px-4 py-2 text-xs text-muted-foreground border-t" dangerouslySetInnerHTML={{ __html: item.detalhes }} />
+                      <div style={{ padding: '8px 16px', fontSize: 12, color: '#6b7280', borderTop: '1px solid #e2e8f0' }} dangerouslySetInnerHTML={{ __html: item.detalhes }} />
                     )}
                     {(item.prazo || hasTaxa) && (
-                      <div className="px-4 py-2 border-t bg-gray-50 text-xs text-muted-foreground flex justify-between">
+                      <div style={{ padding: '8px 16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', fontSize: 12, color: '#6b7280', display: 'flex', justifyContent: 'space-between' }}>
                         {item.prazo && <span>Prazo: {item.prazo}</span>}
-                        {hasTaxa && <span className="text-amber-600">Taxas: {fmt(item.taxa_min)} a {fmt(item.taxa_max)}</span>}
+                        {hasTaxa && <span style={{ color: '#d97706' }}>Taxas: {fmt(item.taxa_min)} a {fmt(item.taxa_max)}</span>}
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Resumo do Investimento</h2>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Honorários</span>
-                <span className="font-medium">{fmt(subtotal)}</span>
+        {/* RESUMO */}
+        <div style={cardStyle}>
+          <div style={cardPad}>
+            <h2 style={{ ...muted, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>Resumo do Investimento</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                <span style={muted}>Honorários</span>
+                <span style={{ ...fg, fontWeight: 500 }}>{fmt(subtotal)}</span>
               </div>
               {orc?.desconto_pct > 0 && (
-                <div className="flex justify-between text-sm text-red-600">
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#dc2626' }}>
                   <span>Desconto ({orc.desconto_pct}%)</span>
                   <span>- {fmt(desconto)}</span>
                 </div>
               )}
               {(totalTaxaMin > 0 || totalTaxaMax > 0) && (
-                <div className="flex justify-between text-sm text-amber-600">
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#d97706' }}>
                   <span>Taxas estimadas</span>
                   <span>{fmt(totalTaxaMin)} a {fmt(totalTaxaMax)}</span>
                 </div>
               )}
-              <div className="flex justify-between items-center pt-3 mt-2 border-t-2 rounded-xl px-4 py-3" style={{ background: isContador ? '#f0fdf4' : '#eff6ff', borderColor: accentColor }}>
-                <span className="text-sm font-bold uppercase" style={{ color: accentColor }}>Total</span>
-                <span className="text-2xl font-black" style={{ color: accentColor }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', marginTop: 8, borderRadius: 12, background: isContador ? '#f0fdf4' : '#eff6ff', borderTop: `2px solid ${accentColor}` }}>
+                <span style={{ fontSize: 14, fontWeight: 700, textTransform: 'uppercase', color: accentColor }}>Total</span>
+                <span style={{ fontSize: 24, fontWeight: 900, color: accentColor }}>
                   {totalTaxaMin > 0 || totalTaxaMax > 0
                     ? `${fmt(total + totalTaxaMin)} a ${fmt(total + totalTaxaMax)}`
                     : fmt(total)
@@ -418,126 +469,144 @@ export default function PropostaPublica() {
                 </span>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Condições</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-[10px] text-muted-foreground uppercase">Validade</p>
-                <p className="text-sm font-semibold">{orc?.validade_dias} dias</p>
+        {/* CONDIÇÕES */}
+        <div style={cardStyle}>
+          <div style={cardPad}>
+            <h2 style={{ ...muted, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>Condições</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12 }}>
+                <p style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase' }}>Validade</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1a2e' }}>{orc?.validade_dias} dias</p>
               </div>
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-[10px] text-muted-foreground uppercase">Pagamento</p>
-                <p className="text-sm font-semibold">{orc?.pagamento || 'A combinar'}</p>
+              <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12 }}>
+                <p style={{ fontSize: 10, color: '#9ca3af', textTransform: 'uppercase' }}>Pagamento</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1a2e' }}>{orc?.pagamento || 'A combinar'}</p>
               </div>
             </div>
             {orc?.observacoes && (
-              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <p className="text-xs text-amber-800" dangerouslySetInnerHTML={{ __html: orc.observacoes }} />
+              <div style={{ marginTop: 12, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: 12 }}>
+                <p style={{ fontSize: 12, color: '#92400e' }} dangerouslySetInnerHTML={{ __html: orc.observacoes }} />
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
+        {/* ACTION BUTTONS */}
         {orc?.status === 'enviado' && (
-          <div className="flex gap-3">
-            <Button 
-              className="flex-1 h-14 text-base font-bold gap-2"
-              style={{ background: accentColor }}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              style={{ flex: 1, height: 56, fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: accentColor, color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer' }}
               onClick={() => setShowAprovacao(true)}
             >
-              <CheckCircle className="h-5 w-5" /> Aprovar Proposta
-            </Button>
-            <Button 
-              variant="outline" 
-              className="h-14 px-6 text-base text-destructive border-destructive/30 hover:bg-destructive/5"
+              <CheckCircle style={{ height: 20, width: 20 }} /> Aprovar Proposta
+            </button>
+            <button
+              style={{ height: 56, padding: '0 24px', fontSize: 16, color: '#dc2626', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 12, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
               onClick={() => setShowRecusa(true)}
             >
-              <XCircle className="h-5 w-5" />
-            </Button>
+              <XCircle style={{ height: 20, width: 20 }} />
+            </button>
           </div>
         )}
 
         {orc?.status === 'recusado' && (
-          <div className="flex gap-3">
-            <Button 
-              className="flex-1 h-14 text-base font-bold gap-2"
-              style={{ background: accentColor }}
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              style={{ flex: 1, height: 56, fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: accentColor, color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer' }}
               onClick={() => setShowAprovacao(true)}
             >
-              <CheckCircle className="h-5 w-5" /> Aprovar Proposta (mudei de ideia)
-            </Button>
+              <CheckCircle style={{ height: 20, width: 20 }} /> Aprovar Proposta (mudei de ideia)
+            </button>
           </div>
         )}
 
-        <div className="text-center pt-6 pb-8 border-t text-xs text-muted-foreground">
+        {/* FOOTER */}
+        <div style={{ textAlign: 'center', paddingTop: 24, paddingBottom: 32, borderTop: '1px solid #e2e8f0', fontSize: 12, color: '#9ca3af' }}>
           <p>Trevo Legaliza · CNPJ 39.969.412/0001-70</p>
-          <p className="mt-1">(11) 93492-7001 · administrativo@trevolegaliza.com.br</p>
+          <p style={{ marginTop: 4 }}>(11) 93492-7001 · administrativo@trevolegaliza.com.br</p>
         </div>
       </div>
 
-      <Dialog open={showAprovacao} onOpenChange={setShowAprovacao}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Confirmar Aprovação</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-              <p className="text-sm text-green-800 font-medium">Valor total da proposta</p>
-              <p className="text-2xl font-black text-green-700 mt-1">
-                {totalTaxaMin > 0 || totalTaxaMax > 0
-                  ? `${fmt(total + totalTaxaMin)} a ${fmt(total + totalTaxaMax)}`
-                  : fmt(total)
-                }
+      {/* MODAL APROVAÇÃO */}
+      {showAprovacao && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ ...cardStyle, maxWidth: 448, width: '100%' }}>
+            <div style={cardPad}>
+              <h3 style={{ ...fg, fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Confirmar Aprovação</h3>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 16, textAlign: 'center', marginBottom: 16 }}>
+                <p style={{ fontSize: 14, color: '#166534', fontWeight: 500 }}>Valor total da proposta</p>
+                <p style={{ fontSize: 24, fontWeight: 900, color: '#15803d', marginTop: 4 }}>
+                  {totalTaxaMin > 0 || totalTaxaMax > 0
+                    ? `${fmt(total + totalTaxaMin)} a ${fmt(total + totalTaxaMax)}`
+                    : fmt(total)
+                  }
+                </p>
+                <p style={{ fontSize: 12, color: '#16a34a', marginTop: 4 }}>{itens.length} serviços incluídos</p>
+              </div>
+              <p style={{ ...muted, fontSize: 14, textAlign: 'center', marginBottom: 16 }}>
+                Ao aprovar, nossa equipe será notificada e entrará em contato para os próximos passos.
               </p>
-              <p className="text-xs text-green-600 mt-1">{itens.length} serviços incluídos</p>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  onClick={() => setShowAprovacao(false)}
+                  disabled={processando}
+                  style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14, color: '#374151' }}
+                >Cancelar</button>
+                <button
+                  onClick={handleAprovar}
+                  disabled={processando}
+                  style={{ padding: '8px 16px', background: '#16a34a', color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 14, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, opacity: processando ? 0.7 : 1 }}
+                >
+                  {processando ? <Loader2 style={{ height: 16, width: 16 }} className="animate-spin" /> : <CheckCircle style={{ height: 16, width: 16 }} />}
+                  Confirmar Aprovação
+                </button>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground text-center">
-              Ao aprovar, nossa equipe será notificada e entrará em contato para os próximos passos.
-            </p>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAprovacao(false)} disabled={processando}>Cancelar</Button>
-            <Button onClick={handleAprovar} disabled={processando} className="bg-green-600 hover:bg-green-700">
-              {processando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-              Confirmar Aprovação
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      <Dialog open={showRecusa} onOpenChange={setShowRecusa}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Recusar Proposta</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Lamentamos. Por favor, nos diga o motivo para que possamos melhorar nossas propostas.
-            </p>
-            <div>
-              <Label className="text-sm">Motivo da recusa *</Label>
-              <Textarea 
-                value={motivoRecusa} 
-                onChange={e => setMotivoRecusa(e.target.value)} 
-                placeholder="Ex: Valor acima do orçamento, optamos por outro fornecedor, etc."
-                rows={3}
-                className="mt-1"
-              />
+      {/* MODAL RECUSA */}
+      {showRecusa && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ ...cardStyle, maxWidth: 448, width: '100%' }}>
+            <div style={cardPad}>
+              <h3 style={{ ...fg, fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Recusar Proposta</h3>
+              <p style={{ ...muted, fontSize: 14, marginBottom: 16 }}>
+                Lamentamos. Por favor, nos diga o motivo para que possamos melhorar nossas propostas.
+              </p>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>Motivo da recusa *</label>
+                <textarea
+                  value={motivoRecusa}
+                  onChange={e => setMotivoRecusa(e.target.value)}
+                  placeholder="Ex: Valor acima do orçamento, optamos por outro fornecedor, etc."
+                  rows={3}
+                  style={{ width: '100%', marginTop: 4, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, resize: 'vertical', outline: 'none', color: '#1a1a2e' }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  onClick={() => setShowRecusa(false)}
+                  disabled={processando}
+                  style={{ padding: '8px 16px', border: '1px solid #d1d5db', borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 14, color: '#374151' }}
+                >Cancelar</button>
+                <button
+                  onClick={handleRecusar}
+                  disabled={processando || !motivoRecusa.trim()}
+                  style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', borderRadius: 8, fontWeight: 600, fontSize: 14, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, opacity: (processando || !motivoRecusa.trim()) ? 0.7 : 1 }}
+                >
+                  {processando ? <Loader2 style={{ height: 16, width: 16 }} className="animate-spin" /> : <XCircle style={{ height: 16, width: 16 }} />}
+                  Confirmar Recusa
+                </button>
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRecusa(false)} disabled={processando}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleRecusar} disabled={processando || !motivoRecusa.trim()}>
-              {processando ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
-              Confirmar Recusa
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   );
 }
