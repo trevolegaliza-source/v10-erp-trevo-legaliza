@@ -235,9 +235,22 @@ export default function Orcamentos() {
   }
 
   function handleCopyLink(orc: Orcamento) {
-    const url = `${window.location.origin}/orcamento/${orc.share_token}`;
+    const orcAny = orc as any;
+    // Modo cliente_via_contador NÃO tem link público
+    if (orcAny.destinatario === 'cliente_via_contador') {
+      toast.error('Orçamentos white-label não possuem link público. Use o PDF.');
+      return;
+    }
+    const url = `${window.location.origin}/proposta/${orc.share_token}`;
     navigator.clipboard.writeText(url);
-    toast.success('Link copiado!');
+    
+    if (orcAny.destinatario === 'contador' && orcAny.senha_link) {
+      toast.success(`Link copiado! Senha: ${orcAny.senha_link}`);
+    } else if (orcAny.destinatario === 'contador' && !orcAny.senha_link) {
+      toast.success('Link copiado! ⚠️ Sem senha — qualquer um com o link pode acessar.');
+    } else {
+      toast.success('Link copiado!');
+    }
   }
 
   function handleEditApproved(orc: Orcamento) {
