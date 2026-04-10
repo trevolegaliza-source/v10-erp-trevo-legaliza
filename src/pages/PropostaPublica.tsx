@@ -151,6 +151,7 @@ export default function PropostaPublica() {
           titulo: '🟢 PROPOSTA APROVADA',
           mensagem: `${orc.prospect_nome} aprovou a proposta #${String(orc.numero).padStart(3, '0')} no valor de ${fmt(total)}. Aguardando pagamento.`,
           orcamento_id: orc.id,
+          empresa_id: orc.empresa_id || null,
         }),
       });
 
@@ -187,6 +188,7 @@ export default function PropostaPublica() {
           titulo: '🔴 PROPOSTA RECUSADA',
           mensagem: `${orc.prospect_nome} recusou a proposta #${String(orc.numero).padStart(3, '0')}. Motivo: ${motivoRecusa}`,
           orcamento_id: orc.id,
+          empresa_id: orc.empresa_id || null,
         }),
       });
 
