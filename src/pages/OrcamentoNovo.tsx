@@ -313,8 +313,11 @@ export default function OrcamentoNovo() {
 
   async function salvarOrcamento(): Promise<string> {
     if (!form.prospect_nome?.trim()) throw new Error('Informe o nome da empresa');
-    const payload: any = buildPayload('enviado');
-    if (orcamentoId) payload.id = orcamentoId;
+    const payload: any = buildPayload('rascunho');
+    if (orcamentoId) {
+      payload.id = orcamentoId;
+      delete payload.status; // Não sobrescrever status ao salvar orçamento existente
+    }
     const id = await saveMutation.mutateAsync(payload);
     setOrcamentoId(id);
     return id;
