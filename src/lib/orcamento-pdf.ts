@@ -208,7 +208,7 @@ async function medirAlturaReal(html: string): Promise<number> {
     ? (probe.firstElementChild as HTMLElement).getBoundingClientRect().height
     : probe.getBoundingClientRect().height;
   document.body.removeChild(probe);
-  return Math.ceil(altura) + 2; // +2px tight safety margin for optimal page utilization
+  return Math.ceil(altura) + 8; // +8px safety margin to prevent content bleeding between pages
 }
 
 const HEADER_HEIGHT = 64;
@@ -1451,7 +1451,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   // ═══════════════════════════════════════════════════════
   const FOOTER_HEIGHT = 60;
   const PADDING_VERTICAL = 48; // 24px top + 24px bottom padding
-  const MARGEM_SEGURANCA = 10; // Reduced from 30 — accurate measurement allows tighter packing
+  const MARGEM_SEGURANCA = 30; // Restore safety margin to prevent content bleeding between pages
   const ALTURA_DISPONIVEL = 1123 - HEADER_HEIGHT - FOOTER_HEIGHT - PADDING_VERTICAL - MARGEM_SEGURANCA;
 
   const pageGroups: number[][] = [[]];
