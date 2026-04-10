@@ -60,7 +60,8 @@ const defaultForm = (): OrcamentoForm => ({
   beneficios_capa: [],
   etapas_fluxo: [],
   cenarios: [],
-});
+  senha_link: '',
+} as any);
 
 function destinatarioToModoPDF(d: OrcamentoDestinatario): OrcamentoPDFMode {
   if (d === 'contador') return 'contador';
@@ -151,7 +152,8 @@ export default function OrcamentoNovo() {
         beneficios_capa: Array.isArray((orc as any).beneficios_capa) ? (orc as any).beneficios_capa : [],
         etapas_fluxo: Array.isArray((orc as any).etapas_fluxo) ? (orc as any).etapas_fluxo : [],
         cenarios: Array.isArray((orc as any).cenarios) ? (orc as any).cenarios : [],
-      });
+        senha_link: (orc as any).senha_link || '',
+      } as any);
     })();
   }, [editId, clientes]);
 
@@ -237,6 +239,7 @@ export default function OrcamentoNovo() {
       beneficios_capa: form.beneficios_capa as any,
       headline_cenario: form.headline_cenario || null,
       cenarios: form.cenarios as any,
+      senha_link: (form as any).senha_link || null,
       status,
       created_by: null,
       pdf_url: null,
@@ -964,6 +967,19 @@ export default function OrcamentoNovo() {
                   <Input value={form.prazo_execucao} onChange={e => setForm(f => ({ ...f, prazo_execucao: e.target.value }))} placeholder="Ex: 15 dias úteis" />
                 </div>
               </div>
+              {form.destinatario === 'contador' && (
+                <div>
+                  <Label className="text-xs">Senha do link (proteção para o contador)</Label>
+                  <Input 
+                    value={(form as any).senha_link || ''} 
+                    onChange={e => setForm(f => ({ ...f, senha_link: e.target.value }))} 
+                    placeholder="Ex: fato2026 (deixe vazio para link sem senha)"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    O contador precisará digitar esta senha para acessar a proposta pelo link.
+                  </p>
+                </div>
+              )}
               <div>
                 <Label className="text-xs">Condições de pagamento</Label>
                 <RichTextEditor
