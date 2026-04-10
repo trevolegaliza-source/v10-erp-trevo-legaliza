@@ -25,15 +25,15 @@ const STATUS_MAP: Record<string, { label: string; color: string }> = {
   rascunho: { label: 'Rascunho', color: 'bg-muted text-muted-foreground' },
   enviado: { label: 'Enviado', color: 'bg-blue-500/10 text-blue-500' },
   aprovado: { label: 'Aprovado', color: 'bg-primary/10 text-primary' },
-  recusado: { label: 'Recusado', color: 'bg-destructive/10 text-destructive' },
-  expirado: { label: 'Expirado', color: 'bg-amber-500/10 text-amber-500' },
+  aguardando_pagamento: { label: 'Aguardando Pgto', color: 'bg-amber-500/10 text-amber-500' },
   convertido: { label: 'Convertido', color: 'bg-violet-500/10 text-violet-500' },
+  recusado: { label: 'Recusado', color: 'bg-destructive/10 text-destructive' },
 };
 
 export default function Orcamentos() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [tab, setTab] = useState('todos');
+  const [tab, setTab] = useState('rascunho');
   const { data: orcamentos, isLoading } = useOrcamentos(tab);
   const { data: kpis } = useOrcamentoKPIs();
   const deleteMutation = useDeleteOrcamento();
@@ -42,7 +42,7 @@ export default function Orcamentos() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   useEffect(() => {
     (async () => {
-      const statuses = ['rascunho', 'enviado', 'aprovado', 'convertido'];
+      const statuses = ['rascunho', 'enviado', 'aprovado', 'aguardando_pagamento', 'convertido', 'recusado'];
       const results: Record<string, number> = {};
       await Promise.all(statuses.map(async (s) => {
         const { count } = await supabase.from('orcamentos')
@@ -89,9 +89,17 @@ export default function Orcamentos() {
 
   async function marcarComoAprovado(id: string) {
     const { error } = await supabase.from('orcamentos')
-      .update({ status: 'aprovado', aprovado_em: new Date().toISOString() } as any)
+      .update({ status: 'aguardando_pagamento', aprovado_em: new Date().toISOString() } as any)
       .eq('id', id);
-    if (!error) { toast.success('Orçamento aprovado! Use "Gerar contrato" quando estiver pronto.'); invalidate(); }
+    if (!error) { toast.success('Orçamento aprovado! Aguardando pagamento.'); invalidate(); }
+    else toast.error('Erro: ' + error.message);
+  }
+
+  async function marcarComoPago(id: string) {
+    const { error } = await supabase.from('orcamentos')
+      .update({ status: 'convertido', convertido_em: new Date().toISOString(), pago_em: new Date().toISOString() } as any)
+      .eq('id', id);
+    if (!error) { toast.success('Pagamento confirmado! Orçamento convertido.'); invalidate(); }
     else toast.error('Erro: ' + error.message);
   }
 
@@ -310,6 +318,23 @@ export default function Orcamentos() {
             </>
           )}
 
+          {status === 'aguardando_pagamento' && (
+            <>
+              <DropdownMenuItem onClick={() => marcarComoPago(orc.id)}>
+                <CheckCircle className="h-3.5 w-3.5 mr-2" />Marcar como pago (convertido)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => voltarParaEnviado(orc.id)}>
+                <ArrowLeft className="h-3.5 w-3.5 mr-2" />Voltar para enviado
+              </DropdownMenuItem>
+            </>
+          )}
+
+          {status === 'recusado' && (
+            <DropdownMenuItem onClick={() => voltarParaEnviado(orc.id)}>
+              <ArrowLeft className="h-3.5 w-3.5 mr-2" />Reenviar proposta
+            </DropdownMenuItem>
+          )}
+
           {status === 'convertido' && (
             <DropdownMenuItem onClick={() => verContrato(orc.id)}>
               <Eye className="h-3.5 w-3.5 mr-2" />Ver contrato
@@ -337,11 +362,12 @@ export default function Orcamentos() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { label: 'Total', value: kpis?.total ?? 0, icon: FileText, color: 'text-foreground' },
           { label: 'Enviados', value: kpis?.enviados ?? 0, icon: Send, color: 'text-blue-500' },
-          { label: 'Aprovados', value: kpis?.aprovados ?? 0, icon: CheckCircle, color: 'text-primary' },
+          { label: 'Aguardando Pgto', value: kpis?.aguardandoPgto ?? 0, icon: CheckCircle, color: 'text-amber-500' },
+          { label: 'Convertidos', value: kpis?.convertidos ?? 0, icon: TrendingUp, color: 'text-violet-500' },
           { label: 'Taxa Conversão', value: `${kpis?.taxa ?? 0}%`, icon: TrendingUp, color: 'text-primary' },
         ].map(k => (
           <Card key={k.label}>
@@ -358,11 +384,14 @@ export default function Orcamentos() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="todos">Todos</TabsTrigger>
           <TabsTrigger value="rascunho">Rascunhos {counts.rascunho ? `(${counts.rascunho})` : ''}</TabsTrigger>
           <TabsTrigger value="enviado">Enviados {counts.enviado ? `(${counts.enviado})` : ''}</TabsTrigger>
-          <TabsTrigger value="aprovado">Aprovados {counts.aprovado ? `(${counts.aprovado})` : ''}</TabsTrigger>
+          <TabsTrigger value="aguardando_pagamento">
+            Aguardando Pgto {counts.aguardando_pagamento ? `(${counts.aguardando_pagamento})` : ''}
+          </TabsTrigger>
           <TabsTrigger value="convertido">Convertidos {counts.convertido ? `(${counts.convertido})` : ''}</TabsTrigger>
+          <TabsTrigger value="recusado">Recusados {counts.recusado ? `(${counts.recusado})` : ''}</TabsTrigger>
+          <TabsTrigger value="todos">Todos</TabsTrigger>
         </TabsList>
 
         <TabsContent value={tab} className="mt-4">
@@ -399,6 +428,11 @@ export default function Orcamentos() {
                       <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
                         <p className="text-sm font-bold">{fmt(orc.valor_final)}</p>
                         <Badge className={`text-[10px] ${st.color}`}>{st.label}</Badge>
+                        {orc.status === 'recusado' && (orc as any).observacoes_recusa && (
+                          <p className="text-xs text-destructive/70 mt-1 line-clamp-1">
+                            Motivo: {(orc as any).observacoes_recusa}
+                          </p>
+                        )}
                         {renderActions(orc)}
                       </div>
                     </div>

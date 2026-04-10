@@ -44,6 +44,13 @@ export interface Orcamento {
   beneficios_capa?: any;
   headline_cenario?: string | null;
   cenarios?: any;
+  observacoes_recusa?: string | null;
+  recusado_em?: string | null;
+  pago_em?: string | null;
+  senha_link?: string | null;
+  prazo_pagamento_dias?: number | null;
+  itens_selecionados?: any;
+  cenario_selecionado?: string | null;
 }
 
 export type OrcamentoInsert = Omit<Orcamento, 'id' | 'numero' | 'share_token' | 'created_at' | 'updated_at'>;
@@ -73,10 +80,12 @@ export function useOrcamentoKPIs() {
       const total = all.length;
       const enviados = all.filter(o => o.status === 'enviado').length;
       const aprovados = all.filter(o => o.status === 'aprovado').length;
+      const aguardandoPgto = all.filter(o => o.status === 'aguardando_pagamento').length;
       const convertidos = all.filter(o => o.status === 'convertido').length;
-      const taxa = total > 0 ? Math.round(((aprovados + convertidos) / total) * 100) : 0;
+      const recusados = all.filter(o => o.status === 'recusado').length;
+      const taxa = total > 0 ? Math.round(((aprovados + aguardandoPgto + convertidos) / total) * 100) : 0;
       const valorTotal = all.reduce((s, o) => s + Number(o.valor_final), 0);
-      return { total, enviados, aprovados, convertidos, taxa, valorTotal };
+      return { total, enviados, aprovados, aguardandoPgto, convertidos, recusados, taxa, valorTotal };
     },
   });
 }
