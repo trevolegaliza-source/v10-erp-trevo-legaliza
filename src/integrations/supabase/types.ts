@@ -873,6 +873,47 @@ export type Database = {
         }
         Relationships: []
       }
+      notificacoes: {
+        Row: {
+          created_at: string | null
+          empresa_id: string | null
+          id: string
+          lida: boolean | null
+          mensagem: string
+          orcamento_id: string | null
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string | null
+          empresa_id?: string | null
+          id?: string
+          lida?: boolean | null
+          mensagem: string
+          orcamento_id?: string | null
+          tipo: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string | null
+          empresa_id?: string | null
+          id?: string
+          lida?: boolean | null
+          mensagem?: string
+          orcamento_id?: string | null
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacoes_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orcamento_pdfs: {
         Row: {
           cancelado_em: string | null
@@ -930,9 +971,12 @@ export type Database = {
         Row: {
           aprovado_em: string | null
           beneficios_capa: Json | null
+          cenario_selecionado: string | null
           cenarios: Json | null
+          clicksign_document_key: string | null
           cliente_id: string | null
           contexto: string | null
+          contrato_assinado_url: string | null
           convertido_em: string | null
           created_at: string | null
           created_by: string | null
@@ -947,22 +991,28 @@ export type Database = {
           etapas_fluxo: Json | null
           headline_cenario: string | null
           id: string
+          itens_selecionados: Json | null
           naturezas: Json
           numero: number
           observacoes: string | null
+          observacoes_recusa: string | null
           ordem_execucao: string | null
           pacotes: Json | null
           pagamento: string | null
+          pago_em: string | null
           pdf_url: string | null
           prazo_execucao: string | null
+          prazo_pagamento_dias: number | null
           prospect_cnpj: string | null
           prospect_contato: string | null
           prospect_email: string | null
           prospect_nome: string
           prospect_telefone: string | null
           qtd_processos: number | null
+          recusado_em: string | null
           riscos: Json | null
           secoes: Json | null
+          senha_link: string | null
           servicos: Json
           share_token: string | null
           sla: string | null
@@ -976,9 +1026,12 @@ export type Database = {
         Insert: {
           aprovado_em?: string | null
           beneficios_capa?: Json | null
+          cenario_selecionado?: string | null
           cenarios?: Json | null
+          clicksign_document_key?: string | null
           cliente_id?: string | null
           contexto?: string | null
+          contrato_assinado_url?: string | null
           convertido_em?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -993,22 +1046,28 @@ export type Database = {
           etapas_fluxo?: Json | null
           headline_cenario?: string | null
           id?: string
+          itens_selecionados?: Json | null
           naturezas?: Json
           numero?: number
           observacoes?: string | null
+          observacoes_recusa?: string | null
           ordem_execucao?: string | null
           pacotes?: Json | null
           pagamento?: string | null
+          pago_em?: string | null
           pdf_url?: string | null
           prazo_execucao?: string | null
+          prazo_pagamento_dias?: number | null
           prospect_cnpj?: string | null
           prospect_contato?: string | null
           prospect_email?: string | null
           prospect_nome: string
           prospect_telefone?: string | null
           qtd_processos?: number | null
+          recusado_em?: string | null
           riscos?: Json | null
           secoes?: Json | null
+          senha_link?: string | null
           servicos?: Json
           share_token?: string | null
           sla?: string | null
@@ -1022,9 +1081,12 @@ export type Database = {
         Update: {
           aprovado_em?: string | null
           beneficios_capa?: Json | null
+          cenario_selecionado?: string | null
           cenarios?: Json | null
+          clicksign_document_key?: string | null
           cliente_id?: string | null
           contexto?: string | null
+          contrato_assinado_url?: string | null
           convertido_em?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -1039,22 +1101,28 @@ export type Database = {
           etapas_fluxo?: Json | null
           headline_cenario?: string | null
           id?: string
+          itens_selecionados?: Json | null
           naturezas?: Json
           numero?: number
           observacoes?: string | null
+          observacoes_recusa?: string | null
           ordem_execucao?: string | null
           pacotes?: Json | null
           pagamento?: string | null
+          pago_em?: string | null
           pdf_url?: string | null
           prazo_execucao?: string | null
+          prazo_pagamento_dias?: number | null
           prospect_cnpj?: string | null
           prospect_contato?: string | null
           prospect_email?: string | null
           prospect_nome?: string
           prospect_telefone?: string | null
           qtd_processos?: number | null
+          recusado_em?: string | null
           riscos?: Json | null
           secoes?: Json | null
+          senha_link?: string | null
           servicos?: Json
           share_token?: string | null
           sla?: string | null
@@ -1306,6 +1374,47 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      proposta_eventos: {
+        Row: {
+          created_at: string | null
+          dados: Json | null
+          empresa_id: string | null
+          id: string
+          ip_address: string | null
+          orcamento_id: string | null
+          tipo: string
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          dados?: Json | null
+          empresa_id?: string | null
+          id?: string
+          ip_address?: string | null
+          orcamento_id?: string | null
+          tipo: string
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          dados?: Json | null
+          empresa_id?: string | null
+          id?: string
+          ip_address?: string | null
+          orcamento_id?: string | null
+          tipo?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposta_eventos_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       service_negotiations: {
         Row: {
