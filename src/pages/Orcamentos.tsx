@@ -241,7 +241,8 @@ export default function Orcamentos() {
       toast.error('Orçamentos white-label não possuem link público. Use o PDF.');
       return;
     }
-    const url = `${window.location.origin}/proposta/${orc.share_token}`;
+    const baseUrl = import.meta.env.PROD ? 'https://trevolegaliza.lovable.app' : window.location.origin;
+    const url = `${baseUrl}/proposta/${orc.share_token}`;
     navigator.clipboard.writeText(url);
     
     if (orcAny.destinatario === 'contador' && orcAny.senha_link) {
