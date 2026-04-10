@@ -44,6 +44,13 @@ export interface Orcamento {
   beneficios_capa?: any;
   headline_cenario?: string | null;
   cenarios?: any;
+  observacoes_recusa?: string | null;
+  recusado_em?: string | null;
+  pago_em?: string | null;
+  senha_link?: string | null;
+  prazo_pagamento_dias?: number | null;
+  itens_selecionados?: any;
+  cenario_selecionado?: string | null;
 }
 
 export type OrcamentoInsert = Omit<Orcamento, 'id' | 'numero' | 'share_token' | 'created_at' | 'updated_at'>;
