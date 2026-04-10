@@ -60,7 +60,8 @@ const defaultForm = (): OrcamentoForm => ({
   beneficios_capa: [],
   etapas_fluxo: [],
   cenarios: [],
-});
+  senha_link: '',
+} as any);
 
 function destinatarioToModoPDF(d: OrcamentoDestinatario): OrcamentoPDFMode {
   if (d === 'contador') return 'contador';
