@@ -362,11 +362,12 @@ export default function Orcamentos() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { label: 'Total', value: kpis?.total ?? 0, icon: FileText, color: 'text-foreground' },
           { label: 'Enviados', value: kpis?.enviados ?? 0, icon: Send, color: 'text-blue-500' },
-          { label: 'Aprovados', value: kpis?.aprovados ?? 0, icon: CheckCircle, color: 'text-primary' },
+          { label: 'Aguardando Pgto', value: kpis?.aguardandoPgto ?? 0, icon: CheckCircle, color: 'text-amber-500' },
+          { label: 'Convertidos', value: kpis?.convertidos ?? 0, icon: TrendingUp, color: 'text-violet-500' },
           { label: 'Taxa Conversão', value: `${kpis?.taxa ?? 0}%`, icon: TrendingUp, color: 'text-primary' },
         ].map(k => (
           <Card key={k.label}>
