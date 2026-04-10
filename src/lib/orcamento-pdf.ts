@@ -513,6 +513,11 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
   const margemCapaIdeal = precoIdealFinalCapa - custoTrevoFinalCapa;
   const margemCapaIdealPct = custoTrevoFinalCapa > 0 ? (((precoIdealFinalCapa / custoTrevoFinalCapa) - 1) * 100).toFixed(0) : '0';
   const temMargemFaixa = margemCapaIdeal > margemCapaMin && totalPrecoIdeal > totalPrecoCliente;
+  // Detecta se algum item tem recomendação de preço (mínimo ou mercado preenchidos)
+  const temRecomendacaoPreco = d.itens.some(i => 
+    (i.honorario_minimo_contador > 0 && i.honorario_minimo_contador !== i.honorario) || 
+    (i.valor_mercado > 0 && i.valor_mercado !== i.honorario)
+  );
 
   const useBlueTheme = pdfMode === 'cliente'; // only pure client mode uses blue; direto uses Trevo green
   const accentColor = useBlueTheme ? '#3b82f6' : '#22c55e';
@@ -604,25 +609,32 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
             `;
           }).join('')}
           ` : `
+          ${temRecomendacaoPreco ? `
           <div style="display: flex; gap: 16px; width: 100%; margin-top: 24px;">
-            <!-- Card 1: Custo Trevo -->
             <div style="flex: 1; background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px 16px; text-align: center;">
               <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">SEU CUSTO TREVO</div>
               <div style="font-size: 20px; font-weight: 700; color: #333;">${fmt(custoTrevoFinalCapa)}</div>
             </div>
-            <!-- Card 2: Cobrar do Cliente (highlight) -->
             <div style="flex: 1; background: #e8f5e9; border: 2px solid #2d6a4f; border-radius: 8px; padding: 20px 16px; text-align: center;">
               <div style="font-size: 9px; color: #1a4731; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">COBRAR DO CLIENTE</div>
               <div style="font-size: 24px; font-weight: 700; color: #0f3d24;">${valorCapa}</div>
               <div style="font-size: 9px; color: #555; margin-top: 6px;">honorários${hasTaxas ? ' + taxas gov. estimadas' : ''}</div>
             </div>
-            <!-- Card 3: Sua Margem -->
             <div style="flex: 1; background: #1a4731; border-radius: 8px; padding: 20px 16px; text-align: center;">
               <div style="font-size: 9px; color: #86efac; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">SUA MARGEM</div>
               <div style="font-size: ${temMargemFaixa ? '18' : '24'}px; font-weight: 700; color: #ffffff;">${temMargemFaixa ? `${fmt(margemCapaMin)} a ${fmt(margemCapaIdeal)}` : fmt(margemCapaMin)}</div>
               <div style="font-size: 11px; color: #86efac; margin-top: 6px;">${temMargemFaixa ? `${margemCapaMinPct}% a ${margemCapaIdealPct}%` : `${margemCapaMinPct}%`} de lucro</div>
             </div>
           </div>
+          ` : `
+          <div style="display: flex; justify-content: center; width: 100%; margin-top: 24px;">
+            <div style="background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 8px; padding: 24px 48px; text-align: center;">
+              <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">SEU CUSTO TREVO</div>
+              <div style="font-size: 28px; font-weight: 700; color: #0f3d24;">${fmt(custoTrevoFinalCapa)}</div>
+              <div style="font-size: 9px; color: #555; margin-top: 6px;">honorários${hasTaxas ? ' + taxas gov. estimadas' : ''}</div>
+            </div>
+          </div>
+          `}
           `}
         </div>
 
@@ -1293,6 +1305,7 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
         ${cenarioResumoHtml}
       </div>
     ` : `
+      ${temRecomendacaoPreco ? `
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
           <span style="color: #64748b;">Seu custo Trevo (honorários)</span>
@@ -1325,6 +1338,32 @@ async function buildDetalhadoPages(d: OrcamentoPDFData, logo: string | null): Pr
           </span>
         </div>
       </div>
+      ` : `
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0;">
+          <span style="color: #64748b;">Custo Trevo (honorários)</span>
+          <span style="font-weight: 600;">${fmt(totalCustoTrevo)}</span>
+        </div>
+        ${d.desconto_pct > 0 ? `
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; color: #dc2626;">
+            <span>Desconto (${d.desconto_pct}%)</span>
+            <span style="font-weight: 600;">- ${fmt(descontoCusto)}</span>
+          </div>
+        ` : ''}
+        ${hasTaxas ? `
+          <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-top: 1px solid #e2e8f0;">
+            <span style="color: #64748b;">Taxas externas estimadas</span>
+            <span style="color: #b45309; font-weight: 600;">${fmt(totalTaxaMin)} a ${fmt(totalTaxaMax)}</span>
+          </div>
+        ` : ''}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; margin-top: 10px; background: #f0fdf4; border: 2px solid #22c55e; border-radius: 12px;">
+          <span style="font-size: 12px; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 1px;">Total</span>
+          <span style="font-size: ${hasTaxas ? '22' : '28'}px; font-weight: 900; color: #166534;">
+            ${hasTaxas ? `${fmt(custoFinal + totalTaxaMin)} a ${fmt(custoFinal + totalTaxaMax)}` : fmt(custoFinal)}
+          </span>
+        </div>
+      </div>
+      `}
     `;
   } else {
     const totalHonResumo = pdfMode === 'direto' ? totalPrecoDireto : totalPrecoCliente;
