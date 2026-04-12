@@ -410,6 +410,34 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
         processos={deferimentoProcessos}
         onConfirm={handleDeferimentoConfirm}
       />
+      {extratoGerado && (
+        <Dialog open={!!extratoGerado} onOpenChange={(o) => { if (!o) setExtratoGerado(null); }}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Extrato Gerado!</DialogTitle>
+            </DialogHeader>
+            <div className="text-center space-y-4 py-4">
+              <CheckCircle className="h-12 w-12 text-primary mx-auto" />
+              <div>
+                <p className="font-semibold">{cliente.cliente_apelido || cliente.cliente_nome}</p>
+                <p className="text-2xl font-bold text-primary">{fmt(extratoGerado.total)}</p>
+              </div>
+              <p className="text-sm text-muted-foreground">Como deseja enviar?</p>
+              <div className="space-y-2">
+                <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={handleWhatsAppPosExtrato}>
+                  <MessageCircle className="h-4 w-4" /> Enviar via WhatsApp
+                </Button>
+                <Button variant="outline" className="w-full gap-2" onClick={handleCompartilharPosExtrato}>
+                  <Share2 className="h-4 w-4" /> Compartilhar PDF
+                </Button>
+                <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => setExtratoGerado(null)}>
+                  Fazer depois
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </AccordionItem>
   );
 }
