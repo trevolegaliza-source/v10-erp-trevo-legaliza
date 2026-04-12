@@ -334,7 +334,7 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
           {selected.size > 0 && (
             <div className="flex items-center justify-between bg-muted/50 rounded-lg p-3 mt-3">
               <span className="text-sm font-medium">{selected.size} selecionados · {fmt(totalSelecionado)}</span>
-              <Button size="sm" onClick={handleGerarExtrato} disabled={generating} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Button size="sm" onClick={handleGerarExtrato} disabled={generating || (isDeferimento && nenhumDeferido)} className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50">
                 <FileText className="h-4 w-4 mr-1" />
                 {generating ? 'Gerando...' : `Gerar Extrato (${selected.size})`}
               </Button>
