@@ -16,6 +16,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Plus, FileText, Save, FileDown, ArrowLeft, Copy, ExternalLink, Loader2, ChevronDown, Trash2,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
@@ -494,6 +495,11 @@ export default function OrcamentoNovo() {
           {orcamentoId && (
             <Button variant="outline" size="sm" onClick={handleDuplicate}>
               <Copy className="h-4 w-4 mr-1" /> Duplicar
+            </Button>
+          )}
+          {orcamentoId && form.destinatario !== 'cliente_via_contador' && (
+            <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-1">
+              <LinkIcon className="h-4 w-4" /> Copiar Link
             </Button>
           )}
         </div>
