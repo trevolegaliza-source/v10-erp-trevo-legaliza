@@ -311,13 +311,31 @@ export default function PropostaPublica() {
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', colorScheme: 'light' }} data-theme="light">
       {/* HEADER */}
-      <div style={{ background: isContador ? 'linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%)' : 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', padding: '16px 24px', color: '#fff' }}>
+      <div style={{ 
+        background: isContador ? 'linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%)' : 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', 
+        padding: '20px 24px', 
+        color: '#fff',
+        borderBottom: `3px solid ${accentColor}`
+      }}>
         <div style={{ maxWidth: 768, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>
-            {isContador ? '🍀 Trevo Legaliza' : (escritorioNome || '🍀 Trevo Legaliza')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 24 }}>🍀</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 18, letterSpacing: '0.02em' }}>
+                {isContador ? 'Trevo Legaliza' : (escritorioNome || 'Trevo Legaliza')}
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2 }}>
+                {isContador ? 'Painel do Parceiro' : 'Assessoria Empresarial'}
+              </div>
+            </div>
           </div>
-          <div style={{ textAlign: 'right', fontSize: 14, opacity: 0.7 }}>
-            Proposta #{String(orc?.numero || 0).padStart(3, '0')}
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: isContador ? '#4ade80' : '#93c5fd', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Proposta #{String(orc?.numero || 0).padStart(3, '0')}
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.5, marginTop: 2 }}>
+              {orc?.created_at ? new Date(orc.created_at).toLocaleDateString('pt-BR') : ''}
+            </div>
           </div>
         </div>
       </div>
@@ -325,20 +343,39 @@ export default function PropostaPublica() {
       <div style={{ maxWidth: 768, margin: '0 auto', padding: '32px 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* CAPA */}
-        <div style={cardStyle}>
-          <div style={{ ...cardPad, textAlign: 'center' }}>
-            <p style={{ ...muted, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Proposta Comercial</p>
-            <h1 style={{ ...fg, fontSize: 24, fontWeight: 700, marginBottom: 4 }}>{orc?.prospect_nome}</h1>
-            {orc?.prospect_cnpj && <p style={{ ...muted, fontSize: 14 }}>CNPJ: {orc.prospect_cnpj}</p>}
+        <div style={{ ...cardStyle, overflow: 'hidden' }}>
+          <div style={{ 
+            background: `linear-gradient(135deg, ${isContador ? '#f0fdf4' : '#eff6ff'} 0%, #ffffff 100%)`,
+            padding: '40px 24px', 
+            textAlign: 'center' 
+          }}>
+            <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.2em', color: accentColor, fontWeight: 600, marginBottom: 16 }}>Proposta Comercial</p>
+            <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1a1a2e', marginBottom: 8, lineHeight: 1.2 }}>{orc?.prospect_nome}</h1>
+            {orc?.prospect_cnpj && orc.prospect_cnpj !== '0000000000' && orc.prospect_cnpj !== '00000000000000' && (
+              <p style={{ fontSize: 13, color: '#6b7280' }}>CNPJ: {orc.prospect_cnpj}</p>
+            )}
 
-            <div style={{ marginTop: 24, display: 'inline-block', padding: '16px 32px', borderRadius: 12, background: isContador ? '#f0fdf4' : '#eff6ff', border: `2px solid ${accentColor}` }}>
-              <p style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, color: accentColor }}>Investimento Estimado</p>
-              <p style={{ fontSize: 28, fontWeight: 900, color: accentColor }}>
+            <div style={{ 
+              marginTop: 32, 
+              display: 'inline-block', 
+              padding: '20px 40px', 
+              borderRadius: 16, 
+              background: '#ffffff',
+              border: `2px solid ${accentColor}`,
+              boxShadow: `0 4px 24px ${isContador ? 'rgba(34,197,94,0.15)' : 'rgba(59,130,246,0.15)'}`
+            }}>
+              <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, color: accentColor, fontWeight: 600 }}>Investimento Estimado</p>
+              <p style={{ fontSize: 32, fontWeight: 900, color: accentColor, lineHeight: 1 }}>
                 {totalTaxaMin > 0 || totalTaxaMax > 0
                   ? `${fmt(total + totalTaxaMin)} a ${fmt(total + totalTaxaMax)}`
                   : fmt(total)
                 }
               </p>
+            </div>
+
+            <div style={{ marginTop: 20, display: 'flex', justifyContent: 'center', gap: 24, fontSize: 12, color: '#9ca3af' }}>
+              <span>📋 {itens.filter(i => i.descricao.trim()).length} serviços</span>
+              <span>⏱️ Válido por {orc?.validade_dias} dias</span>
             </div>
           </div>
         </div>
@@ -409,7 +446,14 @@ export default function PropostaPublica() {
 
                 return (
                   <div key={item.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: isContador ? '#f0fdf4' : '#eff6ff' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between', 
+                      padding: '12px 16px', 
+                      background: isContador ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                      borderBottom: '1px solid #e2e8f0'
+                    }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>{idx + 1}.</span>
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#1a1a2e' }}>{item.descricao}</span>
@@ -461,7 +505,16 @@ export default function PropostaPublica() {
                   <span>{fmt(totalTaxaMin)} a {fmt(totalTaxaMax)}</span>
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', marginTop: 8, borderRadius: 12, background: isContador ? '#f0fdf4' : '#eff6ff', borderTop: `2px solid ${accentColor}` }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                padding: '16px 20px', 
+                marginTop: 12, 
+                borderRadius: 12, 
+                background: isContador ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)', 
+                border: `2px solid ${accentColor}` 
+              }}>
                 <span style={{ fontSize: 14, fontWeight: 700, textTransform: 'uppercase', color: accentColor }}>Total</span>
                 <span style={{ fontSize: 24, fontWeight: 900, color: accentColor }}>
                   {totalTaxaMin > 0 || totalTaxaMax > 0
@@ -500,7 +553,26 @@ export default function PropostaPublica() {
         {orc?.status === 'enviado' && (
           <div style={{ display: 'flex', gap: 12 }}>
             <button
-              style={{ flex: 1, height: 56, fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: accentColor, color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer' }}
+              style={{ 
+                flex: 1, 
+                height: 60, 
+                fontSize: 17, 
+                fontWeight: 700, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                gap: 10, 
+                background: `linear-gradient(135deg, ${accentColor} 0%, ${isContador ? '#16a34a' : '#2563eb'} 100%)`, 
+                color: '#fff', 
+                border: 'none', 
+                borderRadius: 14, 
+                cursor: 'pointer',
+                boxShadow: `0 4px 16px ${isContador ? 'rgba(34,197,94,0.3)' : 'rgba(59,130,246,0.3)'}`,
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                letterSpacing: '0.02em'
+              }}
+              onMouseOver={e => { (e.target as any).style.transform = 'translateY(-2px)'; (e.target as any).style.boxShadow = `0 6px 24px ${isContador ? 'rgba(34,197,94,0.4)' : 'rgba(59,130,246,0.4)'}` }}
+              onMouseOut={e => { (e.target as any).style.transform = 'translateY(0)'; (e.target as any).style.boxShadow = `0 4px 16px ${isContador ? 'rgba(34,197,94,0.3)' : 'rgba(59,130,246,0.3)'}` }}
               onClick={() => setShowAprovacao(true)}
             >
               <CheckCircle style={{ height: 20, width: 20 }} /> Aprovar Proposta
@@ -535,9 +607,23 @@ export default function PropostaPublica() {
           </div>
         )}
 
-        <div style={{ textAlign: 'center', paddingTop: 24, paddingBottom: 32, borderTop: '1px solid #e2e8f0', fontSize: 12, color: '#9ca3af' }}>
-          <p>Trevo Legaliza · CNPJ 39.969.412/0001-70</p>
-          <p style={{ marginTop: 4 }}>(11) 93492-7001 · administrativo@trevolegaliza.com.br</p>
+        <div style={{ textAlign: 'center', paddingTop: 32, paddingBottom: 40, borderTop: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.8 }}>
+            {isContador ? (
+              <>
+                <p style={{ fontWeight: 600, color: '#6b7280' }}>Trevo Legaliza</p>
+                <p>CNPJ 39.969.412/0001-70 · Rua Brasil, nº 1170, Rudge Ramos, SBC/SP</p>
+                <p>(11) 93492-7001 · administrativo@trevolegaliza.com.br · trevolegaliza.com.br</p>
+                <p style={{ marginTop: 8, fontStyle: 'italic', fontSize: 10 }}>Desde 2018 · Referência nacional em regularização empresarial · 27 estados</p>
+              </>
+            ) : (
+              <>
+                <p style={{ fontWeight: 600, color: '#6b7280' }}>{escritorioNome || 'Trevo Legaliza'}</p>
+                <p>CNPJ 39.969.412/0001-70</p>
+                <p>(11) 93492-7001 · administrativo@trevolegaliza.com.br</p>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
