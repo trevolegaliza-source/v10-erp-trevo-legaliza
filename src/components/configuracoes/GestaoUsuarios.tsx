@@ -348,11 +348,32 @@ export default function GestaoUsuarios() {
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}>
                           <Shield className="h-3 w-3 mr-1" />Permissões
                         </Button>
-                        {p.ativo !== false && (
+                         {p.ativo !== false && (
                           <Button variant="ghost" size="sm" className="h-7" onClick={() => toggleAtivo(p)}>
                             <UserX className="h-3.5 w-3.5" />
                           </Button>
                         )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja excluir <strong>{p.nome || p.email}</strong>? Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteUser(p)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     ) : (
                       <span className="text-[10px] text-muted-foreground">—</span>
