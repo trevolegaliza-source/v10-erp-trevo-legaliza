@@ -1279,6 +1279,8 @@ export type Database = {
       }
       processos: {
         Row: {
+          auditado_em: string | null
+          auditado_financeiro: boolean | null
           cliente_id: string
           created_at: string | null
           data_deferimento: string | null
@@ -1299,6 +1301,8 @@ export type Database = {
           valor_avulso: number | null
         }
         Insert: {
+          auditado_em?: string | null
+          auditado_financeiro?: boolean | null
           cliente_id: string
           created_at?: string | null
           data_deferimento?: string | null
@@ -1319,6 +1323,8 @@ export type Database = {
           valor_avulso?: number | null
         }
         Update: {
+          auditado_em?: string | null
+          auditado_financeiro?: boolean | null
           cliente_id?: string
           created_at?: string | null
           data_deferimento?: string | null
