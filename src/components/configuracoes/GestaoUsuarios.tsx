@@ -9,9 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Shield, Users, Loader2, UserPlus, UserX, UserCheck, Trash2 } from 'lucide-react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -38,27 +37,18 @@ interface Permission {
 }
 
 const MODULOS = [
-  // Operação
   { key: 'dashboard', label: 'Dashboard', grupo: 'Operação' },
   { key: 'processos', label: 'Processos', grupo: 'Operação' },
   { key: 'clientes', label: 'Clientes', grupo: 'Operação' },
   { key: 'importar', label: 'Importar Planilha', grupo: 'Operação' },
-
-  // Comercial
   { key: 'orcamentos', label: 'Orçamentos', grupo: 'Comercial' },
   { key: 'catalogo', label: 'Portfólio & Preços', grupo: 'Comercial' },
-
-  // Financeiro
   { key: 'financeiro', label: 'Financeiro (Cobranças)', grupo: 'Financeiro' },
   { key: 'contas_pagar', label: 'Contas a Pagar', grupo: 'Financeiro' },
   { key: 'relatorios_dre', label: 'Relatórios DRE', grupo: 'Financeiro' },
   { key: 'fluxo_caixa', label: 'Fluxo de Caixa', grupo: 'Financeiro' },
-
-  // Gestão
   { key: 'colaboradores', label: 'Colaboradores', grupo: 'Gestão' },
   { key: 'intel_geografica', label: 'Inteligência Geográfica', grupo: 'Gestão' },
-
-  // Sistema
   { key: 'configuracoes', label: 'Configurações', grupo: 'Sistema' },
 ];
 
@@ -144,6 +134,7 @@ export default function GestaoUsuarios() {
   const [form, setForm] = useState({ nome: '', email: '', password: '', confirmPassword: '', role: 'operacional' });
   const [saving, setSaving] = useState(false);
   const [empresaId, setEmpresaId] = useState<string>('');
+  const [deleteConfirm, setDeleteConfirm] = useState<Profile | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -209,10 +200,8 @@ export default function GestaoUsuarios() {
   };
 
   const savePermissions = async (userId: string, empId: string) => {
-    // Delete all existing permissions for this user
     await supabase.from('user_permissions').delete().eq('user_id', userId) as any;
 
-    // Insert new permissions for all 13 modules
     const inserts = MODULOS.map(m => ({
       user_id: userId,
       empresa_id: empId,
@@ -231,7 +220,12 @@ export default function GestaoUsuarios() {
     if (editUser) {
       setSaving(true);
       try {
-        await supabase.from('profiles').update({ role: form.role, ativo: editUser.ativo, updated_at: new Date().toISOString() } as any).eq('id', editUser.id);
+        await supabase.from('profiles').update({
+          role: form.role,
+          ativo: editUser.ativo,
+          nome: form.nome || editUser.nome,
+          updated_at: new Date().toISOString(),
+        } as any).eq('id', editUser.id);
         await savePermissions(editUser.id, empresaId);
         toast.success('Usuário atualizado com sucesso!');
         setModalOpen(false);
@@ -270,11 +264,13 @@ export default function GestaoUsuarios() {
     loadData();
   };
 
-  const handleDeleteUser = async (profile: Profile) => {
+  const handleDeleteUser = async () => {
+    if (!deleteConfirm) return;
     try {
-      await supabase.from('user_permissions').delete().eq('user_id', profile.id) as any;
-      await supabase.from('profiles').delete().eq('id', profile.id) as any;
-      toast.success(`Usuário ${profile.nome || profile.email} excluído`);
+      await supabase.from('user_permissions').delete().eq('user_id', deleteConfirm.id) as any;
+      await supabase.from('profiles').delete().eq('id', deleteConfirm.id) as any;
+      toast.success(`Usuário ${deleteConfirm.nome || deleteConfirm.email} excluído`);
+      setDeleteConfirm(null);
       loadData();
     } catch (e: any) {
       toast.error('Erro ao excluir: ' + e.message);
@@ -310,7 +306,7 @@ export default function GestaoUsuarios() {
             </TableHeader>
             <TableBody>
               {profiles.map((p) => (
-                <TableRow key={p.id}>
+                <TableRow key={p.id} className={p.ativo === false ? 'bg-amber-500/5' : ''}>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
@@ -348,32 +344,19 @@ export default function GestaoUsuarios() {
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}>
                           <Shield className="h-3 w-3 mr-1" />Permissões
                         </Button>
-                         {p.ativo !== false && (
+                        {p.ativo !== false && (
                           <Button variant="ghost" size="sm" className="h-7" onClick={() => toggleAtivo(p)}>
                             <UserX className="h-3.5 w-3.5" />
                           </Button>
                         )}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Tem certeza que deseja excluir <strong>{p.nome || p.email}</strong>? Esta ação não pode ser desfeita.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDeleteUser(p)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                Excluir
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteConfirm(p)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                     ) : (
                       <span className="text-[10px] text-muted-foreground">—</span>
@@ -388,7 +371,10 @@ export default function GestaoUsuarios() {
 
       {/* MODAL: Criar/Editar Usuário */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+        <DialogContent
+          className="sm:max-w-2xl"
+          style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
               <Shield className="h-4 w-4 text-primary" />
@@ -402,7 +388,7 @@ export default function GestaoUsuarios() {
             )}
           </DialogHeader>
 
-          <div className="space-y-4 flex-1 min-h-0 flex flex-col">
+          <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-1">
             {/* Form fields for new user */}
             {!editUser && (
               <>
@@ -460,8 +446,11 @@ export default function GestaoUsuarios() {
               ))}
             </div>
 
-            {/* Permissions Grid grouped by section */}
-            <ScrollArea className="flex-1 border rounded-lg border-border/40">
+            {/* Permissions Grid — native scroll, no ScrollArea */}
+            <div
+              className="border rounded-lg border-border/40 overflow-y-auto"
+              style={{ maxHeight: '400px' }}
+            >
               <div className="p-3 space-y-5">
                 {GRUPOS.map(grupo => {
                   const modulosDoGrupo = MODULOS.filter(m => m.grupo === grupo);
@@ -492,7 +481,7 @@ export default function GestaoUsuarios() {
                   );
                 })}
               </div>
-            </ScrollArea>
+            </div>
           </div>
 
           <DialogFooter>
@@ -504,6 +493,28 @@ export default function GestaoUsuarios() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* DIALOG: Confirmar exclusão */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => !o && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{deleteConfirm?.nome || deleteConfirm?.email}</strong>?
+              Esta ação remove o perfil e todas as permissões. O usuário não poderá mais acessar o sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDeleteUser}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
