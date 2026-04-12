@@ -270,6 +270,17 @@ export default function GestaoUsuarios() {
     loadData();
   };
 
+  const handleDeleteUser = async (profile: Profile) => {
+    try {
+      await supabase.from('user_permissions').delete().eq('user_id', profile.id) as any;
+      await supabase.from('profiles').delete().eq('id', profile.id) as any;
+      toast.success(`Usuário ${profile.nome || profile.email} excluído`);
+      loadData();
+    } catch (e: any) {
+      toast.error('Erro ao excluir: ' + e.message);
+    }
+  };
+
   if (loading) {
     return <Card className="border-border/60"><CardContent className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></CardContent></Card>;
   }
