@@ -158,6 +158,63 @@ export default function OrcamentoNovo() {
     })();
   }, [editId, clientes]);
 
+  // Load and duplicate existing orcamento
+  useEffect(() => {
+    if (!duplicateId || editId) return;
+    (async () => {
+      const { data } = await supabase.from('orcamentos').select('*').eq('id', duplicateId).single();
+      if (!data) return;
+      const orc = data as any;
+
+      let itens: OrcamentoItem[] = [];
+      try {
+        const raw = orc.servicos as any;
+        if (Array.isArray(raw) && raw.length > 0) {
+          itens = raw.map(normalizeItem);
+        }
+      } catch { /* ignore */ }
+
+      const hasDetailedData = itens.some(i => i.taxa_min > 0 || i.taxa_max > 0 || i.prazo || i.docs_necessarios);
+      const modo: OrcamentoModo = (hasDetailedData || orc.contexto) ? 'detalhado' : 'simples';
+      const rawPacotes = orc.pacotes;
+      const rawSecoes = orc.secoes;
+      const selectedCliente = clientes?.find(c => c.id === orc.cliente_id);
+
+      setForm({
+        destinatario: (orc.destinatario as OrcamentoDestinatario) || 'contador',
+        prospect_nome: orc.prospect_nome + ' (cópia)',
+        prospect_cnpj: orc.prospect_cnpj || '',
+        prospect_email: orc.prospect_email || '',
+        prospect_telefone: orc.prospect_telefone || '',
+        prospect_contato: orc.prospect_contato || '',
+        escritorio_nome: selectedCliente?.apelido || selectedCliente?.nome || '',
+        escritorio_cnpj: selectedCliente?.cnpj || '',
+        escritorio_email: selectedCliente?.email || '',
+        escritorio_telefone: selectedCliente?.telefone || '',
+        cliente_id: orc.cliente_id || null,
+        modo,
+        contexto: orc.contexto || '',
+        ordem_execucao: orc.ordem_execucao || '',
+        itens: itens.length ? itens : [createItem()],
+        pacotes: Array.isArray(rawPacotes) ? rawPacotes : [],
+        secoes: Array.isArray(rawSecoes) && rawSecoes.length > 0 ? rawSecoes : [...DEFAULT_SECOES],
+        desconto_pct: orc.desconto_pct,
+        validade_dias: orc.validade_dias,
+        prazo_execucao: orc.prazo_execucao || '',
+        pagamento: orc.pagamento || '',
+        observacoes: orc.observacoes || '',
+        headline_cenario: orc.headline_cenario || '',
+        riscos: Array.isArray(orc.riscos) ? orc.riscos : [],
+        beneficios_capa: Array.isArray(orc.beneficios_capa) ? orc.beneficios_capa : [],
+        etapas_fluxo: Array.isArray(orc.etapas_fluxo) ? orc.etapas_fluxo : [],
+        cenarios: Array.isArray(orc.cenarios) ? orc.cenarios : [],
+        senha_link: '',
+      } as any);
+
+      toast.info('Orçamento duplicado! Edite e salve como novo.');
+    })();
+  }, [duplicateId, editId, clientes]);
+
   const subtotal = useMemo(() =>
     form.itens.reduce((s, i) => s + getItemValor(i) * i.quantidade, 0),
     [form.itens]
