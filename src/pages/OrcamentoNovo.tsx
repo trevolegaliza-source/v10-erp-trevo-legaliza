@@ -410,6 +410,36 @@ export default function OrcamentoNovo() {
     }
   }
 
+  function handleCopyLink() {
+    if (!orcamentoId) {
+      toast.error('Salve o orçamento primeiro para gerar o link.');
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from('orcamentos')
+        .select('share_token, senha_link')
+        .eq('id', orcamentoId)
+        .single();
+
+      if (!data || !(data as any).share_token) {
+        toast.error('Token não encontrado. Salve o orçamento novamente.');
+        return;
+      }
+
+      const url = `https://trevolegaliza.lovable.app/proposta/${(data as any).share_token}`;
+      navigator.clipboard.writeText(url);
+
+      if (form.destinatario === 'contador' && (form as any).senha_link) {
+        toast.success(`Link copiado! Senha: ${(form as any).senha_link}`);
+      } else if (form.destinatario === 'contador') {
+        toast.success('Link copiado! ⚠️ Sem senha definida.');
+      } else {
+        toast.success('Link copiado!');
+      }
+    })();
+  }
+
   function handleDuplicate() {
     setForm(f => ({ ...f, prospect_nome: f.prospect_nome + ' (cópia)' }));
     setOrcamentoId(null);
