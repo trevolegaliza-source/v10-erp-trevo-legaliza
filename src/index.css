@@ -495,3 +495,24 @@
   background: var(--glass-sidebar-hover);
   transition: background 0.3s ease;
 }
+
+/* PWA Mobile Fixes */
+@supports (padding: env(safe-area-inset-top)) {
+  .min-h-screen {
+    min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
+
+html {
+  overscroll-behavior-y: contain;
+}
+
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (display-mode: standalone) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
