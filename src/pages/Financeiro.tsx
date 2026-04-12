@@ -349,6 +349,10 @@ export default function Financeiro() {
               </TabsTrigger>
             </TabsList>
 
+            <TabsContent value="clientes" className="mt-4">
+              <ClientesFinanceiroTab />
+            </TabsContent>
+
             <TabsContent value="cobrar" className="mt-4">
               <ClientesFaturar clientes={clientesCobrar} />
               
