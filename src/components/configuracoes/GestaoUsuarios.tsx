@@ -330,78 +330,69 @@ export default function GestaoUsuarios() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table className="w-full table-fixed">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-xs uppercase w-[30%]">Usuário</TableHead>
-                <TableHead className="text-xs uppercase w-[12%]">Perfil</TableHead>
-                <TableHead className="text-xs uppercase w-[15%]">Status</TableHead>
-                <TableHead className="text-xs uppercase w-[13%]">Acesso</TableHead>
-                <TableHead className="text-xs uppercase text-right w-[30%]">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {profiles.map((p) => (
-                <TableRow key={p.id} className={p.ativo === false ? 'bg-amber-500/5' : ''}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                        {(p.nome || p.email || '?')[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{p.nome || p.email}</p>
-                        <p className="text-xs text-muted-foreground">{p.email}</p>
-                      </div>
+          <div className="space-y-3">
+            {profiles.map((p) => (
+              <div
+                key={p.id}
+                className={`border rounded-lg p-4 space-y-3 ${p.ativo === false ? 'border-amber-500/40 bg-amber-500/5' : 'border-border/60'}`}
+              >
+                {/* Row 1: Avatar + Name + Role */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                      {(p.nome || p.email || '?')[0].toUpperCase()}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`${ROLE_COLORS[p.role] || 'bg-muted text-muted-foreground'} border text-[10px] uppercase`}>
-                      {getRoleLabel(p.role)}{p.id === user?.id ? ' (você)' : ''}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{p.nome || p.email}</p>
+                      <p className="text-xs text-muted-foreground truncate">{p.email}</p>
+                    </div>
+                  </div>
+                  <Badge className={`${ROLE_COLORS[p.role] || 'bg-muted text-muted-foreground'} border text-[10px] uppercase shrink-0`}>
+                    {getRoleLabel(p.role)}{p.id === user?.id ? ' (você)' : ''}
+                  </Badge>
+                </div>
+
+                {/* Row 2: Status + Modules + Actions */}
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className={`text-[10px] ${p.ativo !== false ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500 animate-pulse'}`}>
                       {p.ativo !== false ? 'ATIVO' : '⏳ AGUARDANDO APROVAÇÃO'}
                     </Badge>
-                  </TableCell>
-                  <TableCell>
                     <span className="text-xs text-muted-foreground">
                       {p.role === 'master' ? '13 módulos' : `${getPermCount(p.id)} módulos com acesso`}
                     </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {p.id !== user?.id ? (
-                      <div className="flex justify-end gap-1">
-                        {p.ativo === false && (
-                          <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => toggleAtivo(p)}>
-                            <UserCheck className="h-3 w-3 mr-1" />Aprovar
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}>
-                          <Shield className="h-3 w-3 mr-1" />Permissões
+                  </div>
+                  {p.id !== user?.id ? (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {p.ativo === false && (
+                        <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => toggleAtivo(p)}>
+                          <UserCheck className="h-3 w-3 mr-1" />Aprovar
                         </Button>
-                        {p.ativo !== false && (
-                          <Button variant="ghost" size="sm" className="h-7" onClick={() => toggleAtivo(p)}>
-                            <UserX className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteConfirm(p)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}>
+                        <Shield className="h-3 w-3 mr-1" />Permissões
+                      </Button>
+                      {p.ativo !== false && (
+                        <Button variant="ghost" size="sm" className="h-7" onClick={() => toggleAtivo(p)}>
+                          <UserX className="h-3.5 w-3.5" />
                         </Button>
-                      </div>
-                    ) : (
-                      <span className="text-[10px] text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-destructive hover:text-destructive"
+                        onClick={() => setDeleteConfirm(p)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">—</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
