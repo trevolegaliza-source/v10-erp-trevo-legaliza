@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, ChevronDown, ChevronRight, FileText } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, FileText, Pencil, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -34,6 +35,9 @@ interface ProcessoResumido {
   etapa: string;
   valor: number | null;
   created_at: string;
+  notas: string | null;
+  auditado_financeiro: boolean;
+  auditado_em: string | null;
   lancamento_status: string | null;
   lancamento_etapa: string | null;
   lancamento_valor: number | null;
@@ -47,6 +51,8 @@ export default function ClientesFinanceiroTab() {
   const [filtroAuditado, setFiltroAuditado] = useState<'todos' | 'auditado' | 'pendente'>('todos');
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedProcessoId, setExpandedProcessoId] = useState<string | null>(null);
+  const [valoresAdicionaisId, setValoresAdicionaisId] = useState<string | null>(null);
 
   const { data: clientes = [], isLoading } = useQuery({
     queryKey: ['clientes_financeiro_tab'],
@@ -61,7 +67,7 @@ export default function ClientesFinanceiroTab() {
 
       const { data: processosData, error: pErr } = await supabase
         .from('processos')
-        .select('id, razao_social, tipo, etapa, valor, created_at, cliente_id')
+        .select('id, razao_social, tipo, etapa, valor, created_at, cliente_id, notas, auditado_financeiro, auditado_em')
         .eq('is_archived', false);
 
       if (pErr) throw pErr;
@@ -90,6 +96,9 @@ export default function ClientesFinanceiroTab() {
               etapa: p.etapa,
               valor: p.valor,
               created_at: p.created_at,
+              notas: p.notas,
+              auditado_financeiro: p.auditado_financeiro || false,
+              auditado_em: p.auditado_em,
               lancamento_status: lanc?.status || null,
               lancamento_etapa: lanc?.etapa_financeiro || null,
               lancamento_valor: lanc?.valor || null,
@@ -143,6 +152,8 @@ export default function ClientesFinanceiroTab() {
   const totalClientes = filtered.length;
   const totalAuditados = filtered.filter(c => c.auditado_financeiro).length;
   const totalPendentes = totalClientes - totalAuditados;
+  const totalProcessosAuditados = filtered.reduce((s, c) => s + c.processos.filter(p => p.auditado_financeiro).length, 0);
+  const totalProcessos = filtered.reduce((s, c) => s + c.processos.length, 0);
 
   async function toggleAuditado(clienteId: string, atual: boolean) {
     const novoValor = !atual;
@@ -154,14 +165,47 @@ export default function ClientesFinanceiroTab() {
     toast.success(novoValor ? 'Cliente marcado como auditado ✅' : 'Auditoria removida');
   }
 
+  async function toggleProcessoAuditado(processoId: string, atual: boolean) {
+    const novoValor = !atual;
+    await supabase.from('processos').update({
+      auditado_financeiro: novoValor,
+      auditado_em: novoValor ? new Date().toISOString() : null,
+    } as any).eq('id', processoId);
+
+    // Auto-audit client if all processes are audited
+    const cliente = clientes.find(c => c.processos.some(p => p.id === processoId));
+    if (cliente && novoValor) {
+      const todosAuditados = cliente.processos.every(p =>
+        p.id === processoId ? true : p.auditado_financeiro
+      );
+      if (todosAuditados) {
+        await supabase.from('clientes').update({
+          auditado_financeiro: true,
+          auditado_em: new Date().toISOString(),
+        } as any).eq('id', cliente.id);
+        toast.success('Todos os processos auditados — cliente marcado como auditado ✅');
+      } else {
+        toast.success('Processo auditado ✅');
+      }
+    } else {
+      toast.success(novoValor ? 'Processo auditado ✅' : 'Auditoria do processo removida');
+    }
+
+    qc.invalidateQueries({ queryKey: ['clientes_financeiro_tab'] });
+  }
+
+  async function salvarObservacao(processoId: string, texto: string) {
+    await supabase.from('processos').update({ notas: texto } as any).eq('id', processoId);
+    toast.success('Observação salva');
+  }
+
   function getResumo(c: ClienteFinanceiro) {
     const total = c.processos.reduce((s, p) => s + (p.lancamento_valor || p.valor || 0), 0);
     const pago = c.processos.filter(p => p.lancamento_status === 'pago').reduce((s, p) => s + (p.lancamento_valor || 0), 0);
     const pendente = total - pago;
-    const qtdPago = c.processos.filter(p => p.lancamento_status === 'pago').length;
     const qtdPendente = c.processos.filter(p => p.lancamento_status !== 'pago').length;
     const qtdSemLanc = c.processos.filter(p => !p.lancamento_status).length;
-    return { total, pago, pendente, qtdPago, qtdPendente, qtdSemLanc };
+    return { total, pago, pendente, qtdPendente, qtdSemLanc };
   }
 
   if (isLoading) {
@@ -171,7 +215,7 @@ export default function ClientesFinanceiroTab() {
   return (
     <div className="space-y-4">
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="bg-card border rounded-lg p-4 text-center">
           <p className="text-xs text-muted-foreground uppercase">Total Clientes</p>
           <p className="text-2xl font-bold">{totalClientes}</p>
@@ -183,6 +227,13 @@ export default function ClientesFinanceiroTab() {
         <div className="bg-card border rounded-lg p-4 text-center">
           <p className="text-xs text-muted-foreground uppercase">Pendentes Auditoria</p>
           <p className="text-2xl font-bold text-amber-500">{totalPendentes}</p>
+        </div>
+        <div className="bg-card border rounded-lg p-4 text-center">
+          <p className="text-xs text-muted-foreground uppercase">Processos Auditados</p>
+          <p className="text-2xl font-bold text-blue-500">
+            {totalProcessosAuditados}
+            <span className="text-sm text-muted-foreground font-normal"> / {totalProcessos}</span>
+          </p>
         </div>
       </div>
 
@@ -230,7 +281,7 @@ export default function ClientesFinanceiroTab() {
             <div key={c.id} className={cn("border rounded-lg overflow-hidden", c.auditado_financeiro ? "border-primary/30 bg-primary/5" : "")}>
               <div
                 className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50"
-                onClick={() => setExpandedId(isExpanded ? null : c.id)}
+                onClick={() => { setExpandedId(isExpanded ? null : c.id); setExpandedProcessoId(null); }}
               >
                 <Checkbox
                   checked={c.auditado_financeiro}
@@ -288,39 +339,100 @@ export default function ClientesFinanceiroTab() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="text-xs text-muted-foreground border-b">
+                          <th className="text-left py-2 font-medium w-8"></th>
                           <th className="text-left py-2 font-medium">Razão Social</th>
                           <th className="text-left py-2 font-medium">Tipo</th>
                           <th className="text-left py-2 font-medium">Etapa</th>
                           <th className="text-right py-2 font-medium">Valor</th>
                           <th className="text-left py-2 font-medium">Financeiro</th>
                           <th className="text-left py-2 font-medium">Vencimento</th>
+                          <th className="text-left py-2 font-medium w-8"></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {c.processos.map(p => (
-                          <tr key={p.id} className="border-b border-muted last:border-0">
-                            <td className="py-2 font-medium">{p.razao_social}</td>
-                            <td className="py-2">
-                              <Badge variant="outline" className="text-[10px]">{p.tipo}</Badge>
-                            </td>
-                            <td className="py-2 text-xs text-muted-foreground">{p.etapa}</td>
-                            <td className="py-2 text-right font-medium">{fmt(p.lancamento_valor || p.valor || 0)}</td>
-                            <td className="py-2">
-                              {p.lancamento_status === 'pago' ? (
-                                <Badge className="text-[10px] bg-primary/20 text-primary">Pago</Badge>
-                              ) : p.lancamento_etapa === 'cobranca_enviada' ? (
-                                <Badge className="text-[10px] bg-blue-500/20 text-blue-500">Enviado</Badge>
-                              ) : p.lancamento_etapa === 'solicitacao_criada' ? (
-                                <Badge className="text-[10px] bg-amber-500/20 text-amber-500">Cobrar</Badge>
-                              ) : (
-                                <Badge variant="destructive" className="text-[10px]">Sem lançamento</Badge>
+                        {c.processos.map(p => {
+                          const isProcessoExpanded = expandedProcessoId === p.id;
+
+                          return (
+                            <React.Fragment key={p.id}>
+                              <tr
+                                className="border-b border-muted cursor-pointer hover:bg-muted/30"
+                                onClick={() => setExpandedProcessoId(isProcessoExpanded ? null : p.id)}
+                              >
+                                <td className="py-2">
+                                  <Checkbox
+                                    checked={p.auditado_financeiro}
+                                    onCheckedChange={() => toggleProcessoAuditado(p.id, p.auditado_financeiro)}
+                                    onClick={e => e.stopPropagation()}
+                                    className="h-4 w-4"
+                                  />
+                                </td>
+                                <td className="py-2 font-medium">
+                                  <div className="flex items-center gap-2">
+                                    {isProcessoExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                    {p.razao_social}
+                                  </div>
+                                </td>
+                                <td className="py-2">
+                                  <Badge variant="outline" className="text-[10px]">{p.tipo}</Badge>
+                                </td>
+                                <td className="py-2 text-xs text-muted-foreground">{p.etapa}</td>
+                                <td className="py-2 text-right font-medium">{fmt(p.lancamento_valor || p.valor || 0)}</td>
+                                <td className="py-2">
+                                  {p.lancamento_status === 'pago' ? (
+                                    <Badge className="text-[10px] bg-primary/20 text-primary">Pago</Badge>
+                                  ) : p.lancamento_etapa === 'cobranca_enviada' ? (
+                                    <Badge className="text-[10px] bg-blue-500/20 text-blue-500">Enviado</Badge>
+                                  ) : p.lancamento_etapa === 'solicitacao_criada' ? (
+                                    <Badge className="text-[10px] bg-amber-500/20 text-amber-500">Cobrar</Badge>
+                                  ) : (
+                                    <Badge variant="destructive" className="text-[10px]">Sem lançamento</Badge>
+                                  )}
+                                </td>
+                                <td className="py-2 text-xs text-muted-foreground">
+                                  {p.lancamento_data_vencimento ? new Date(p.lancamento_data_vencimento).toLocaleDateString('pt-BR') : '—'}
+                                </td>
+                                <td className="py-2">
+                                  {p.auditado_financeiro && <span className="text-[10px] text-primary">✅</span>}
+                                </td>
+                              </tr>
+
+                              {isProcessoExpanded && (
+                                <tr>
+                                  <td colSpan={8} className="py-3 px-4 bg-muted/20">
+                                    <div className="space-y-3">
+                                      <div className="flex gap-4 text-xs text-muted-foreground">
+                                        <span>Criado em: {p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—'}</span>
+                                        <span>Etapa: {p.etapa}</span>
+                                        {p.auditado_em && <span>Auditado em: {new Date(p.auditado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
+                                      </div>
+
+                                      <div>
+                                        <label className="text-xs font-medium text-muted-foreground">Observações financeiras</label>
+                                        <textarea
+                                          className="w-full mt-1 px-3 py-2 text-sm border rounded-lg bg-background resize-none"
+                                          rows={2}
+                                          defaultValue={p.notas || ''}
+                                          placeholder="Notas sobre cobrança, taxas adicionais, acordos..."
+                                          onBlur={e => salvarObservacao(p.id, e.target.value)}
+                                        />
+                                      </div>
+
+                                      <div className="flex gap-2">
+                                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={e => { e.stopPropagation(); setValoresAdicionaisId(p.id); }}>
+                                          <DollarSign className="h-3 w-3 mr-1" /> Valores Adicionais
+                                        </Button>
+                                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={e => { e.stopPropagation(); window.open(`/clientes/${c.id}`, '_blank'); }}>
+                                          <FileText className="h-3 w-3 mr-1" /> Ver Cliente
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
                               )}
-                            </td>
-                            <td className="py-2 text-xs text-muted-foreground">
-                              {p.lancamento_data_vencimento ? new Date(p.lancamento_data_vencimento).toLocaleDateString('pt-BR') : '—'}
-                            </td>
-                          </tr>
-                        ))}
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </table>
                   )}
@@ -341,6 +453,16 @@ export default function ClientesFinanceiroTab() {
           );
         })}
       </div>
+
+      {/* Modal valores adicionais */}
+      {valoresAdicionaisId && (
+        <ValoresAdicionaisModal
+          open={!!valoresAdicionaisId}
+          onOpenChange={(open) => { if (!open) setValoresAdicionaisId(null); }}
+          processoId={valoresAdicionaisId}
+          clienteApelido=""
+        />
+      )}
     </div>
   );
 }
