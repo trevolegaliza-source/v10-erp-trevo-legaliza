@@ -134,6 +134,7 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
     tipo: string;
     data_deferimento_atual: string | null;
   }>>([]);
+  const [extratoGerado, setExtratoGerado] = useState<{ blob: Blob; filename: string; clienteId: string; total: number } | null>(null);
   const { salvarExtrato } = useExtratos();
   const qc = useQueryClient();
 
@@ -149,7 +150,6 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
     const selecionados = lancSemExtrato.filter(l => selected.has(l.id));
     if (selecionados.length === 0) { toast.warning('Selecione ao menos um processo.'); return; }
 
-    // Verificar se cliente tem faturamento por deferimento
     const { data: clienteCheck } = await supabase
       .from('clientes')
       .select('momento_faturamento, nome')
@@ -157,7 +157,6 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
       .single();
 
     if (clienteCheck?.momento_faturamento === 'no_deferimento') {
-      // Buscar dados dos processos para o modal
       const processoIds = selecionados.map(l => l.processo_id).filter(Boolean);
       const { data: processosData } = await supabase
         .from('processos')
@@ -174,7 +173,6 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
       return;
     }
 
-    // Fluxo normal (sem deferimento)
     await executarGeracaoExtrato(selecionados);
   }
 
@@ -242,7 +240,7 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
       const clienteName = clienteData?.apelido || clienteData?.nome || 'extrato';
       const filename = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-      // Download
+      // Download (backup)
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -266,11 +264,66 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
 
       setSelected(new Set());
       invalidateFinanceiro(qc);
+
+      // Show post-extrato action modal
+      setExtratoGerado({ blob, filename, clienteId: cliente.cliente_id, total: result.totalGeral });
     } catch (err: any) {
       toast.error('Erro ao gerar extrato: ' + err.message);
     } finally {
       setGenerating(false);
     }
+  }
+
+  async function handleWhatsAppPosExtrato() {
+    if (!extratoGerado) return;
+    const lancamentosComProcesso = cliente.lancamentos.filter(l => l.processo_id);
+    const processoIds = [...new Set(lancamentosComProcesso.map(l => l.processo_id).filter(Boolean))] as string[];
+    const vaMap: Record<string, number> = {};
+    if (processoIds.length > 0) {
+      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
+      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+    }
+    const l = cliente.lancamentos[0];
+    if (!l) return;
+    const valorPrimeiro = l.valor + (l.processo_id ? (vaMap[l.processo_id] || 0) : 0);
+    const adicionais = cliente.lancamentos.slice(1).map(item => ({
+      tipo: item.processo_tipo, razao_social: item.processo_razao_social,
+      valor: item.valor + (item.processo_id ? (vaMap[item.processo_id] || 0) : 0),
+    }));
+    const msg = gerarMensagemCobranca({
+      tipo: l.processo_tipo, razao_social: l.processo_razao_social, valor: valorPrimeiro,
+      data_vencimento: l.data_vencimento, diasAtraso: 0,
+      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
+    });
+    const { data: clienteData } = await supabase.from('clientes').select('telefone').eq('id', extratoGerado.clienteId).single();
+    const telefone = (clienteData as any)?.telefone?.replace(/\D/g, '') || '';
+    const msgEncoded = encodeURIComponent(msg);
+    if (telefone) {
+      const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
+      window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
+    } else {
+      window.open(`https://wa.me/?text=${msgEncoded}`, '_blank');
+      toast.info('Telefone não cadastrado. Escolha o contato no WhatsApp.');
+    }
+    setExtratoGerado(null);
+  }
+
+  async function handleCompartilharPosExtrato() {
+    if (!extratoGerado) return;
+    try {
+      const file = new File([extratoGerado.blob], extratoGerado.filename, { type: 'application/pdf' });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: 'Extrato Trevo Legaliza', files: [file] });
+      } else {
+        const url = URL.createObjectURL(extratoGerado.blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = extratoGerado.filename; a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') toast.error('Erro ao compartilhar: ' + err.message);
+    }
+    setExtratoGerado(null);
   }
 
   const nenhumDeferido = isDeferimento && cliente.lancamentos.every(l => {
