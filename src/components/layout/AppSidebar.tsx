@@ -1,10 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Kanban, Users, DollarSign, Settings,
-  ChevronLeft, ChevronRight, PlusCircle, ArrowUpCircle, LogOut, UsersRound, Receipt, MapPin, BookOpen, Upload, BarChart3,
+  PlusCircle, ArrowUpCircle, LogOut, UsersRound, Receipt, MapPin, BookOpen, Upload, BarChart3, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSidebarCounts } from '@/hooks/useSidebarCounts';
@@ -21,7 +20,6 @@ const navItems = [
   { path: '/financeiro', label: 'Financeiro', icon: DollarSign, badgeKey: 'pendentesFinanceiro' as const, modulo: 'financeiro' },
   { path: '/contas-pagar', label: 'Contas a Pagar', icon: ArrowUpCircle, badgeKey: null, modulo: 'contas_pagar' },
   { path: '/colaboradores', label: 'Colaboradores', icon: UsersRound, badgeKey: null, modulo: 'colaboradores' },
-  
   { path: '/relatorios/dre', label: 'Relatórios (DRE)', icon: BarChart3, badgeKey: null, modulo: 'relatorios_dre' },
   { path: '/relatorios/fluxo-caixa', label: 'Fluxo de Caixa', icon: ArrowUpCircle, badgeKey: null, modulo: 'fluxo_caixa' },
   { path: '/inteligencia-geografica', label: 'Intel. Geográfica', icon: MapPin, badgeKey: null, modulo: 'intel_geografica' },
@@ -44,9 +42,13 @@ const badgeColors: Record<BadgeVariant, string> = {
   info: 'bg-blue-500/20 text-blue-500',
 };
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
   const { signOut, user } = useAuth();
   const { data: counts } = useSidebarCounts();
   const { podeVer, loading: permsLoading } = usePermissions();
@@ -56,23 +58,28 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-sidebar-border bg-sidebar/80 glass sidebar-glass text-sidebar-foreground transition-all duration-300',
-        collapsed ? 'w-16' : 'w-60'
+        'fixed top-0 z-50 flex h-screen w-60 flex-col border-r border-sidebar-border bg-sidebar/95 backdrop-blur-md text-sidebar-foreground transition-transform duration-300',
+        'lg:translate-x-0 lg:z-40',
+        open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       )}
     >
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2.5 border-b border-sidebar-border px-3">
-        <img
-          src={logoTrevo}
-          alt="Trevo Legaliza"
-          className={cn('shrink-0 logo-pulse transition-all', collapsed ? 'h-9 w-9 object-contain' : 'h-10 w-auto')}
-        />
-        {!collapsed && (
+      {/* Logo + Close (mobile) */}
+      <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-3">
+        <div className="flex items-center gap-2.5">
+          <img src={logoTrevo} alt="Trevo Legaliza" className="h-10 w-auto shrink-0 logo-pulse" />
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold tracking-tight truncate">Trevo Legaliza</span>
             <span className="text-[10px] text-sidebar-foreground/60">Controladoria & Gestão</span>
           </div>
-        )}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden h-8 w-8 text-sidebar-foreground/60"
+          onClick={onClose}
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Nav */}
@@ -81,12 +88,10 @@ export function AppSidebar() {
           Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="flex items-center gap-3 rounded-lg px-3 py-2.5">
               <div className="h-4.5 w-4.5 shrink-0 rounded bg-sidebar-foreground/10 animate-pulse" />
-              {!collapsed && (
-                <div
-                  className="h-3.5 rounded bg-sidebar-foreground/10 animate-pulse"
-                  style={{ width: `${[70, 50, 80, 40, 65, 55][i]}%` }}
-                />
-              )}
+              <div
+                className="h-3.5 rounded bg-sidebar-foreground/10 animate-pulse"
+                style={{ width: `${[70, 50, 80, 40, 65, 55][i]}%` }}
+              />
             </div>
           ))
         ) : (
@@ -99,6 +104,7 @@ export function AppSidebar() {
               <Link
                 key={item.path}
                 to={item.path}
+                onClick={onClose}
                 className={cn(
                   'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   isActive
@@ -107,18 +113,14 @@ export function AppSidebar() {
                 )}
               >
                 <item.icon className={cn('h-4.5 w-4.5 shrink-0 transition-all', isActive && 'icon-glow text-primary')} />
-                {!collapsed && (
-                  <>
-                    <span className="flex-1 truncate">{item.label}</span>
-                    {badgeCount > 0 && (
-                      <span className={cn(
-                        'ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full',
-                        badgeColors[variant]
-                      )}>
-                        {badgeCount}
-                      </span>
-                    )}
-                  </>
+                <span className="flex-1 truncate">{item.label}</span>
+                {badgeCount > 0 && (
+                  <span className={cn(
+                    'ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full',
+                    badgeColors[variant]
+                  )}>
+                    {badgeCount}
+                  </span>
                 )}
               </Link>
             );
@@ -128,7 +130,7 @@ export function AppSidebar() {
 
       {/* User & Actions */}
       <div className="border-t border-sidebar-border p-2 space-y-1">
-        {!collapsed && user && (
+        {user && (
           <p className="text-[10px] text-sidebar-foreground/50 px-3 truncate">{user.email}</p>
         )}
         <Button
@@ -138,16 +140,7 @@ export function AppSidebar() {
           className="w-full justify-start gap-2 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
           <LogOut className="h-4 w-4 shrink-0" />
-          {!collapsed && <span className="text-xs">Sair</span>}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          style={{ willChange: 'auto', backfaceVisibility: 'hidden' }}
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          <span className="text-xs">Sair</span>
         </Button>
       </div>
     </aside>
