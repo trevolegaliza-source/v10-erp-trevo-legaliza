@@ -23,8 +23,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
+
+      if (session?.user) {
+        // Check if profile exists — use setTimeout to avoid Supabase deadlock on auth state change
+        setTimeout(async () => {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('id', session.user.id)
+              .maybeSingle();
+
+            if (!profile) {
+              // Find master's empresa_id to link new user
+              const { data: masterProfile } = await supabase
+                .from('profiles')
+                .select('empresa_id')
+                .eq('role', 'master')
+                .limit(1)
+                .single();
+
+              const empresaId = masterProfile?.empresa_id || '';
+
+              // Create inactive profile
+              await supabase.from('profiles').insert({
+                id: session.user.id,
+                email: session.user.email,
+                nome: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Novo Usuário',
+                role: 'usuario',
+                ativo: false,
+                empresa_id: empresaId,
+              } as any);
+
+              // Notify admin
+              await supabase.from('notificacoes').insert({
+                tipo: 'aprovacao',
+                titulo: '👤 NOVO USUÁRIO AGUARDANDO APROVAÇÃO',
+                mensagem: `${session.user.email} solicitou acesso ao sistema. Vá em Configurações → Usuários para aprovar.`,
+                empresa_id: empresaId || null,
+              } as any);
+            }
+          } catch (err) {
+            console.error('Error checking/creating profile:', err);
+          }
+        }, 0);
+      }
+
       setLoading(false);
     });
 

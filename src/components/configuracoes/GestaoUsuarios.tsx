@@ -68,6 +68,7 @@ const ROLES = [
   { value: 'financeiro', label: 'Financeiro' },
   { value: 'operacional', label: 'Operacional' },
   { value: 'visualizador', label: 'Visualizador' },
+  { value: 'usuario', label: 'Usuário' },
 ];
 
 const ROLE_COLORS: Record<string, string> = {
@@ -75,6 +76,7 @@ const ROLE_COLORS: Record<string, string> = {
   financeiro: 'bg-blue-500/15 text-blue-500 border-blue-500/30',
   operacional: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
   visualizador: 'bg-gray-500/15 text-gray-500 border-gray-500/30',
+  usuario: 'bg-purple-500/15 text-purple-500 border-purple-500/30',
 };
 
 const ROLE_PRESETS: Record<string, Record<string, boolean[]>> = {
@@ -314,8 +316,8 @@ export default function GestaoUsuarios() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={`text-[10px] ${p.ativo !== false ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
-                      {p.ativo !== false ? 'ATIVO' : 'INATIVO'}
+                    <Badge variant="outline" className={`text-[10px] ${p.ativo !== false ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500 animate-pulse'}`}>
+                      {p.ativo !== false ? 'ATIVO' : '⏳ AGUARDANDO APROVAÇÃO'}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -326,12 +328,19 @@ export default function GestaoUsuarios() {
                   <TableCell className="text-right">
                     {p.id !== user?.id ? (
                       <div className="flex justify-end gap-1">
+                        {p.ativo === false && (
+                          <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => toggleAtivo(p)}>
+                            <UserCheck className="h-3 w-3 mr-1" />Aprovar
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}>
                           <Shield className="h-3 w-3 mr-1" />Permissões
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-7" onClick={() => toggleAtivo(p)}>
-                          {p.ativo !== false ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
-                        </Button>
+                        {p.ativo !== false && (
+                          <Button variant="ghost" size="sm" className="h-7" onClick={() => toggleAtivo(p)}>
+                            <UserX className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       <span className="text-[10px] text-muted-foreground">—</span>
