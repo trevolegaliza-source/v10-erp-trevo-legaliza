@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Shield, Users, Loader2, UserPlus, UserX, UserCheck } from 'lucide-react';
+import { Shield, Users, Loader2, UserPlus, UserX, UserCheck, Trash2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -269,6 +270,17 @@ export default function GestaoUsuarios() {
     loadData();
   };
 
+  const handleDeleteUser = async (profile: Profile) => {
+    try {
+      await supabase.from('user_permissions').delete().eq('user_id', profile.id) as any;
+      await supabase.from('profiles').delete().eq('id', profile.id) as any;
+      toast.success(`Usuário ${profile.nome || profile.email} excluído`);
+      loadData();
+    } catch (e: any) {
+      toast.error('Erro ao excluir: ' + e.message);
+    }
+  };
+
   if (loading) {
     return <Card className="border-border/60"><CardContent className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></CardContent></Card>;
   }
@@ -336,11 +348,32 @@ export default function GestaoUsuarios() {
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}>
                           <Shield className="h-3 w-3 mr-1" />Permissões
                         </Button>
-                        {p.ativo !== false && (
+                         {p.ativo !== false && (
                           <Button variant="ghost" size="sm" className="h-7" onClick={() => toggleAtivo(p)}>
                             <UserX className="h-3.5 w-3.5" />
                           </Button>
                         )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja excluir <strong>{p.nome || p.email}</strong>? Esta ação não pode ser desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteUser(p)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     ) : (
                       <span className="text-[10px] text-muted-foreground">—</span>
