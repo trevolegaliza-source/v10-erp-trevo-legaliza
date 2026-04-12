@@ -388,7 +388,7 @@ export default function GestaoUsuarios() {
 
       {/* MODAL: Criar/Editar Usuário */}
       <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
               <Shield className="h-4 w-4 text-primary" />
