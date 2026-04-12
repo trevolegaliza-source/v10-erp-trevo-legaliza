@@ -200,7 +200,11 @@ export default function GestaoUsuarios() {
   };
 
   const savePermissions = async (userId: string, empId: string) => {
-    await supabase.from('user_permissions').delete().eq('user_id', userId) as any;
+    const { error: delError } = await supabase.from('user_permissions').delete().eq('user_id', userId) as any;
+    if (delError) {
+      console.error('Erro ao deletar permissões antigas:', delError);
+      throw new Error('Erro ao limpar permissões: ' + delError.message);
+    }
 
     const inserts = MODULOS.map(m => ({
       user_id: userId,
@@ -213,23 +217,34 @@ export default function GestaoUsuarios() {
       pode_aprovar: editPerms[m.key]?.[4] || false,
     }));
 
-    await supabase.from('user_permissions').insert(inserts as any);
+    const { error: insError } = await supabase.from('user_permissions').insert(inserts as any);
+    if (insError) {
+      console.error('Erro ao inserir permissões:', insError);
+      throw new Error('Erro ao salvar permissões: ' + insError.message);
+    }
   };
 
   const handleSave = async () => {
     if (editUser) {
       setSaving(true);
       try {
-        await supabase.from('profiles').update({
+        const { error: updateError } = await supabase.from('profiles').update({
           role: form.role,
           ativo: editUser.ativo,
           nome: form.nome || editUser.nome,
           updated_at: new Date().toISOString(),
         } as any).eq('id', editUser.id);
+
+        if (updateError) {
+          toast.error('Erro ao atualizar perfil: ' + updateError.message);
+          setSaving(false);
+          return;
+        }
+
         await savePermissions(editUser.id, empresaId);
         toast.success('Usuário atualizado com sucesso!');
         setModalOpen(false);
-        loadData();
+        await loadData();
       } catch (e: any) { toast.error('Erro: ' + e.message); }
       finally { setSaving(false); }
     } else {
@@ -267,12 +282,33 @@ export default function GestaoUsuarios() {
   const handleDeleteUser = async () => {
     if (!deleteConfirm) return;
     try {
-      await supabase.from('user_permissions').delete().eq('user_id', deleteConfirm.id) as any;
-      await supabase.from('profiles').delete().eq('id', deleteConfirm.id) as any;
+      const { error: permError } = await supabase
+        .from('user_permissions')
+        .delete()
+        .eq('user_id', deleteConfirm.id) as any;
+
+      if (permError) {
+        console.error('Erro ao deletar permissões:', permError);
+        toast.error('Erro ao deletar permissões: ' + permError.message);
+        return;
+      }
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', deleteConfirm.id) as any;
+
+      if (profileError) {
+        console.error('Erro ao deletar profile:', profileError);
+        toast.error('Erro ao deletar usuário: ' + profileError.message);
+        return;
+      }
+
       toast.success(`Usuário ${deleteConfirm.nome || deleteConfirm.email} excluído`);
       setDeleteConfirm(null);
-      loadData();
+      await loadData();
     } catch (e: any) {
+      console.error('Erro geral:', e);
       toast.error('Erro ao excluir: ' + e.message);
     }
   };
@@ -283,7 +319,7 @@ export default function GestaoUsuarios() {
 
   return (
     <>
-      <Card className="border-border/60">
+      <Card className="border-border/60 w-full">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -294,14 +330,14 @@ export default function GestaoUsuarios() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="w-full table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs uppercase">Usuário</TableHead>
-                <TableHead className="text-xs uppercase">Perfil</TableHead>
-                <TableHead className="text-xs uppercase">Status</TableHead>
-                <TableHead className="text-xs uppercase">Acesso</TableHead>
-                <TableHead className="text-xs uppercase text-right">Ações</TableHead>
+                <TableHead className="text-xs uppercase w-[30%]">Usuário</TableHead>
+                <TableHead className="text-xs uppercase w-[12%]">Perfil</TableHead>
+                <TableHead className="text-xs uppercase w-[15%]">Status</TableHead>
+                <TableHead className="text-xs uppercase w-[13%]">Acesso</TableHead>
+                <TableHead className="text-xs uppercase text-right w-[30%]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
