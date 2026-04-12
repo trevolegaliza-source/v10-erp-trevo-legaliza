@@ -672,7 +672,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       if (!fileData) { toast.error('Erro ao carregar extrato.'); return; }
       const file = new File([fileData], (extrato as any).filename, { type: 'application/pdf' });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title: `Extrato - ${cliente.cliente_apelido || cliente.cliente_nome}`, text: 'Extrato de serviços Trevo Legaliza', files: [file] });
+        await navigator.share({ title: 'Extrato Trevo Legaliza', files: [file] });
         toast.success('Compartilhado!');
       } else {
         const url = URL.createObjectURL(fileData);
@@ -907,7 +907,7 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
       if (!fileData) { toast.error('Erro ao carregar extrato.'); return; }
       const file = new File([fileData], (extrato as any).filename, { type: 'application/pdf' });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title: `Extrato - ${cliente.cliente_apelido || cliente.cliente_nome}`, text: 'Extrato de serviços Trevo Legaliza', files: [file] });
+        await navigator.share({ title: 'Extrato Trevo Legaliza', files: [file] });
       } else {
         const url = URL.createObjectURL(fileData);
         const a = document.createElement('a'); a.href = url; a.download = (extrato as any).filename; a.click();
