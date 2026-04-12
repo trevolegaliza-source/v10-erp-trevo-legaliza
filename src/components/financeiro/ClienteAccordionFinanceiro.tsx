@@ -95,14 +95,33 @@ function tipoLabel(c: ClienteFinanceiro): string {
 // ══════════ TAB: FATURAR ══════════
 export function ClientesFaturar({ clientes }: { clientes: ClienteFinanceiro[] }) {
   if (clientes.length === 0) return <EmptyState text="Nenhum cliente aguardando geração de extrato." />;
+
+  const prontos = clientes.filter(c => c.cliente_momento_faturamento !== 'no_deferimento');
+  const aguardandoDef = clientes.filter(c => c.cliente_momento_faturamento === 'no_deferimento');
+
   return (
-    <Accordion type="multiple" className="space-y-2">
-      {clientes.map(c => <FaturarItem key={c.cliente_id} cliente={c} />)}
-    </Accordion>
+    <div className="space-y-6">
+      {prontos.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5">✅ Prontos para cobrar</h3>
+          <Accordion type="multiple" className="space-y-2">
+            {prontos.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={false} />)}
+          </Accordion>
+        </div>
+      )}
+      {aguardandoDef.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">⏳ Aguardando deferimento — não cobrar ainda</h3>
+          <Accordion type="multiple" className="space-y-2">
+            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={true} />)}
+          </Accordion>
+        </div>
+      )}
+    </div>
   );
 }
 
-function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
+function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinanceiro; isDeferimento?: boolean }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [taxaModalOpen, setTaxaModalOpen] = useState(false);
@@ -254,23 +273,28 @@ function FaturarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
   }
 
+  const nenhumDeferido = isDeferimento && cliente.lancamentos.every(l => {
+    // Check if processo has no deferimento date — we approximate by checking etapa
+    return l.processo_etapa ? ['recebidos', 'analise_documental', 'contrato', 'viabilidade', 'dbe', 'vre', 'aguardando_pagamento', 'taxa_paga', 'assinaturas', 'assinado', 'em_analise'].includes(l.processo_etapa) : true;
+  });
+
   return (
-    <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
+    <AccordionItem value={cliente.cliente_id} className={cn("border rounded-lg bg-card", isDeferimento && "border-dashed opacity-60")}>
       <AccordionTrigger className="px-4 py-3 hover:no-underline">
         <div className="flex items-center gap-3 flex-1 text-left">
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
+            <p className="font-semibold text-sm break-words">{cliente.cliente_apelido || cliente.cliente_nome}</p>
             <p className="text-xs text-muted-foreground">
               {cliente.qtd_processos} proc. · {fmt(cliente.total_faturado)} · {tipoLabel(cliente)}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
             <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs">
               {cliente.qtd_sem_extrato} sem extrato
             </Badge>
             {cliente.qtd_aguardando_deferimento > 0 && (
-              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-xs">
-                Ag. deferimento ({cliente.qtd_aguardando_deferimento})
+              <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30 text-xs">
+                ⏳ {cliente.qtd_aguardando_deferimento} proc. aguardando deferimento — NÃO COBRAR
               </Badge>
             )}
             <MoverParaMenu cliente={cliente} />
