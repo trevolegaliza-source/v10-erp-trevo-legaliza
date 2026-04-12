@@ -36,9 +36,15 @@ export function usePermissions(): UsePermissionsReturn {
     const load = async () => {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role, empresa_id')
+        .select('role, empresa_id, ativo')
         .eq('id', user.id)
         .single() as any;
+
+      if (profile && profile.ativo === false) {
+        setRole('inativo');
+        setLoading(false);
+        return;
+      }
 
       if (profile) {
         setRole(profile.role);
