@@ -520,6 +520,66 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     toast.success('Cobrança marcada como enviada!');
   }
 
+  async function handleEnviarWhatsApp() {
+    const lancamentosComProcesso = cliente.lancamentos.filter(l => l.processo_id);
+    const processoIds = [...new Set(lancamentosComProcesso.map(l => l.processo_id).filter(Boolean))] as string[];
+    const vaMap: Record<string, number> = {};
+    if (processoIds.length > 0) {
+      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
+      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+    }
+    const l = cliente.lancamentos[0];
+    const valorPrimeiro = l.valor + (l.processo_id ? (vaMap[l.processo_id] || 0) : 0);
+    const adicionais = cliente.lancamentos.slice(1).map(item => ({
+      tipo: item.processo_tipo, razao_social: item.processo_razao_social,
+      valor: item.valor + (item.processo_id ? (vaMap[item.processo_id] || 0) : 0),
+    }));
+    const msg = gerarMensagemCobranca({
+      tipo: l.processo_tipo, razao_social: l.processo_razao_social, valor: valorPrimeiro,
+      data_vencimento: l.data_vencimento, diasAtraso: 0,
+      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
+    });
+    const { data: clienteData } = await supabase.from('clientes').select('telefone').eq('id', cliente.cliente_id).single();
+    const telefone = (clienteData as any)?.telefone?.replace(/\D/g, '') || '';
+    const msgEncoded = encodeURIComponent(msg);
+    if (telefone) {
+      const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
+      window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
+    } else {
+      window.open(`https://wa.me/?text=${msgEncoded}`, '_blank');
+      toast.info('Telefone não cadastrado. Escolha o contato no WhatsApp.');
+    }
+    setTimeout(() => {
+      const confirmar = window.confirm('Cobrança enviada via WhatsApp. Marcar como enviada no sistema?');
+      if (confirmar) handleMarcarEnviado();
+    }, 1000);
+  }
+
+  async function handleCompartilhar() {
+    try {
+      const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
+      const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
+      if (!extratoId) { toast.error('Nenhum extrato encontrado. Gere novamente.'); return; }
+      const { data: extrato } = await supabase.from('extratos').select('cliente_id, filename').eq('id', extratoId).single();
+      if (!extrato) { toast.error('Extrato não encontrado.'); return; }
+      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
+      const { data: fileData } = await supabase.storage.from('documentos').download(path);
+      if (!fileData) { toast.error('Erro ao carregar extrato.'); return; }
+      const file = new File([fileData], (extrato as any).filename, { type: 'application/pdf' });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: `Extrato - ${cliente.cliente_apelido || cliente.cliente_nome}`, text: 'Extrato de serviços Trevo Legaliza', files: [file] });
+        toast.success('Compartilhado!');
+      } else {
+        const url = URL.createObjectURL(fileData);
+        const a = document.createElement('a'); a.href = url; a.download = (extrato as any).filename; a.click();
+        URL.revokeObjectURL(url);
+        toast.success('Extrato baixado!');
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') toast.error('Erro ao compartilhar: ' + err.message);
+    }
+  }
+
   return (
     <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
       <AccordionTrigger className="px-4 py-3 hover:no-underline">
@@ -554,6 +614,12 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
           )}
           {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
           <div className="flex gap-2 mt-3 flex-wrap">
+            <Button size="sm" variant="outline" onClick={handleEnviarWhatsApp} className="gap-1 text-green-600 border-green-600/30 hover:bg-green-600/10">
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleCompartilhar} className="gap-1">
+              <Share2 className="h-4 w-4" /> Compartilhar
+            </Button>
             {hasExtratoNoSistema && (
               <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato}>
                 {loadingExtrato ? (
