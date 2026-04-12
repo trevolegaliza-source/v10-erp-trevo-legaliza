@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown } from 'lucide-react';
 import { useFinanceiroClientes, type LancamentoFinanceiro, isLancamentoVencidoReal } from '@/hooks/useFinanceiroClientes';
+import ClientesFinanceiroTab from '@/components/financeiro/ClientesFinanceiroTab';
 import {
   ClientesFaturar,
   ClientesEnviar,
@@ -310,6 +311,10 @@ export default function Financeiro() {
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="flex-wrap h-auto gap-1">
+              <TabsTrigger value="clientes" className="gap-1.5">
+                <Search className="h-3.5 w-3.5" />
+                Clientes
+              </TabsTrigger>
               <TabsTrigger value="cobrar" className="gap-1.5">
                 <FileText className="h-3.5 w-3.5" />
                 Cobrar
