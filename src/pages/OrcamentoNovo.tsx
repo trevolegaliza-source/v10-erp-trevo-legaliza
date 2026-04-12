@@ -16,6 +16,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Plus, FileText, Save, FileDown, ArrowLeft, Copy, ExternalLink, Loader2, ChevronDown, Trash2,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
@@ -409,6 +410,36 @@ export default function OrcamentoNovo() {
     }
   }
 
+  function handleCopyLink() {
+    if (!orcamentoId) {
+      toast.error('Salve o orçamento primeiro para gerar o link.');
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from('orcamentos')
+        .select('share_token, senha_link')
+        .eq('id', orcamentoId)
+        .single();
+
+      if (!data || !(data as any).share_token) {
+        toast.error('Token não encontrado. Salve o orçamento novamente.');
+        return;
+      }
+
+      const url = `https://trevolegaliza.lovable.app/proposta/${(data as any).share_token}`;
+      navigator.clipboard.writeText(url);
+
+      if (form.destinatario === 'contador' && (form as any).senha_link) {
+        toast.success(`Link copiado! Senha: ${(form as any).senha_link}`);
+      } else if (form.destinatario === 'contador') {
+        toast.success('Link copiado! ⚠️ Sem senha definida.');
+      } else {
+        toast.success('Link copiado!');
+      }
+    })();
+  }
+
   function handleDuplicate() {
     setForm(f => ({ ...f, prospect_nome: f.prospect_nome + ' (cópia)' }));
     setOrcamentoId(null);
@@ -494,6 +525,11 @@ export default function OrcamentoNovo() {
           {orcamentoId && (
             <Button variant="outline" size="sm" onClick={handleDuplicate}>
               <Copy className="h-4 w-4 mr-1" /> Duplicar
+            </Button>
+          )}
+          {orcamentoId && form.destinatario !== 'cliente_via_contador' && (
+            <Button variant="outline" size="sm" onClick={handleCopyLink} className="gap-1">
+              <LinkIcon className="h-4 w-4" /> Copiar Link
             </Button>
           )}
         </div>
