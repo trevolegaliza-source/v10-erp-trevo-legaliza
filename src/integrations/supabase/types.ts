@@ -100,6 +100,8 @@ export type Database = {
       clientes: {
         Row: {
           apelido: string | null
+          auditado_em: string | null
+          auditado_financeiro: boolean | null
           bairro: string | null
           cep: string | null
           cidade: string | null
@@ -141,6 +143,8 @@ export type Database = {
         }
         Insert: {
           apelido?: string | null
+          auditado_em?: string | null
+          auditado_financeiro?: boolean | null
           bairro?: string | null
           cep?: string | null
           cidade?: string | null
@@ -182,6 +186,8 @@ export type Database = {
         }
         Update: {
           apelido?: string | null
+          auditado_em?: string | null
+          auditado_financeiro?: boolean | null
           bairro?: string | null
           cep?: string | null
           cidade?: string | null
