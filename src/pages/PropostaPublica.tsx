@@ -305,6 +305,8 @@ export default function PropostaPublica() {
   // ─── MAIN PROPOSAL ───
   const riscos = Array.isArray(orc?.riscos) ? orc.riscos : [];
   const etapasFluxo = Array.isArray(orc?.etapas_fluxo) ? orc.etapas_fluxo : [];
+  const beneficios = Array.isArray(orc?.beneficios_capa) ? orc.beneficios_capa : [];
+  const pacotes = Array.isArray(orc?.pacotes) ? orc.pacotes.filter((p: any) => p.nome && p.itens_ids?.length > 0) : [];
   const contexto = orc?.contexto || '';
   const headline = orc?.headline_cenario || '';
 
@@ -432,7 +434,34 @@ export default function PropostaPublica() {
           </div>
         )}
 
-        {/* ITENS */}
+        {/* BENEFÍCIOS */}
+        {beneficios.length > 0 && (
+          <div style={cardStyle}>
+            <div style={cardPad}>
+              <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
+                {beneficios.map((ben: any, idx: number) => {
+                  const icons = ['🛡️', '📋', '⏱️'];
+                  return (
+                    <div key={ben.id} style={{ 
+                      flex: 1, 
+                      maxWidth: 200, 
+                      textAlign: 'center', 
+                      padding: '16px 12px', 
+                      background: idx === 1 ? (isContador ? '#f0fdf4' : '#eff6ff') : '#f8fafc', 
+                      borderRadius: 10, 
+                      border: `1px solid ${idx === 1 ? accentColor + '40' : '#e2e8f0'}` 
+                    }}>
+                      <div style={{ fontSize: 28, marginBottom: 8 }}>{icons[idx % 3]}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', marginBottom: 4 }}>{ben.titulo}</div>
+                      <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4 }}>{ben.descricao}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={cardStyle}>
           <div style={cardPad}>
             <h2 style={{ ...muted, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>Escopo dos Serviços</h2>
@@ -484,7 +513,66 @@ export default function PropostaPublica() {
           </div>
         </div>
 
-        {/* RESUMO */}
+        {/* PACOTES */}
+        {pacotes.length > 0 && (
+          <div style={cardStyle}>
+            <div style={cardPad}>
+              <h2 style={{ ...muted, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>Pacotes Disponíveis</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {pacotes.map((pac: any) => {
+                  const selected = itens.filter(i => pac.itens_ids.includes(i.id));
+                  const valorKey = isContador ? 'honorario' : 'honorario_minimo_contador';
+                  const precoSemDesconto = selected.reduce((s: number, i: any) => s + ((i[valorKey] || i.honorario || 0) * i.quantidade), 0);
+                  const precoComDesconto = precoSemDesconto * (1 - (pac.desconto_pct || 0) / 100);
+                  const economia = precoSemDesconto - precoComDesconto;
+                  const isCompleto = pac.nome.toLowerCase().includes('completo');
+                  
+                  return (
+                    <div key={pac.id} style={{ 
+                      border: isCompleto ? `2px solid ${accentColor}` : '1px solid #e2e8f0', 
+                      borderRadius: 12, 
+                      overflow: 'hidden' 
+                    }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        padding: '12px 16px', 
+                        background: isContador ? 'linear-gradient(135deg, #0f1f0f 0%, #1a3a1a 100%)' : 'linear-gradient(135deg, #1e293b 0%, #334155 100%)', 
+                        color: '#fff' 
+                      }}>
+                        <span style={{ fontSize: 15, fontWeight: 700 }}>{pac.nome}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {isCompleto && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: 'rgba(255,255,255,0.2)', fontWeight: 700 }}>★ RECOMENDADO</span>}
+                          <span style={{ fontSize: 12, color: isContador ? '#4ade80' : '#93c5fd', fontWeight: 600 }}>-{pac.desconto_pct}%</span>
+                        </div>
+                      </div>
+                      <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                        {selected.map((i: any) => (
+                          <div key={i.id} style={{ fontSize: 12, color: '#374151', padding: '2px 0' }}>✓ {i.descricao}</div>
+                        ))}
+                      </div>
+                      <div style={{ padding: '12px 16px', background: '#fafafa' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>
+                          <span>Sem desconto</span>
+                          <span style={{ textDecoration: 'line-through' }}>{fmt(precoSemDesconto)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: accentColor }}>
+                          <span>Com -{pac.desconto_pct}%</span>
+                          <span>{fmt(precoComDesconto)}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, textAlign: 'right', marginTop: 2 }}>
+                          ↓ Economia de {fmt(economia)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={cardStyle}>
           <div style={cardPad}>
             <h2 style={{ ...muted, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>Resumo do Investimento</h2>
