@@ -73,6 +73,7 @@ export default function OrcamentoNovo() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
+  const duplicateId = searchParams.get('duplicate');
 
   const [form, setForm] = useState<OrcamentoForm>(defaultForm());
   const [orcamentoId, setOrcamentoId] = useState<string | null>(editId);
