@@ -68,6 +68,7 @@ const ROLES = [
   { value: 'financeiro', label: 'Financeiro' },
   { value: 'operacional', label: 'Operacional' },
   { value: 'visualizador', label: 'Visualizador' },
+  { value: 'usuario', label: 'Usuário' },
 ];
 
 const ROLE_COLORS: Record<string, string> = {
@@ -75,6 +76,7 @@ const ROLE_COLORS: Record<string, string> = {
   financeiro: 'bg-blue-500/15 text-blue-500 border-blue-500/30',
   operacional: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
   visualizador: 'bg-gray-500/15 text-gray-500 border-gray-500/30',
+  usuario: 'bg-purple-500/15 text-purple-500 border-purple-500/30',
 };
 
 const ROLE_PRESETS: Record<string, Record<string, boolean[]>> = {
