@@ -1084,6 +1084,122 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
   }
 
+  const valorSelecionado = cliente.lancamentos.filter(l => selectedPagar.has(l.id)).reduce((s, l) => s + l.valor, 0);
+
+  return (
+    <>
+      <AccordionItem value={cliente.cliente_id} className={cn("border rounded-lg bg-card", temVencidos && "border-destructive/30")}>
+        <AccordionTrigger className="px-4 py-3 hover:no-underline">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {fmt(cliente.total_faturado)} · Enviado · Vence {fmtDate(vencimento)}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+              <ClienteHeaderBadges cliente={cliente} />
+              {temVencidos ? (
+                <Badge className="bg-destructive/15 text-destructive border-0 text-[10px] sm:text-xs whitespace-nowrap">
+                  Vencido há {maiorAtraso}d
+                </Badge>
+              ) : (
+                <Badge variant="outline" className={cn('text-[10px] sm:text-xs whitespace-nowrap', dias < 0
+                  ? 'bg-destructive/10 text-destructive border-destructive/30'
+                  : dias <= 3
+                    ? 'bg-warning/10 text-warning border-warning/30'
+                    : 'bg-muted text-muted-foreground'
+                )}>
+                  {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
+                </Badge>
+              )}
+              <MoverParaMenu cliente={cliente} />
+            </div>
+          </div>
+        </AccordionTrigger>
+        <AccordionContent className="px-4 pb-4">
+          <div className="space-y-2">
+            {cliente.lancamentos.map(l => {
+              const isVenc = isLancamentoVencidoReal(l);
+              const dAtraso = isVenc ? Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(l.data_vencimento + 'T00:00:00').getTime()) / 86400000) : 0;
+              return (
+                <div key={l.id} className="flex items-center gap-2">
+                  <Checkbox
+                    checked={selectedPagar.has(l.id)}
+                    onCheckedChange={() => toggleSelectPagar(l.id)}
+                    className="h-4 w-4 shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <LancamentoRow lancamento={l} />
+                  </div>
+                  {isVenc && (
+                    <Badge className="bg-destructive/15 text-destructive border-0 text-[10px] shrink-0">
+                      Vencido {dAtraso}d
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+            <div className="flex items-center gap-2 mt-2">
+              <Button size="sm" variant="ghost" className="text-xs h-6" onClick={selectAllPagar}>
+                Selecionar todos
+              </Button>
+              <Button size="sm" variant="ghost" className="text-xs h-6" onClick={deselectAllPagar}>
+                Limpar seleção
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {selectedPagar.size} de {cliente.lancamentos.length} · {fmt(valorSelecionado)}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:flex gap-2 mt-3 sm:flex-wrap">
+              <Button size="sm" variant="outline" onClick={handleEnviarWhatsAppRecobranca} className={cn("gap-1 h-11 sm:h-9", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
+                <MessageCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">WhatsApp{cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ' (sem tel.)'}</span>
+                <span className="sm:hidden">WhatsApp</span>
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleCompartilharAguardando} className="gap-1 h-11 sm:h-9">
+                <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Compartilhar</span><span className="sm:hidden">Enviar</span>
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleCopiarCobranca} className="h-11 sm:h-9">
+                <Copy className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">{temVencidos ? 'Reenviar Cobrança' : 'Copiar WhatsApp'}</span><span className="sm:hidden">{temVencidos ? 'Reenviar' : 'Copiar'}</span>
+              </Button>
+              {(cliente.lancamentos.some(l => l.extrato_id) || cliente.extrato_mais_recente) && (
+                <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato} className="h-11 sm:h-9">
+                  <Download className="h-4 w-4 mr-1" /> {loadingExtrato ? 'Baixando...' : 'Baixar'}
+                </Button>
+              )}
+              <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white col-span-2 h-11 sm:h-9">
+                <CheckCircle className="h-4 w-4 mr-1" /> {selectedPagar.size > 0 ? `Pagar (${selectedPagar.size})` : 'Marcar como Pago'}
+              </Button>
+            </div>
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+
+      <Dialog open={showPago} onOpenChange={setShowPago}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Confirmar Pagamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {cliente.cliente_apelido || cliente.cliente_nome} — {selectedPagar.size > 0 ? `${selectedPagar.size} de ${cliente.lancamentos.length} processos · ${fmt(valorSelecionado)}` : fmt(cliente.total_faturado)}
+            </p>
+            <div>
+              <label className="text-xs font-medium">Data do pagamento</label>
+              <Input type="date" value={dataPagamento} onChange={e => setDataPagamento(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPago(false)}>Cancelar</Button>
+            <Button onClick={confirmarPago} className="bg-emerald-600 hover:bg-emerald-700 text-white">Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // ══════════ MOVER PARA MENU ══════════
 function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
   const qc = useQueryClient();
