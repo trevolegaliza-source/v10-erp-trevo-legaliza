@@ -1200,6 +1200,85 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
   );
 }
 
+// ══════════ TAB: RECEBIDOS ══════════
+export function ClientesRecebidos({ clientes }: { clientes: ClienteFinanceiro[] }) {
+  if (clientes.length === 0) return <EmptyState text="Nenhum pagamento recebido neste período." />;
+  return (
+    <Accordion type="multiple" className="space-y-2">
+      {clientes.map(c => <RecebidoItem key={c.cliente_id} cliente={c} />)}
+    </Accordion>
+  );
+}
+
+function RecebidoItem({ cliente: c }: { cliente: ClienteFinanceiro }) {
+  const qc = useQueryClient();
+
+  async function handleDesfazerPagamento(lancamentoIds: string[]) {
+    if (!confirm('Tem certeza que deseja desfazer este pagamento? O lançamento voltará para "Aguardando".')) return;
+    const { error } = await supabase
+      .from('lancamentos')
+      .update({
+        etapa_financeiro: 'cobranca_enviada',
+        status: 'pendente' as const,
+        data_pagamento: null,
+        confirmado_recebimento: false,
+      })
+      .in('id', lancamentoIds);
+    if (error) { toast.error(error.message); return; }
+    invalidateFinanceiro(qc);
+    toast.success('Pagamento desfeito! Lançamento voltou para "Aguardando".');
+  }
+
+  return (
+    <AccordionItem key={c.cliente_id} value={c.cliente_id} className="border rounded-lg bg-card">
+      <AccordionTrigger className="px-4 py-3 hover:no-underline">
+        <div className="flex items-center gap-3 flex-1 text-left">
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm truncate">{c.cliente_apelido || c.cliente_nome}</p>
+            <p className="text-xs text-muted-foreground">{fmt(c.total_faturado)} · {c.qtd_processos} proc.</p>
+          </div>
+          <ClienteHeaderBadges cliente={c} />
+          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-xs">
+            <CheckCircle className="h-3 w-3 mr-1" /> Pago
+          </Badge>
+          <MoverParaMenu cliente={c} />
+        </div>
+      </AccordionTrigger>
+      <AccordionContent className="px-4 pb-4">
+        <div className="space-y-2">
+          {c.lancamentos.map(l => (
+            <div key={l.id} className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <LancamentoRow lancamento={l} />
+              </div>
+              {(l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 text-xs shrink-0"
+                  onClick={() => handleDesfazerPagamento([l.id])}
+                >
+                  Desfazer
+                </Button>
+              )}
+            </div>
+          ))}
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-amber-600 border-amber-600/30 hover:bg-amber-500/10"
+              onClick={() => handleDesfazerPagamento(c.lancamentos.map(l => l.id))}
+            >
+              Desfazer Todos os Pagamentos
+            </Button>
+          </div>
+        </div>
+      </AccordionContent>
+    </AccordionItem>
+  );
+}
+
 // ══════════ MOVER PARA MENU ══════════
 function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
   const qc = useQueryClient();
