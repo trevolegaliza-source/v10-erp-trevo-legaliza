@@ -1287,6 +1287,7 @@ export type Database = {
           dentro_do_plano: boolean | null
           empresa_id: string | null
           etapa: string
+          etiquetas: string[] | null
           id: string
           is_archived: boolean | null
           justificativa_avulso: string | null
@@ -1309,6 +1310,7 @@ export type Database = {
           dentro_do_plano?: boolean | null
           empresa_id?: string | null
           etapa?: string
+          etiquetas?: string[] | null
           id?: string
           is_archived?: boolean | null
           justificativa_avulso?: string | null
@@ -1331,6 +1333,7 @@ export type Database = {
           dentro_do_plano?: boolean | null
           empresa_id?: string | null
           etapa?: string
+          etiquetas?: string[] | null
           id?: string
           is_archived?: boolean | null
           justificativa_avulso?: string | null
