@@ -697,6 +697,9 @@ export type Database = {
       }
       lancamentos: {
         Row: {
+          auditado: boolean | null
+          auditado_em: string | null
+          auditado_por: string | null
           boleto_url: string | null
           categoria: string | null
           centro_custo: string | null
@@ -734,8 +737,14 @@ export type Database = {
           url_comprovante: string | null
           url_recibo_taxa: string | null
           valor: number
+          valor_alterado_em: string | null
+          valor_alterado_por: string | null
+          valor_original: number | null
         }
         Insert: {
+          auditado?: boolean | null
+          auditado_em?: string | null
+          auditado_por?: string | null
           boleto_url?: string | null
           categoria?: string | null
           centro_custo?: string | null
@@ -773,8 +782,14 @@ export type Database = {
           url_comprovante?: string | null
           url_recibo_taxa?: string | null
           valor: number
+          valor_alterado_em?: string | null
+          valor_alterado_por?: string | null
+          valor_original?: number | null
         }
         Update: {
+          auditado?: boolean | null
+          auditado_em?: string | null
+          auditado_por?: string | null
           boleto_url?: string | null
           categoria?: string | null
           centro_custo?: string | null
@@ -812,8 +827,18 @@ export type Database = {
           url_comprovante?: string | null
           url_recibo_taxa?: string | null
           valor?: number
+          valor_alterado_em?: string | null
+          valor_alterado_por?: string | null
+          valor_original?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "lancamentos_auditado_por_fkey"
+            columns: ["auditado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "lancamentos_cliente_id_fkey"
             columns: ["cliente_id"]
@@ -854,6 +879,13 @@ export type Database = {
             columns: ["processo_id"]
             isOneToOne: false
             referencedRelation: "processos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_valor_alterado_por_fkey"
+            columns: ["valor_alterado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
