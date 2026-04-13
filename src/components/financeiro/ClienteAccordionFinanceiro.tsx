@@ -460,29 +460,18 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
       const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
       if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
     }
-    const l = cliente.lancamentos[0];
-    if (!l) return;
-    const valorPrimeiro = l.valor + (l.processo_id ? (vaMap[l.processo_id] || 0) : 0);
-    const adicionais = cliente.lancamentos.slice(1).map(item => ({
-      tipo: item.processo_tipo, razao_social: item.processo_razao_social,
-      valor: item.valor + (item.processo_id ? (vaMap[item.processo_id] || 0) : 0),
-    }));
-    const msg = gerarMensagemCobranca({
-      tipo: l.processo_tipo, razao_social: l.processo_razao_social, valor: valorPrimeiro,
-      data_vencimento: l.data_vencimento, diasAtraso: 0,
-      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
-    });
+    const nomeRemetente = await getNomeRemetente();
+    const msg = buildMensagemFromLancamentos({ lancamentos: cliente.lancamentos, vaMap, diasAtraso: 0, nomeRemetente });
     const { data: clienteData } = await supabase.from('clientes').select('telefone').eq('id', extratoGerado.clienteId).single();
     const telefone = (clienteData as any)?.telefone?.replace(/\D/g, '') || '';
-    const msgEncoded = encodeURIComponent(msg);
-    if (telefone) {
-      const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
-      window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
-    } else {
-      window.open(`https://wa.me/?text=${msgEncoded}`, '_blank');
-      toast.info('Telefone não cadastrado. Escolha o contato no WhatsApp.');
+    if (!telefone) {
+      toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
+      return;
     }
-    setExtratoGerado(null);
+    const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
+    const msgEncoded = encodeURIComponent(msg);
+    window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
+    // Don't auto-close modal — user can choose other actions too
   }
 
   async function handleCompartilharPosExtrato() {
