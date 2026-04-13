@@ -4,13 +4,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { ClipboardCheck, Check, Pencil, Receipt, X, AlertTriangle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ClipboardCheck, Check, Pencil, Receipt, X, AlertTriangle, Phone } from 'lucide-react';
 import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import { useAuditarLancamento, useAuditarTodosCliente, useAlterarValorLancamento } from '@/hooks/useFinanceiroClientes';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -27,6 +30,13 @@ function tipoLabel(c: ClienteFinanceiro): string {
   if (c.cliente_tipo === 'PRE_PAGO') return 'Pré-Pago';
   if (c.cliente_dia_cobranca && c.cliente_dia_cobranca > 0) return `Avulso D+${c.cliente_dia_cobranca}`;
   return 'Avulso';
+}
+
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return raw;
 }
 
 export function ClientesAuditoria({ clientes }: { clientes: ClienteFinanceiro[] }) {
@@ -64,8 +74,13 @@ export function ClientesAuditoria({ clientes }: { clientes: ClienteFinanceiro[] 
 function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const auditarMut = useAuditarLancamento();
   const auditarTodosMut = useAuditarTodosCliente();
+  const qc = useQueryClient();
   const [taxaModalOpen, setTaxaModalOpen] = useState(false);
   const [taxaProcessoId, setTaxaProcessoId] = useState('');
+  const [phoneModalOpen, setPhoneModalOpen] = useState(false);
+  const [phoneValue, setPhoneValue] = useState('');
+  const [phoneAction, setPhoneAction] = useState<'single' | 'all'>('single');
+  const [pendingAuditId, setPendingAuditId] = useState('');
 
   const lancNaoAuditados = cliente.lancamentos.filter(l => !l.auditado && l.status !== 'pago');
   const totalNaoAuditado = lancNaoAuditados.reduce((s, l) => s + l.valor, 0);
@@ -73,47 +88,108 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const temMetodoTrevo = lancNaoAuditados.some(l => l.tem_etiqueta_metodo_trevo);
   const temPrioridade = lancNaoAuditados.some(l => l.tem_etiqueta_prioridade);
 
-  const handleAuditarTodos = () => {
+  const executarAuditarTodos = () => {
     const ids = lancNaoAuditados.map(l => l.id);
     auditarTodosMut.mutate({ lancamentoIds: ids }, {
       onSuccess: () => toast.success(`${ids.length} processos auditados ✅ — movidos para Cobrar`),
     });
   };
 
+  const executarAuditarUm = (lancamentoId: string) => {
+    auditarMut.mutate({ lancamentoId, auditado: true }, {
+      onSuccess: () => toast.success('Processo auditado ✅ — movido para Cobrar'),
+    });
+  };
+
+  const handleAuditarTodos = () => {
+    if (!cliente.cliente_telefone) {
+      setPhoneAction('all');
+      setPendingAuditId('');
+      setPhoneValue('');
+      setPhoneModalOpen(true);
+      return;
+    }
+    executarAuditarTodos();
+  };
+
+  const handleAuditarUm = (lancamentoId: string) => {
+    if (!cliente.cliente_telefone) {
+      setPhoneAction('single');
+      setPendingAuditId(lancamentoId);
+      setPhoneValue('');
+      setPhoneModalOpen(true);
+      return;
+    }
+    executarAuditarUm(lancamentoId);
+  };
+
+  const handlePhoneSave = async () => {
+    const digits = phoneValue.replace(/\D/g, '');
+    if (digits.length < 10 || digits.length > 11) {
+      toast.error('Telefone inválido. Use (XX) XXXXX-XXXX');
+      return;
+    }
+    try {
+      await supabase.from('clientes').update({ telefone: phoneValue }).eq('id', cliente.cliente_id);
+      qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      toast.success('Telefone salvo!');
+    } catch {
+      toast.error('Erro ao salvar telefone');
+    }
+    setPhoneModalOpen(false);
+    if (phoneAction === 'all') executarAuditarTodos();
+    else executarAuditarUm(pendingAuditId);
+  };
+
+  const handlePhoneSkip = () => {
+    setPhoneModalOpen(false);
+    if (phoneAction === 'all') executarAuditarTodos();
+    else executarAuditarUm(pendingAuditId);
+  };
+
+  const handlePhoneInput = (val: string) => {
+    let digits = val.replace(/\D/g, '');
+    if (digits.length > 11) digits = digits.slice(0, 11);
+    if (digits.length <= 2) setPhoneValue(digits.length > 0 ? `(${digits}` : '');
+    else if (digits.length <= 7) setPhoneValue(`(${digits.slice(0, 2)}) ${digits.slice(2)}`);
+    else setPhoneValue(`(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`);
+  };
+
   return (
     <>
       <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
         <AccordionTrigger className="px-4 py-3 hover:no-underline">
-          <div className="flex items-center gap-3 flex-1 text-left">
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm break-words">{cliente.cliente_apelido || cliente.cliente_nome}</p>
-              <p className="text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
+              <p className="text-xs text-muted-foreground truncate">
                 {lancNaoAuditados.length} proc. · {fmt(totalNaoAuditado)} · {tipoLabel(cliente)}
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
               {temMetodoTrevo && (
-                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
+                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0 hidden sm:inline-flex">
                   🍀 Método Trevo
                 </Badge>
               )}
               {temPrioridade && (
-                <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
+                <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0 hidden sm:inline-flex">
                   🔴 Prioridade
                 </Badge>
               )}
-              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">
-                {lancNaoAuditados.length} não auditados
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-[10px] sm:text-xs whitespace-nowrap">
+                <span className="sm:hidden">{lancNaoAuditados.length} pend.</span>
+                <span className="hidden sm:inline">{lancNaoAuditados.length} não auditados</span>
               </Badge>
               <Button
                 size="sm"
                 variant="outline"
-                className="text-xs text-emerald-600 border-emerald-600/30 hover:bg-emerald-600/10 h-7"
+                className="text-xs text-emerald-600 border-emerald-600/30 hover:bg-emerald-600/10 h-7 px-2 sm:px-3"
                 onClick={(e) => { e.stopPropagation(); handleAuditarTodos(); }}
                 disabled={auditarTodosMut.isPending}
               >
-                <Check className="h-3 w-3 mr-1" />
-                Auditar Todos
+                <Check className="h-3 w-3" />
+                <span className="hidden sm:inline ml-1">Auditar Todos</span>
               </Button>
             </div>
           </div>
@@ -129,6 +205,7 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
                   setTaxaProcessoId(processoId);
                   setTaxaModalOpen(true);
                 }}
+                onAuditar={() => handleAuditarUm(l.id)}
               />
             ))}
           </div>
@@ -142,6 +219,39 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
           clienteApelido={cliente.cliente_apelido || cliente.cliente_nome}
         />
       )}
+      {/* Phone Modal */}
+      <Dialog open={phoneModalOpen} onOpenChange={setPhoneModalOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Phone className="h-4 w-4" /> Telefone do cliente
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              <strong>{cliente.cliente_apelido || cliente.cliente_nome}</strong> não tem telefone cadastrado. Informe para facilitar o envio de cobranças via WhatsApp.
+            </p>
+            <Input
+              type="tel"
+              inputMode="numeric"
+              placeholder="(XX) XXXXX-XXXX"
+              value={phoneValue}
+              onChange={e => handlePhoneInput(e.target.value)}
+              className="h-10"
+              style={{ fontSize: '16px' }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" onClick={handlePhoneSkip} className="text-muted-foreground">
+              Pular
+            </Button>
+            <Button onClick={handlePhoneSave} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              Salvar e Auditar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -150,10 +260,12 @@ function AuditoriaFicha({
   lancamento: l,
   clienteApelido,
   onOpenTaxa,
+  onAuditar,
 }: {
   lancamento: LancamentoFinanceiro;
   clienteApelido: string;
   onOpenTaxa: (processoId: string) => void;
+  onAuditar: () => void;
 }) {
   const auditarMut = useAuditarLancamento();
   const alterarValorMut = useAlterarValorLancamento();
@@ -162,9 +274,9 @@ function AuditoriaFicha({
 
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
 
-  const handleAuditar = () => {
-    auditarMut.mutate({ lancamentoId: l.id, auditado: !l.auditado }, {
-      onSuccess: () => toast.success(l.auditado ? 'Auditoria removida' : 'Processo auditado ✅ — movido para Cobrar'),
+  const handleDesmarcar = () => {
+    auditarMut.mutate({ lancamentoId: l.id, auditado: false }, {
+      onSuccess: () => toast.success('Auditoria removida'),
     });
   };
 
@@ -187,8 +299,8 @@ function AuditoriaFicha({
     )}>
       {/* Header */}
       <div>
-        <p className="text-sm font-semibold">{l.processo_razao_social}</p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm font-semibold truncate">{l.processo_razao_social}</p>
+        <p className="text-xs text-muted-foreground truncate">
           {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo}
           {l.processo_etapa && ` · ${l.processo_etapa}`}
         </p>
@@ -210,7 +322,7 @@ function AuditoriaFicha({
 
       {/* Valor + Vencimento */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <span className="text-sm font-bold text-primary">{fmt(l.valor)}</span>
           {l.valor_original != null && l.valor_original !== l.valor && (
             <span className="text-[10px] text-muted-foreground line-through">
@@ -223,7 +335,7 @@ function AuditoriaFicha({
             </Badge>
           )}
         </div>
-        <span className="text-xs text-muted-foreground">Vence {fmtDate(l.data_vencimento)}</span>
+        <span className="text-xs text-muted-foreground whitespace-nowrap">Vence {fmtDate(l.data_vencimento)}</span>
       </div>
 
       {/* Taxas adicionais */}
@@ -297,7 +409,7 @@ function AuditoriaFicha({
               ? "bg-emerald-600/20 text-emerald-600 hover:bg-emerald-600/30 border border-emerald-600/30"
               : "bg-emerald-600 hover:bg-emerald-700 text-white"
           )}
-          onClick={handleAuditar}
+          onClick={l.auditado ? handleDesmarcar : onAuditar}
           disabled={auditarMut.isPending}
         >
           <Check className="h-3 w-3 mr-1" /> {l.auditado ? 'Auditado ✅' : 'Auditar'}

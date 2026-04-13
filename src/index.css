@@ -372,6 +372,10 @@
   transition: background 0.3s ease;
 }
 
+/* No-scrollbar utility */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* PWA Mobile Fixes */
 @supports (padding: env(safe-area-inset-top)) {
   .min-h-screen {
