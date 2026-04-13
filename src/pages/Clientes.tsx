@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Users, Search, UserX, FileText, Download, Trash2, Archive, ArchiveRestore, Eye, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Plus, Users, Search, UserX, FileText, Download, Trash2, Archive, ArchiveRestore, Eye, AlertTriangle, ShieldAlert, Clock } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,6 +21,7 @@ import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { UFS_BRASIL, UF_NOMES } from '@/constants/estados-brasil';
+import { useQuery } from '@tanstack/react-query';
 
 export default function Clientes() {
   const navigate = useNavigate();
