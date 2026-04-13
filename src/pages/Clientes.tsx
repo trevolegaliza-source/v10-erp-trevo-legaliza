@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Users, Search, UserX, FileText, Download, Trash2, Archive, ArchiveRestore, Eye, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Plus, Users, Search, UserX, FileText, Download, Trash2, Archive, ArchiveRestore, Eye, AlertTriangle, ShieldAlert, Clock } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,6 +21,7 @@ import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { UFS_BRASIL, UF_NOMES } from '@/constants/estados-brasil';
+import { useQuery } from '@tanstack/react-query';
 
 export default function Clientes() {
   const navigate = useNavigate();
@@ -40,6 +41,25 @@ export default function Clientes() {
   const deleteCliente = useDeleteCliente();
   const archiveCliente = useArchiveCliente();
   const unarchiveCliente = useUnarchiveCliente();
+
+  // Audit pending counts per client
+  const { data: auditPendentes } = useQuery({
+    queryKey: ['audit_pendentes_clientes'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('lancamentos')
+        .select('cliente_id')
+        .eq('auditado', false)
+        .eq('status', 'pendente')
+        .eq('tipo', 'receber') as any;
+      const map: Record<string, number> = {};
+      for (const row of (data || [])) {
+        if (row.cliente_id) map[row.cliente_id] = (map[row.cliente_id] || 0) + 1;
+      }
+      return map;
+    },
+    staleTime: 60_000,
+  });
 
   const processCount = (clienteId: string) =>
     (processos || []).filter(p => p.cliente_id === clienteId).length;
@@ -338,6 +358,11 @@ export default function Clientes() {
                           <p className="font-medium text-foreground">{client.nome}</p>
                           {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
                           {client.nome_contador && <p className="text-[10px] text-muted-foreground">Contador: {client.nome_contador}</p>}
+                          {(auditPendentes?.[client.id] || 0) > 0 && (
+                            <Badge variant="outline" className="mt-1 text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-500">
+                              ⏳ {auditPendentes![client.id]} proc. s/ auditoria
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
