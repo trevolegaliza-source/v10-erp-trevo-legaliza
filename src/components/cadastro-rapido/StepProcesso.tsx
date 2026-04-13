@@ -213,6 +213,12 @@ export default function StepProcesso({ form, onChange, negotiations, colaborador
         </div>
       )}
 
+      {/* Etiquetas */}
+      <EtiquetasCheckboxes
+        etiquetas={form.etiquetas || []}
+        onChange={(novas) => update('etiquetas', novas)}
+      />
+
       <div className="space-y-2">
         <Label>Data de Entrada do Processo</Label>
         <Input
