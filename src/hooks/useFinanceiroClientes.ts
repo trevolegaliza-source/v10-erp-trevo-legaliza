@@ -47,6 +47,7 @@ export interface LancamentoFinanceiro {
   total_valores_adicionais: number;
   tem_etiqueta_metodo_trevo: boolean;
   tem_etiqueta_prioridade: boolean;
+  observacoes_financeiro: string | null;
 }
 
 const ETAPAS_PRE_DEFERIMENTO = [
