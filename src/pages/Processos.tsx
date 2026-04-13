@@ -105,6 +105,11 @@ function ProcessCard({
               <p className="text-[10px] text-muted-foreground mt-0.5">📅 {new Date(process.created_at).toLocaleDateString('pt-BR')}</p>
               <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{process.razao_social}</p>
               <p className="text-[12px] font-semibold text-primary mt-0.5 truncate">{typeLabel}</p>
+              {(process as any).etiquetas?.length > 0 && (
+                <div className="mt-1">
+                  <EtiquetasDisplay etiquetas={(process as any).etiquetas || []} size="compact" />
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
               <QuickActionsMenu process={process} onDelete={onDelete} onEdit={onEdit} onHonorarioExtra={onHonorarioExtra} />
@@ -154,6 +159,7 @@ export default function Processos() {
   const updateEtapa = useUpdateProcessoEtapa();
   const deleteProcesso = useDeleteProcesso();
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterEtiquetas, setFilterEtiquetas] = useState<Set<EtiquetaProcesso>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [groupBy, setGroupBy] = useState<GroupBy>('cliente');
   const [filterMonth, setFilterMonth] = useState<string>('all');
@@ -187,8 +193,16 @@ export default function Processos() {
         return d.getFullYear() === fYear && d.getMonth() + 1 === fMonth;
       });
     }
+
+    if (filterEtiquetas.size > 0) {
+      result = result.filter(p => {
+        const tags: string[] = (p as any).etiquetas || [];
+        return Array.from(filterEtiquetas).every(e => tags.includes(e));
+      });
+    }
+
     return result;
-  }, [processos, filterType, filterMonth]);
+  }, [processos, filterType, filterMonth, filterEtiquetas]);
 
   const monthOptions = useMemo(() => {
     const months = new Set<string>();
