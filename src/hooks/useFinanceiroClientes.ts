@@ -220,6 +220,9 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
         const c = result.get(clienteId)!;
 
+        const etiquetas: string[] = processo?.etiquetas || [];
+        const totalVA = l.processo_id ? (vaMap.get(l.processo_id) || 0) : 0;
+
         c.lancamentos.push({
           id: l.id,
           processo_id: l.processo_id || '',
@@ -237,6 +240,9 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           extrato_id: l.extrato_id,
           descricao: l.descricao,
           confirmado_recebimento: l.confirmado_recebimento ?? false,
+          total_valores_adicionais: totalVA,
+          tem_etiqueta_metodo_trevo: etiquetas.includes('metodo_trevo'),
+          tem_etiqueta_prioridade: etiquetas.includes('prioridade'),
         });
 
         c.total_faturado += l.valor;
