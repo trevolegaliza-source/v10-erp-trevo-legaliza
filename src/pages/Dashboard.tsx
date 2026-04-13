@@ -184,6 +184,18 @@ export default function Dashboard() {
       alertas.push({ id: 'contas_pagar_proximas', titulo: `${contasAVencer.length} contas a pagar nos próximos ${diasAlertaPagar} dias`, descricao: `R$ ${valorAVencer.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a vencer`, severity: 'warning', icon: CreditCard, link: '/contas-pagar' });
     }
 
+    // Mensalistas sem fatura no mês
+    for (const m of mensalistaAlerts) {
+      alertas.push({
+        id: `mensalista_${m.id}`,
+        titulo: `Mensalista ${m.nome} sem fatura`,
+        descricao: `${fmt(m.valor_base)}/mês — dia ${m.dia}`,
+        severity: 'critical',
+        icon: CreditCard,
+        link: `/clientes/${m.id}`,
+      });
+    }
+
     const fases = [
       { id: 'entrada', nome: 'Entrada', etapas: ['recebidos', 'analise_documental'], cor: 'bg-blue-500' },
       { id: 'andamento', nome: 'Em andamento', etapas: ['contrato', 'viabilidade', 'dbe', 'vre', 'em_analise'], cor: 'bg-teal-500' },
