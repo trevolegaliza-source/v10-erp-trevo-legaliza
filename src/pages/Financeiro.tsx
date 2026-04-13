@@ -118,6 +118,9 @@ export default function Financeiro() {
 
   const resultado = metricas.totalRecebido - despesasPagas;
 
+  // Count pending audit
+  const qtdAguardandoAuditoria = clientesAguardandoAuditoria.reduce((s, c) => s + c.qtd_nao_auditados, 0);
+
   // Resumo do mês
   const resumoMes = useMemo(() => {
     const now = new Date();
@@ -220,35 +223,35 @@ export default function Financeiro() {
         <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">Carregando...</div>
       ) : (
         <>
-          {/* 5 KPIs */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {/* 5 KPIs — grid 2x2+1 on mobile, 5 cols on lg */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-5">
             {/* Faturado */}
             <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)">
-              <div className="rounded-lg bg-foreground/5 p-2 w-fit">
-                <DollarSign className="h-4.5 w-4.5 text-foreground" />
+              <div className="rounded-lg bg-foreground/5 p-1.5 sm:p-2 w-fit">
+                <DollarSign className="h-4 w-4 text-foreground" />
               </div>
-              <p className="text-2xl font-bold mt-3 text-foreground">{formatBRL(metricas.totalFaturado)}</p>
+              <p className="text-xl sm:text-2xl font-bold mt-2 sm:mt-3 text-foreground">{formatBRL(metricas.totalFaturado)}</p>
               <p className="text-xs text-muted-foreground">{metricas.totalProcessos} processos</p>
               <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Faturado</p>
             </GlassCard>
 
             {/* Cobrado */}
             <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)" onClick={() => setActiveTab('enviados')} className="cursor-pointer">
-              <div className="rounded-lg bg-blue-500/10 p-2 w-fit">
-                <Send className="h-4.5 w-4.5 text-blue-400" />
+              <div className="rounded-lg bg-blue-500/10 p-1.5 sm:p-2 w-fit">
+                <Send className="h-4 w-4 text-blue-400" />
               </div>
-              <p className="text-2xl font-bold mt-3 text-blue-400">{formatBRL(metricas.totalCobrado)}</p>
+              <p className="text-xl sm:text-2xl font-bold mt-2 sm:mt-3 text-blue-400">{formatBRL(metricas.totalCobrado)}</p>
               <p className="text-xs text-muted-foreground">{metricas.clientesCobrados} clientes</p>
               <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Cobrado</p>
             </GlassCard>
 
             {/* Recebido */}
             <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)" onClick={() => setActiveTab('pagos')} className="cursor-pointer">
-              <div className="rounded-lg bg-emerald-500/10 p-2 w-fit">
-                <CheckCircle className="h-4.5 w-4.5 text-emerald-400" />
+              <div className="rounded-lg bg-emerald-500/10 p-1.5 sm:p-2 w-fit">
+                <CheckCircle className="h-4 w-4 text-emerald-400" />
               </div>
-              <p className="text-2xl font-bold mt-3 text-emerald-400">{formatBRL(metricas.totalRecebido)}</p>
-              <div className="w-full bg-foreground/10 rounded-full h-1.5 mt-2">
+              <p className="text-xl sm:text-2xl font-bold mt-2 sm:mt-3 text-emerald-400">{formatBRL(metricas.totalRecebido)}</p>
+              <div className="hidden sm:block w-full bg-foreground/10 rounded-full h-1.5 mt-2">
                 <div className="bg-emerald-400 h-1.5 rounded-full transition-all" style={{ width: `${metricas.taxaRecebimento}%` }} />
               </div>
               <p className="text-xs text-muted-foreground mt-1">{metricas.taxaRecebimento}% do faturado</p>
@@ -262,22 +265,22 @@ export default function Financeiro() {
               onClick={() => setActiveTab('aguardando')}
               className="cursor-pointer"
             >
-              <div className="rounded-lg bg-red-500/10 p-2 w-fit">
-                <AlertTriangle className="h-4.5 w-4.5 text-red-400" />
+              <div className="rounded-lg bg-red-500/10 p-1.5 sm:p-2 w-fit">
+                <AlertTriangle className="h-4 w-4 text-red-400" />
               </div>
-              <p className={`text-2xl font-bold mt-3 ${inadimplenciaCalc.total > 0 ? 'text-red-400' : 'text-muted-foreground/70'}`}>
+              <p className={`text-xl sm:text-2xl font-bold mt-2 sm:mt-3 ${inadimplenciaCalc.total > 0 ? 'text-red-400' : 'text-muted-foreground/70'}`}>
                 {formatBRL(inadimplenciaCalc.total)}
               </p>
               <p className="text-xs text-red-400/80">{inadimplenciaCalc.qtdClientes} clientes</p>
               <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Inadimplente</p>
             </GlassCard>
 
-            {/* Resultado */}
-            <GlassCard variant="service" glowColor={resultado >= 0 ? 'rgba(168, 85, 247, 0.12)' : 'rgba(239, 68, 68, 0.12)'}>
-              <div className={`rounded-lg p-2 w-fit ${resultado >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-                {resultado >= 0 ? <TrendingUp className="h-4.5 w-4.5 text-emerald-400" /> : <TrendingDown className="h-4.5 w-4.5 text-red-400" />}
+            {/* Resultado — spans 2 cols on mobile */}
+            <GlassCard variant="service" glowColor={resultado >= 0 ? 'rgba(168, 85, 247, 0.12)' : 'rgba(239, 68, 68, 0.12)'} className="col-span-2 lg:col-span-1">
+              <div className={`rounded-lg p-1.5 sm:p-2 w-fit ${resultado >= 0 ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+                {resultado >= 0 ? <TrendingUp className="h-4 w-4 text-emerald-400" /> : <TrendingDown className="h-4 w-4 text-red-400" />}
               </div>
-              <p className={`text-2xl font-bold mt-3 ${resultado >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              <p className={`text-xl sm:text-2xl font-bold mt-2 sm:mt-3 ${resultado >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 {formatBRL(resultado)}
               </p>
               <p className="text-xs text-muted-foreground">Receita - Despesas</p>
@@ -299,12 +302,15 @@ export default function Financeiro() {
                     {resumoMes.qtdInadimplentes > 0 && (
                       <span className="text-red-500"> · {resumoMes.qtdInadimplentes} inadimplentes</span>
                     )}
-                    {resumoMes.qtdSemExtrato === 0 && resumoMes.qtdInadimplentes === 0 && (
+                    {qtdAguardandoAuditoria > 0 && (
+                      <span className="text-amber-500"> · ⏳ {qtdAguardandoAuditoria} aguardando auditoria</span>
+                    )}
+                    {resumoMes.qtdSemExtrato === 0 && resumoMes.qtdInadimplentes === 0 && qtdAguardandoAuditoria === 0 && (
                       <span className="text-emerald-500"> · Tudo em dia ✓</span>
                     )}
                   </p>
                 </div>
-                <div className="flex gap-6 text-right flex-wrap">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-6 text-left sm:text-right">
                   <div>
                     <p className="text-xs text-muted-foreground">Faturado</p>
                     <p className="text-sm font-bold">{formatBRL(metricas.totalFaturado)}</p>
@@ -326,15 +332,15 @@ export default function Financeiro() {
             </CardContent>
           </Card>
 
-          {/* Tabs */}
+          {/* Tabs — horizontal scroll on mobile */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="flex-wrap h-auto gap-1">
-              <TabsTrigger value="clientes" className="gap-1.5">
+            <TabsList className="flex w-full overflow-x-auto overflow-y-hidden no-scrollbar gap-1 h-auto flex-nowrap justify-start">
+              <TabsTrigger value="clientes" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                 <Search className="h-3.5 w-3.5" />
                 Clientes
               </TabsTrigger>
               {!isFinanceiro && (
-                <TabsTrigger value="auditoria" className="gap-1.5">
+                <TabsTrigger value="auditoria" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                   <ClipboardCheck className="h-3.5 w-3.5" />
                   Auditoria
                   {clientesAguardandoAuditoria.length > 0 && (
@@ -342,35 +348,36 @@ export default function Financeiro() {
                   )}
                 </TabsTrigger>
               )}
-              <TabsTrigger value="cobrar" className="gap-1.5">
+              <TabsTrigger value="cobrar" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                 <FileText className="h-3.5 w-3.5" />
                 Cobrar
                 {clientesCobrar.length > 0 && (
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesCobrar.length}</Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="enviados" className="gap-1.5">
+              <TabsTrigger value="enviados" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                 <Send className="h-3.5 w-3.5" />
                 Enviados
                 {clientesEnviados.length > 0 && (
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesEnviados.length}</Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="aguardando" className="gap-1.5">
+              <TabsTrigger value="aguardando" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                 <Clock className="h-3.5 w-3.5" />
-                Ag. Pagamento
+                <span className="hidden sm:inline">Ag. Pagamento</span>
+                <span className="sm:hidden">Ag. Pgto</span>
                 {clientesAguardando.length > 0 && (
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesAguardando.length}</Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="pagos" className="gap-1.5">
+              <TabsTrigger value="pagos" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                 <CheckCircle className="h-3.5 w-3.5" />
                 Pagos
                 {clientesPagos.length > 0 && (
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0 min-w-[18px] text-emerald-500 border-emerald-500/30">{clientesPagos.length}</Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="todos" className="gap-1.5">
+              <TabsTrigger value="todos" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                 <TrendingUp className="h-3.5 w-3.5" />
                 Todos
               </TabsTrigger>
@@ -409,13 +416,13 @@ export default function Financeiro() {
                           : Math.max(1, diaInicioJanela - hoje);
                         return (
                           <div key={c.cliente_id} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-border/60">
-                            <div>
-                              <p className="text-sm font-medium">{c.cliente_apelido || c.cliente_nome}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{c.cliente_apelido || c.cliente_nome}</p>
                               <p className="text-xs text-muted-foreground">
                                 {c.qtd_sem_extrato} proc. · {formatBRL(c.total_faturado)} · Fatura dia {diaFatura}
                               </p>
                             </div>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs shrink-0 ml-2">
                               Cobrar em {diasAteCobranca} dia{diasAteCobranca > 1 ? 's' : ''}
                             </Badge>
                           </div>
