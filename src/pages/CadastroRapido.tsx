@@ -200,6 +200,7 @@ export default function CadastroRapido() {
     dentroDoPlano: processoForm.dentroDoPlano,
     valorAvulso: processoForm.valorAvulso,
     justificativaAvulso: processoForm.justificativaAvulso,
+    etiquetas: processoForm.etiquetas || [],
     valorFinal: preview.valorFinal,
     slotNumero: preview.slotNumero,
     descontoAplicado: preview.descontoAplicado,
