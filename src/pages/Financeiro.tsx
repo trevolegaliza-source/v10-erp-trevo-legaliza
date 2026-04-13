@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 import { useLocation } from 'react-router-dom';
+import { usePermissions } from '@/hooks/usePermissions';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { GlassCard } from '@/components/ui/glass-card';
