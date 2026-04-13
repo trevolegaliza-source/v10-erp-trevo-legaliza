@@ -1101,6 +1101,57 @@ export default function ClienteDetalhe() {
               </div>
             </CardHeader>
             <CardContent>
+              {/* Mensalista: botão para gerar fatura mensal se não existe no mês */}
+              {isMensalista && (() => {
+                const now = new Date();
+                const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+                const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                const temFaturaMes = lancamentos.some(l => {
+                  if (l.tipo !== 'receber') return false;
+                  const venc = new Date(l.data_vencimento);
+                  return venc >= inicioMes && venc <= fimMes;
+                });
+                if (temFaturaMes) return null;
+                return (
+                  <div className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-amber-600">Sem fatura neste mês</p>
+                      <p className="text-xs text-muted-foreground">
+                        {fmt(Number((cliente as any).valor_base || 0))}/mês · Vencimento dia {(cliente as any).dia_vencimento_mensal || 10}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        const dia = (cliente as any).dia_vencimento_mensal || 10;
+                        const vencimento = new Date(now.getFullYear(), now.getMonth(), dia);
+                        if (vencimento < now) vencimento.setMonth(vencimento.getMonth() + 1);
+                        const mesLabel = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                        const { error } = await supabase.from('lancamentos').insert({
+                          tipo: 'receber' as const,
+                          cliente_id: cliente.id,
+                          descricao: `Fatura mensal — ${mesLabel}`,
+                          valor: Number((cliente as any).valor_base || 0),
+                          data_vencimento: vencimento.toISOString().split('T')[0],
+                          status: 'pendente' as const,
+                          etapa_financeiro: 'solicitacao_criada',
+                        });
+                        if (error) {
+                          toast.error('Erro ao gerar fatura: ' + error.message);
+                        } else {
+                          toast.success('Fatura mensal gerada!');
+                          loadAll(cliente.id);
+                          navigate('/financeiro');
+                        }
+                      }}
+                    >
+                      <Receipt className="h-3 w-3 mr-1" />
+                      Gerar Fatura Mensal
+                    </Button>
+                  </div>
+                );
+              })()}
               {!isMensalista && (
                 <div className="mb-4 p-3 rounded-lg bg-muted/40 border border-border/40">
                   <p className="text-xs font-medium">Próximo Fechamento (Avulso)</p>
