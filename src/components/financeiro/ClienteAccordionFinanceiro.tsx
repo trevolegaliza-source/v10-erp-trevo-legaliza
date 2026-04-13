@@ -92,12 +92,83 @@ function tipoLabel(c: ClienteFinanceiro): string {
   return 'Avulso';
 }
 
+// ══════════ HELPER: Client-level badge indicators ══════════
+function ClienteHeaderBadges({ cliente }: { cliente: ClienteFinanceiro }) {
+  const temMetodoTrevo = cliente.lancamentos.some(l => l.tem_etiqueta_metodo_trevo);
+  const temPrioridade = cliente.lancamentos.some(l => l.tem_etiqueta_prioridade);
+  const temAlertaTaxas = cliente.lancamentos.some(l =>
+    (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0
+  );
+  const totalTaxas = cliente.lancamentos.reduce((s, l) => s + l.total_valores_adicionais, 0);
+
+  return (
+    <>
+      {temMetodoTrevo && (
+        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
+          🍀 Método Trevo
+        </Badge>
+      )}
+      {temPrioridade && (
+        <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
+          🔴 Prioridade
+        </Badge>
+      )}
+      {temAlertaTaxas && (
+        <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-[10px] px-1.5 py-0">
+          ⚠️ Taxas pendentes
+        </Badge>
+      )}
+      {totalTaxas > 0 && (
+        <span className="text-[10px] text-muted-foreground">+ {fmt(totalTaxas)} taxas</span>
+      )}
+    </>
+  );
+}
+
 // ══════════ TAB: FATURAR ══════════
 export function ClientesFaturar({ clientes }: { clientes: ClienteFinanceiro[] }) {
   if (clientes.length === 0) return <EmptyState text="Nenhum cliente aguardando geração de extrato." />;
 
-  const prontos = clientes.filter(c => c.cliente_momento_faturamento !== 'no_deferimento');
-  const aguardandoDef = clientes.filter(c => c.cliente_momento_faturamento === 'no_deferimento');
+  // Per-process split: for no_deferimento clients, baixa/avulso processes go to "prontos"
+  const prontosMap = new Map<string, ClienteFinanceiro>();
+  const aguardandoDefMap = new Map<string, ClienteFinanceiro>();
+
+  for (const c of clientes) {
+    if (c.cliente_momento_faturamento !== 'no_deferimento') {
+      // Non-deferimento clients go entirely to prontos
+      prontosMap.set(c.cliente_id, c);
+      continue;
+    }
+
+    // Split lancamentos for no_deferimento clients
+    const lancProntos = c.lancamentos.filter(l => ['baixa', 'avulso'].includes(l.processo_tipo));
+    const lancAguardando = c.lancamentos.filter(l => !['baixa', 'avulso'].includes(l.processo_tipo));
+
+    if (lancProntos.length > 0) {
+      prontosMap.set(c.cliente_id, {
+        ...c,
+        lancamentos: lancProntos,
+        qtd_processos: lancProntos.length,
+        total_faturado: lancProntos.reduce((s, l) => s + l.valor, 0),
+        total_pendente: lancProntos.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+        qtd_sem_extrato: lancProntos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+      });
+    }
+
+    if (lancAguardando.length > 0) {
+      aguardandoDefMap.set(c.cliente_id, {
+        ...c,
+        lancamentos: lancAguardando,
+        qtd_processos: lancAguardando.length,
+        total_faturado: lancAguardando.reduce((s, l) => s + l.valor, 0),
+        total_pendente: lancAguardando.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+        qtd_sem_extrato: lancAguardando.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+      });
+    }
+  }
+
+  const prontos = Array.from(prontosMap.values());
+  const aguardandoDef = Array.from(aguardandoDefMap.values());
 
   return (
     <div className="space-y-6">
@@ -113,7 +184,7 @@ export function ClientesFaturar({ clientes }: { clientes: ClienteFinanceiro[] })
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">⏳ Aguardando deferimento — não cobrar ainda</h3>
           <Accordion type="multiple" className="space-y-2">
-            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={true} />)}
+            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} />)}
           </Accordion>
         </div>
       )}
