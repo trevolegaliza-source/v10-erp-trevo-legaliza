@@ -765,6 +765,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
             <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
             <p className="text-xs text-muted-foreground">{fmt(cliente.total_faturado)} · {cliente.qtd_processos} proc.</p>
           </div>
+          <ClienteHeaderBadges cliente={cliente} />
           {hasExtratoNoSistema && cliente.extrato_mais_recente ? (
             <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-xs">
               Extrato em {fmtDate(cliente.extrato_mais_recente.created_at)}
@@ -1004,6 +1005,7 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 {fmt(cliente.total_faturado)} · Enviado · Vence {fmtDate(vencimento)}
               </p>
             </div>
+            <ClienteHeaderBadges cliente={cliente} />
             {temVencidos ? (
               <Badge className="bg-destructive/15 text-destructive border-0 text-xs">
                 Vencido há {maiorAtraso}d
@@ -1139,6 +1141,7 @@ function RecebidoItem({ cliente: c }: { cliente: ClienteFinanceiro }) {
             <p className="font-semibold text-sm truncate">{c.cliente_apelido || c.cliente_nome}</p>
             <p className="text-xs text-muted-foreground">{fmt(c.total_faturado)} · {c.qtd_processos} proc.</p>
           </div>
+          <ClienteHeaderBadges cliente={c} />
           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-xs">
             <CheckCircle className="h-3 w-3 mr-1" /> Pago
           </Badge>
