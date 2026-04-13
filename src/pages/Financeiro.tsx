@@ -50,6 +50,8 @@ function getPeriodoDates(preset: PeriodoPreset): { inicio: string; fim: string }
 }
 
 export default function Financeiro() {
+  const { role } = usePermissions();
+  const isFinanceiro = role === 'financeiro';
   const [periodo, setPeriodo] = useState<PeriodoPreset>('este_mes');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
@@ -57,7 +59,7 @@ export default function Financeiro() {
   const [activeTab, setActiveTab] = useState(() => {
     const stateTab = (location.state as any)?.tab;
     if (stateTab) return stateTab;
-    return 'auditoria';
+    return isFinanceiro ? 'cobrar' : 'auditoria';
   });
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
@@ -331,13 +333,15 @@ export default function Financeiro() {
                 <Search className="h-3.5 w-3.5" />
                 Clientes
               </TabsTrigger>
-              <TabsTrigger value="auditoria" className="gap-1.5">
-                <ClipboardCheck className="h-3.5 w-3.5" />
-                Auditoria
-                {clientesAguardandoAuditoria.length > 0 && (
-                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesAguardandoAuditoria.length}</Badge>
-                )}
-              </TabsTrigger>
+              {!isFinanceiro && (
+                <TabsTrigger value="auditoria" className="gap-1.5">
+                  <ClipboardCheck className="h-3.5 w-3.5" />
+                  Auditoria
+                  {clientesAguardandoAuditoria.length > 0 && (
+                    <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesAguardandoAuditoria.length}</Badge>
+                  )}
+                </TabsTrigger>
+              )}
               <TabsTrigger value="cobrar" className="gap-1.5">
                 <FileText className="h-3.5 w-3.5" />
                 Cobrar
