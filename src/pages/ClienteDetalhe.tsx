@@ -11,8 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil, List, Check, Tags } from 'lucide-react';
+import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil, List, Check, Tags, ClipboardCheck, AlertTriangle, Undo2 } from 'lucide-react';
 import { EtiquetasDisplay, EtiquetasEdit } from '@/components/EtiquetasBadges';
+import { useAuditarLancamento, useAuditarTodosCliente, useAlterarValorLancamento } from '@/hooks/useFinanceiroClientes';
+import ValoresAdicionaisModal from '@/components/financeiro/ValoresAdicionaisModal';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { formatCEP, buscarCEP, buscarCoordenadas } from '@/lib/cep';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -58,6 +61,8 @@ export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qcRef = useQueryClient();
+  const { isMaster: permIsMasterFn } = usePermissions();
+  const permIsMaster = permIsMasterFn();
   const [cliente, setCliente] = useState<ClienteDB | null>(null);
   const [processos, setProcessos] = useState<ProcessoDB[]>([]);
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
@@ -614,6 +619,9 @@ export default function ClienteDetalhe() {
   const totalFaturado = lancamentos.filter(l => l.tipo === 'receber').reduce((s, l) => s + Number(l.valor), 0);
   const totalPago = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
   const totalPendente = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
+  const lancNaoAuditados = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente' && !(l as any).auditado && (l as any).etapa_financeiro === 'solicitacao_criada');
+  const lancAuditadosPendentes = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente' && (l as any).auditado);
+  const qtdNaoAuditados = lancNaoAuditados.length;
   const formatCurrencyOrZero = (value: number | null | undefined) =>
     Number(value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const formatValueOrZero = (value: number | null | undefined) =>
@@ -724,7 +732,12 @@ export default function ClienteDetalhe() {
           <TabsTrigger value="financeiro-config" className="text-xs gap-1"><Settings className="h-3.5 w-3.5" />Financeiro</TabsTrigger>
           <TabsTrigger value="honorarios" className="text-xs gap-1"><List className="h-3.5 w-3.5" />Serviços</TabsTrigger>
           <TabsTrigger value="processos" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Processos</TabsTrigger>
-          <TabsTrigger value="faturas" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Faturas</TabsTrigger>
+          <TabsTrigger value="faturas" className="text-xs gap-1">
+            <DollarSign className="h-3.5 w-3.5" />Faturas
+            {qtdNaoAuditados > 0 && (
+              <Badge variant="destructive" className="text-[10px] px-1 py-0 min-w-[16px]">{qtdNaoAuditados}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="contratos" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Contratos</TabsTrigger>
           {isPrePago && <TabsTrigger value="prepago" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Pré-Pago</TabsTrigger>}
           <TabsTrigger value="observacoes" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Obs.</TabsTrigger>
@@ -1163,39 +1176,81 @@ export default function ClienteDetalhe() {
                   </p>
                 </div>
               )}
-              {lancamentos.filter(l => l.tipo === 'receber').length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Vencimento</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lancamentos.filter(l => l.tipo === 'receber').map(l => (
-                      <TableRow key={l.id}>
-                        <TableCell className="font-medium text-sm">
-                          {l.descricao}
-                          {l.descricao.includes('Honorário avulso') && (
-                            <Badge className="ml-2 bg-amber-500/10 text-amber-500 text-[10px] border-0">AVULSO</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
-                        <TableCell>
-                          <Badge className={cn('text-[10px] border-0', STATUS_STYLES[l.status as StatusFinanceiro] || '')}>
-                            {STATUS_LABELS[l.status as StatusFinanceiro] || l.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-sm font-medium">
-                          {Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </TableCell>
+
+              {/* ── Aguardando Auditoria ── */}
+              {lancNaoAuditados.length > 0 && (
+                <ClienteDetalheFaturasAuditoria
+                  lancamentos={lancNaoAuditados}
+                  clienteApelido={cliente.apelido || cliente.nome}
+                  onReload={() => loadAll(cliente.id)}
+                  isMaster={permIsMaster}
+                />
+              )}
+
+              {/* ── Auditados / Prontos para cobrar ── */}
+              {lancAuditadosPendentes.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  <h4 className="text-xs font-semibold text-emerald-600 flex items-center gap-1.5">
+                    <ClipboardCheck className="h-3.5 w-3.5" /> Auditados — Prontos para cobrar
+                  </h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Vencimento</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        {permIsMaster && <TableHead className="w-8" />}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
+                    </TableHeader>
+                    <TableBody>
+                      {lancAuditadosPendentes.map(l => (
+                        <AuditedLancRow key={l.id} l={l} isMaster={permIsMaster} onReload={() => loadAll(cliente.id)} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* ── Pagos ── */}
+              {lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pago').length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground">Pagos</h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Vencimento</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pago').map(l => (
+                        <TableRow key={l.id}>
+                          <TableCell className="font-medium text-sm">
+                            {l.descricao}
+                            {(l as any).valor_alterado_em && (
+                              <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 text-amber-600 border-amber-500/30">✏️ Alterado</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
+                          <TableCell>
+                            <Badge className={cn('text-[10px] border-0', STATUS_STYLES[l.status as StatusFinanceiro] || '')}>
+                              {STATUS_LABELS[l.status as StatusFinanceiro] || l.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-sm font-medium">
+                            {Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {lancamentos.filter(l => l.tipo === 'receber').length === 0 && (
                 <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma fatura registrada</p>
               )}
             </CardContent>
@@ -2229,5 +2284,194 @@ export default function ClienteDetalhe() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+// ── Sub-components for audit in ClienteDetalhe ──
+
+function ClienteDetalheFaturasAuditoria({ lancamentos, clienteApelido, onReload, isMaster }: {
+  lancamentos: any[];
+  clienteApelido: string;
+  onReload: () => void;
+  isMaster: boolean;
+}) {
+  const auditarMut = useAuditarLancamento();
+  const auditarTodosMut = useAuditarTodosCliente();
+  const alterarValorMut = useAlterarValorLancamento();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [novoValor, setNovoValor] = useState('');
+  const [taxaModalOpen, setTaxaModalOpen] = useState(false);
+  const [taxaProcessoId, setTaxaProcessoId] = useState('');
+
+  const totalNaoAuditado = lancamentos.reduce((s: number, l: any) => s + Number(l.valor), 0);
+
+  const handleAuditarTodos = () => {
+    const ids = lancamentos.map((l: any) => l.id);
+    auditarTodosMut.mutate({ lancamentoIds: ids }, {
+      onSuccess: () => { toast.success(`${ids.length} processos auditados ✅`); onReload(); },
+    });
+  };
+
+  return (
+    <>
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-semibold text-amber-600 flex items-center gap-1.5">
+            <ClipboardCheck className="h-3.5 w-3.5" /> Aguardando Auditoria ({lancamentos.length})
+          </h4>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs text-emerald-600 border-emerald-600/30 hover:bg-emerald-600/10 h-7"
+            onClick={handleAuditarTodos}
+            disabled={auditarTodosMut.isPending}
+          >
+            <Check className="h-3 w-3 mr-1" /> Auditar Todos
+          </Button>
+        </div>
+        <div className="space-y-2 border border-dashed border-amber-500/40 rounded-lg p-3 bg-amber-500/5">
+          {lancamentos.map((l: any) => {
+            const alertaTaxas = ((l as any).etiquetas?.includes('metodo_trevo') || (l as any).etiquetas?.includes('prioridade'));
+            return (
+              <div key={l.id} className="rounded-lg border border-border bg-card p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">{l.descricao}</p>
+                    <p className="text-xs text-muted-foreground">Vence {new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <span className="text-sm font-bold text-primary">
+                    {Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {(l as any).valor_original != null && (l as any).valor_original !== l.valor && (
+                      <span className="text-[10px] text-muted-foreground line-through ml-1">
+                        {Number((l as any).valor_original).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                {editingId === l.id && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={novoValor}
+                      onChange={e => setNovoValor(e.target.value)}
+                      placeholder="Novo valor"
+                      className="h-8 text-sm w-32"
+                      style={{ fontSize: '16px' }}
+                      autoFocus
+                    />
+                    <Button size="sm" variant="ghost" className="h-8 text-emerald-600" onClick={() => {
+                      const valor = parseFloat(novoValor.replace(',', '.'));
+                      if (isNaN(valor) || valor <= 0) { toast.error('Valor inválido'); return; }
+                      alterarValorMut.mutate({ lancamentoId: l.id, novoValor: valor, valorAtual: l.valor }, {
+                        onSuccess: () => { setEditingId(null); onReload(); },
+                      });
+                    }} disabled={alterarValorMut.isPending}>
+                      <Check className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 text-muted-foreground" onClick={() => setEditingId(null)}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setNovoValor(String(l.valor)); setEditingId(l.id); }}>
+                    <Pencil className="h-3 w-3 mr-1" /> Editar Valor
+                  </Button>
+                  {l.processo_id && (
+                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setTaxaProcessoId(l.processo_id); setTaxaModalOpen(true); }}>
+                      <Receipt className="h-3 w-3 mr-1" /> Add Taxa
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    className="text-xs h-7 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    onClick={() => {
+                      auditarMut.mutate({ lancamentoId: l.id, auditado: true }, {
+                        onSuccess: () => { toast.success('Processo auditado ✅'); onReload(); },
+                      });
+                    }}
+                    disabled={auditarMut.isPending}
+                  >
+                    <Check className="h-3 w-3 mr-1" /> Auditar
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {taxaProcessoId && (
+        <ValoresAdicionaisModal
+          open={taxaModalOpen}
+          onOpenChange={setTaxaModalOpen}
+          processoId={taxaProcessoId}
+          clienteApelido={clienteApelido}
+        />
+      )}
+    </>
+  );
+}
+
+function AuditedLancRow({ l, isMaster, onReload }: { l: any; isMaster: boolean; onReload: () => void }) {
+  const auditarMut = useAuditarLancamento();
+
+  return (
+    <TableRow>
+      <TableCell className="font-medium text-sm">
+        {l.descricao}
+        <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 text-emerald-600 border-emerald-500/30">✅ Auditado</Badge>
+        {(l as any).valor_alterado_em && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 text-amber-600 border-amber-500/30">✏️ Alterado</Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  Original: {Number((l as any).valor_original || l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {(l as any).auditado_em && ` · Auditado em ${new Date((l as any).auditado_em).toLocaleDateString('pt-BR')}`}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </TableCell>
+      <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
+      <TableCell>
+        <Badge className={cn('text-[10px] border-0', STATUS_STYLES[l.status as StatusFinanceiro] || '')}>
+          {STATUS_LABELS[l.status as StatusFinanceiro] || l.status}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-right text-sm font-medium">
+        {Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+      </TableCell>
+      {isMaster && (
+        <TableCell className="w-8">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={() => {
+                    auditarMut.mutate({ lancamentoId: l.id, auditado: false }, {
+                      onSuccess: () => { toast.success('Auditoria removida — voltou para pendente'); onReload(); },
+                    });
+                  }}
+                  disabled={auditarMut.isPending}
+                >
+                  <Undo2 className="h-3 w-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p className="text-xs">Desmarcar auditoria</p></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </TableCell>
+      )}
+    </TableRow>
   );
 }

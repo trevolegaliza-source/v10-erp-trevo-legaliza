@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   DollarSign, Clock, CheckCircle, Activity, TrendingUp, TrendingDown,
-  AlertTriangle, FileText, Send, PauseCircle, ChevronRight, Check, CreditCard, Download,
+  AlertTriangle, FileText, Send, PauseCircle, ChevronRight, Check, CreditCard, Download, ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -160,6 +160,22 @@ export default function Dashboard() {
       const dias = Math.floor((Date.now() - new Date(p.updated_at || p.created_at || '').getTime()) / 86400000);
       return dias >= 7 && !['finalizados', 'arquivo'].includes(p.etapa);
     });
+
+    // Auditoria pendente alert
+    const naoAuditados = lancamentosMes.filter(l =>
+      l.status !== 'pago' && (l as any).auditado === false && l.etapa_financeiro === 'solicitacao_criada'
+    );
+    if (naoAuditados.length > 0) {
+      alertas.push({
+        id: 'auditoria_pendente',
+        titulo: `${naoAuditados.length} processos aguardando auditoria`,
+        descricao: 'Validar antes de cobrar',
+        severity: 'warning',
+        icon: ClipboardCheck,
+        link: '/financeiro',
+      });
+    }
+
     if (parados.length > 0) {
       alertas.push({ id: 'parados', titulo: `${parados.length} processos parados`, descricao: 'Sem movimentação há 7+ dias', severity: 'info', icon: PauseCircle, link: '/processos' });
     }
@@ -443,7 +459,13 @@ export default function Dashboard() {
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {alertasFiltrados.map(alerta => (
-                <GlassCard key={alerta.id} variant="service" glowColor={glowMap[alerta.severity]} onClick={() => navigate(alerta.link)}>
+                <GlassCard key={alerta.id} variant="service" glowColor={glowMap[alerta.severity]} onClick={() => {
+                  if (alerta.id === 'auditoria_pendente') {
+                    navigate('/financeiro', { state: { tab: 'auditoria' } });
+                  } else {
+                    navigate(alerta.link);
+                  }
+                }}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-foreground/10 flex items-center justify-center">

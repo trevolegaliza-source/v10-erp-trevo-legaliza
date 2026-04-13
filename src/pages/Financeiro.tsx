@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
+import { useLocation } from 'react-router-dom';
 import { ptBR } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { GlassCard } from '@/components/ui/glass-card';
@@ -51,9 +52,20 @@ export default function Financeiro() {
   const [periodo, setPeriodo] = useState<PeriodoPreset>('este_mes');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
-  const [activeTab, setActiveTab] = useState('auditoria');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(() => {
+    const stateTab = (location.state as any)?.tab;
+    if (stateTab) return stateTab;
+    return 'auditoria';
+  });
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
+
+  // Update tab when navigating with state
+  useEffect(() => {
+    const stateTab = (location.state as any)?.tab;
+    if (stateTab) setActiveTab(stateTab);
+  }, [location.state]);
 
   const dates = periodo === 'custom'
     ? { inicio: customInicio, fim: customFim }
