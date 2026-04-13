@@ -358,6 +358,11 @@ export default function Clientes() {
                           <p className="font-medium text-foreground">{client.nome}</p>
                           {client.apelido && <p className="text-xs text-muted-foreground">{client.apelido}</p>}
                           {client.nome_contador && <p className="text-[10px] text-muted-foreground">Contador: {client.nome_contador}</p>}
+                          {(auditPendentes?.[client.id] || 0) > 0 && (
+                            <Badge variant="outline" className="mt-1 text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-500">
+                              ⏳ {auditPendentes![client.id]} proc. s/ auditoria
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
