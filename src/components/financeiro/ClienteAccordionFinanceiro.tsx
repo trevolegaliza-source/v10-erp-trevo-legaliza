@@ -1140,24 +1140,24 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 {selectedPagar.size} de {cliente.lancamentos.length} · {fmt(valorSelecionado)}
               </span>
             </div>
-            <div className="flex gap-2 mt-3 flex-wrap">
-              <Button size="sm" variant="outline" onClick={handleEnviarWhatsAppRecobranca} className={cn("gap-1", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
+            <div className="grid grid-cols-2 sm:flex gap-2 mt-3 sm:flex-wrap">
+              <Button size="sm" variant="outline" onClick={handleEnviarWhatsAppRecobranca} className={cn("gap-1 h-11 sm:h-9", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
                 <MessageCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">WhatsApp{cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ' (sem tel.)'}</span>
                 <span className="sm:hidden">WhatsApp</span>
               </Button>
-              <Button size="sm" variant="outline" onClick={handleCompartilharAguardando} className="gap-1">
-                <Share2 className="h-4 w-4" /> Compartilhar
+              <Button size="sm" variant="outline" onClick={handleCompartilharAguardando} className="gap-1 h-11 sm:h-9">
+                <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Compartilhar</span><span className="sm:hidden">Enviar</span>
               </Button>
-              <Button size="sm" variant="outline" onClick={handleCopiarCobranca}>
-                <Copy className="h-4 w-4 mr-1" /> {temVencidos ? 'Reenviar Cobrança' : 'Copiar WhatsApp'}
+              <Button size="sm" variant="outline" onClick={handleCopiarCobranca} className="h-11 sm:h-9">
+                <Copy className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">{temVencidos ? 'Reenviar Cobrança' : 'Copiar WhatsApp'}</span><span className="sm:hidden">{temVencidos ? 'Reenviar' : 'Copiar'}</span>
               </Button>
               {(cliente.lancamentos.some(l => l.extrato_id) || cliente.extrato_mais_recente) && (
-                <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato}>
-                  <Download className="h-4 w-4 mr-1" /> {loadingExtrato ? 'Baixando...' : 'Baixar Extrato'}
+                <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato} className="h-11 sm:h-9">
+                  <Download className="h-4 w-4 mr-1" /> {loadingExtrato ? 'Baixando...' : 'Baixar'}
                 </Button>
               )}
-              <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white col-span-2 h-11 sm:h-9">
                 <CheckCircle className="h-4 w-4 mr-1" /> {selectedPagar.size > 0 ? `Pagar (${selectedPagar.size})` : 'Marcar como Pago'}
               </Button>
             </div>
