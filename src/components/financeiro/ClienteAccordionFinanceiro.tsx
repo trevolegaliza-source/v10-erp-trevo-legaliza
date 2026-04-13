@@ -17,8 +17,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
-import { isLancamentoVencidoReal } from '@/hooks/useFinanceiroClientes';
+import type { ClienteFinanceiro, LancamentoFinanceiro, MensalistaSemFatura } from '@/hooks/useFinanceiroClientes';
+import { isLancamentoVencidoReal, invalidateFinanceiro } from '@/hooks/useFinanceiroClientes';
 import { useExtratos } from '@/hooks/useExtratos';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
 import { gerarMensagemCobranca } from '@/lib/mensagem-cobranca';
@@ -34,7 +34,7 @@ function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-import { invalidateFinanceiro } from '@/hooks/useFinanceiroClientes';
+
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return '-';
@@ -126,8 +126,44 @@ function ClienteHeaderBadges({ cliente }: { cliente: ClienteFinanceiro }) {
 }
 
 // ══════════ TAB: FATURAR ══════════
-export function ClientesFaturar({ clientes }: { clientes: ClienteFinanceiro[] }) {
-  if (clientes.length === 0) return <EmptyState text="Nenhum cliente aguardando geração de extrato." />;
+export function ClientesFaturar({ clientes, mensalistasSemFatura = [] }: { clientes: ClienteFinanceiro[]; mensalistasSemFatura?: MensalistaSemFatura[] }) {
+  const queryClient = useQueryClient();
+  const [gerandoFatura, setGerandoFatura] = useState<string | null>(null);
+
+  const handleGerarFaturaMensal = async (m: MensalistaSemFatura) => {
+    setGerandoFatura(m.id);
+    try {
+      const now = new Date();
+      const dia = m.dia_vencimento_mensal || 10;
+      const vencimento = new Date(now.getFullYear(), now.getMonth(), dia);
+      if (vencimento < now) {
+        vencimento.setMonth(vencimento.getMonth() + 1);
+      }
+      const mesLabel = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+      const { error } = await supabase.from('lancamentos').insert({
+        tipo: 'receber' as const,
+        cliente_id: m.id,
+        descricao: `Fatura mensal — ${mesLabel}`,
+        valor: m.valor_base,
+        data_vencimento: vencimento.toISOString().split('T')[0],
+        status: 'pendente' as const,
+        etapa_financeiro: 'solicitacao_criada',
+      });
+      if (error) throw error;
+      toast.success(`Fatura mensal gerada para ${m.apelido || m.nome}!`);
+      invalidateFinanceiro(queryClient);
+    } catch (err: any) {
+      toast.error('Erro ao gerar fatura: ' + (err?.message || 'Erro'));
+    } finally {
+      setGerandoFatura(null);
+    }
+  };
+
+  const hasMensalistas = mensalistasSemFatura.length > 0;
+  const hasClientes = clientes.length > 0;
+
+  if (!hasMensalistas && !hasClientes) return <EmptyState text="Nenhum cliente aguardando geração de extrato." />;
 
   // Per-process split: for no_deferimento clients, baixa/avulso processes go to "prontos"
   const prontosMap = new Map<string, ClienteFinanceiro>();
@@ -135,12 +171,10 @@ export function ClientesFaturar({ clientes }: { clientes: ClienteFinanceiro[] })
 
   for (const c of clientes) {
     if (c.cliente_momento_faturamento !== 'no_deferimento') {
-      // Non-deferimento clients go entirely to prontos
       prontosMap.set(c.cliente_id, c);
       continue;
     }
 
-    // Split lancamentos for no_deferimento clients
     const lancProntos = c.lancamentos.filter(l => ['baixa', 'avulso'].includes(l.processo_tipo));
     const lancAguardando = c.lancamentos.filter(l => !['baixa', 'avulso'].includes(l.processo_tipo));
 
@@ -172,6 +206,35 @@ export function ClientesFaturar({ clientes }: { clientes: ClienteFinanceiro[] })
 
   return (
     <div className="space-y-6">
+      {/* Mensalistas sem fatura */}
+      {hasMensalistas && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-amber-600 flex items-center gap-1.5">📋 Mensalistas sem fatura neste mês</h3>
+          <div className="space-y-2">
+            {mensalistasSemFatura.map(m => (
+              <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5">
+                <div>
+                  <p className="text-sm font-medium">{m.apelido || m.nome}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {fmt(m.valor_base)}/mês · Vencimento dia {m.dia_vencimento_mensal}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={gerandoFatura === m.id}
+                  onClick={() => handleGerarFaturaMensal(m)}
+                  className="text-xs"
+                >
+                  {gerandoFatura === m.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Receipt className="h-3 w-3 mr-1" />}
+                  Gerar Fatura
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {prontos.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5">✅ Prontos para cobrar</h3>

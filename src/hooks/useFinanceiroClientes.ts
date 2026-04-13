@@ -119,6 +119,15 @@ export function invalidateFinanceiro(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['lancamentos'] });
 }
 
+export interface MensalistaSemFatura {
+  id: string;
+  nome: string;
+  apelido: string | null;
+  valor_base: number;
+  dia_vencimento_mensal: number;
+  telefone: string | null;
+}
+
 export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const queryClient = useQueryClient();
 
@@ -187,27 +196,29 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
       for (const l of lancamentos) {
         const clienteId = l.cliente_id;
-        if (!clienteId) continue;
-        const cliente = clienteMap.get(clienteId);
-        if (!cliente) continue;
+        // Handle orphan lancamentos (no client linked)
+        const ORPHAN_ID = '__orphan__';
+        const effectiveClienteId = clienteId || ORPHAN_ID;
+        const cliente = clienteId ? clienteMap.get(clienteId) : null;
+        if (clienteId && !cliente) continue;
         const processo = l.processo_id ? processoMap.get(l.processo_id) : null;
 
-        if (!result.has(clienteId)) {
-          result.set(clienteId, {
-            cliente_id: clienteId,
-            cliente_nome: cliente.nome,
-            cliente_apelido: cliente.apelido,
-            cliente_cnpj: cliente.cnpj,
-            cliente_tipo: cliente.tipo,
-            cliente_momento_faturamento: cliente.momento_faturamento || 'na_solicitacao',
-            cliente_dia_cobranca: cliente.dia_cobranca,
-            cliente_dia_vencimento_mensal: cliente.dia_vencimento_mensal,
-            cliente_telefone: cliente.telefone,
-            cliente_email: cliente.email,
-            cliente_nome_contador: cliente.nome_contador,
-            cliente_valor_base: cliente.valor_base,
-            cliente_desconto_progressivo: cliente.desconto_progressivo,
-            cliente_valor_limite_desconto: cliente.valor_limite_desconto,
+        if (!result.has(effectiveClienteId)) {
+          result.set(effectiveClienteId, {
+            cliente_id: effectiveClienteId,
+            cliente_nome: cliente?.nome || '⚠️ SEM CLIENTE VINCULADO',
+            cliente_apelido: cliente?.apelido || null,
+            cliente_cnpj: cliente?.cnpj || null,
+            cliente_tipo: cliente?.tipo || 'AVULSO_4D',
+            cliente_momento_faturamento: cliente?.momento_faturamento || 'na_solicitacao',
+            cliente_dia_cobranca: cliente?.dia_cobranca || null,
+            cliente_dia_vencimento_mensal: cliente?.dia_vencimento_mensal || null,
+            cliente_telefone: cliente?.telefone || null,
+            cliente_email: cliente?.email || null,
+            cliente_nome_contador: cliente?.nome_contador || null,
+            cliente_valor_base: cliente?.valor_base || null,
+            cliente_desconto_progressivo: cliente?.desconto_progressivo || null,
+            cliente_valor_limite_desconto: cliente?.valor_limite_desconto || null,
             lancamentos: [],
             total_faturado: 0,
             total_pendente: 0,
@@ -219,7 +230,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           });
         }
 
-        const c = result.get(clienteId)!;
+        const c = result.get(effectiveClienteId)!;
 
         const etiquetas: string[] = processo?.etiquetas || [];
         const totalVA = l.processo_id ? (vaMap.get(l.processo_id) || 0) : 0;
@@ -252,7 +263,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
         c.qtd_processos++;
         if (!l.extrato_id && l.etapa_financeiro === 'solicitacao_criada') c.qtd_sem_extrato++;
 
-        if (cliente.momento_faturamento === 'no_deferimento' && processo) {
+        if (cliente?.momento_faturamento === 'no_deferimento' && processo) {
           if (ETAPAS_PRE_DEFERIMENTO.includes(processo.etapa || '')) {
             c.qtd_aguardando_deferimento++;
           }
@@ -362,6 +373,48 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   const clientes = query.data || [];
 
+  // ── Mensalistas without invoice this month ──
+  const mensalistaQuery = useQuery({
+    queryKey: ['mensalistas_sem_fatura', dataInicio],
+    queryFn: async () => {
+      const now = new Date();
+      const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+      const { data: mensalistas } = await supabase
+        .from('clientes')
+        .select('id, nome, apelido, valor_base, dia_vencimento_mensal, telefone')
+        .eq('tipo', 'MENSALISTA')
+        .neq('is_archived', true);
+
+      if (!mensalistas?.length) return [];
+
+      const { data: lancMes } = await supabase
+        .from('lancamentos')
+        .select('cliente_id')
+        .eq('tipo', 'receber')
+        .gte('data_vencimento', inicioMes)
+        .lte('data_vencimento', fimMes)
+        .in('cliente_id', mensalistas.map(m => m.id));
+
+      const clientesComFatura = new Set((lancMes || []).map(l => l.cliente_id));
+
+      return mensalistas
+        .filter(m => !clientesComFatura.has(m.id))
+        .map(m => ({
+          id: m.id,
+          nome: m.nome,
+          apelido: m.apelido,
+          valor_base: Number(m.valor_base || 0),
+          dia_vencimento_mensal: m.dia_vencimento_mensal || 10,
+          telefone: m.telefone,
+        })) as MensalistaSemFatura[];
+    },
+    staleTime: 60_000,
+  });
+
+  const mensalistasSemFatura = mensalistaQuery.data || [];
+
   // Correct KPI calculations
   const allLanc = clientes.flatMap(c => c.lancamentos);
   const totalFaturado = allLanc.reduce((s, l) => s + l.valor, 0);
@@ -454,6 +507,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     clientesEnviados,
     clientesAguardando,
     clientesPagos,
+    mensalistasSemFatura,
     metricas,
     isLoading: query.isLoading,
     isVencido: isLancamentoVencidoReal,

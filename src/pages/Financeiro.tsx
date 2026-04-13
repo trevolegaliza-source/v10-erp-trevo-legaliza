@@ -65,6 +65,7 @@ export default function Financeiro() {
     clientesEnviados,
     clientesAguardando,
     clientesPagos,
+    mensalistasSemFatura,
     metricas,
     isLoading,
   } = useFinanceiroClientes(dates.inicio, dates.fim);
@@ -354,7 +355,7 @@ export default function Financeiro() {
             </TabsContent>
 
             <TabsContent value="cobrar" className="mt-4">
-              <ClientesFaturar clientes={clientesCobrar} />
+              <ClientesFaturar clientes={clientesCobrar} mensalistasSemFatura={mensalistasSemFatura} />
               
               {clientesFuturaFatura.length > 0 && (
                 <div className="mt-6">

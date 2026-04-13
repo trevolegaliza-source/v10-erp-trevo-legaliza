@@ -77,6 +77,40 @@ export default function Dashboard() {
   }, [permsLoading, podeVer, navigate]);
 
 
+  // Fetch mensalistas without invoice this month
+  const [mensalistaAlerts, setMensalistaAlerts] = useState<Array<{ id: string; nome: string; valor_base: number; dia: number }>>([]);
+  useEffect(() => {
+    async function checkMensalistas() {
+      const now = new Date();
+      const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+      const { data: mensalistas } = await supabase
+        .from('clientes')
+        .select('id, nome, apelido, valor_base, dia_vencimento_mensal')
+        .eq('tipo', 'MENSALISTA')
+        .neq('is_archived', true);
+
+      if (!mensalistas?.length) return;
+
+      const { data: lancMes } = await supabase
+        .from('lancamentos')
+        .select('cliente_id')
+        .eq('tipo', 'receber')
+        .gte('data_vencimento', inicioMes)
+        .lte('data_vencimento', fimMes)
+        .in('cliente_id', mensalistas.map(m => m.id));
+
+      const comFatura = new Set((lancMes || []).map(l => l.cliente_id));
+      setMensalistaAlerts(
+        mensalistas
+          .filter(m => !comFatura.has(m.id))
+          .map(m => ({ id: m.id, nome: m.apelido || m.nome, valor_base: Number(m.valor_base || 0), dia: m.dia_vencimento_mensal || 10 }))
+      );
+    }
+    checkMensalistas();
+  }, [data]);
+
   const calc = useMemo(() => {
     if (!data) return null;
     const { lancamentosMes, lancamentosMesAnterior, processos, proximosVencimentos, lancamentosHistorico, lancamentosPagar } = data;
@@ -150,6 +184,18 @@ export default function Dashboard() {
       alertas.push({ id: 'contas_pagar_proximas', titulo: `${contasAVencer.length} contas a pagar nos próximos ${diasAlertaPagar} dias`, descricao: `R$ ${valorAVencer.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a vencer`, severity: 'warning', icon: CreditCard, link: '/contas-pagar' });
     }
 
+    // Mensalistas sem fatura no mês
+    for (const m of mensalistaAlerts) {
+      alertas.push({
+        id: `mensalista_${m.id}`,
+        titulo: `Mensalista ${m.nome} sem fatura`,
+        descricao: `${fmt(m.valor_base)}/mês — dia ${m.dia}`,
+        severity: 'critical',
+        icon: CreditCard,
+        link: `/clientes/${m.id}`,
+      });
+    }
+
     const fases = [
       { id: 'entrada', nome: 'Entrada', etapas: ['recebidos', 'analise_documental'], cor: 'bg-blue-500' },
       { id: 'andamento', nome: 'Em andamento', etapas: ['contrato', 'viabilidade', 'dbe', 'vre', 'em_analise'], cor: 'bg-teal-500' },
@@ -214,7 +260,7 @@ export default function Dashboard() {
         cliente_apelido: (v.clientes as any)?.apelido || null,
       })),
     };
-  }, [data, diasAlertaPagar]);
+  }, [data, diasAlertaPagar, mensalistaAlerts]);
 
   const animFaturado = useCountUp(calc?.totalFaturado ?? 0);
   const animPendente = useCountUp(calc?.totalPendente ?? 0);
