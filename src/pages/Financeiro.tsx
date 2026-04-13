@@ -363,6 +363,10 @@ export default function Financeiro() {
               <ClientesFinanceiroTab />
             </TabsContent>
 
+            <TabsContent value="auditoria" className="mt-4">
+              <ClientesAuditoria clientes={clientesAguardandoAuditoria} />
+            </TabsContent>
+
             <TabsContent value="cobrar" className="mt-4">
               <ClientesFaturar clientes={clientesCobrar} mensalistasSemFatura={mensalistasSemFatura} />
               
