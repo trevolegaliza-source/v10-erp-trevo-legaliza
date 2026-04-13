@@ -413,6 +413,7 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            <ClienteHeaderBadges cliente={cliente} />
             <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs">
               {cliente.qtd_sem_extrato} sem extrato
             </Badge>
