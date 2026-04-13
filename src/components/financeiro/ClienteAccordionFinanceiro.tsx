@@ -860,8 +860,10 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
           )}
           {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
           <div className="flex gap-2 mt-3 flex-wrap">
-            <Button size="sm" variant="outline" onClick={handleEnviarWhatsApp} className="gap-1 text-green-600 border-green-600/30 hover:bg-green-600/10">
-              <MessageCircle className="h-4 w-4" /> WhatsApp
+            <Button size="sm" variant="outline" onClick={handleEnviarWhatsApp} className={cn("gap-1", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
+              <MessageCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">WhatsApp{cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ' (sem tel.)'}</span>
+              <span className="sm:hidden">WhatsApp</span>
             </Button>
             <Button size="sm" variant="outline" onClick={handleCompartilhar} className="gap-1">
               <Share2 className="h-4 w-4" /> Compartilhar
