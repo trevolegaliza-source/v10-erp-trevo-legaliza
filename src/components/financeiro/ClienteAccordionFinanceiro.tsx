@@ -1269,7 +1269,7 @@ function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
 function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: LancamentoFinanceiro; checked?: boolean; onToggle?: () => void }) {
   const badges = parseBadges(l.processo_notas);
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
-  const obsLower = (l.descricao || '').toLowerCase() + ((l as any).observacoes_financeiro || '').toLowerCase();
+  const obsLower = ((l.observacoes_financeiro || '') + ' ' + (l.descricao || '')).toLowerCase();
   const temExtratoLegado = !l.extrato_id && obsLower.includes('extrato emitido');
 
   return (
