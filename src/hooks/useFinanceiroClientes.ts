@@ -23,6 +23,8 @@ export interface ClienteFinanceiro {
   qtd_processos: number;
   qtd_sem_extrato: number;
   qtd_aguardando_deferimento: number;
+  qtd_auditados: number;
+  qtd_nao_auditados: number;
   etapa_predominante: string;
   extrato_mais_recente: { id: string; pdf_url: string; filename: string; created_at: string } | null;
 }
@@ -48,16 +50,18 @@ export interface LancamentoFinanceiro {
   tem_etiqueta_metodo_trevo: boolean;
   tem_etiqueta_prioridade: boolean;
   observacoes_financeiro: string | null;
+  auditado: boolean;
+  auditado_por: string | null;
+  auditado_em: string | null;
+  valor_original: number | null;
+  valor_alterado_por: string | null;
+  valor_alterado_em: string | null;
 }
 
 const ETAPAS_PRE_DEFERIMENTO = [
   'recebidos', 'analise_documental', 'contrato', 'viabilidade',
   'dbe', 'vre', 'aguardando_pagamento', 'taxa_paga',
   'assinaturas', 'assinado', 'em_analise',
-];
-
-const ETAPAS_POS_DEFERIMENTO = [
-  'registro', 'mat', 'inscricao_me', 'alvaras', 'conselho', 'finalizados', 'arquivo',
 ];
 
 const ETAPA_ORDER: Record<string, number> = {
@@ -70,7 +74,6 @@ const ETAPA_ORDER: Record<string, number> = {
 
 /**
  * Determines if a client should appear in the "Cobrar" tab based on billing rules.
- * Returns { show: boolean, isFutura: boolean } — isFutura means it belongs in "Próximas faturas".
  */
 export function clienteDeveAparecerEmCobrar(cliente: ClienteFinanceiro): { show: boolean; isFutura: boolean } {
   if (cliente.qtd_sem_extrato === 0) return { show: false, isFutura: false };
@@ -78,22 +81,16 @@ export function clienteDeveAparecerEmCobrar(cliente: ClienteFinanceiro): { show:
   const hoje = new Date();
   const diaHoje = hoje.getDate();
 
-  // No deferimento: sempre mostrar se tem lançamentos sem extrato.
-  // O controle de deferimento é feito no DeferimentoModal ao gerar o extrato.
   if (cliente.cliente_momento_faturamento === 'no_deferimento') {
     return { show: true, isFutura: false };
   }
 
-  // Fatura mensal dia X (somente quando NÃO há dia_cobranca): show 5 days before
   if (cliente.cliente_dia_vencimento_mensal && cliente.cliente_dia_vencimento_mensal > 0 && !cliente.cliente_dia_cobranca) {
     const diaFatura = cliente.cliente_dia_vencimento_mensal;
-    // Within 5-day window before billing day → show in main list
     if (diaHoje >= diaFatura - 5 && diaHoje <= diaFatura) return { show: true, isFutura: false };
-    // Outside window (before or after billing day) → future billing for next cycle
     return { show: false, isFutura: true };
   }
 
-  // Avulso D+X ou padrão: mostrar imediatamente
   return { show: true, isFutura: false };
 }
 
@@ -128,24 +125,85 @@ export interface MensalistaSemFatura {
   telefone: string | null;
 }
 
+// ── Audit mutations ──
+
+export function useAuditarLancamento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ lancamentoId, auditado }: { lancamentoId: string; auditado: boolean }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({
+          auditado,
+          auditado_por: auditado ? user?.id : null,
+          auditado_em: auditado ? new Date().toISOString() : null,
+        } as any)
+        .eq('id', lancamentoId);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateFinanceiro(qc),
+  });
+}
+
+export function useAuditarTodosCliente() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ lancamentoIds }: { lancamentoIds: string[] }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({
+          auditado: true,
+          auditado_por: user?.id,
+          auditado_em: new Date().toISOString(),
+        } as any)
+        .in('id', lancamentoIds);
+      if (error) throw error;
+    },
+    onSuccess: () => invalidateFinanceiro(qc),
+  });
+}
+
+export function useAlterarValorLancamento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ lancamentoId, novoValor, valorAtual }: { lancamentoId: string; novoValor: number; valorAtual: number }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({
+          valor: novoValor,
+          valor_original: valorAtual,
+          valor_alterado_por: user?.id,
+          valor_alterado_em: new Date().toISOString(),
+        } as any)
+        .eq('id', lancamentoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateFinanceiro(qc);
+      toast.success('Valor alterado com sucesso!');
+    },
+  });
+}
+
 export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ['financeiro_clientes', dataInicio, dataFim],
     queryFn: async () => {
-      // Fetch ALL pending lancamentos (no date filter) + paid ones within period
-      // This ensures processes with future vencimento dates (e.g. no_deferimento clients) are never hidden
       const pendingQ = supabase
         .from('lancamentos')
-        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento, observacoes_financeiro')
+        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento, observacoes_financeiro, auditado, auditado_por, auditado_em, valor_original, valor_alterado_por, valor_alterado_em')
         .eq('tipo', 'receber')
         .neq('status', 'pago')
         .order('created_at', { ascending: false });
 
       let pagosQ = supabase
         .from('lancamentos')
-        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento, observacoes_financeiro')
+        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento, observacoes_financeiro, auditado, auditado_por, auditado_em, valor_original, valor_alterado_por, valor_alterado_em')
         .eq('tipo', 'receber')
         .eq('status', 'pago')
         .order('created_at', { ascending: false });
@@ -157,7 +215,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
       if (pendingRes.error) throw pendingRes.error;
       if (pagosRes.error) throw pagosRes.error;
 
-      // Deduplicate by id
       const seenIds = new Set<string>();
       const lancamentos: typeof pendingRes.data = [];
       for (const l of [...(pendingRes.data || []), ...(pagosRes.data || [])]) {
@@ -186,7 +243,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
       const processoMap = new Map((processosRes.data || []).map((p: any) => [p.id, p]));
       const clienteMap = new Map((clientesRes.data || []).map((c: any) => [c.id, c]));
 
-      // Sum valores adicionais per processo
       const vaMap = new Map<string, number>();
       for (const va of (valoresAdicionaisRes.data || [])) {
         vaMap.set(va.processo_id, (vaMap.get(va.processo_id) || 0) + Number(va.valor));
@@ -196,7 +252,6 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
       for (const l of lancamentos) {
         const clienteId = l.cliente_id;
-        // Handle orphan lancamentos (no client linked)
         const ORPHAN_ID = '__orphan__';
         const effectiveClienteId = clienteId || ORPHAN_ID;
         const cliente = clienteId ? clienteMap.get(clienteId) : null;
@@ -225,6 +280,8 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
             qtd_processos: 0,
             qtd_sem_extrato: 0,
             qtd_aguardando_deferimento: 0,
+            qtd_auditados: 0,
+            qtd_nao_auditados: 0,
             etapa_predominante: 'solicitacao_criada',
             extrato_mais_recente: null,
           });
@@ -256,12 +313,24 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           tem_etiqueta_metodo_trevo: etiquetas.includes('metodo_trevo'),
           tem_etiqueta_prioridade: etiquetas.includes('prioridade'),
           observacoes_financeiro: l.observacoes_financeiro || null,
+          auditado: (l as any).auditado ?? false,
+          auditado_por: (l as any).auditado_por || null,
+          auditado_em: (l as any).auditado_em || null,
+          valor_original: (l as any).valor_original || null,
+          valor_alterado_por: (l as any).valor_alterado_por || null,
+          valor_alterado_em: (l as any).valor_alterado_em || null,
         });
 
         c.total_faturado += l.valor;
         c.total_pendente += l.status !== 'pago' ? l.valor : 0;
         c.qtd_processos++;
         if (!l.extrato_id && l.etapa_financeiro === 'solicitacao_criada') c.qtd_sem_extrato++;
+
+        // Audit counts (only pending)
+        if (l.status !== 'pago') {
+          if ((l as any).auditado) c.qtd_auditados++;
+          else c.qtd_nao_auditados++;
+        }
 
         if (cliente?.momento_faturamento === 'no_deferimento' && processo) {
           if (ETAPAS_PRE_DEFERIMENTO.includes(processo.etapa || '')) {
@@ -270,7 +339,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
         }
       }
 
-      // Determine predominant stage per client (only non-pago lancamentos)
+      // Determine predominant stage per client
       for (const c of result.values()) {
         const nonPago = c.lancamentos.filter(l => l.status !== 'pago');
         if (nonPago.length === 0) {
@@ -415,7 +484,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   const mensalistasSemFatura = mensalistaQuery.data || [];
 
-  // Correct KPI calculations
+  // KPI calculations
   const allLanc = clientes.flatMap(c => c.lancamentos);
   const totalFaturado = allLanc.reduce((s, l) => s + l.valor, 0);
   const totalRecebido = allLanc
@@ -427,8 +496,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const totalPendente = totalFaturado - totalRecebido;
   const taxaRecebimento = totalFaturado > 0 ? Math.round(totalRecebido / totalFaturado * 100) : 0;
 
-  // ── Multi-tab assignment: a client can appear in MULTIPLE tabs ──
-  // Each tab gets a "view" of the client with only the relevant lancamentos.
+  // ── Multi-tab assignment ──
   function buildClienteView(c: ClienteFinanceiro, filteredLancs: LancamentoFinanceiro[]): ClienteFinanceiro {
     return {
       ...c,
@@ -437,6 +505,8 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
       total_pendente: filteredLancs.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
       qtd_processos: filteredLancs.length,
       qtd_sem_extrato: filteredLancs.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+      qtd_auditados: filteredLancs.filter(l => l.status !== 'pago' && l.auditado).length,
+      qtd_nao_auditados: filteredLancs.filter(l => l.status !== 'pago' && !l.auditado).length,
     };
   }
 
@@ -472,10 +542,33 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     return result;
   }
 
+  // ── "Cobrar" tab: only AUDITED lancamentos ──
   const clientesCobrarRaw = buildTabClientes('cobrar');
-  const cobrarResult = clientesCobrarRaw.map(c => ({ c, result: clienteDeveAparecerEmCobrar(c) }));
+  // Filter each client's lancamentos to only audited ones for the "Cobrar" tab
+  const clientesCobrarAuditados: ClienteFinanceiro[] = [];
+  for (const c of clientesCobrarRaw) {
+    const auditadosLancs = c.lancamentos.filter(l => l.auditado);
+    if (auditadosLancs.length > 0) {
+      clientesCobrarAuditados.push(buildClienteView(c, auditadosLancs));
+    }
+  }
+  const cobrarResult = clientesCobrarAuditados.map(c => ({ c, result: clienteDeveAparecerEmCobrar(c) }));
   const clientesCobrar = cobrarResult.filter(x => x.result.show).map(x => x.c);
   const clientesFuturaFatura = cobrarResult.filter(x => x.result.isFutura).map(x => x.c);
+
+  // ── "Aguardando Auditoria" tab: non-audited pending lancamentos ──
+  const clientesAguardandoAuditoriaMap = new Map<string, LancamentoFinanceiro[]>();
+  for (const c of clientesCobrarRaw) {
+    const naoAuditados = c.lancamentos.filter(l => !l.auditado && l.status !== 'pago' && l.etapa_financeiro === 'solicitacao_criada');
+    if (naoAuditados.length > 0) {
+      clientesAguardandoAuditoriaMap.set(c.cliente_id, naoAuditados);
+    }
+  }
+  const clientesAguardandoAuditoria: ClienteFinanceiro[] = [];
+  for (const [clienteId, lancs] of clientesAguardandoAuditoriaMap) {
+    const original = clienteById.get(clienteId);
+    if (original) clientesAguardandoAuditoria.push(buildClienteView(original, lancs));
+  }
 
   const clientesEnviados = buildTabClientes('enviados');
   const clientesAguardando = buildTabClientes('aguardando');
@@ -504,6 +597,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     clientes,
     clientesCobrar,
     clientesFuturaFatura,
+    clientesAguardandoAuditoria,
     clientesEnviados,
     clientesAguardando,
     clientesPagos,
