@@ -800,31 +800,21 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
       if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
     }
-    const l = cliente.lancamentos[0];
-    const valorPrimeiro = l.valor + (l.processo_id ? (vaMap[l.processo_id] || 0) : 0);
-    const adicionais = cliente.lancamentos.slice(1).map(item => ({
-      tipo: item.processo_tipo, razao_social: item.processo_razao_social,
-      valor: item.valor + (item.processo_id ? (vaMap[item.processo_id] || 0) : 0),
-    }));
-    const msg = gerarMensagemCobranca({
-      tipo: l.processo_tipo, razao_social: l.processo_razao_social, valor: valorPrimeiro,
-      data_vencimento: l.data_vencimento, diasAtraso: 0,
-      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
-    });
+    const nomeRemetente = await getNomeRemetente();
+    const msg = buildMensagemFromLancamentos({ lancamentos: cliente.lancamentos, vaMap, diasAtraso: 0, nomeRemetente });
     const { data: clienteData } = await supabase.from('clientes').select('telefone').eq('id', cliente.cliente_id).single();
     const telefone = (clienteData as any)?.telefone?.replace(/\D/g, '') || '';
-    const msgEncoded = encodeURIComponent(msg);
-    if (telefone) {
-      const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
-      window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
-    } else {
-      window.open(`https://wa.me/?text=${msgEncoded}`, '_blank');
-      toast.info('Telefone não cadastrado. Escolha o contato no WhatsApp.');
+    if (!telefone) {
+      toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
+      return;
     }
+    const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
+    const msgEncoded = encodeURIComponent(msg);
+    window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
     setTimeout(() => {
-      const confirmar = window.confirm('Cobrança enviada via WhatsApp. Marcar como enviada no sistema?');
+      const confirmar = window.confirm('Você conseguiu enviar a mensagem no WhatsApp?\n\nClique OK para marcar como enviado no sistema.');
       if (confirmar) handleMarcarEnviado();
-    }, 1000);
+    }, 2000);
   }
 
   async function handleCompartilhar() {
@@ -838,27 +828,14 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       const { data: fileData } = await supabase.storage.from('documentos').download(path);
       if (!fileData) { toast.error('Erro ao carregar extrato.'); return; }
       const file = new File([fileData], (extrato as any).filename, { type: 'application/pdf' });
-      // Build message
-      const l = cliente.lancamentos[0];
-      let msg = '';
-      if (l) {
-        const processoIds = [...new Set(cliente.lancamentos.map(it => it.processo_id).filter(Boolean))] as string[];
-        const vaMap: Record<string, number> = {};
-        if (processoIds.length > 0) {
-          const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-          if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
-        }
-        const valorPrimeiro = l.valor + (l.processo_id ? (vaMap[l.processo_id] || 0) : 0);
-        const adicionais = cliente.lancamentos.slice(1).map(item => ({
-          tipo: item.processo_tipo, razao_social: item.processo_razao_social,
-          valor: item.valor + (item.processo_id ? (vaMap[item.processo_id] || 0) : 0),
-        }));
-        msg = gerarMensagemCobranca({
-          tipo: l.processo_tipo, razao_social: l.processo_razao_social, valor: valorPrimeiro,
-          data_vencimento: l.data_vencimento, diasAtraso: 0,
-          processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
-        });
+      const processoIds = [...new Set(cliente.lancamentos.map(it => it.processo_id).filter(Boolean))] as string[];
+      const vaMap: Record<string, number> = {};
+      if (processoIds.length > 0) {
+        const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
+        if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
       }
+      const nomeRemetente = await getNomeRemetente();
+      const msg = buildMensagemFromLancamentos({ lancamentos: cliente.lancamentos, vaMap, diasAtraso: 0, nomeRemetente });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
       } else {
