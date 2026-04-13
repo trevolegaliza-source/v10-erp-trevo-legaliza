@@ -129,14 +129,14 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
       // This ensures processes with future vencimento dates (e.g. no_deferimento clients) are never hidden
       const pendingQ = supabase
         .from('lancamentos')
-        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento')
+        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento, observacoes_financeiro')
         .eq('tipo', 'receber')
         .neq('status', 'pago')
         .order('created_at', { ascending: false });
 
       let pagosQ = supabase
         .from('lancamentos')
-        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento')
+        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento, observacoes_financeiro')
         .eq('tipo', 'receber')
         .eq('status', 'pago')
         .order('created_at', { ascending: false });
