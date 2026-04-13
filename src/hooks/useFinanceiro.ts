@@ -251,6 +251,7 @@ export function useCreateProcesso() {
       dentro_do_plano?: boolean | null;
       valor_avulso?: number;
       justificativa_avulso?: string;
+      etiquetas?: string[];
     }) => {
       const isAvulso = input.tipo === 'avulso';
       const isManualPrice = !!input.valor_manual && input.valor_manual > 0;
@@ -384,6 +385,7 @@ export function useCreateProcesso() {
           dentro_do_plano: input.dentro_do_plano ?? null,
           valor_avulso: input.valor_avulso ?? 0,
           justificativa_avulso: input.justificativa_avulso || null,
+          etiquetas: input.etiquetas || [],
         } as any)
         .select('*, cliente:clientes(*)')
         .single();
