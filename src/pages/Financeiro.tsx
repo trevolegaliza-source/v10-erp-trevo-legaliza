@@ -18,7 +18,9 @@ import {
   ClientesEnviar,
   ClientesAguardando,
   ClientesRecebidos,
+  ModalPosExtrato,
 } from '@/components/financeiro/ClienteAccordionFinanceiro';
+import type { ExtratoGeradoPayload } from '@/components/financeiro/ClienteAccordionFinanceiro';
 import { ClientesAuditoria } from '@/components/financeiro/ClientesAuditoria';
 import { formatBRL } from '@/lib/pricing-engine';
 import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
@@ -63,8 +65,8 @@ export default function Financeiro() {
   });
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
+  const [extratoGerado, setExtratoGerado] = useState<ExtratoGeradoPayload | null>(null);
 
-  // Update tab when navigating with state
   useEffect(() => {
     const stateTab = (location.state as any)?.tab;
     if (stateTab) setActiveTab(stateTab);
@@ -87,7 +89,6 @@ export default function Financeiro() {
     isLoading,
   } = useFinanceiroClientes(dates.inicio, dates.fim);
 
-  // Fetch despesas pagas no período para KPI Resultado
   const { data: despesasPagas = 0 } = useQuery({
     queryKey: ['despesas_pagas_periodo', dates.inicio, dates.fim],
     queryFn: async () => {
@@ -103,7 +104,6 @@ export default function Financeiro() {
     staleTime: 60_000,
   });
 
-  // Inadimplente: cobrança enviada + vencida + não paga
   const inadimplenciaCalc = useMemo(() => {
     const allLanc = clientes.flatMap(c => c.lancamentos);
     const inadimplentes = allLanc.filter(l => isLancamentoVencidoReal(l));
@@ -118,10 +118,8 @@ export default function Financeiro() {
 
   const resultado = metricas.totalRecebido - despesasPagas;
 
-  // Count pending audit
   const qtdAguardandoAuditoria = clientesAguardandoAuditoria.reduce((s, c) => s + c.qtd_nao_auditados, 0);
 
-  // Resumo do mês
   const resumoMes = useMemo(() => {
     const now = new Date();
     const mesNome = format(
@@ -146,7 +144,6 @@ export default function Financeiro() {
     };
   }, [clientes, metricas, inadimplenciaCalc, periodo]);
 
-  // Tab "Todos" - flat list
   const todosLancamentos = useMemo(() => {
     const all: Array<LancamentoFinanceiro & { cliente_nome: string; cliente_apelido: string | null }> = [];
     for (const c of clientes) {
@@ -392,7 +389,7 @@ export default function Financeiro() {
             </TabsContent>
 
             <TabsContent value="cobrar" className="mt-4">
-              <ClientesFaturar clientes={clientesCobrar} mensalistasSemFatura={mensalistasSemFatura} />
+              <ClientesFaturar clientes={clientesCobrar} mensalistasSemFatura={mensalistasSemFatura} onExtratoGerado={setExtratoGerado} />
               
               {clientesFuturaFatura.length > 0 && (
                 <div className="mt-6">
@@ -452,16 +449,22 @@ export default function Financeiro() {
           </Tabs>
         </>
       )}
+
+      {/* Modal pós-extrato — lives OUTSIDE Tabs, survives query invalidation */}
+      {extratoGerado && (
+        <ModalPosExtrato
+          extratoGerado={extratoGerado}
+          onClose={() => setExtratoGerado(null)}
+        />
+      )}
     </div>
   );
 }
 
-// ── Tab Pagos uses the existing component but we re-export for clarity
 function ClientesPagos({ clientes }: { clientes: import('@/hooks/useFinanceiroClientes').ClienteFinanceiro[] }) {
   return <ClientesRecebidos clientes={clientes} />;
 }
 
-// ── Tab Todos: flat table
 function TabTodos({ lancamentos, search, onSearchChange }: {
   lancamentos: Array<LancamentoFinanceiro & { cliente_nome: string; cliente_apelido: string | null }>;
   search: string;
