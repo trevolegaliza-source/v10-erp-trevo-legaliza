@@ -161,17 +161,26 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
       const processoIds = [...new Set(lancamentos.map(l => l.processo_id).filter(Boolean))] as string[];
       const clienteIds = [...new Set(lancamentos.map(l => l.cliente_id).filter(Boolean))] as string[];
 
-      const [processosRes, clientesRes] = await Promise.all([
+      const [processosRes, clientesRes, valoresAdicionaisRes] = await Promise.all([
         processoIds.length > 0
-          ? supabase.from('processos').select('id, razao_social, tipo, etapa, notas, valor, created_at').in('id', processoIds)
+          ? supabase.from('processos').select('id, razao_social, tipo, etapa, notas, valor, created_at, etiquetas').in('id', processoIds)
           : { data: [], error: null },
         clienteIds.length > 0
           ? supabase.from('clientes').select('id, nome, apelido, cnpj, tipo, momento_faturamento, dia_cobranca, dia_vencimento_mensal, telefone, email, nome_contador, valor_base, desconto_progressivo, valor_limite_desconto').in('id', clienteIds)
+          : { data: [], error: null },
+        processoIds.length > 0
+          ? supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds)
           : { data: [], error: null },
       ]);
 
       const processoMap = new Map((processosRes.data || []).map((p: any) => [p.id, p]));
       const clienteMap = new Map((clientesRes.data || []).map((c: any) => [c.id, c]));
+
+      // Sum valores adicionais per processo
+      const vaMap = new Map<string, number>();
+      for (const va of (valoresAdicionaisRes.data || [])) {
+        vaMap.set(va.processo_id, (vaMap.get(va.processo_id) || 0) + Number(va.valor));
+      }
 
       const result = new Map<string, ClienteFinanceiro>();
 
