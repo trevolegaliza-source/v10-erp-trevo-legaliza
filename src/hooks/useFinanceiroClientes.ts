@@ -196,9 +196,11 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
       for (const l of lancamentos) {
         const clienteId = l.cliente_id;
-        if (!clienteId) continue;
-        const cliente = clienteMap.get(clienteId);
-        if (!cliente) continue;
+        // Handle orphan lancamentos (no client linked)
+        const ORPHAN_ID = '__orphan__';
+        const effectiveClienteId = clienteId || ORPHAN_ID;
+        const cliente = clienteId ? clienteMap.get(clienteId) : null;
+        if (clienteId && !cliente) continue;
         const processo = l.processo_id ? processoMap.get(l.processo_id) : null;
 
         if (!result.has(clienteId)) {
