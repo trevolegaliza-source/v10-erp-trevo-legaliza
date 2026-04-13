@@ -1378,6 +1378,11 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
             {b}
           </Badge>
         ))}
+        {l.valor_alterado_em && (
+          <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-[10px] px-1.5 py-0">
+            ✏️ Alterado
+          </Badge>
+        )}
         {l.extrato_id && (
           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-[10px] px-1.5 py-0">
             Extrato
