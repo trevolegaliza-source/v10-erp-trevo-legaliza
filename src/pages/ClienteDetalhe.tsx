@@ -1045,6 +1045,8 @@ export default function ClienteDetalhe() {
                           <div className="flex items-center gap-2">
                             {pago && <Check className="h-4 w-4 text-green-500 flex-shrink-0" />}
                             <span className={pago ? 'line-through text-muted-foreground' : ''}>{p.razao_social}</span>
+                            <EtiquetasDisplay etiquetas={(p as any).etiquetas || []} size="compact" />
+                            <EtiquetasEdit etiquetas={(p as any).etiquetas || []} processoId={p.id} size="compact" triggerVariant="icon" />
                           </div>
                         </TableCell>
                         <TableCell>
