@@ -24,6 +24,7 @@ export interface ProcessoNaFila {
   dentroDoPlano: boolean;
   valorAvulso: number;
   justificativaAvulso: string;
+  etiquetas: string[];
   // calculated
   valorFinal: number;
   slotNumero: number;
