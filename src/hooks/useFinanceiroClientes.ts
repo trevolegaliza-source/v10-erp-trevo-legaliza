@@ -373,6 +373,48 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   const clientes = query.data || [];
 
+  // ── Mensalistas without invoice this month ──
+  const mensalistaQuery = useQuery({
+    queryKey: ['mensalistas_sem_fatura', dataInicio],
+    queryFn: async () => {
+      const now = new Date();
+      const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+      const { data: mensalistas } = await supabase
+        .from('clientes')
+        .select('id, nome, apelido, valor_base, dia_vencimento_mensal, telefone')
+        .eq('tipo', 'MENSALISTA')
+        .neq('is_archived', true);
+
+      if (!mensalistas?.length) return [];
+
+      const { data: lancMes } = await supabase
+        .from('lancamentos')
+        .select('cliente_id')
+        .eq('tipo', 'receber')
+        .gte('data_vencimento', inicioMes)
+        .lte('data_vencimento', fimMes)
+        .in('cliente_id', mensalistas.map(m => m.id));
+
+      const clientesComFatura = new Set((lancMes || []).map(l => l.cliente_id));
+
+      return mensalistas
+        .filter(m => !clientesComFatura.has(m.id))
+        .map(m => ({
+          id: m.id,
+          nome: m.nome,
+          apelido: m.apelido,
+          valor_base: Number(m.valor_base || 0),
+          dia_vencimento_mensal: m.dia_vencimento_mensal || 10,
+          telefone: m.telefone,
+        })) as MensalistaSemFatura[];
+    },
+    staleTime: 60_000,
+  });
+
+  const mensalistasSemFatura = mensalistaQuery.data || [];
+
   // Correct KPI calculations
   const allLanc = clientes.flatMap(c => c.lancamentos);
   const totalFaturado = allLanc.reduce((s, l) => s + l.valor, 0);
