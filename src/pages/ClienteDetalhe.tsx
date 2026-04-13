@@ -11,8 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil, List, Check, Tags } from 'lucide-react';
+import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil, List, Check, Tags, ClipboardCheck, AlertTriangle, Undo2 } from 'lucide-react';
 import { EtiquetasDisplay, EtiquetasEdit } from '@/components/EtiquetasBadges';
+import { useAuditarLancamento, useAuditarTodosCliente, useAlterarValorLancamento } from '@/hooks/useFinanceiroClientes';
+import ValoresAdicionaisModal from '@/components/financeiro/ValoresAdicionaisModal';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
 import { formatCEP, buscarCEP, buscarCoordenadas } from '@/lib/cep';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -614,6 +617,9 @@ export default function ClienteDetalhe() {
   const totalFaturado = lancamentos.filter(l => l.tipo === 'receber').reduce((s, l) => s + Number(l.valor), 0);
   const totalPago = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pago').reduce((s, l) => s + Number(l.valor), 0);
   const totalPendente = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente').reduce((s, l) => s + Number(l.valor), 0);
+  const lancNaoAuditados = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente' && !(l as any).auditado && (l as any).etapa_financeiro === 'solicitacao_criada');
+  const lancAuditadosPendentes = lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pendente' && (l as any).auditado);
+  const qtdNaoAuditados = lancNaoAuditados.length;
   const formatCurrencyOrZero = (value: number | null | undefined) =>
     Number(value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const formatValueOrZero = (value: number | null | undefined) =>
