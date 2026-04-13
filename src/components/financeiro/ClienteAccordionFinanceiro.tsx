@@ -440,10 +440,12 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
       });
 
       setSelected(new Set());
-      invalidateFinanceiro(qc);
 
-      // Show post-extrato action modal (stable, no auto-download or auto-whatsapp)
+      // Show post-extrato action modal FIRST, before invalidating queries
       setExtratoGerado({ blob, filename, clienteId: cliente.cliente_id, total: result.totalGeral });
+
+      // Invalidate AFTER modal state is set — prevents re-render from destroying modal
+      invalidateFinanceiro(qc);
     } catch (err: any) {
       toast.error('Erro ao gerar extrato: ' + err.message);
     } finally {
