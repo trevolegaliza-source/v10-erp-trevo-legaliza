@@ -469,21 +469,21 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
   return (
     <AccordionItem value={cliente.cliente_id} className={cn("border rounded-lg bg-card", isDeferimento && "border-dashed opacity-60")}>
       <AccordionTrigger className="px-4 py-3 hover:no-underline">
-        <div className="flex items-center gap-3 flex-1 text-left">
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm break-words">{cliente.cliente_apelido || cliente.cliente_nome}</p>
-            <p className="text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
+            <p className="text-xs text-muted-foreground truncate">
               {cliente.qtd_processos} proc. · {fmt(cliente.total_faturado)} · {tipoLabel(cliente)}
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
             <ClienteHeaderBadges cliente={cliente} />
-            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs">
+            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-[10px] sm:text-xs whitespace-nowrap">
               {cliente.qtd_sem_extrato} sem extrato
             </Badge>
             {cliente.qtd_aguardando_deferimento > 0 && (
-              <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30 text-xs">
-                ⏳ {cliente.qtd_aguardando_deferimento} proc. aguardando deferimento — NÃO COBRAR
+              <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30 text-[10px] sm:text-xs whitespace-nowrap">
+                ⏳ {cliente.qtd_aguardando_deferimento} ag. deferimento
               </Badge>
             )}
             <MoverParaMenu cliente={cliente} />
@@ -827,22 +827,24 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   return (
     <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
       <AccordionTrigger className="px-4 py-3 hover:no-underline">
-        <div className="flex items-center gap-3 flex-1 text-left">
-          <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
-            <p className="text-xs text-muted-foreground">{fmt(cliente.total_faturado)} · {cliente.qtd_processos} proc.</p>
+            <p className="text-xs text-muted-foreground truncate">{fmt(cliente.total_faturado)} · {cliente.qtd_processos} proc.</p>
           </div>
-          <ClienteHeaderBadges cliente={cliente} />
-          {hasExtratoNoSistema && cliente.extrato_mais_recente ? (
-            <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-xs">
-              Extrato em {fmtDate(cliente.extrato_mais_recente.created_at)}
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs">
-              Extrato não salvo
-            </Badge>
-          )}
-          <MoverParaMenu cliente={cliente} />
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            <ClienteHeaderBadges cliente={cliente} />
+            {hasExtratoNoSistema && cliente.extrato_mais_recente ? (
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-[10px] sm:text-xs whitespace-nowrap">
+                Extrato em {fmtDate(cliente.extrato_mais_recente.created_at)}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-[10px] sm:text-xs whitespace-nowrap">
+                Extrato não salvo
+              </Badge>
+            )}
+            <MoverParaMenu cliente={cliente} />
+          </div>
         </div>
       </AccordionTrigger>
       <AccordionContent className="px-4 pb-4">
@@ -1065,29 +1067,31 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
     <>
       <AccordionItem value={cliente.cliente_id} className={cn("border rounded-lg bg-card", temVencidos && "border-destructive/30")}>
         <AccordionTrigger className="px-4 py-3 hover:no-underline">
-          <div className="flex items-center gap-3 flex-1 text-left">
-            <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
               <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate">
                 {fmt(cliente.total_faturado)} · Enviado · Vence {fmtDate(vencimento)}
               </p>
             </div>
-            <ClienteHeaderBadges cliente={cliente} />
-            {temVencidos ? (
-              <Badge className="bg-destructive/15 text-destructive border-0 text-xs">
-                Vencido há {maiorAtraso}d
-              </Badge>
-            ) : (
-              <Badge variant="outline" className={cn('text-xs', dias < 0
-                ? 'bg-destructive/10 text-destructive border-destructive/30'
-                : dias <= 3
-                  ? 'bg-warning/10 text-warning border-warning/30'
-                  : 'bg-muted text-muted-foreground'
-              )}>
-                {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
-              </Badge>
-            )}
-            <MoverParaMenu cliente={cliente} />
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+              <ClienteHeaderBadges cliente={cliente} />
+              {temVencidos ? (
+                <Badge className="bg-destructive/15 text-destructive border-0 text-[10px] sm:text-xs whitespace-nowrap">
+                  Vencido há {maiorAtraso}d
+                </Badge>
+              ) : (
+                <Badge variant="outline" className={cn('text-[10px] sm:text-xs whitespace-nowrap', dias < 0
+                  ? 'bg-destructive/10 text-destructive border-destructive/30'
+                  : dias <= 3
+                    ? 'bg-warning/10 text-warning border-warning/30'
+                    : 'bg-muted text-muted-foreground'
+                )}>
+                  {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
+                </Badge>
+              )}
+              <MoverParaMenu cliente={cliente} />
+            </div>
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-4 pb-4">
