@@ -1104,8 +1104,31 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
       const { data: fileData } = await supabase.storage.from('documentos').download(path);
       if (!fileData) { toast.error('Erro ao carregar extrato.'); return; }
       const file = new File([fileData], (extrato as any).filename, { type: 'application/pdf' });
+      // Build cobrança message
+      const lancsParaMsg = temVencidos ? lancVencidos : cliente.lancamentos;
+      let msg = '';
+      if (lancsParaMsg.length > 0) {
+        const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))] as string[];
+        const vaMap: Record<string, number> = {};
+        if (processoIds.length > 0) {
+          const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
+          if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+        }
+        const primeiro = lancsParaMsg[0];
+        const valorPrimeiro = primeiro.valor + (vaMap[primeiro.processo_id] || 0);
+        const adicionais = lancsParaMsg.slice(1).map(l => ({
+          tipo: l.processo_tipo, razao_social: l.processo_razao_social,
+          valor: l.valor + (vaMap[l.processo_id] || 0),
+        }));
+        msg = gerarMensagemCobranca({
+          tipo: primeiro.processo_tipo, razao_social: primeiro.processo_razao_social,
+          valor: valorPrimeiro, data_vencimento: primeiro.data_vencimento, diasAtraso: maiorAtraso,
+          processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
+        });
+      }
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file] });
+        await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
+      } else {
         const url = URL.createObjectURL(fileData);
         const a = document.createElement('a'); a.href = url; a.download = (extrato as any).filename; a.click();
         URL.revokeObjectURL(url);
