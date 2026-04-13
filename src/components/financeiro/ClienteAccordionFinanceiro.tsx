@@ -1261,6 +1261,8 @@ function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
 // ══════════ SHARED COMPONENTS ══════════
 function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: LancamentoFinanceiro; checked?: boolean; onToggle?: () => void }) {
   const badges = parseBadges(l.processo_notas);
+  const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
+
   return (
     <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/30 transition-colors">
       {onToggle !== undefined && (
@@ -1270,10 +1272,26 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
         <p className="text-sm font-medium truncate">{l.processo_razao_social}</p>
         <p className="text-xs text-muted-foreground">
           {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo} · {fmt(l.valor)}
+          {l.total_valores_adicionais > 0 && (
+            <span className="text-amber-600 font-medium"> + {fmt(l.total_valores_adicionais)} taxas</span>
+          )}
           {l.data_vencimento && ` · Vence ${fmtDate(l.data_vencimento)}`}
         </p>
+        {alertaTaxas && (
+          <p className="text-[10px] text-amber-600 mt-0.5">⚠️ Verificar taxas adicionais</p>
+        )}
       </div>
       <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+        {l.tem_etiqueta_metodo_trevo && (
+          <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
+            🍀 Trevo
+          </Badge>
+        )}
+        {l.tem_etiqueta_prioridade && (
+          <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
+            🔴 Prior.
+          </Badge>
+        )}
         {badges.map(b => (
           <Badge key={b} variant="outline" className={cn('text-[10px] px-1.5 py-0', BADGE_COLORS[b] || '')}>
             {b}
