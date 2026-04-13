@@ -42,6 +42,25 @@ export default function Clientes() {
   const archiveCliente = useArchiveCliente();
   const unarchiveCliente = useUnarchiveCliente();
 
+  // Audit pending counts per client
+  const { data: auditPendentes } = useQuery({
+    queryKey: ['audit_pendentes_clientes'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('lancamentos')
+        .select('cliente_id')
+        .eq('auditado', false)
+        .eq('status', 'pendente')
+        .eq('tipo', 'receber') as any;
+      const map: Record<string, number> = {};
+      for (const row of (data || [])) {
+        if (row.cliente_id) map[row.cliente_id] = (map[row.cliente_id] || 0) + 1;
+      }
+      return map;
+    },
+    staleTime: 60_000,
+  });
+
   const processCount = (clienteId: string) =>
     (processos || []).filter(p => p.cliente_id === clienteId).length;
   const activeCount = (clienteId: string) =>
