@@ -92,12 +92,83 @@ function tipoLabel(c: ClienteFinanceiro): string {
   return 'Avulso';
 }
 
+// ══════════ HELPER: Client-level badge indicators ══════════
+function ClienteHeaderBadges({ cliente }: { cliente: ClienteFinanceiro }) {
+  const temMetodoTrevo = cliente.lancamentos.some(l => l.tem_etiqueta_metodo_trevo);
+  const temPrioridade = cliente.lancamentos.some(l => l.tem_etiqueta_prioridade);
+  const temAlertaTaxas = cliente.lancamentos.some(l =>
+    (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0
+  );
+  const totalTaxas = cliente.lancamentos.reduce((s, l) => s + l.total_valores_adicionais, 0);
+
+  return (
+    <>
+      {temMetodoTrevo && (
+        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
+          🍀 Método Trevo
+        </Badge>
+      )}
+      {temPrioridade && (
+        <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
+          🔴 Prioridade
+        </Badge>
+      )}
+      {temAlertaTaxas && (
+        <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-[10px] px-1.5 py-0">
+          ⚠️ Taxas pendentes
+        </Badge>
+      )}
+      {totalTaxas > 0 && (
+        <span className="text-[10px] text-muted-foreground">+ {fmt(totalTaxas)} taxas</span>
+      )}
+    </>
+  );
+}
+
 // ══════════ TAB: FATURAR ══════════
 export function ClientesFaturar({ clientes }: { clientes: ClienteFinanceiro[] }) {
   if (clientes.length === 0) return <EmptyState text="Nenhum cliente aguardando geração de extrato." />;
 
-  const prontos = clientes.filter(c => c.cliente_momento_faturamento !== 'no_deferimento');
-  const aguardandoDef = clientes.filter(c => c.cliente_momento_faturamento === 'no_deferimento');
+  // Per-process split: for no_deferimento clients, baixa/avulso processes go to "prontos"
+  const prontosMap = new Map<string, ClienteFinanceiro>();
+  const aguardandoDefMap = new Map<string, ClienteFinanceiro>();
+
+  for (const c of clientes) {
+    if (c.cliente_momento_faturamento !== 'no_deferimento') {
+      // Non-deferimento clients go entirely to prontos
+      prontosMap.set(c.cliente_id, c);
+      continue;
+    }
+
+    // Split lancamentos for no_deferimento clients
+    const lancProntos = c.lancamentos.filter(l => ['baixa', 'avulso'].includes(l.processo_tipo));
+    const lancAguardando = c.lancamentos.filter(l => !['baixa', 'avulso'].includes(l.processo_tipo));
+
+    if (lancProntos.length > 0) {
+      prontosMap.set(c.cliente_id, {
+        ...c,
+        lancamentos: lancProntos,
+        qtd_processos: lancProntos.length,
+        total_faturado: lancProntos.reduce((s, l) => s + l.valor, 0),
+        total_pendente: lancProntos.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+        qtd_sem_extrato: lancProntos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+      });
+    }
+
+    if (lancAguardando.length > 0) {
+      aguardandoDefMap.set(c.cliente_id, {
+        ...c,
+        lancamentos: lancAguardando,
+        qtd_processos: lancAguardando.length,
+        total_faturado: lancAguardando.reduce((s, l) => s + l.valor, 0),
+        total_pendente: lancAguardando.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+        qtd_sem_extrato: lancAguardando.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+      });
+    }
+  }
+
+  const prontos = Array.from(prontosMap.values());
+  const aguardandoDef = Array.from(aguardandoDefMap.values());
 
   return (
     <div className="space-y-6">
@@ -113,7 +184,7 @@ export function ClientesFaturar({ clientes }: { clientes: ClienteFinanceiro[] })
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">⏳ Aguardando deferimento — não cobrar ainda</h3>
           <Accordion type="multiple" className="space-y-2">
-            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={true} />)}
+            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} />)}
           </Accordion>
         </div>
       )}
@@ -342,6 +413,7 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            <ClienteHeaderBadges cliente={cliente} />
             <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs">
               {cliente.qtd_sem_extrato} sem extrato
             </Badge>
@@ -693,6 +765,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
             <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
             <p className="text-xs text-muted-foreground">{fmt(cliente.total_faturado)} · {cliente.qtd_processos} proc.</p>
           </div>
+          <ClienteHeaderBadges cliente={cliente} />
           {hasExtratoNoSistema && cliente.extrato_mais_recente ? (
             <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-xs">
               Extrato em {fmtDate(cliente.extrato_mais_recente.created_at)}
@@ -932,6 +1005,7 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 {fmt(cliente.total_faturado)} · Enviado · Vence {fmtDate(vencimento)}
               </p>
             </div>
+            <ClienteHeaderBadges cliente={cliente} />
             {temVencidos ? (
               <Badge className="bg-destructive/15 text-destructive border-0 text-xs">
                 Vencido há {maiorAtraso}d
@@ -1067,6 +1141,7 @@ function RecebidoItem({ cliente: c }: { cliente: ClienteFinanceiro }) {
             <p className="font-semibold text-sm truncate">{c.cliente_apelido || c.cliente_nome}</p>
             <p className="text-xs text-muted-foreground">{fmt(c.total_faturado)} · {c.qtd_processos} proc.</p>
           </div>
+          <ClienteHeaderBadges cliente={c} />
           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-xs">
             <CheckCircle className="h-3 w-3 mr-1" /> Pago
           </Badge>
@@ -1190,6 +1265,8 @@ function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
 // ══════════ SHARED COMPONENTS ══════════
 function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: LancamentoFinanceiro; checked?: boolean; onToggle?: () => void }) {
   const badges = parseBadges(l.processo_notas);
+  const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
+
   return (
     <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/30 transition-colors">
       {onToggle !== undefined && (
@@ -1199,10 +1276,26 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
         <p className="text-sm font-medium truncate">{l.processo_razao_social}</p>
         <p className="text-xs text-muted-foreground">
           {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo} · {fmt(l.valor)}
+          {l.total_valores_adicionais > 0 && (
+            <span className="text-amber-600 font-medium"> + {fmt(l.total_valores_adicionais)} taxas</span>
+          )}
           {l.data_vencimento && ` · Vence ${fmtDate(l.data_vencimento)}`}
         </p>
+        {alertaTaxas && (
+          <p className="text-[10px] text-amber-600 mt-0.5">⚠️ Verificar taxas adicionais</p>
+        )}
       </div>
       <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+        {l.tem_etiqueta_metodo_trevo && (
+          <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
+            🍀 Trevo
+          </Badge>
+        )}
+        {l.tem_etiqueta_prioridade && (
+          <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
+            🔴 Prior.
+          </Badge>
+        )}
         {badges.map(b => (
           <Badge key={b} variant="outline" className={cn('text-[10px] px-1.5 py-0', BADGE_COLORS[b] || '')}>
             {b}

@@ -1,0 +1,2 @@
+ALTER TABLE public.processos ADD COLUMN IF NOT EXISTS etiquetas text[] DEFAULT '{}'::text[];
+COMMENT ON COLUMN public.processos.etiquetas IS 'Etiquetas do processo: metodo_trevo, prioridade, cortesia, boas_vindas';
