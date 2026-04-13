@@ -686,7 +686,10 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   }
 
   async function handleMarcarEnviado() {
-    const ids = cliente.lancamentos.filter(l => l.etapa_financeiro === 'cobranca_gerada').map(l => l.id);
+    const ids = cliente.lancamentos.filter(l =>
+      l.etapa_financeiro === 'cobranca_gerada' ||
+      (l.etapa_financeiro === 'solicitacao_criada' && l.extrato_id)
+    ).map(l => l.id);
     if (ids.length === 0) return;
     const { error } = await supabase
       .from('lancamentos')
@@ -1266,6 +1269,8 @@ function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
 function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: LancamentoFinanceiro; checked?: boolean; onToggle?: () => void }) {
   const badges = parseBadges(l.processo_notas);
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
+  const obsLower = ((l.observacoes_financeiro || '') + ' ' + (l.descricao || '')).toLowerCase();
+  const temExtratoLegado = !l.extrato_id && obsLower.includes('extrato emitido');
 
   return (
     <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/30 transition-colors">
@@ -1304,6 +1309,11 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
         {l.extrato_id && (
           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-[10px] px-1.5 py-0">
             Extrato
+          </Badge>
+        )}
+        {temExtratoLegado && (
+          <Badge variant="outline" className="bg-orange-500/15 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">
+            ⚠️ Extrato anterior — gerar novamente
           </Badge>
         )}
       </div>

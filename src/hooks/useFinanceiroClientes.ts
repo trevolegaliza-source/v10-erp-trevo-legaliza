@@ -47,6 +47,7 @@ export interface LancamentoFinanceiro {
   total_valores_adicionais: number;
   tem_etiqueta_metodo_trevo: boolean;
   tem_etiqueta_prioridade: boolean;
+  observacoes_financeiro: string | null;
 }
 
 const ETAPAS_PRE_DEFERIMENTO = [
@@ -128,14 +129,14 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
       // This ensures processes with future vencimento dates (e.g. no_deferimento clients) are never hidden
       const pendingQ = supabase
         .from('lancamentos')
-        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento')
+        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento, observacoes_financeiro')
         .eq('tipo', 'receber')
         .neq('status', 'pago')
         .order('created_at', { ascending: false });
 
       let pagosQ = supabase
         .from('lancamentos')
-        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento')
+        .select('id, valor, data_vencimento, data_pagamento, status, etapa_financeiro, extrato_id, descricao, processo_id, cliente_id, confirmado_recebimento, observacoes_financeiro')
         .eq('tipo', 'receber')
         .eq('status', 'pago')
         .order('created_at', { ascending: false });
@@ -243,6 +244,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           total_valores_adicionais: totalVA,
           tem_etiqueta_metodo_trevo: etiquetas.includes('metodo_trevo'),
           tem_etiqueta_prioridade: etiquetas.includes('prioridade'),
+          observacoes_financeiro: l.observacoes_financeiro || null,
         });
 
         c.total_faturado += l.valor;
