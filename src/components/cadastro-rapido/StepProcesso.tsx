@@ -6,6 +6,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { TIPO_PROCESSO_LABELS, type TipoProcesso } from '@/types/financial';
+import { EtiquetasCheckboxes } from '@/components/EtiquetasBadges';
 import type { ServiceNegotiation } from '@/hooks/useServiceNegotiations';
 
 export interface ProcessoFormData {
@@ -19,6 +20,7 @@ export interface ProcessoFormData {
   dentroDoPlano: boolean;
   valorAvulso: number;
   justificativaAvulso: string;
+  etiquetas: string[];
 }
 
 interface Props {
@@ -210,6 +212,12 @@ export default function StepProcesso({ form, onChange, negotiations, colaborador
           )}
         </div>
       )}
+
+      {/* Etiquetas */}
+      <EtiquetasCheckboxes
+        etiquetas={form.etiquetas || []}
+        onChange={(novas) => update('etiquetas', novas)}
+      />
 
       <div className="space-y-2">
         <Label>Data de Entrada do Processo</Label>

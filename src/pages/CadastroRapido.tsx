@@ -28,6 +28,7 @@ const INITIAL_PROCESSO: ProcessoFormData = {
   dentroDoPlano: true,
   valorAvulso: 0,
   justificativaAvulso: '',
+  etiquetas: [],
 };
 
 const INITIAL_VALOR: ValorFormData = {
@@ -199,6 +200,7 @@ export default function CadastroRapido() {
     dentroDoPlano: processoForm.dentroDoPlano,
     valorAvulso: processoForm.valorAvulso,
     justificativaAvulso: processoForm.justificativaAvulso,
+    etiquetas: processoForm.etiquetas || [],
     valorFinal: preview.valorFinal,
     slotNumero: preview.slotNumero,
     descontoAplicado: preview.descontoAplicado,
@@ -291,6 +293,7 @@ export default function CadastroRapido() {
           dentro_do_plano: selectedCliente?.tipo === 'MENSALISTA' ? item.dentroDoPlano : undefined,
           valor_avulso: !item.dentroDoPlano ? item.valorAvulso : 0,
           justificativa_avulso: !item.dentroDoPlano ? item.justificativaAvulso : undefined,
+          etiquetas: item.etiquetas || [],
         });
 
         saved.push({

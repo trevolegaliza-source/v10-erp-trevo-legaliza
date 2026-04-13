@@ -4,7 +4,9 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { KANBAN_STAGES, PROCESS_TYPE_LABELS, type KanbanStage } from '@/types/process';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, GripVertical, LayoutGrid, List, MoreHorizontal, Receipt, EyeOff, Trash2, Pencil, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Filter, GripVertical, LayoutGrid, List, MoreHorizontal, Receipt, EyeOff, Trash2, Pencil, Download, ChevronDown, ChevronRight, Tags } from 'lucide-react';
+import { EtiquetasDisplay, EtiquetasEdit } from '@/components/EtiquetasBadges';
+import { ETIQUETAS_PROCESSO, type EtiquetaProcesso } from '@/constants/etiquetas';
 import { cn } from '@/lib/utils';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -103,6 +105,11 @@ function ProcessCard({
               <p className="text-[10px] text-muted-foreground mt-0.5">📅 {new Date(process.created_at).toLocaleDateString('pt-BR')}</p>
               <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{process.razao_social}</p>
               <p className="text-[12px] font-semibold text-primary mt-0.5 truncate">{typeLabel}</p>
+              {(process as any).etiquetas?.length > 0 && (
+                <div className="mt-1">
+                  <EtiquetasDisplay etiquetas={(process as any).etiquetas || []} size="compact" />
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-0.5 shrink-0">
               <QuickActionsMenu process={process} onDelete={onDelete} onEdit={onEdit} onHonorarioExtra={onHonorarioExtra} />
@@ -152,6 +159,7 @@ export default function Processos() {
   const updateEtapa = useUpdateProcessoEtapa();
   const deleteProcesso = useDeleteProcesso();
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterEtiquetas, setFilterEtiquetas] = useState<Set<EtiquetaProcesso>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [groupBy, setGroupBy] = useState<GroupBy>('cliente');
   const [filterMonth, setFilterMonth] = useState<string>('all');
@@ -185,8 +193,16 @@ export default function Processos() {
         return d.getFullYear() === fYear && d.getMonth() + 1 === fMonth;
       });
     }
+
+    if (filterEtiquetas.size > 0) {
+      result = result.filter(p => {
+        const tags: string[] = (p as any).etiquetas || [];
+        return Array.from(filterEtiquetas).every(e => tags.includes(e));
+      });
+    }
+
     return result;
-  }, [processos, filterType, filterMonth]);
+  }, [processos, filterType, filterMonth, filterEtiquetas]);
 
   const monthOptions = useMemo(() => {
     const months = new Set<string>();
@@ -318,6 +334,30 @@ export default function Processos() {
                 <SelectItem value="orcamento">Orçamento</SelectItem>
               </SelectContent>
             </Select>
+
+            <div className="flex items-center gap-1">
+              {ETIQUETAS_PROCESSO.map(etiq => {
+                const active = filterEtiquetas.has(etiq.value as EtiquetaProcesso);
+                return (
+                  <Button
+                    key={etiq.value}
+                    size="sm"
+                    variant={active ? 'default' : 'outline'}
+                    className={cn('h-7 px-2 text-[10px]', active && etiq.color)}
+                    onClick={() => {
+                      setFilterEtiquetas(prev => {
+                        const next = new Set(prev);
+                        if (next.has(etiq.value as EtiquetaProcesso)) next.delete(etiq.value as EtiquetaProcesso);
+                        else next.add(etiq.value as EtiquetaProcesso);
+                        return next;
+                      });
+                    }}
+                  >
+                    {etiq.label}
+                  </Button>
+                );
+              })}
+            </div>
 
             <Button size="sm" variant="outline" className="h-9" onClick={() => {
               if (filtered.length === 0) { toast.info('Sem dados'); return; }
@@ -464,7 +504,12 @@ export default function Processos() {
                                   className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
                                   onDoubleClick={() => openEditModal(proc)}
                                 >
-                                  <TableCell className="font-medium text-foreground">{proc.razao_social}</TableCell>
+                                  <TableCell className="font-medium text-foreground">
+                                    <div className="flex items-center gap-2">
+                                      <span>{proc.razao_social}</span>
+                                      <EtiquetasDisplay etiquetas={(proc as any).etiquetas || []} size="compact" />
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="text-sm text-foreground">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
                                   <TableCell>
                                     <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
@@ -520,7 +565,12 @@ export default function Processos() {
                         className="cursor-pointer hover:bg-muted/50 border-t border-border/30"
                         onDoubleClick={() => openEditModal(proc)}
                       >
-                        <TableCell className="font-medium text-foreground">{proc.razao_social}</TableCell>
+                        <TableCell className="font-medium text-foreground">
+                          <div className="flex items-center gap-2">
+                            <span>{proc.razao_social}</span>
+                            <EtiquetasDisplay etiquetas={(proc as any).etiquetas || []} size="compact" />
+                          </div>
+                        </TableCell>
                         <TableCell className="text-sm text-foreground">{proc.cliente?.apelido || proc.cliente?.nome || '-'}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
