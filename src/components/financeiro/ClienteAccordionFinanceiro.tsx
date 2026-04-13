@@ -836,8 +836,29 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       const { data: fileData } = await supabase.storage.from('documentos').download(path);
       if (!fileData) { toast.error('Erro ao carregar extrato.'); return; }
       const file = new File([fileData], (extrato as any).filename, { type: 'application/pdf' });
+      // Build message
+      const l = cliente.lancamentos[0];
+      let msg = '';
+      if (l) {
+        const processoIds = [...new Set(cliente.lancamentos.map(it => it.processo_id).filter(Boolean))] as string[];
+        const vaMap: Record<string, number> = {};
+        if (processoIds.length > 0) {
+          const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
+          if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+        }
+        const valorPrimeiro = l.valor + (l.processo_id ? (vaMap[l.processo_id] || 0) : 0);
+        const adicionais = cliente.lancamentos.slice(1).map(item => ({
+          tipo: item.processo_tipo, razao_social: item.processo_razao_social,
+          valor: item.valor + (item.processo_id ? (vaMap[item.processo_id] || 0) : 0),
+        }));
+        msg = gerarMensagemCobranca({
+          tipo: l.processo_tipo, razao_social: l.processo_razao_social, valor: valorPrimeiro,
+          data_vencimento: l.data_vencimento, diasAtraso: 0,
+          processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
+        });
+      }
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file] });
+        await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
       } else {
         const url = URL.createObjectURL(fileData);
         const a = document.createElement('a'); a.href = url; a.download = (extrato as any).filename; a.click();
