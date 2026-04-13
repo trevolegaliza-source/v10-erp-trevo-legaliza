@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, ChevronDown, ChevronRight, FileText, Pencil, DollarSign } from 'lucide-react';
+import { Search, ChevronDown, ChevronRight, FileText, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
@@ -172,7 +172,6 @@ export default function ClientesFinanceiroTab() {
       auditado_em: novoValor ? new Date().toISOString() : null,
     } as any).eq('id', processoId);
 
-    // Auto-audit client if all processes are audited
     const cliente = clientes.find(c => c.processos.some(p => p.id === processoId));
     if (cliente && novoValor) {
       const todosAuditados = cliente.processos.every(p =>
@@ -214,61 +213,63 @@ export default function ClientesFinanceiroTab() {
 
   return (
     <div className="space-y-4">
-      {/* KPIs */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-xs text-muted-foreground uppercase">Total Clientes</p>
-          <p className="text-2xl font-bold">{totalClientes}</p>
+      {/* KPIs — responsive 2x2 on mobile, 4 cols on desktop */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+        <div className="bg-card border rounded-lg p-2 sm:p-4 text-center">
+          <p className="text-[10px] sm:text-xs text-muted-foreground uppercase">Total Clientes</p>
+          <p className="text-xl sm:text-2xl font-bold">{totalClientes}</p>
         </div>
-        <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-xs text-muted-foreground uppercase">Auditados ✅</p>
-          <p className="text-2xl font-bold text-primary">{totalAuditados}</p>
+        <div className="bg-card border rounded-lg p-2 sm:p-4 text-center">
+          <p className="text-[10px] sm:text-xs text-muted-foreground uppercase">Auditados ✅</p>
+          <p className="text-xl sm:text-2xl font-bold text-primary">{totalAuditados}</p>
         </div>
-        <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-xs text-muted-foreground uppercase">Pendentes Auditoria</p>
-          <p className="text-2xl font-bold text-amber-500">{totalPendentes}</p>
+        <div className="bg-card border rounded-lg p-2 sm:p-4 text-center">
+          <p className="text-[10px] sm:text-xs text-muted-foreground uppercase">Pend. Auditoria</p>
+          <p className="text-xl sm:text-2xl font-bold text-amber-500">{totalPendentes}</p>
         </div>
-        <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-xs text-muted-foreground uppercase">Processos Auditados</p>
-          <p className="text-2xl font-bold text-blue-500">
+        <div className="bg-card border rounded-lg p-2 sm:p-4 text-center">
+          <p className="text-[10px] sm:text-xs text-muted-foreground uppercase">Proc. Auditados</p>
+          <p className="text-xl sm:text-2xl font-bold text-blue-500">
             {totalProcessosAuditados}
             <span className="text-sm text-muted-foreground font-normal"> / {totalProcessos}</span>
           </p>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex gap-3 items-center">
+      {/* Filtros — stack on mobile */}
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por código, nome, apelido, contador ou razão social do processo..."
+            placeholder="Buscar cliente..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
-        <Select value={filtroAuditado} onValueChange={(v: any) => setFiltroAuditado(v)}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="pendente">Pendentes auditoria</SelectItem>
-            <SelectItem value="auditado">Já auditados</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos os tipos</SelectItem>
-            <SelectItem value="AVULSO_4D">Avulso D+4</SelectItem>
-            <SelectItem value="MENSALISTA">Mensalista</SelectItem>
-            <SelectItem value="PRE_PAGO">Pré-pago</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Select value={filtroAuditado} onValueChange={(v: any) => setFiltroAuditado(v)}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="pendente">Pendentes auditoria</SelectItem>
+              <SelectItem value="auditado">Já auditados</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              <SelectItem value="AVULSO_4D">Avulso D+4</SelectItem>
+              <SelectItem value="MENSALISTA">Mensalista</SelectItem>
+              <SelectItem value="PRE_PAGO">Pré-pago</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Lista */}
@@ -279,28 +280,29 @@ export default function ClientesFinanceiroTab() {
 
           return (
             <div key={c.id} className={cn("border rounded-lg overflow-hidden", c.auditado_financeiro ? "border-primary/30 bg-primary/5" : "")}>
+              {/* Header — mobile: vertical stack / desktop: horizontal */}
               <div
-                className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50"
+                className="flex items-start sm:items-center gap-3 px-3 sm:px-4 py-3 cursor-pointer hover:bg-muted/50"
                 onClick={() => { setExpandedId(isExpanded ? null : c.id); setExpandedProcessoId(null); }}
               >
                 <Checkbox
                   checked={c.auditado_financeiro}
                   onCheckedChange={() => toggleAuditado(c.id, c.auditado_financeiro)}
                   onClick={e => e.stopPropagation()}
-                  className="h-5 w-5"
+                  className="h-5 w-5 mt-0.5 shrink-0"
                 />
 
-                {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-muted-foreground">{c.codigo_identificador || '—'}</span>
-                    <span className="font-semibold text-sm truncate">{c.apelido || c.nome}</span>
-                    {c.nome_contador && <span className="text-xs text-muted-foreground">· {c.nome_contador}</span>}
-                  </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs text-muted-foreground">{c.processos.length} processos</span>
-                    <span className="text-xs text-muted-foreground">·</span>
+                  {/* Nome */}
+                  <p className="font-semibold text-sm truncate">
+                    {c.apelido || c.nome}
+                  </p>
+                  {/* Details line */}
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {c.codigo_identificador || '—'}{c.nome_contador ? ` · ${c.nome_contador}` : ''} · {c.processos.length} proc.
+                  </p>
+                  {/* Type and badges */}
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                     <span className="text-xs text-muted-foreground">{c.tipo || 'Sem tipo'}</span>
                     {c.momento_faturamento === 'no_deferimento' && (
                       <Badge variant="outline" className="text-[10px]">No deferimento</Badge>
@@ -308,133 +310,187 @@ export default function ClientesFinanceiroTab() {
                     {c.tipo === 'MENSALISTA' && (
                       <Badge variant="outline" className="text-[10px] bg-primary/10">Mensal dia {c.dia_vencimento_mensal}</Badge>
                     )}
+                    {c.auditado_financeiro && (
+                      <Badge className="text-[10px] bg-primary/20 text-primary border-primary/30 sm:hidden">✅</Badge>
+                    )}
+                  </div>
+                  {/* Values — always visible */}
+                  <div className="flex items-center gap-4 mt-1.5">
+                    {resumo.pendente > 0 && (
+                      <span className="text-xs">
+                        <span className="text-muted-foreground">Pend.: </span>
+                        <span className="font-semibold text-amber-500">{fmt(resumo.pendente)}</span>
+                      </span>
+                    )}
+                    <span className="text-xs">
+                      <span className="text-muted-foreground">Rec.: </span>
+                      <span className="font-semibold text-primary">{fmt(resumo.pago)}</span>
+                    </span>
+                    {resumo.qtdSemLanc > 0 && (
+                      <Badge variant="destructive" className="text-[10px]">{resumo.qtdSemLanc} sem lanç.</Badge>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 text-right">
-                  {resumo.qtdPendente > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Pendente</p>
-                      <p className="text-sm font-bold text-amber-500">{fmt(resumo.pendente)}</p>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-xs text-muted-foreground">Recebido</p>
-                    <p className="text-sm font-bold text-primary">{fmt(resumo.pago)}</p>
-                  </div>
-                  {resumo.qtdSemLanc > 0 && (
-                    <Badge variant="destructive" className="text-[10px]">{resumo.qtdSemLanc} sem lanç.</Badge>
-                  )}
+                {/* Desktop-only badges and values */}
+                <div className="hidden sm:flex items-center gap-4 text-right shrink-0">
                   {c.auditado_financeiro && (
                     <Badge className="text-[10px] bg-primary/20 text-primary border-primary/30">✅ Auditado</Badge>
                   )}
                 </div>
+
+                <div className="shrink-0 mt-1">
+                  {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                </div>
               </div>
 
               {isExpanded && (
-                <div className="border-t bg-muted/30 px-4 py-3">
+                <div className="border-t bg-muted/30 px-3 sm:px-4 py-3">
                   {c.processos.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">Nenhum processo cadastrado</p>
                   ) : (
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-xs text-muted-foreground border-b">
-                          <th className="text-left py-2 font-medium w-8"></th>
-                          <th className="text-left py-2 font-medium">Razão Social</th>
-                          <th className="text-left py-2 font-medium">Tipo</th>
-                          <th className="text-left py-2 font-medium">Etapa</th>
-                          <th className="text-right py-2 font-medium">Valor</th>
-                          <th className="text-left py-2 font-medium">Financeiro</th>
-                          <th className="text-left py-2 font-medium">Vencimento</th>
-                          <th className="text-left py-2 font-medium w-8"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
+                    <>
+                      {/* Desktop: table */}
+                      <div className="hidden sm:block">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-xs text-muted-foreground border-b">
+                              <th className="text-left py-2 font-medium w-8"></th>
+                              <th className="text-left py-2 font-medium">Razão Social</th>
+                              <th className="text-left py-2 font-medium">Tipo</th>
+                              <th className="text-left py-2 font-medium">Etapa</th>
+                              <th className="text-right py-2 font-medium">Valor</th>
+                              <th className="text-left py-2 font-medium">Financeiro</th>
+                              <th className="text-left py-2 font-medium">Vencimento</th>
+                              <th className="text-left py-2 font-medium w-8"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {c.processos.map(p => {
+                              const isProcessoExpanded = expandedProcessoId === p.id;
+                              return (
+                                <React.Fragment key={p.id}>
+                                  <tr
+                                    className="border-b border-muted cursor-pointer hover:bg-muted/30"
+                                    onClick={() => setExpandedProcessoId(isProcessoExpanded ? null : p.id)}
+                                  >
+                                    <td className="py-2">
+                                      <Checkbox
+                                        checked={p.auditado_financeiro}
+                                        onCheckedChange={() => toggleProcessoAuditado(p.id, p.auditado_financeiro)}
+                                        onClick={e => e.stopPropagation()}
+                                        className="h-4 w-4"
+                                      />
+                                    </td>
+                                    <td className="py-2 font-medium">
+                                      <div className="flex items-center gap-2">
+                                        {isProcessoExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                        {p.razao_social}
+                                      </div>
+                                    </td>
+                                    <td className="py-2">
+                                      <Badge variant="outline" className="text-[10px]">{p.tipo}</Badge>
+                                    </td>
+                                    <td className="py-2 text-xs text-muted-foreground">{p.etapa}</td>
+                                    <td className="py-2 text-right font-medium">{fmt(p.lancamento_valor || p.valor || 0)}</td>
+                                    <td className="py-2">
+                                      {p.lancamento_status === 'pago' ? (
+                                        <Badge className="text-[10px] bg-primary/20 text-primary">Pago</Badge>
+                                      ) : p.lancamento_etapa === 'cobranca_enviada' ? (
+                                        <Badge className="text-[10px] bg-blue-500/20 text-blue-500">Enviado</Badge>
+                                      ) : p.lancamento_etapa === 'solicitacao_criada' ? (
+                                        <Badge className="text-[10px] bg-amber-500/20 text-amber-500">Cobrar</Badge>
+                                      ) : (
+                                        <Badge variant="destructive" className="text-[10px]">Sem lançamento</Badge>
+                                      )}
+                                    </td>
+                                    <td className="py-2 text-xs text-muted-foreground">
+                                      {p.lancamento_data_vencimento ? new Date(p.lancamento_data_vencimento).toLocaleDateString('pt-BR') : '—'}
+                                    </td>
+                                    <td className="py-2">
+                                      {p.auditado_financeiro && <span className="text-[10px] text-primary">✅</span>}
+                                    </td>
+                                  </tr>
+                                  {isProcessoExpanded && (
+                                    <tr>
+                                      <td colSpan={8} className="py-3 px-4 bg-muted/20">
+                                        <ProcessoExpandido
+                                          p={p}
+                                          clienteId={c.id}
+                                          salvarObservacao={salvarObservacao}
+                                          setValoresAdicionaisId={setValoresAdicionaisId}
+                                        />
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile: stacked cards */}
+                      <div className="sm:hidden space-y-2">
                         {c.processos.map(p => {
                           const isProcessoExpanded = expandedProcessoId === p.id;
-
                           return (
-                            <React.Fragment key={p.id}>
-                              <tr
-                                className="border-b border-muted cursor-pointer hover:bg-muted/30"
+                            <div key={p.id} className="border rounded-lg p-3 space-y-1.5">
+                              <div
+                                className="flex items-start justify-between cursor-pointer"
                                 onClick={() => setExpandedProcessoId(isProcessoExpanded ? null : p.id)}
                               >
-                                <td className="py-2">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
                                   <Checkbox
                                     checked={p.auditado_financeiro}
                                     onCheckedChange={() => toggleProcessoAuditado(p.id, p.auditado_financeiro)}
                                     onClick={e => e.stopPropagation()}
-                                    className="h-4 w-4"
+                                    className="h-4 w-4 shrink-0"
                                   />
-                                </td>
-                                <td className="py-2 font-medium">
-                                  <div className="flex items-center gap-2">
-                                    {isProcessoExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                                    {p.razao_social}
-                                  </div>
-                                </td>
-                                <td className="py-2">
-                                  <Badge variant="outline" className="text-[10px]">{p.tipo}</Badge>
-                                </td>
-                                <td className="py-2 text-xs text-muted-foreground">{p.etapa}</td>
-                                <td className="py-2 text-right font-medium">{fmt(p.lancamento_valor || p.valor || 0)}</td>
-                                <td className="py-2">
-                                  {p.lancamento_status === 'pago' ? (
-                                    <Badge className="text-[10px] bg-primary/20 text-primary">Pago</Badge>
-                                  ) : p.lancamento_etapa === 'cobranca_enviada' ? (
-                                    <Badge className="text-[10px] bg-blue-500/20 text-blue-500">Enviado</Badge>
-                                  ) : p.lancamento_etapa === 'solicitacao_criada' ? (
-                                    <Badge className="text-[10px] bg-amber-500/20 text-amber-500">Cobrar</Badge>
-                                  ) : (
-                                    <Badge variant="destructive" className="text-[10px]">Sem lançamento</Badge>
-                                  )}
-                                </td>
-                                <td className="py-2 text-xs text-muted-foreground">
-                                  {p.lancamento_data_vencimento ? new Date(p.lancamento_data_vencimento).toLocaleDateString('pt-BR') : '—'}
-                                </td>
-                                <td className="py-2">
+                                  <p className="text-sm font-medium truncate">{p.razao_social}</p>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
                                   {p.auditado_financeiro && <span className="text-[10px] text-primary">✅</span>}
-                                </td>
-                              </tr>
+                                  {isProcessoExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 flex-wrap ml-6">
+                                <Badge variant="outline" className="text-[10px]">{p.tipo}</Badge>
+                                <span className="text-xs text-muted-foreground">{p.etapa}</span>
+                                {p.lancamento_status === 'pago' ? (
+                                  <Badge className="text-[10px] bg-primary/20 text-primary">Pago</Badge>
+                                ) : p.lancamento_etapa === 'cobranca_enviada' ? (
+                                  <Badge className="text-[10px] bg-blue-500/20 text-blue-500">Enviado</Badge>
+                                ) : p.lancamento_etapa === 'solicitacao_criada' ? (
+                                  <Badge className="text-[10px] bg-amber-500/20 text-amber-500">Cobrar</Badge>
+                                ) : (
+                                  <Badge variant="destructive" className="text-[10px]">Sem lanç.</Badge>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between ml-6">
+                                <span className="text-sm font-bold">{fmt(p.lancamento_valor || p.valor || 0)}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  Vence {p.lancamento_data_vencimento ? new Date(p.lancamento_data_vencimento).toLocaleDateString('pt-BR') : '—'}
+                                </span>
+                              </div>
 
                               {isProcessoExpanded && (
-                                <tr>
-                                  <td colSpan={8} className="py-3 px-4 bg-muted/20">
-                                    <div className="space-y-3">
-                                      <div className="flex gap-4 text-xs text-muted-foreground">
-                                        <span>Criado em: {p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—'}</span>
-                                        <span>Etapa: {p.etapa}</span>
-                                        {p.auditado_em && <span>Auditado em: {new Date(p.auditado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
-                                      </div>
-
-                                      <div>
-                                        <label className="text-xs font-medium text-muted-foreground">Observações financeiras</label>
-                                        <textarea
-                                          className="w-full mt-1 px-3 py-2 text-sm border rounded-lg bg-background resize-none"
-                                          rows={2}
-                                          defaultValue={p.notas || ''}
-                                          placeholder="Notas sobre cobrança, taxas adicionais, acordos..."
-                                          onBlur={e => salvarObservacao(p.id, e.target.value)}
-                                        />
-                                      </div>
-
-                                      <div className="flex gap-2">
-                                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={e => { e.stopPropagation(); setValoresAdicionaisId(p.id); }}>
-                                          <DollarSign className="h-3 w-3 mr-1" /> Valores Adicionais
-                                        </Button>
-                                        <Button variant="outline" size="sm" className="text-xs h-7" onClick={e => { e.stopPropagation(); window.open(`/clientes/${c.id}`, '_blank'); }}>
-                                          <FileText className="h-3 w-3 mr-1" /> Ver Cliente
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
+                                <div className="ml-6 pt-2 border-t">
+                                  <ProcessoExpandido
+                                    p={p}
+                                    clienteId={c.id}
+                                    salvarObservacao={salvarObservacao}
+                                    setValoresAdicionaisId={setValoresAdicionaisId}
+                                  />
+                                </div>
                               )}
-                            </React.Fragment>
+                            </div>
                           );
                         })}
-                      </tbody>
-                    </table>
+                      </div>
+                    </>
                   )}
 
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-muted">
@@ -463,6 +519,48 @@ export default function ClientesFinanceiroTab() {
           clienteApelido=""
         />
       )}
+    </div>
+  );
+}
+
+/** Expanded process detail — shared between mobile cards and desktop table rows */
+function ProcessoExpandido({
+  p,
+  clienteId,
+  salvarObservacao,
+  setValoresAdicionaisId,
+}: {
+  p: ProcessoResumido;
+  clienteId: string;
+  salvarObservacao: (id: string, texto: string) => void;
+  setValoresAdicionaisId: (id: string | null) => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-4 text-xs text-muted-foreground flex-wrap">
+        <span>Criado em: {p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—'}</span>
+        <span>Etapa: {p.etapa}</span>
+        {p.auditado_em && <span>Auditado em: {new Date(p.auditado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Observações financeiras</label>
+        <textarea
+          className="w-full mt-1 px-3 py-2 text-sm border rounded-lg bg-background resize-none"
+          rows={2}
+          defaultValue={p.notas || ''}
+          placeholder="Notas sobre cobrança, taxas adicionais, acordos..."
+          onBlur={e => salvarObservacao(p.id, e.target.value)}
+          style={{ fontSize: '16px' }}
+        />
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <Button variant="outline" size="sm" className="text-xs h-7" onClick={e => { e.stopPropagation(); setValoresAdicionaisId(p.id); }}>
+          <DollarSign className="h-3 w-3 mr-1" /> Valores Adicionais
+        </Button>
+        <Button variant="outline" size="sm" className="text-xs h-7" onClick={e => { e.stopPropagation(); window.open(`/clientes/${clienteId}`, '_blank'); }}>
+          <FileText className="h-3 w-3 mr-1" /> Ver Cliente
+        </Button>
+      </div>
     </div>
   );
 }
