@@ -498,7 +498,7 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
     } catch (err: any) {
       if (err.name !== 'AbortError') toast.error('Erro ao compartilhar: ' + err.message);
     }
-    setExtratoGerado(null);
+    // Don't auto-close modal — user can choose other actions
   }
 
   const nenhumDeferido = isDeferimento && cliente.lancamentos.every(l => {
@@ -587,7 +587,7 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
         onConfirm={handleDeferimentoConfirm}
       />
       {extratoGerado && (
-        <Dialog open={!!extratoGerado} onOpenChange={(o) => { if (!o) setExtratoGerado(null); }}>
+        <Dialog open={!!extratoGerado} onOpenChange={() => {}}>
           <DialogContent className="sm:max-w-sm" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
