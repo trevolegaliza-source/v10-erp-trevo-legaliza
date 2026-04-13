@@ -1117,7 +1117,7 @@ export default function ClienteDetalhe() {
                     <div>
                       <p className="text-sm font-medium text-amber-600">Sem fatura neste mês</p>
                       <p className="text-xs text-muted-foreground">
-                        {fmt(Number((cliente as any).valor_base || 0))}/mês · Vencimento dia {(cliente as any).dia_vencimento_mensal || 10}
+                        {Number((cliente as any).valor_base || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/mês · Vencimento dia {(cliente as any).dia_vencimento_mensal || 10}
                       </p>
                     </div>
                     <Button
