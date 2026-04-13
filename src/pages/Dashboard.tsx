@@ -77,6 +77,40 @@ export default function Dashboard() {
   }, [permsLoading, podeVer, navigate]);
 
 
+  // Fetch mensalistas without invoice this month
+  const [mensalistaAlerts, setMensalistaAlerts] = useState<Array<{ id: string; nome: string; valor_base: number; dia: number }>>([]);
+  useEffect(() => {
+    async function checkMensalistas() {
+      const now = new Date();
+      const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+      const { data: mensalistas } = await supabase
+        .from('clientes')
+        .select('id, nome, apelido, valor_base, dia_vencimento_mensal')
+        .eq('tipo', 'MENSALISTA')
+        .neq('is_archived', true);
+
+      if (!mensalistas?.length) return;
+
+      const { data: lancMes } = await supabase
+        .from('lancamentos')
+        .select('cliente_id')
+        .eq('tipo', 'receber')
+        .gte('data_vencimento', inicioMes)
+        .lte('data_vencimento', fimMes)
+        .in('cliente_id', mensalistas.map(m => m.id));
+
+      const comFatura = new Set((lancMes || []).map(l => l.cliente_id));
+      setMensalistaAlerts(
+        mensalistas
+          .filter(m => !comFatura.has(m.id))
+          .map(m => ({ id: m.id, nome: m.apelido || m.nome, valor_base: Number(m.valor_base || 0), dia: m.dia_vencimento_mensal || 10 }))
+      );
+    }
+    checkMensalistas();
+  }, [data]);
+
   const calc = useMemo(() => {
     if (!data) return null;
     const { lancamentosMes, lancamentosMesAnterior, processos, proximosVencimentos, lancamentosHistorico, lancamentosPagar } = data;
