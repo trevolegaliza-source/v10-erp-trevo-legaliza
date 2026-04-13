@@ -293,6 +293,7 @@ export default function CadastroRapido() {
           dentro_do_plano: selectedCliente?.tipo === 'MENSALISTA' ? item.dentroDoPlano : undefined,
           valor_avulso: !item.dentroDoPlano ? item.valorAvulso : 0,
           justificativa_avulso: !item.dentroDoPlano ? item.justificativaAvulso : undefined,
+          etiquetas: item.etiquetas || [],
         });
 
         saved.push({
