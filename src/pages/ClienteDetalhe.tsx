@@ -61,6 +61,8 @@ export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qcRef = useQueryClient();
+  const { isMaster: permIsMasterFn } = usePermissions();
+  const permIsMaster = permIsMasterFn();
   const [cliente, setCliente] = useState<ClienteDB | null>(null);
   const [processos, setProcessos] = useState<ProcessoDB[]>([]);
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
