@@ -159,14 +159,14 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
     <>
       <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
         <AccordionTrigger className="px-4 py-3 hover:no-underline">
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0">
+          <div className="flex items-center gap-3 sm:gap-3 flex-1 text-left min-w-0">
             <div className="flex-1 min-w-0 overflow-hidden">
               <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
               <p className="text-xs text-muted-foreground truncate">
                 {lancNaoAuditados.length} proc. · {fmt(totalNaoAuditado)} · {tipoLabel(cliente)}
               </p>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
               {temMetodoTrevo && (
                 <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0 hidden sm:inline-flex">
                   🍀 Método Trevo
@@ -183,12 +183,11 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
               </Badge>
               <Button
                 size="sm"
-                variant="outline"
-                className="text-xs text-emerald-600 border-emerald-600/30 hover:bg-emerald-600/10 h-7 px-2 sm:px-3"
+                className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white h-9 w-9 sm:h-7 sm:w-auto sm:px-3 p-0 flex items-center justify-center"
                 onClick={(e) => { e.stopPropagation(); handleAuditarTodos(); }}
                 disabled={auditarTodosMut.isPending}
               >
-                <Check className="h-3 w-3" />
+                <Check className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline ml-1">Auditar Todos</span>
               </Button>
             </div>

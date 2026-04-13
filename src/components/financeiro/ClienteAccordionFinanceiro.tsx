@@ -375,15 +375,7 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
       const clienteName = clienteData?.apelido || clienteData?.nome || 'extrato';
       const filename = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
 
-      // Download (backup)
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      // Save
+      // Save to storage (no auto-download)
       const now = new Date();
       await salvarExtrato.mutateAsync({
         clienteId: cliente.cliente_id,
@@ -400,7 +392,7 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
       setSelected(new Set());
       invalidateFinanceiro(qc);
 
-      // Show post-extrato action modal
+      // Show post-extrato action modal (stable, no auto-download or auto-whatsapp)
       setExtratoGerado({ blob, filename, clienteId: cliente.cliente_id, total: result.totalGeral });
     } catch (err: any) {
       toast.error('Erro ao gerar extrato: ' + err.message);
@@ -548,25 +540,37 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
       />
       {extratoGerado && (
         <Dialog open={!!extratoGerado} onOpenChange={(o) => { if (!o) setExtratoGerado(null); }}>
-          <DialogContent className="sm:max-w-sm">
+          <DialogContent className="sm:max-w-sm" onInteractOutside={(e) => e.preventDefault()}>
             <DialogHeader>
-              <DialogTitle>Extrato Gerado!</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-emerald-500" /> Extrato Gerado!
+              </DialogTitle>
             </DialogHeader>
             <div className="text-center space-y-4 py-4">
-              <CheckCircle className="h-12 w-12 text-primary mx-auto" />
               <div>
                 <p className="font-semibold">{cliente.cliente_apelido || cliente.cliente_nome}</p>
                 <p className="text-2xl font-bold text-primary">{fmt(extratoGerado.total)}</p>
+                <p className="text-xs text-muted-foreground mt-1">honorários + taxas</p>
               </div>
-              <p className="text-sm text-muted-foreground">Como deseja enviar?</p>
+              <p className="text-sm text-muted-foreground">O que deseja fazer?</p>
               <div className="space-y-2">
-                <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={handleWhatsAppPosExtrato}>
-                  <MessageCircle className="h-4 w-4" /> Enviar via WhatsApp
+                <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white h-11" onClick={handleWhatsAppPosExtrato}>
+                  <MessageCircle className="h-4 w-4" /> Enviar WhatsApp
                 </Button>
-                <Button variant="outline" className="w-full gap-2" onClick={handleCompartilharPosExtrato}>
+                <Button variant="outline" className="w-full gap-2 h-11" onClick={handleCompartilharPosExtrato}>
                   <Share2 className="h-4 w-4" /> Compartilhar PDF
                 </Button>
-                <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => setExtratoGerado(null)}>
+                <Button variant="outline" className="w-full gap-2 h-11" onClick={() => {
+                  if (!extratoGerado) return;
+                  const url = URL.createObjectURL(extratoGerado.blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = extratoGerado.filename; a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success('PDF baixado!');
+                }}>
+                  <Download className="h-4 w-4" /> Baixar PDF
+                </Button>
+                <Button variant="ghost" className="w-full text-muted-foreground h-11" onClick={() => setExtratoGerado(null)}>
                   Fazer depois
                 </Button>
               </div>
@@ -826,20 +830,28 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   return (
     <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
       <AccordionTrigger className="px-4 py-3 hover:no-underline">
-        <div className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0">
+        <div className="flex items-center gap-3 flex-1 text-left min-w-0">
           <div className="flex-1 min-w-0 overflow-hidden">
             <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
-            <p className="text-xs text-muted-foreground truncate">{fmt(cliente.total_faturado)} · {cliente.qtd_processos} proc.</p>
+            <p className="text-xs text-muted-foreground truncate">
+              {fmt(cliente.total_faturado)} · {cliente.qtd_processos} proc.
+              {hasExtratoNoSistema && cliente.extrato_mais_recente && (
+                <span> · Extrato {fmtDate(cliente.extrato_mais_recente.created_at)}</span>
+              )}
+            </p>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-            <ClienteHeaderBadges cliente={cliente} />
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            <div className="hidden sm:contents">
+              <ClienteHeaderBadges cliente={cliente} />
+            </div>
             {hasExtratoNoSistema && cliente.extrato_mais_recente ? (
-              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-[10px] sm:text-xs whitespace-nowrap">
-                Extrato em {fmtDate(cliente.extrato_mais_recente.created_at)}
+              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-[10px] sm:text-xs whitespace-nowrap hidden sm:inline-flex">
+                Extrato ✓
               </Badge>
             ) : (
               <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-[10px] sm:text-xs whitespace-nowrap">
-                Extrato não salvo
+                <span className="sm:hidden">Sem extrato</span>
+                <span className="hidden sm:inline">Extrato não salvo</span>
               </Badge>
             )}
             <MoverParaMenu cliente={cliente} />
@@ -850,37 +862,37 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
         <div className="space-y-2">
           {!hasExtratoNoSistema && (
             <div className="flex items-center gap-2 p-2 rounded bg-amber-500/10 text-amber-600 text-sm mb-2">
-              <AlertTriangle className="h-4 w-4" />
-              <span>Extrato gerado pelo sistema anterior. Gere novamente para salvar no sistema.</span>
-              <Button size="sm" variant="outline" onClick={handleRegerarExtrato} disabled={regenerating}>
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span className="text-xs sm:text-sm">Extrato do sistema anterior. Gere novamente para salvar.</span>
+              <Button size="sm" variant="outline" onClick={handleRegerarExtrato} disabled={regenerating} className="shrink-0">
                 <RefreshCw className="h-4 w-4 mr-1" />
-                {regenerating ? 'Gerando...' : 'Gerar e Salvar'}
+                {regenerating ? 'Gerando...' : 'Gerar'}
               </Button>
             </div>
           )}
           {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
-          <div className="flex gap-2 mt-3 flex-wrap">
-            <Button size="sm" variant="outline" onClick={handleEnviarWhatsApp} className={cn("gap-1", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
+          <div className="grid grid-cols-2 sm:flex gap-2 mt-3 sm:flex-wrap">
+            <Button size="sm" variant="outline" onClick={handleEnviarWhatsApp} className={cn("gap-1 h-11 sm:h-9", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
               <MessageCircle className="h-4 w-4" />
               <span className="hidden sm:inline">WhatsApp{cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ' (sem tel.)'}</span>
               <span className="sm:hidden">WhatsApp</span>
             </Button>
-            <Button size="sm" variant="outline" onClick={handleCompartilhar} className="gap-1">
-              <Share2 className="h-4 w-4" /> Compartilhar
+            <Button size="sm" variant="outline" onClick={handleCompartilhar} className="gap-1 h-11 sm:h-9">
+              <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Compartilhar</span><span className="sm:hidden">Enviar</span>
             </Button>
             {hasExtratoNoSistema && (
-              <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato}>
+              <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato} className="h-11 sm:h-9">
                 {loadingExtrato ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Baixando...</>
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Baixando</>
                 ) : (
-                  <><Download className="h-4 w-4 mr-1" /> Baixar Extrato</>
+                  <><Download className="h-4 w-4 mr-1" /> Baixar</>
                 )}
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={handleCopiarMensagem}>
-              <Copy className="h-4 w-4 mr-1" /> Copiar WhatsApp
+            <Button size="sm" variant="outline" onClick={handleCopiarMensagem} className="h-11 sm:h-9">
+              <Copy className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Copiar WhatsApp</span><span className="sm:hidden">Copiar</span>
             </Button>
-            <Button size="sm" onClick={handleMarcarEnviado} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button size="sm" onClick={handleMarcarEnviado} className="bg-blue-600 hover:bg-blue-700 text-white col-span-2 h-11 sm:h-9">
               <Send className="h-4 w-4 mr-1" /> Marcar como Enviado
             </Button>
           </div>
@@ -1128,24 +1140,24 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 {selectedPagar.size} de {cliente.lancamentos.length} · {fmt(valorSelecionado)}
               </span>
             </div>
-            <div className="flex gap-2 mt-3 flex-wrap">
-              <Button size="sm" variant="outline" onClick={handleEnviarWhatsAppRecobranca} className={cn("gap-1", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
+            <div className="grid grid-cols-2 sm:flex gap-2 mt-3 sm:flex-wrap">
+              <Button size="sm" variant="outline" onClick={handleEnviarWhatsAppRecobranca} className={cn("gap-1 h-11 sm:h-9", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
                 <MessageCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">WhatsApp{cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ' (sem tel.)'}</span>
                 <span className="sm:hidden">WhatsApp</span>
               </Button>
-              <Button size="sm" variant="outline" onClick={handleCompartilharAguardando} className="gap-1">
-                <Share2 className="h-4 w-4" /> Compartilhar
+              <Button size="sm" variant="outline" onClick={handleCompartilharAguardando} className="gap-1 h-11 sm:h-9">
+                <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Compartilhar</span><span className="sm:hidden">Enviar</span>
               </Button>
-              <Button size="sm" variant="outline" onClick={handleCopiarCobranca}>
-                <Copy className="h-4 w-4 mr-1" /> {temVencidos ? 'Reenviar Cobrança' : 'Copiar WhatsApp'}
+              <Button size="sm" variant="outline" onClick={handleCopiarCobranca} className="h-11 sm:h-9">
+                <Copy className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">{temVencidos ? 'Reenviar Cobrança' : 'Copiar WhatsApp'}</span><span className="sm:hidden">{temVencidos ? 'Reenviar' : 'Copiar'}</span>
               </Button>
               {(cliente.lancamentos.some(l => l.extrato_id) || cliente.extrato_mais_recente) && (
-                <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato}>
-                  <Download className="h-4 w-4 mr-1" /> {loadingExtrato ? 'Baixando...' : 'Baixar Extrato'}
+                <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato} className="h-11 sm:h-9">
+                  <Download className="h-4 w-4 mr-1" /> {loadingExtrato ? 'Baixando...' : 'Baixar'}
                 </Button>
               )}
-              <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white col-span-2 h-11 sm:h-9">
                 <CheckCircle className="h-4 w-4 mr-1" /> {selectedPagar.size > 0 ? `Pagar (${selectedPagar.size})` : 'Marcar como Pago'}
               </Button>
             </div>
@@ -1307,7 +1319,7 @@ function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+        <Button variant="ghost" size="sm" className="h-9 w-9 sm:h-7 sm:w-7 p-0 flex items-center justify-center">
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -1342,17 +1354,19 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
   const obsLower = ((l.observacoes_financeiro || '') + ' ' + (l.descricao || '')).toLowerCase();
   const temExtratoLegado = !l.extrato_id && obsLower.includes('extrato emitido');
 
-  // Build current etiquetas array from booleans
   const currentEtiquetas: string[] = [];
   if (l.tem_etiqueta_metodo_trevo) currentEtiquetas.push('metodo_trevo');
   if (l.tem_etiqueta_prioridade) currentEtiquetas.push('prioridade');
 
+  const hasEtiquetaBadges = l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade || badges.length > 0;
+  const hasStatusBadges = l.valor_alterado_em || l.extrato_id || temExtratoLegado;
+
   return (
-    <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/30 transition-colors">
+    <div className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/30 transition-colors">
       {onToggle !== undefined && (
-        <Checkbox checked={checked} onCheckedChange={onToggle} />
+        <Checkbox checked={checked} onCheckedChange={onToggle} className="mt-1" />
       )}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 space-y-1">
         <p className="text-sm font-medium truncate">{l.processo_razao_social}</p>
         <p className="text-xs text-muted-foreground">
           {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo} · {fmt(l.valor)}
@@ -1363,49 +1377,45 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
             <span className="text-amber-600 font-medium"> + {fmt(l.total_valores_adicionais)} taxas</span>
           )}
           {l.data_vencimento && ` · Vence ${fmtDate(l.data_vencimento)}`}
+          {/* Inline status badges on the info line */}
+          {l.extrato_id && <span className="text-emerald-500 font-medium"> · Extrato ✓</span>}
+          {l.valor_alterado_em && <span className="text-amber-600 font-medium"> · ✏️ Alterado</span>}
         </p>
         {alertaTaxas && (
           <p className="text-[10px] text-amber-600 mt-0.5">⚠️ Verificar taxas adicionais</p>
         )}
-      </div>
-      <div className="flex gap-1 shrink-0 flex-wrap justify-end items-center">
-        {l.tem_etiqueta_metodo_trevo && (
-          <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
-            🍀 Trevo
-          </Badge>
-        )}
-        {l.tem_etiqueta_prioridade && (
-          <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
-            🔴 Prior.
-          </Badge>
-        )}
-        {badges.map(b => (
-          <Badge key={b} variant="outline" className={cn('text-[10px] px-1.5 py-0', BADGE_COLORS[b] || '')}>
-            {b}
-          </Badge>
-        ))}
-        {l.valor_alterado_em && (
-          <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-[10px] px-1.5 py-0">
-            ✏️ Alterado
-          </Badge>
-        )}
-        {l.extrato_id && (
-          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-[10px] px-1.5 py-0">
-            Extrato
-          </Badge>
-        )}
-        {temExtratoLegado && (
-          <Badge variant="outline" className="bg-orange-500/15 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">
-            ⚠️ Extrato anterior — gerar novamente
-          </Badge>
-        )}
-        {l.processo_id && (
-          <EtiquetasEdit
-            etiquetas={currentEtiquetas}
-            processoId={l.processo_id}
-            size="compact"
-            triggerVariant="icon"
-          />
+        {/* Etiqueta badges on their own line */}
+        {(hasEtiquetaBadges || temExtratoLegado) && (
+          <div className="flex gap-1 flex-wrap items-center">
+            {l.tem_etiqueta_metodo_trevo && (
+              <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
+                🍀 Trevo
+              </Badge>
+            )}
+            {l.tem_etiqueta_prioridade && (
+              <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
+                🔴 Prior.
+              </Badge>
+            )}
+            {badges.map(b => (
+              <Badge key={b} variant="outline" className={cn('text-[10px] px-1.5 py-0', BADGE_COLORS[b] || '')}>
+                {b}
+              </Badge>
+            ))}
+            {temExtratoLegado && (
+              <Badge variant="outline" className="bg-orange-500/15 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">
+                ⚠️ Extrato anterior
+              </Badge>
+            )}
+            {l.processo_id && (
+              <EtiquetasEdit
+                etiquetas={currentEtiquetas}
+                processoId={l.processo_id}
+                size="compact"
+                triggerVariant="icon"
+              />
+            )}
+          </div>
         )}
       </div>
     </div>
