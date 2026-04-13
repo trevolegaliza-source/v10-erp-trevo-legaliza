@@ -263,7 +263,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
         c.qtd_processos++;
         if (!l.extrato_id && l.etapa_financeiro === 'solicitacao_criada') c.qtd_sem_extrato++;
 
-        if (cliente.momento_faturamento === 'no_deferimento' && processo) {
+        if (cliente?.momento_faturamento === 'no_deferimento' && processo) {
           if (ETAPAS_PRE_DEFERIMENTO.includes(processo.etapa || '')) {
             c.qtd_aguardando_deferimento++;
           }
