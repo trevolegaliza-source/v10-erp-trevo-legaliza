@@ -335,6 +335,30 @@ export default function Processos() {
               </SelectContent>
             </Select>
 
+            <div className="flex items-center gap-1">
+              {ETIQUETAS_PROCESSO.map(etiq => {
+                const active = filterEtiquetas.has(etiq.value as EtiquetaProcesso);
+                return (
+                  <Button
+                    key={etiq.value}
+                    size="sm"
+                    variant={active ? 'default' : 'outline'}
+                    className={cn('h-7 px-2 text-[10px]', active && etiq.color)}
+                    onClick={() => {
+                      setFilterEtiquetas(prev => {
+                        const next = new Set(prev);
+                        if (next.has(etiq.value as EtiquetaProcesso)) next.delete(etiq.value as EtiquetaProcesso);
+                        else next.add(etiq.value as EtiquetaProcesso);
+                        return next;
+                      });
+                    }}
+                  >
+                    {etiq.label}
+                  </Button>
+                );
+              })}
+            </div>
+
             <Button size="sm" variant="outline" className="h-9" onClick={() => {
               if (filtered.length === 0) { toast.info('Sem dados'); return; }
               downloadCSV(filtered.map(p => ({
