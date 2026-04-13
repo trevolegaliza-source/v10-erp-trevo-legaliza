@@ -588,7 +588,7 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
       />
       {extratoGerado && (
         <Dialog open={!!extratoGerado} onOpenChange={(o) => { if (!o) setExtratoGerado(null); }}>
-          <DialogContent className="sm:max-w-sm" onInteractOutside={(e) => e.preventDefault()}>
+          <DialogContent className="sm:max-w-sm" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-emerald-500" /> Extrato Gerado!
