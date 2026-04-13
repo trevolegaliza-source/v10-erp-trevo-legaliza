@@ -686,7 +686,10 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   }
 
   async function handleMarcarEnviado() {
-    const ids = cliente.lancamentos.filter(l => l.etapa_financeiro === 'cobranca_gerada').map(l => l.id);
+    const ids = cliente.lancamentos.filter(l =>
+      l.etapa_financeiro === 'cobranca_gerada' ||
+      (l.etapa_financeiro === 'solicitacao_criada' && l.extrato_id)
+    ).map(l => l.id);
     if (ids.length === 0) return;
     const { error } = await supabase
       .from('lancamentos')
