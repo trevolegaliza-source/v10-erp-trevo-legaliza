@@ -203,22 +203,22 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
         if (clienteId && !cliente) continue;
         const processo = l.processo_id ? processoMap.get(l.processo_id) : null;
 
-        if (!result.has(clienteId)) {
-          result.set(clienteId, {
-            cliente_id: clienteId,
-            cliente_nome: cliente.nome,
-            cliente_apelido: cliente.apelido,
-            cliente_cnpj: cliente.cnpj,
-            cliente_tipo: cliente.tipo,
-            cliente_momento_faturamento: cliente.momento_faturamento || 'na_solicitacao',
-            cliente_dia_cobranca: cliente.dia_cobranca,
-            cliente_dia_vencimento_mensal: cliente.dia_vencimento_mensal,
-            cliente_telefone: cliente.telefone,
-            cliente_email: cliente.email,
-            cliente_nome_contador: cliente.nome_contador,
-            cliente_valor_base: cliente.valor_base,
-            cliente_desconto_progressivo: cliente.desconto_progressivo,
-            cliente_valor_limite_desconto: cliente.valor_limite_desconto,
+        if (!result.has(effectiveClienteId)) {
+          result.set(effectiveClienteId, {
+            cliente_id: effectiveClienteId,
+            cliente_nome: cliente?.nome || '⚠️ SEM CLIENTE VINCULADO',
+            cliente_apelido: cliente?.apelido || null,
+            cliente_cnpj: cliente?.cnpj || null,
+            cliente_tipo: cliente?.tipo || 'AVULSO_4D',
+            cliente_momento_faturamento: cliente?.momento_faturamento || 'na_solicitacao',
+            cliente_dia_cobranca: cliente?.dia_cobranca || null,
+            cliente_dia_vencimento_mensal: cliente?.dia_vencimento_mensal || null,
+            cliente_telefone: cliente?.telefone || null,
+            cliente_email: cliente?.email || null,
+            cliente_nome_contador: cliente?.nome_contador || null,
+            cliente_valor_base: cliente?.valor_base || null,
+            cliente_desconto_progressivo: cliente?.desconto_progressivo || null,
+            cliente_valor_limite_desconto: cliente?.valor_limite_desconto || null,
             lancamentos: [],
             total_faturado: 0,
             total_pendente: 0,
@@ -230,7 +230,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           });
         }
 
-        const c = result.get(clienteId)!;
+        const c = result.get(effectiveClienteId)!;
 
         const etiquetas: string[] = processo?.etiquetas || [];
         const totalVA = l.processo_id ? (vaMap.get(l.processo_id) || 0) : 0;
