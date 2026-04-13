@@ -119,6 +119,15 @@ export function invalidateFinanceiro(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['lancamentos'] });
 }
 
+export interface MensalistaSemFatura {
+  id: string;
+  nome: string;
+  apelido: string | null;
+  valor_base: number;
+  dia_vencimento_mensal: number;
+  telefone: string | null;
+}
+
 export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
   const queryClient = useQueryClient();
 
