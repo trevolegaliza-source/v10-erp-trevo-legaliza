@@ -1319,7 +1319,7 @@ function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+        <Button variant="ghost" size="sm" className="h-9 w-9 sm:h-7 sm:w-7 p-0 flex items-center justify-center">
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -1354,17 +1354,19 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
   const obsLower = ((l.observacoes_financeiro || '') + ' ' + (l.descricao || '')).toLowerCase();
   const temExtratoLegado = !l.extrato_id && obsLower.includes('extrato emitido');
 
-  // Build current etiquetas array from booleans
   const currentEtiquetas: string[] = [];
   if (l.tem_etiqueta_metodo_trevo) currentEtiquetas.push('metodo_trevo');
   if (l.tem_etiqueta_prioridade) currentEtiquetas.push('prioridade');
 
+  const hasEtiquetaBadges = l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade || badges.length > 0;
+  const hasStatusBadges = l.valor_alterado_em || l.extrato_id || temExtratoLegado;
+
   return (
-    <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/30 transition-colors">
+    <div className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/30 transition-colors">
       {onToggle !== undefined && (
-        <Checkbox checked={checked} onCheckedChange={onToggle} />
+        <Checkbox checked={checked} onCheckedChange={onToggle} className="mt-1" />
       )}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 space-y-1">
         <p className="text-sm font-medium truncate">{l.processo_razao_social}</p>
         <p className="text-xs text-muted-foreground">
           {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo} · {fmt(l.valor)}
@@ -1375,49 +1377,45 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
             <span className="text-amber-600 font-medium"> + {fmt(l.total_valores_adicionais)} taxas</span>
           )}
           {l.data_vencimento && ` · Vence ${fmtDate(l.data_vencimento)}`}
+          {/* Inline status badges on the info line */}
+          {l.extrato_id && <span className="text-emerald-500 font-medium"> · Extrato ✓</span>}
+          {l.valor_alterado_em && <span className="text-amber-600 font-medium"> · ✏️ Alterado</span>}
         </p>
         {alertaTaxas && (
           <p className="text-[10px] text-amber-600 mt-0.5">⚠️ Verificar taxas adicionais</p>
         )}
-      </div>
-      <div className="flex gap-1 shrink-0 flex-wrap justify-end items-center">
-        {l.tem_etiqueta_metodo_trevo && (
-          <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
-            🍀 Trevo
-          </Badge>
-        )}
-        {l.tem_etiqueta_prioridade && (
-          <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
-            🔴 Prior.
-          </Badge>
-        )}
-        {badges.map(b => (
-          <Badge key={b} variant="outline" className={cn('text-[10px] px-1.5 py-0', BADGE_COLORS[b] || '')}>
-            {b}
-          </Badge>
-        ))}
-        {l.valor_alterado_em && (
-          <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-[10px] px-1.5 py-0">
-            ✏️ Alterado
-          </Badge>
-        )}
-        {l.extrato_id && (
-          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-[10px] px-1.5 py-0">
-            Extrato
-          </Badge>
-        )}
-        {temExtratoLegado && (
-          <Badge variant="outline" className="bg-orange-500/15 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">
-            ⚠️ Extrato anterior — gerar novamente
-          </Badge>
-        )}
-        {l.processo_id && (
-          <EtiquetasEdit
-            etiquetas={currentEtiquetas}
-            processoId={l.processo_id}
-            size="compact"
-            triggerVariant="icon"
-          />
+        {/* Etiqueta badges on their own line */}
+        {(hasEtiquetaBadges || temExtratoLegado) && (
+          <div className="flex gap-1 flex-wrap items-center">
+            {l.tem_etiqueta_metodo_trevo && (
+              <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
+                🍀 Trevo
+              </Badge>
+            )}
+            {l.tem_etiqueta_prioridade && (
+              <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
+                🔴 Prior.
+              </Badge>
+            )}
+            {badges.map(b => (
+              <Badge key={b} variant="outline" className={cn('text-[10px] px-1.5 py-0', BADGE_COLORS[b] || '')}>
+                {b}
+              </Badge>
+            ))}
+            {temExtratoLegado && (
+              <Badge variant="outline" className="bg-orange-500/15 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">
+                ⚠️ Extrato anterior
+              </Badge>
+            )}
+            {l.processo_id && (
+              <EtiquetasEdit
+                etiquetas={currentEtiquetas}
+                processoId={l.processo_id}
+                size="compact"
+                triggerVariant="icon"
+              />
+            )}
+          </div>
         )}
       </div>
     </div>
