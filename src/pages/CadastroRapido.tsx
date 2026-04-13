@@ -28,6 +28,7 @@ const INITIAL_PROCESSO: ProcessoFormData = {
   dentroDoPlano: true,
   valorAvulso: 0,
   justificativaAvulso: '',
+  etiquetas: [],
 };
 
 const INITIAL_VALOR: ValorFormData = {
