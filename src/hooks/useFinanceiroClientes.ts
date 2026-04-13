@@ -244,6 +244,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           total_valores_adicionais: totalVA,
           tem_etiqueta_metodo_trevo: etiquetas.includes('metodo_trevo'),
           tem_etiqueta_prioridade: etiquetas.includes('prioridade'),
+          observacoes_financeiro: l.observacoes_financeiro || null,
         });
 
         c.total_faturado += l.valor;
