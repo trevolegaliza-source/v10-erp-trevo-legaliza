@@ -1174,40 +1174,86 @@ export default function ClienteDetalhe() {
                   </p>
                 </div>
               )}
-              {lancamentos.filter(l => l.tipo === 'receber').length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Vencimento</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lancamentos.filter(l => l.tipo === 'receber').map(l => (
-                      <TableRow key={l.id}>
-                        <TableCell className="font-medium text-sm">
-                          {l.descricao}
-                          {l.descricao.includes('Honorário avulso') && (
-                            <Badge className="ml-2 bg-amber-500/10 text-amber-500 text-[10px] border-0">AVULSO</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
-                        <TableCell>
-                          <Badge className={cn('text-[10px] border-0', STATUS_STYLES[l.status as StatusFinanceiro] || '')}>
-                            {STATUS_LABELS[l.status as StatusFinanceiro] || l.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-sm font-medium">
-                          {Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </TableCell>
+
+              {/* ── Aguardando Auditoria ── */}
+              {lancNaoAuditados.length > 0 && (
+                <ClienteDetalheFaturasAuditoria
+                  lancamentos={lancNaoAuditados}
+                  clienteApelido={cliente.apelido || cliente.nome}
+                  onReload={() => loadAll(cliente.id)}
+                  isMaster={permIsMaster}
+                />
+              )}
+
+              {/* ── Auditados / Prontos para cobrar ── */}
+              {lancAuditadosPendentes.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  <h4 className="text-xs font-semibold text-emerald-600 flex items-center gap-1.5">
+                    <ClipboardCheck className="h-3.5 w-3.5" /> Auditados — Prontos para cobrar
+                  </h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Vencimento</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                        {permIsMaster && <TableHead className="w-8" />}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
+                    </TableHeader>
+                    <TableBody>
+                      {lancAuditadosPendentes.map(l => (
+                        <AuditedLancRow key={l.id} l={l} isMaster={permIsMaster} onReload={() => loadAll(cliente.id)} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* ── Pagos ── */}
+              {lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pago').length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground">Pagos</h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Vencimento</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lancamentos.filter(l => l.tipo === 'receber' && l.status === 'pago').map(l => (
+                        <TableRow key={l.id}>
+                          <TableCell className="font-medium text-sm">
+                            {l.descricao}
+                            {(l as any).valor_alterado_em && (
+                              <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0 text-amber-600 border-amber-500/30">✏️ Alterado</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">{new Date(l.data_vencimento).toLocaleDateString('pt-BR')}</TableCell>
+                          <TableCell>
+                            <Badge className={cn('text-[10px] border-0', STATUS_STYLES[l.status as StatusFinanceiro] || '')}>
+                              {STATUS_LABELS[l.status as StatusFinanceiro] || l.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-sm font-medium">
+                            {Number(l.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {lancamentos.filter(l => l.tipo === 'receber').length === 0 && (
                 <p className="text-center py-8 text-muted-foreground text-sm">Nenhuma fatura registrada</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
               )}
             </CardContent>
           </Card>
