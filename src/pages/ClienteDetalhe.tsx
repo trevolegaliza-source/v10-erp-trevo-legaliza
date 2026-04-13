@@ -1254,10 +1254,6 @@ export default function ClienteDetalhe() {
             </CardContent>
           </Card>
         </TabsContent>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* ── Contratos ── */}
         <TabsContent value="contratos">
