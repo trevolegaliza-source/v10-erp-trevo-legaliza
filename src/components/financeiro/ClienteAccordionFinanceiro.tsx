@@ -34,7 +34,7 @@ function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-import { invalidateFinanceiro } from '@/hooks/useFinanceiroClientes';
+
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return '-';
