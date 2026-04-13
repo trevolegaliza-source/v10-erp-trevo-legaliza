@@ -51,7 +51,7 @@ export default function Financeiro() {
   const [periodo, setPeriodo] = useState<PeriodoPreset>('este_mes');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
-  const [activeTab, setActiveTab] = useState('cobrar');
+  const [activeTab, setActiveTab] = useState('auditoria');
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
 
@@ -63,6 +63,7 @@ export default function Financeiro() {
     clientes,
     clientesCobrar,
     clientesFuturaFatura,
+    clientesAguardandoAuditoria,
     clientesEnviados,
     clientesAguardando,
     clientesPagos,
