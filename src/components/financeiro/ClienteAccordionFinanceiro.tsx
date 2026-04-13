@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt, MessageCircle, Share2, Tags } from 'lucide-react';
+import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt, MessageCircle, Share2, Tags, ChevronDown } from 'lucide-react';
 import { EtiquetasEdit } from '@/components/EtiquetasBadges';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import DeferimentoModal from './DeferimentoModal';
@@ -30,6 +30,16 @@ import { useQueryClient } from '@tanstack/react-query';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { downloadExtrato } from '@/lib/storage-utils';
+
+// ══════════ EXPORTED TYPE ══════════
+export type ExtratoGeradoPayload = {
+  blob: Blob;
+  filename: string;
+  clienteId: string;
+  clienteNome: string;
+  clienteTelefone: string;
+  total: number;
+};
 
 function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -131,7 +141,6 @@ function tipoLabel(c: ClienteFinanceiro): string {
 
   if (c.cliente_tipo === 'PRE_PAGO') return 'Pré-Pago';
 
-  // AVULSO_4D: verificar forma de cobrança
   if (c.cliente_dia_vencimento_mensal && c.cliente_dia_vencimento_mensal > 0 && !c.cliente_dia_cobranca) {
     return `Fatura mensal — dia ${c.cliente_dia_vencimento_mensal}`;
   }
@@ -177,7 +186,15 @@ function ClienteHeaderBadges({ cliente }: { cliente: ClienteFinanceiro }) {
 }
 
 // ══════════ TAB: FATURAR ══════════
-export function ClientesFaturar({ clientes, mensalistasSemFatura = [] }: { clientes: ClienteFinanceiro[]; mensalistasSemFatura?: MensalistaSemFatura[] }) {
+export function ClientesFaturar({ 
+  clientes, 
+  mensalistasSemFatura = [],
+  onExtratoGerado,
+}: { 
+  clientes: ClienteFinanceiro[]; 
+  mensalistasSemFatura?: MensalistaSemFatura[];
+  onExtratoGerado: (payload: ExtratoGeradoPayload) => void;
+}) {
   const queryClient = useQueryClient();
   const [gerandoFatura, setGerandoFatura] = useState<string | null>(null);
 
@@ -216,7 +233,6 @@ export function ClientesFaturar({ clientes, mensalistasSemFatura = [] }: { clien
 
   if (!hasMensalistas && !hasClientes) return <EmptyState text="Nenhum cliente aguardando geração de extrato." />;
 
-  // Per-process split: for no_deferimento clients, baixa/avulso processes go to "prontos"
   const prontosMap = new Map<string, ClienteFinanceiro>();
   const aguardandoDefMap = new Map<string, ClienteFinanceiro>();
 
@@ -257,7 +273,6 @@ export function ClientesFaturar({ clientes, mensalistasSemFatura = [] }: { clien
 
   return (
     <div className="space-y-6">
-      {/* Mensalistas sem fatura */}
       {hasMensalistas && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-amber-600 flex items-center gap-1.5">📋 Mensalistas sem fatura neste mês</h3>
@@ -290,7 +305,7 @@ export function ClientesFaturar({ clientes, mensalistasSemFatura = [] }: { clien
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5">✅ Prontos para cobrar</h3>
           <Accordion type="multiple" className="space-y-2">
-            {prontos.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={false} />)}
+            {prontos.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={false} onExtratoGerado={onExtratoGerado} />)}
           </Accordion>
         </div>
       )}
@@ -298,7 +313,7 @@ export function ClientesFaturar({ clientes, mensalistasSemFatura = [] }: { clien
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">⏳ Aguardando deferimento — não cobrar ainda</h3>
           <Accordion type="multiple" className="space-y-2">
-            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} />)}
+            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} onExtratoGerado={onExtratoGerado} />)}
           </Accordion>
         </div>
       )}
@@ -306,7 +321,11 @@ export function ClientesFaturar({ clientes, mensalistasSemFatura = [] }: { clien
   );
 }
 
-function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinanceiro; isDeferimento?: boolean }) {
+function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: { 
+  cliente: ClienteFinanceiro; 
+  isDeferimento?: boolean;
+  onExtratoGerado: (payload: ExtratoGeradoPayload) => void;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [taxaModalOpen, setTaxaModalOpen] = useState(false);
@@ -319,7 +338,6 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
     tipo: string;
     data_deferimento_atual: string | null;
   }>>([]);
-  const [extratoGerado, setExtratoGerado] = useState<{ blob: Blob; filename: string; clienteId: string; total: number } | null>(null);
   const { salvarExtrato } = useExtratos();
   const qc = useQueryClient();
 
@@ -441,10 +459,17 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
 
       setSelected(new Set());
 
-      // Show post-extrato action modal FIRST, before invalidating queries
-      setExtratoGerado({ blob, filename, clienteId: cliente.cliente_id, total: result.totalGeral });
+      // Call parent callback BEFORE invalidating — modal lives in parent, survives re-render
+      onExtratoGerado({
+        blob,
+        filename,
+        clienteId: cliente.cliente_id,
+        clienteNome: cliente.cliente_apelido || cliente.cliente_nome,
+        clienteTelefone: cliente.cliente_telefone || '',
+        total: result.totalGeral,
+      });
 
-      // Invalidate AFTER modal state is set — prevents re-render from destroying modal
+      // Invalidate AFTER — can re-render FaturarItem freely
       invalidateFinanceiro(qc);
     } catch (err: any) {
       toast.error('Erro ao gerar extrato: ' + err.message);
@@ -453,82 +478,38 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
     }
   }
 
-  async function handleWhatsAppPosExtrato() {
-    if (!extratoGerado) return;
-    const lancamentosComProcesso = cliente.lancamentos.filter(l => l.processo_id);
-    const processoIds = [...new Set(lancamentosComProcesso.map(l => l.processo_id).filter(Boolean))] as string[];
-    const vaMap: Record<string, number> = {};
-    if (processoIds.length > 0) {
-      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
-    }
-    const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: cliente.lancamentos, vaMap, diasAtraso: 0, nomeRemetente });
-    const { data: clienteData } = await supabase.from('clientes').select('telefone').eq('id', extratoGerado.clienteId).single();
-    const telefone = (clienteData as any)?.telefone?.replace(/\D/g, '') || '';
-    if (!telefone) {
-      toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
-      return;
-    }
-    const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
-    const msgEncoded = encodeURIComponent(msg);
-    window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
-    // Don't auto-close modal — user can choose other actions too
-  }
-
-  async function handleCompartilharPosExtrato() {
-    if (!extratoGerado) return;
-    try {
-      const file = new File([extratoGerado.blob], extratoGerado.filename, { type: 'application/pdf' });
-      const lancamentosComProcesso = cliente.lancamentos.filter(l => l.processo_id);
-      const processoIds = [...new Set(lancamentosComProcesso.map(l => l.processo_id).filter(Boolean))] as string[];
-      const vaMap: Record<string, number> = {};
-      if (processoIds.length > 0) {
-        const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-        if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
-      }
-      const nomeRemetente = await getNomeRemetente();
-      const msg = buildMensagemFromLancamentos({ lancamentos: cliente.lancamentos, vaMap, diasAtraso: 0, nomeRemetente });
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
-      } else {
-        const url = URL.createObjectURL(extratoGerado.blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = extratoGerado.filename; a.click();
-        URL.revokeObjectURL(url);
-      }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') toast.error('Erro ao compartilhar: ' + err.message);
-    }
-    // Don't auto-close modal — user can choose other actions
-  }
-
   const nenhumDeferido = isDeferimento && cliente.lancamentos.every(l => {
-    // Check if processo has no deferimento date — we approximate by checking etapa
     return l.processo_etapa ? ['recebidos', 'analise_documental', 'contrato', 'viabilidade', 'dbe', 'vre', 'aguardando_pagamento', 'taxa_paga', 'assinaturas', 'assinado', 'em_analise'].includes(l.processo_etapa) : true;
   });
 
   return (
     <AccordionItem value={cliente.cliente_id} className={cn("border rounded-lg bg-card", isDeferimento && "border-dashed opacity-60")}>
-      <AccordionTrigger className="px-4 py-3 hover:no-underline">
-        <div className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0">
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
+      <AccordionTrigger className="px-3 sm:px-4 py-3 hover:no-underline [&>svg]:hidden">
+        <div className="flex items-center gap-2 flex-1 text-left min-w-0">
+          <div className="flex flex-col gap-1 min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="font-semibold text-sm truncate min-w-0 flex-1">
+                {cliente.cliente_apelido || cliente.cliente_nome}
+              </p>
+            </div>
             <p className="text-xs text-muted-foreground truncate">
               {cliente.qtd_processos} proc. · {fmt(cliente.total_faturado)} · {tipoLabel(cliente)}
             </p>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-            <ClienteHeaderBadges cliente={cliente} />
-            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-[10px] sm:text-xs whitespace-nowrap">
-              {cliente.qtd_sem_extrato} sem extrato
-            </Badge>
-            {cliente.qtd_aguardando_deferimento > 0 && (
-              <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30 text-[10px] sm:text-xs whitespace-nowrap">
-                ⏳ {cliente.qtd_aguardando_deferimento} ag. deferimento
+            <div className="flex flex-wrap gap-1 items-center">
+              <ClienteHeaderBadges cliente={cliente} />
+              <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-[10px] sm:text-xs whitespace-nowrap">
+                {cliente.qtd_sem_extrato} sem extrato
               </Badge>
-            )}
+              {cliente.qtd_aguardando_deferimento > 0 && (
+                <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30 text-[10px] sm:text-xs whitespace-nowrap">
+                  ⏳ {cliente.qtd_aguardando_deferimento} ag. deferimento
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3 shrink-0 ml-2">
             <MoverParaMenu cliente={cliente} />
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0" />
           </div>
         </div>
       </AccordionTrigger>
@@ -588,46 +569,6 @@ function FaturarItem({ cliente, isDeferimento = false }: { cliente: ClienteFinan
         processos={deferimentoProcessos}
         onConfirm={handleDeferimentoConfirm}
       />
-      {extratoGerado && (
-        <Dialog open={!!extratoGerado} onOpenChange={() => {}}>
-          <DialogContent className="sm:max-w-sm" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-emerald-500" /> Extrato Gerado!
-              </DialogTitle>
-            </DialogHeader>
-            <div className="text-center space-y-4 py-4">
-              <div>
-                <p className="font-semibold">{cliente.cliente_apelido || cliente.cliente_nome}</p>
-                <p className="text-2xl font-bold text-primary">{fmt(extratoGerado.total)}</p>
-                <p className="text-xs text-muted-foreground mt-1">honorários + taxas</p>
-              </div>
-              <p className="text-sm text-muted-foreground">O que deseja fazer?</p>
-              <div className="space-y-2">
-                <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white h-11" onClick={handleWhatsAppPosExtrato}>
-                  <MessageCircle className="h-4 w-4" /> Enviar WhatsApp
-                </Button>
-                <Button variant="outline" className="w-full gap-2 h-11" onClick={handleCompartilharPosExtrato}>
-                  <Share2 className="h-4 w-4" /> Compartilhar PDF
-                </Button>
-                <Button variant="outline" className="w-full gap-2 h-11" onClick={() => {
-                  if (!extratoGerado) return;
-                  const url = URL.createObjectURL(extratoGerado.blob);
-                  const a = document.createElement('a');
-                  a.href = url; a.download = extratoGerado.filename; a.click();
-                  URL.revokeObjectURL(url);
-                  toast.success('PDF baixado!');
-                }}>
-                  <Download className="h-4 w-4" /> Baixar PDF
-                </Button>
-                <Button variant="ghost" className="w-full text-muted-foreground h-11" onClick={() => setExtratoGerado(null)}>
-                  Fazer depois
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </AccordionItem>
   );
 }
@@ -853,32 +794,36 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
 
   return (
     <AccordionItem value={cliente.cliente_id} className="border rounded-lg bg-card">
-      <AccordionTrigger className="px-4 py-3 hover:no-underline">
-        <div className="flex items-center gap-3 flex-1 text-left min-w-0">
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
+      <AccordionTrigger className="px-3 sm:px-4 py-3 hover:no-underline [&>svg]:hidden">
+        <div className="flex items-center gap-2 flex-1 text-left min-w-0">
+          <div className="flex flex-col gap-1 min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="font-semibold text-sm truncate min-w-0 flex-1">
+                {cliente.cliente_apelido || cliente.cliente_nome}
+              </p>
+            </div>
             <p className="text-xs text-muted-foreground truncate">
               {fmt(cliente.total_faturado)} · {cliente.qtd_processos} proc.
               {hasExtratoNoSistema && cliente.extrato_mais_recente && (
                 <span> · Extrato {fmtDate(cliente.extrato_mais_recente.created_at)}</span>
               )}
             </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-            <div className="hidden sm:contents">
+            <div className="flex flex-wrap gap-1 items-center">
               <ClienteHeaderBadges cliente={cliente} />
+              {hasExtratoNoSistema && cliente.extrato_mais_recente ? (
+                <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-[10px] sm:text-xs whitespace-nowrap">
+                  Extrato ✓
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-[10px] sm:text-xs whitespace-nowrap">
+                  Sem extrato
+                </Badge>
+              )}
             </div>
-            {hasExtratoNoSistema && cliente.extrato_mais_recente ? (
-              <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-[10px] sm:text-xs whitespace-nowrap hidden sm:inline-flex">
-                Extrato ✓
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-[10px] sm:text-xs whitespace-nowrap">
-                <span className="sm:hidden">Sem extrato</span>
-                <span className="hidden sm:inline">Extrato não salvo</span>
-              </Badge>
-            )}
+          </div>
+          <div className="flex items-center gap-3 shrink-0 ml-2">
             <MoverParaMenu cliente={cliente} />
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0" />
           </div>
         </div>
       </AccordionTrigger>
@@ -1091,31 +1036,38 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
   return (
     <>
       <AccordionItem value={cliente.cliente_id} className={cn("border rounded-lg bg-card", temVencidos && "border-destructive/30")}>
-        <AccordionTrigger className="px-4 py-3 hover:no-underline">
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0">
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
+        <AccordionTrigger className="px-3 sm:px-4 py-3 hover:no-underline [&>svg]:hidden">
+          <div className="flex items-center gap-2 flex-1 text-left min-w-0">
+            <div className="flex flex-col gap-1 min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="font-semibold text-sm truncate min-w-0 flex-1">
+                  {cliente.cliente_apelido || cliente.cliente_nome}
+                </p>
+              </div>
               <p className="text-xs text-muted-foreground truncate">
                 {fmt(cliente.total_faturado)} · Enviado · Vence {fmtDate(vencimento)}
               </p>
+              <div className="flex flex-wrap gap-1 items-center">
+                <ClienteHeaderBadges cliente={cliente} />
+                {temVencidos ? (
+                  <Badge className="bg-destructive/15 text-destructive border-0 text-[10px] sm:text-xs whitespace-nowrap">
+                    Vencido há {maiorAtraso}d
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className={cn('text-[10px] sm:text-xs whitespace-nowrap', dias < 0
+                    ? 'bg-destructive/10 text-destructive border-destructive/30'
+                    : dias <= 3
+                      ? 'bg-warning/10 text-warning border-warning/30'
+                      : 'bg-muted text-muted-foreground'
+                  )}>
+                    {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
+                  </Badge>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-              <ClienteHeaderBadges cliente={cliente} />
-              {temVencidos ? (
-                <Badge className="bg-destructive/15 text-destructive border-0 text-[10px] sm:text-xs whitespace-nowrap">
-                  Vencido há {maiorAtraso}d
-                </Badge>
-              ) : (
-                <Badge variant="outline" className={cn('text-[10px] sm:text-xs whitespace-nowrap', dias < 0
-                  ? 'bg-destructive/10 text-destructive border-destructive/30'
-                  : dias <= 3
-                    ? 'bg-warning/10 text-warning border-warning/30'
-                    : 'bg-muted text-muted-foreground'
-                )}>
-                  {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
-                </Badge>
-              )}
+            <div className="flex items-center gap-3 shrink-0 ml-2">
               <MoverParaMenu cliente={cliente} />
+              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0" />
             </div>
           </div>
         </AccordionTrigger>
@@ -1233,17 +1185,26 @@ function RecebidoItem({ cliente: c }: { cliente: ClienteFinanceiro }) {
 
   return (
     <AccordionItem key={c.cliente_id} value={c.cliente_id} className="border rounded-lg bg-card">
-      <AccordionTrigger className="px-4 py-3 hover:no-underline">
-        <div className="flex items-center gap-3 flex-1 text-left">
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate">{c.cliente_apelido || c.cliente_nome}</p>
+      <AccordionTrigger className="px-3 sm:px-4 py-3 hover:no-underline [&>svg]:hidden">
+        <div className="flex items-center gap-2 flex-1 text-left min-w-0">
+          <div className="flex flex-col gap-1 min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="font-semibold text-sm truncate min-w-0 flex-1">
+                {c.cliente_apelido || c.cliente_nome}
+              </p>
+            </div>
             <p className="text-xs text-muted-foreground">{fmt(c.total_faturado)} · {c.qtd_processos} proc.</p>
+            <div className="flex flex-wrap gap-1 items-center">
+              <ClienteHeaderBadges cliente={c} />
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-[10px] sm:text-xs">
+                <CheckCircle className="h-3 w-3 mr-1" /> Pago
+              </Badge>
+            </div>
           </div>
-          <ClienteHeaderBadges cliente={c} />
-          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-xs">
-            <CheckCircle className="h-3 w-3 mr-1" /> Pago
-          </Badge>
-          <MoverParaMenu cliente={c} />
+          <div className="flex items-center gap-3 shrink-0 ml-2">
+            <MoverParaMenu cliente={c} />
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0" />
+          </div>
         </div>
       </AccordionTrigger>
       <AccordionContent className="px-4 pb-4">
@@ -1278,6 +1239,136 @@ function RecebidoItem({ cliente: c }: { cliente: ClienteFinanceiro }) {
         </div>
       </AccordionContent>
     </AccordionItem>
+  );
+}
+
+// ══════════ MODAL PÓS-EXTRATO (lives in parent, survives re-renders) ══════════
+export function ModalPosExtrato({ 
+  extratoGerado, 
+  onClose 
+}: { 
+  extratoGerado: ExtratoGeradoPayload; 
+  onClose: () => void;
+}) {
+  async function handleWhatsApp() {
+    const telefone = extratoGerado.clienteTelefone.replace(/\D/g, '');
+    if (!telefone) {
+      toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
+      return;
+    }
+    const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
+    
+    const nomeRemetente = await getNomeRemetente();
+    
+    const { data: lancamentos } = await supabase
+      .from('lancamentos')
+      .select('id, valor, data_vencimento, processo_id, processo:processos(tipo, razao_social), observacoes_financeiro')
+      .eq('cliente_id', extratoGerado.clienteId)
+      .eq('tipo', 'receber')
+      .neq('status', 'pago');
+    
+    const processoIds = (lancamentos || []).map((l: any) => l.processo_id).filter(Boolean);
+    const vaMap: Record<string, number> = {};
+    if (processoIds.length > 0) {
+      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
+      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+    }
+    
+    const lancsForMsg = (lancamentos || []).map((l: any) => ({
+      ...l,
+      processo_tipo: l.processo?.tipo || '',
+      processo_razao_social: l.processo?.razao_social || '',
+    }));
+    
+    if (lancsForMsg.length === 0) { toast.warning('Nenhum lançamento encontrado.'); return; }
+    
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, diasAtraso: 0, nomeRemetente });
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank');
+  }
+
+  async function handleCompartilhar() {
+    try {
+      const file = new File([extratoGerado.blob], extratoGerado.filename, { type: 'application/pdf' });
+      
+      const nomeRemetente = await getNomeRemetente();
+      const { data: lancamentos } = await supabase
+        .from('lancamentos')
+        .select('id, valor, data_vencimento, processo_id, processo:processos(tipo, razao_social), observacoes_financeiro')
+        .eq('cliente_id', extratoGerado.clienteId)
+        .eq('tipo', 'receber')
+        .neq('status', 'pago');
+      
+      const processoIds = (lancamentos || []).map((l: any) => l.processo_id).filter(Boolean);
+      const vaMap: Record<string, number> = {};
+      if (processoIds.length > 0) {
+        const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
+        if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+      }
+      
+      const lancsForMsg = (lancamentos || []).map((l: any) => ({
+        ...l,
+        processo_tipo: l.processo?.tipo || '',
+        processo_razao_social: l.processo?.razao_social || '',
+      }));
+      
+      const msg = lancsForMsg.length > 0 
+        ? buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, diasAtraso: 0, nomeRemetente })
+        : '';
+      
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
+      } else {
+        const url = URL.createObjectURL(extratoGerado.blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = extratoGerado.filename; a.click();
+        URL.revokeObjectURL(url);
+        toast.success('PDF baixado!');
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') toast.error('Erro ao compartilhar: ' + err.message);
+    }
+  }
+
+  function handleBaixar() {
+    const url = URL.createObjectURL(extratoGerado.blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = extratoGerado.filename; a.click();
+    URL.revokeObjectURL(url);
+    toast.success('PDF baixado!');
+  }
+
+  return (
+    <Dialog open={true} onOpenChange={() => {}}>
+      <DialogContent className="sm:max-w-sm" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-emerald-500" /> Extrato Gerado!
+          </DialogTitle>
+        </DialogHeader>
+        <div className="text-center space-y-4 py-4">
+          <div>
+            <p className="font-semibold">{extratoGerado.clienteNome}</p>
+            <p className="text-2xl font-bold text-primary">{fmt(extratoGerado.total)}</p>
+            <p className="text-xs text-muted-foreground mt-1">honorários + taxas</p>
+          </div>
+          <p className="text-sm text-muted-foreground">O que deseja fazer?</p>
+          <div className="space-y-2">
+            <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white h-11" onClick={handleWhatsApp}>
+              <MessageCircle className="h-4 w-4" /> Enviar WhatsApp
+            </Button>
+            <Button variant="outline" className="w-full gap-2 h-11" onClick={handleCompartilhar}>
+              <Share2 className="h-4 w-4" /> Compartilhar PDF
+            </Button>
+            <Button variant="outline" className="w-full gap-2 h-11" onClick={handleBaixar}>
+              <Download className="h-4 w-4" /> Baixar PDF
+            </Button>
+            <Button variant="ghost" className="w-full text-muted-foreground h-11" onClick={onClose}>
+              Fazer depois
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1331,7 +1422,7 @@ function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-        <Button variant="ghost" size="sm" className="h-9 w-9 sm:h-7 sm:w-7 p-0 flex items-center justify-center">
+        <Button variant="ghost" size="sm" className="h-9 w-9 sm:h-7 sm:w-7 p-0 border border-border rounded-md flex items-center justify-center">
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -1389,14 +1480,12 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
             <span className="text-amber-600 font-medium"> + {fmt(l.total_valores_adicionais)} taxas</span>
           )}
           {l.data_vencimento && ` · Vence ${fmtDate(l.data_vencimento)}`}
-          {/* Inline status badges on the info line */}
           {l.extrato_id && <span className="text-emerald-500 font-medium"> · Extrato ✓</span>}
           {l.valor_alterado_em && <span className="text-amber-600 font-medium"> · ✏️ Alterado</span>}
         </p>
         {alertaTaxas && (
           <p className="text-[10px] text-amber-600 mt-0.5">⚠️ Verificar taxas adicionais</p>
         )}
-        {/* Etiqueta badges on their own line */}
         {(hasEtiquetaBadges || temExtratoLegado) && (
           <div className="flex gap-1 flex-wrap items-center">
             {l.tem_etiqueta_metodo_trevo && (
