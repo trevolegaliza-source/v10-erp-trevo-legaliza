@@ -1000,27 +1000,16 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
   async function handleCopiarCobranca() {
     const lancsParaMsg = temVencidos ? lancVencidos : cliente.lancamentos;
     if (lancsParaMsg.length === 0) return;
-
     const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))];
     let vaMap: Record<string, number> = {};
     if (processoIds.length > 0) {
       const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
       if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
     }
-
-    const primeiro = lancsParaMsg[0];
-    const valorPrimeiro = primeiro.valor + (vaMap[primeiro.processo_id] || 0);
-    const adicionais = lancsParaMsg.slice(1).map(l => ({
-      tipo: l.processo_tipo, razao_social: l.processo_razao_social,
-      valor: l.valor + (vaMap[l.processo_id] || 0),
-    }));
-    const msg = gerarMensagemCobranca({
-      tipo: primeiro.processo_tipo, razao_social: primeiro.processo_razao_social,
-      valor: valorPrimeiro, data_vencimento: primeiro.data_vencimento, diasAtraso: maiorAtraso,
-      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
-    });
+    const nomeRemetente = await getNomeRemetente();
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
     await navigator.clipboard.writeText(msg);
-    toast.success(temVencidos ? 'Mensagem de recobrança copiada!' : 'Mensagem de cobrança copiada!');
+    toast.success(temVencidos ? '✅ Mensagem de recobrança copiada!' : '✅ Mensagem copiada! Cole no WhatsApp.');
   }
 
   async function handleBaixarExtrato() {
@@ -1049,27 +1038,17 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
       const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
       if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
     }
-    const primeiro = lancsParaMsg[0];
-    const valorPrimeiro = primeiro.valor + (vaMap[primeiro.processo_id] || 0);
-    const adicionais = lancsParaMsg.slice(1).map(l => ({
-      tipo: l.processo_tipo, razao_social: l.processo_razao_social,
-      valor: l.valor + (vaMap[l.processo_id] || 0),
-    }));
-    const msg = gerarMensagemCobranca({
-      tipo: primeiro.processo_tipo, razao_social: primeiro.processo_razao_social,
-      valor: valorPrimeiro, data_vencimento: primeiro.data_vencimento, diasAtraso: maiorAtraso,
-      processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
-    });
+    const nomeRemetente = await getNomeRemetente();
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
     const { data: clienteData } = await supabase.from('clientes').select('telefone').eq('id', cliente.cliente_id).single();
     const telefone = (clienteData as any)?.telefone?.replace(/\D/g, '') || '';
-    const msgEncoded = encodeURIComponent(msg);
-    if (telefone) {
-      const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
-      window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
-    } else {
-      window.open(`https://wa.me/?text=${msgEncoded}`, '_blank');
-      toast.info('Telefone não cadastrado. Escolha o contato no WhatsApp.');
+    if (!telefone) {
+      toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
+      return;
     }
+    const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
+    const msgEncoded = encodeURIComponent(msg);
+    window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
   }
 
   async function handleCompartilharAguardando() {
@@ -1083,28 +1062,15 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
       const { data: fileData } = await supabase.storage.from('documentos').download(path);
       if (!fileData) { toast.error('Erro ao carregar extrato.'); return; }
       const file = new File([fileData], (extrato as any).filename, { type: 'application/pdf' });
-      // Build cobrança message
       const lancsParaMsg = temVencidos ? lancVencidos : cliente.lancamentos;
-      let msg = '';
-      if (lancsParaMsg.length > 0) {
-        const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))] as string[];
-        const vaMap: Record<string, number> = {};
-        if (processoIds.length > 0) {
-          const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-          if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
-        }
-        const primeiro = lancsParaMsg[0];
-        const valorPrimeiro = primeiro.valor + (vaMap[primeiro.processo_id] || 0);
-        const adicionais = lancsParaMsg.slice(1).map(l => ({
-          tipo: l.processo_tipo, razao_social: l.processo_razao_social,
-          valor: l.valor + (vaMap[l.processo_id] || 0),
-        }));
-        msg = gerarMensagemCobranca({
-          tipo: primeiro.processo_tipo, razao_social: primeiro.processo_razao_social,
-          valor: valorPrimeiro, data_vencimento: primeiro.data_vencimento, diasAtraso: maiorAtraso,
-          processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
-        });
+      const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))] as string[];
+      const vaMap: Record<string, number> = {};
+      if (processoIds.length > 0) {
+        const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
+        if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
       }
+      const nomeRemetente = await getNomeRemetente();
+      const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
       } else {
@@ -1117,202 +1083,6 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
       if (err.name !== 'AbortError') toast.error('Erro ao compartilhar: ' + err.message);
     }
   }
-
-  const valorSelecionado = cliente.lancamentos.filter(l => selectedPagar.has(l.id)).reduce((s, l) => s + l.valor, 0);
-
-  return (
-    <>
-      <AccordionItem value={cliente.cliente_id} className={cn("border rounded-lg bg-card", temVencidos && "border-destructive/30")}>
-        <AccordionTrigger className="px-4 py-3 hover:no-underline">
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 text-left min-w-0">
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {fmt(cliente.total_faturado)} · Enviado · Vence {fmtDate(vencimento)}
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-              <ClienteHeaderBadges cliente={cliente} />
-              {temVencidos ? (
-                <Badge className="bg-destructive/15 text-destructive border-0 text-[10px] sm:text-xs whitespace-nowrap">
-                  Vencido há {maiorAtraso}d
-                </Badge>
-              ) : (
-                <Badge variant="outline" className={cn('text-[10px] sm:text-xs whitespace-nowrap', dias < 0
-                  ? 'bg-destructive/10 text-destructive border-destructive/30'
-                  : dias <= 3
-                    ? 'bg-warning/10 text-warning border-warning/30'
-                    : 'bg-muted text-muted-foreground'
-                )}>
-                  {dias < 0 ? `Vencido há ${Math.abs(dias)}d` : dias === 0 ? 'Vence hoje' : `${dias}d p/ vencer`}
-                </Badge>
-              )}
-              <MoverParaMenu cliente={cliente} />
-            </div>
-          </div>
-        </AccordionTrigger>
-        <AccordionContent className="px-4 pb-4">
-          <div className="space-y-2">
-            {cliente.lancamentos.map(l => {
-              const isVenc = isLancamentoVencidoReal(l);
-              const dAtraso = isVenc ? Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(l.data_vencimento + 'T00:00:00').getTime()) / 86400000) : 0;
-              return (
-                <div key={l.id} className="flex items-center gap-2">
-                  <Checkbox
-                    checked={selectedPagar.has(l.id)}
-                    onCheckedChange={() => toggleSelectPagar(l.id)}
-                    className="h-4 w-4 shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <LancamentoRow lancamento={l} />
-                  </div>
-                  {isVenc && (
-                    <Badge className="bg-destructive/15 text-destructive border-0 text-[10px] shrink-0">
-                      Vencido {dAtraso}d
-                    </Badge>
-                  )}
-                </div>
-              );
-            })}
-            <div className="flex items-center gap-2 mt-2">
-              <Button size="sm" variant="ghost" className="text-xs h-6" onClick={selectAllPagar}>
-                Selecionar todos
-              </Button>
-              <Button size="sm" variant="ghost" className="text-xs h-6" onClick={deselectAllPagar}>
-                Limpar seleção
-              </Button>
-              <span className="text-xs text-muted-foreground">
-                {selectedPagar.size} de {cliente.lancamentos.length} · {fmt(valorSelecionado)}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 sm:flex gap-2 mt-3 sm:flex-wrap">
-              <Button size="sm" variant="outline" onClick={handleEnviarWhatsAppRecobranca} className={cn("gap-1 h-11 sm:h-9", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
-                <MessageCircle className="h-4 w-4" />
-                <span className="hidden sm:inline">WhatsApp{cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ' (sem tel.)'}</span>
-                <span className="sm:hidden">WhatsApp</span>
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleCompartilharAguardando} className="gap-1 h-11 sm:h-9">
-                <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Compartilhar</span><span className="sm:hidden">Enviar</span>
-              </Button>
-              <Button size="sm" variant="outline" onClick={handleCopiarCobranca} className="h-11 sm:h-9">
-                <Copy className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">{temVencidos ? 'Reenviar Cobrança' : 'Copiar WhatsApp'}</span><span className="sm:hidden">{temVencidos ? 'Reenviar' : 'Copiar'}</span>
-              </Button>
-              {(cliente.lancamentos.some(l => l.extrato_id) || cliente.extrato_mais_recente) && (
-                <Button size="sm" variant="outline" onClick={handleBaixarExtrato} disabled={loadingExtrato} className="h-11 sm:h-9">
-                  <Download className="h-4 w-4 mr-1" /> {loadingExtrato ? 'Baixando...' : 'Baixar'}
-                </Button>
-              )}
-              <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white col-span-2 h-11 sm:h-9">
-                <CheckCircle className="h-4 w-4 mr-1" /> {selectedPagar.size > 0 ? `Pagar (${selectedPagar.size})` : 'Marcar como Pago'}
-              </Button>
-            </div>
-          </div>
-        </AccordionContent>
-      </AccordionItem>
-
-      <Dialog open={showPago} onOpenChange={setShowPago}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Confirmar Pagamento</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              {cliente.cliente_apelido || cliente.cliente_nome} — {selectedPagar.size > 0 ? `${selectedPagar.size} de ${cliente.lancamentos.length} processos · ${fmt(valorSelecionado)}` : fmt(cliente.total_faturado)}
-            </p>
-            <div>
-              <label className="text-xs font-medium">Data do pagamento</label>
-              <Input type="date" value={dataPagamento} onChange={e => setDataPagamento(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPago(false)}>Cancelar</Button>
-            <Button onClick={confirmarPago} className="bg-emerald-600 hover:bg-emerald-700 text-white">Confirmar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-// ══════════ TAB: RECEBIDOS ══════════
-export function ClientesRecebidos({ clientes }: { clientes: ClienteFinanceiro[] }) {
-  if (clientes.length === 0) return <EmptyState text="Nenhum pagamento recebido neste período." />;
-  return (
-    <Accordion type="multiple" className="space-y-2">
-      {clientes.map(c => <RecebidoItem key={c.cliente_id} cliente={c} />)}
-    </Accordion>
-  );
-}
-
-function RecebidoItem({ cliente: c }: { cliente: ClienteFinanceiro }) {
-  const qc = useQueryClient();
-
-  async function handleDesfazerPagamento(lancamentoIds: string[]) {
-    if (!confirm('Tem certeza que deseja desfazer este pagamento? O lançamento voltará para "Aguardando".')) return;
-    const { error } = await supabase
-      .from('lancamentos')
-      .update({
-        etapa_financeiro: 'cobranca_enviada',
-        status: 'pendente' as const,
-        data_pagamento: null,
-        confirmado_recebimento: false,
-      })
-      .in('id', lancamentoIds);
-    if (error) { toast.error(error.message); return; }
-    invalidateFinanceiro(qc);
-    toast.success('Pagamento desfeito! Lançamento voltou para "Aguardando".');
-  }
-
-  return (
-    <AccordionItem key={c.cliente_id} value={c.cliente_id} className="border rounded-lg bg-card">
-      <AccordionTrigger className="px-4 py-3 hover:no-underline">
-        <div className="flex items-center gap-3 flex-1 text-left">
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate">{c.cliente_apelido || c.cliente_nome}</p>
-            <p className="text-xs text-muted-foreground">{fmt(c.total_faturado)} · {c.qtd_processos} proc.</p>
-          </div>
-          <ClienteHeaderBadges cliente={c} />
-          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-xs">
-            <CheckCircle className="h-3 w-3 mr-1" /> Pago
-          </Badge>
-          <MoverParaMenu cliente={c} />
-        </div>
-      </AccordionTrigger>
-      <AccordionContent className="px-4 pb-4">
-        <div className="space-y-2">
-          {c.lancamentos.map(l => (
-            <div key={l.id} className="flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <LancamentoRow lancamento={l} />
-              </div>
-              {(l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-amber-600 hover:text-amber-700 hover:bg-amber-500/10 text-xs shrink-0"
-                  onClick={() => handleDesfazerPagamento([l.id])}
-                >
-                  Desfazer
-                </Button>
-              )}
-            </div>
-          ))}
-          <div className="flex gap-2 mt-3">
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-amber-600 border-amber-600/30 hover:bg-amber-500/10"
-              onClick={() => handleDesfazerPagamento(c.lancamentos.map(l => l.id))}
-            >
-              Desfazer Todos os Pagamentos
-            </Button>
-          </div>
-        </div>
-      </AccordionContent>
-    </AccordionItem>
-  );
-}
-
 
 // ══════════ MOVER PARA MENU ══════════
 function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
