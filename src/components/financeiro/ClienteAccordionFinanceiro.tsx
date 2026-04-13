@@ -1350,6 +1350,9 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
         <p className="text-sm font-medium truncate">{l.processo_razao_social}</p>
         <p className="text-xs text-muted-foreground">
           {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo} · {fmt(l.valor)}
+          {l.valor_original != null && l.valor_original !== l.valor && (
+            <span className="text-amber-600 font-medium"> (orig. {fmt(l.valor_original)})</span>
+          )}
           {l.total_valores_adicionais > 0 && (
             <span className="text-amber-600 font-medium"> + {fmt(l.total_valores_adicionais)} taxas</span>
           )}
@@ -1375,6 +1378,11 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
             {b}
           </Badge>
         ))}
+        {l.valor_alterado_em && (
+          <Badge variant="outline" className="bg-amber-500/15 text-amber-600 border-amber-500/30 text-[10px] px-1.5 py-0">
+            ✏️ Alterado
+          </Badge>
+        )}
         {l.extrato_id && (
           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-[10px] px-1.5 py-0">
             Extrato

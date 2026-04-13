@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown } from 'lucide-react';
+import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown, ClipboardCheck } from 'lucide-react';
 import { useFinanceiroClientes, type LancamentoFinanceiro, isLancamentoVencidoReal } from '@/hooks/useFinanceiroClientes';
 import ClientesFinanceiroTab from '@/components/financeiro/ClientesFinanceiroTab';
 import {
@@ -17,6 +17,7 @@ import {
   ClientesAguardando,
   ClientesRecebidos,
 } from '@/components/financeiro/ClienteAccordionFinanceiro';
+import { ClientesAuditoria } from '@/components/financeiro/ClientesAuditoria';
 import { formatBRL } from '@/lib/pricing-engine';
 import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
 import { ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
@@ -50,7 +51,7 @@ export default function Financeiro() {
   const [periodo, setPeriodo] = useState<PeriodoPreset>('este_mes');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
-  const [activeTab, setActiveTab] = useState('cobrar');
+  const [activeTab, setActiveTab] = useState('auditoria');
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
 
@@ -62,6 +63,7 @@ export default function Financeiro() {
     clientes,
     clientesCobrar,
     clientesFuturaFatura,
+    clientesAguardandoAuditoria,
     clientesEnviados,
     clientesAguardando,
     clientesPagos,
@@ -316,6 +318,13 @@ export default function Financeiro() {
                 <Search className="h-3.5 w-3.5" />
                 Clientes
               </TabsTrigger>
+              <TabsTrigger value="auditoria" className="gap-1.5">
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                Auditoria
+                {clientesAguardandoAuditoria.length > 0 && (
+                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesAguardandoAuditoria.length}</Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="cobrar" className="gap-1.5">
                 <FileText className="h-3.5 w-3.5" />
                 Cobrar
@@ -352,6 +361,10 @@ export default function Financeiro() {
 
             <TabsContent value="clientes" className="mt-4">
               <ClientesFinanceiroTab />
+            </TabsContent>
+
+            <TabsContent value="auditoria" className="mt-4">
+              <ClientesAuditoria clientes={clientesAguardandoAuditoria} />
             </TabsContent>
 
             <TabsContent value="cobrar" className="mt-4">
