@@ -1336,6 +1336,11 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
   const obsLower = ((l.observacoes_financeiro || '') + ' ' + (l.descricao || '')).toLowerCase();
   const temExtratoLegado = !l.extrato_id && obsLower.includes('extrato emitido');
 
+  // Build current etiquetas array from booleans
+  const currentEtiquetas: string[] = [];
+  if (l.tem_etiqueta_metodo_trevo) currentEtiquetas.push('metodo_trevo');
+  if (l.tem_etiqueta_prioridade) currentEtiquetas.push('prioridade');
+
   return (
     <div className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/30 transition-colors">
       {onToggle !== undefined && (
@@ -1354,7 +1359,7 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
           <p className="text-[10px] text-amber-600 mt-0.5">⚠️ Verificar taxas adicionais</p>
         )}
       </div>
-      <div className="flex gap-1 shrink-0 flex-wrap justify-end">
+      <div className="flex gap-1 shrink-0 flex-wrap justify-end items-center">
         {l.tem_etiqueta_metodo_trevo && (
           <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
             🍀 Trevo
@@ -1379,6 +1384,14 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
           <Badge variant="outline" className="bg-orange-500/15 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">
             ⚠️ Extrato anterior — gerar novamente
           </Badge>
+        )}
+        {l.processo_id && (
+          <EtiquetasEdit
+            etiquetas={currentEtiquetas}
+            processoId={l.processo_id}
+            size="compact"
+            triggerVariant="icon"
+          />
         )}
       </div>
     </div>
