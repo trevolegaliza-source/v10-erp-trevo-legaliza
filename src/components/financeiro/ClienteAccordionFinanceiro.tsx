@@ -35,6 +35,56 @@ function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+async function getNomeRemetente(): Promise<string> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('nome').eq('id', user.id).single();
+      if (profile?.nome) return (profile.nome as string).split(' ')[0];
+    }
+  } catch { /* ignore */ }
+  return 'Equipe';
+}
+
+interface MsgBuilderParams {
+  lancamentos: LancamentoFinanceiro[];
+  vaMap: Record<string, number>;
+  diasAtraso: number;
+  nomeRemetente: string;
+  observacao?: string;
+}
+
+function buildMensagemFromLancamentos({ lancamentos, vaMap, diasAtraso, nomeRemetente, observacao }: MsgBuilderParams): string {
+  const l = lancamentos[0];
+  if (!l) return '';
+  const honorarios = l.valor;
+  const taxasExtras = l.processo_id ? (vaMap[l.processo_id] || 0) : 0;
+  const valorPrimeiro = honorarios + taxasExtras;
+  const adicionais = lancamentos.slice(1).map(item => {
+    const h = item.valor;
+    const t = item.processo_id ? (vaMap[item.processo_id] || 0) : 0;
+    return {
+      tipo: item.processo_tipo,
+      razao_social: item.processo_razao_social,
+      valor: h + t,
+      honorarios: h,
+      taxasExtras: t,
+    };
+  });
+  return gerarMensagemCobranca({
+    tipo: l.processo_tipo,
+    razao_social: l.processo_razao_social,
+    valor: valorPrimeiro,
+    honorarios,
+    taxasExtras,
+    data_vencimento: l.data_vencimento,
+    diasAtraso,
+    nomeRemetente,
+    observacao: observacao || l.observacoes_financeiro || undefined,
+    processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
+  });
+}
+
 
 
 function fmtDate(d: string | null | undefined) {
