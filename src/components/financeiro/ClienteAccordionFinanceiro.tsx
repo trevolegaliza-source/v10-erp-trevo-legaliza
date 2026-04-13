@@ -1311,6 +1311,11 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
             Extrato
           </Badge>
         )}
+        {temExtratoLegado && (
+          <Badge variant="outline" className="bg-orange-500/15 text-orange-600 border-orange-500/30 text-[10px] px-1.5 py-0">
+            ⚠️ Extrato anterior — gerar novamente
+          </Badge>
+        )}
       </div>
     </div>
   );
