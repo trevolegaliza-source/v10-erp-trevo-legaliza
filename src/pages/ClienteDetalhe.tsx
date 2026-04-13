@@ -730,7 +730,12 @@ export default function ClienteDetalhe() {
           <TabsTrigger value="financeiro-config" className="text-xs gap-1"><Settings className="h-3.5 w-3.5" />Financeiro</TabsTrigger>
           <TabsTrigger value="honorarios" className="text-xs gap-1"><List className="h-3.5 w-3.5" />Serviços</TabsTrigger>
           <TabsTrigger value="processos" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Processos</TabsTrigger>
-          <TabsTrigger value="faturas" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Faturas</TabsTrigger>
+          <TabsTrigger value="faturas" className="text-xs gap-1">
+            <DollarSign className="h-3.5 w-3.5" />Faturas
+            {qtdNaoAuditados > 0 && (
+              <Badge variant="destructive" className="text-[10px] px-1 py-0 min-w-[16px]">{qtdNaoAuditados}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="contratos" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Contratos</TabsTrigger>
           {isPrePago && <TabsTrigger value="prepago" className="text-xs gap-1"><DollarSign className="h-3.5 w-3.5" />Pré-Pago</TabsTrigger>}
           <TabsTrigger value="observacoes" className="text-xs gap-1"><FileText className="h-3.5 w-3.5" />Obs.</TabsTrigger>
