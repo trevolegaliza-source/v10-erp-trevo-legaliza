@@ -6,15 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Users, Loader2, UserPlus, MoreHorizontal, UserX, UserCheck, Shield, Mail } from 'lucide-react';
+import { Users, Loader2, UserPlus, MoreHorizontal, UserX, UserCheck, Shield, Mail, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
 import { ROLES, MODULOS_DISPONIVEIS, GRUPOS_MODULOS, getRoleInfo, type RoleValue } from '@/constants/roles';
+import { MfaEnroll } from '@/components/auth/MfaEnroll';
 
 interface Profile {
   id: string;
@@ -26,6 +28,7 @@ interface Profile {
   ultimo_acesso: string | null;
   motivo_inativacao: string | null;
   convidado_em: string | null;
+  convidado_por: string | null;
 }
 
 interface Permission {
@@ -96,6 +99,18 @@ export default function GestaoUsuarios() {
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<Profile | null>(null);
 
+  // Invite modal state
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<string>('operacional');
+  const [inviting, setInviting] = useState(false);
+
+  // MFA enrollment modal
+  const [mfaEnrollOpen, setMfaEnrollOpen] = useState(false);
+
+  // MFA factors for current users
+  const [mfaFactors, setMfaFactors] = useState<Record<string, boolean>>({});
+
   const loadData = async () => {
     setLoading(true);
     const { data: myProfile } = await supabase
@@ -117,6 +132,17 @@ export default function GestaoUsuarios() {
 
   useEffect(() => { loadData(); }, [user]);
 
+  // Check MFA for current user
+  useEffect(() => {
+    const checkMfa = async () => {
+      const { data } = await supabase.auth.mfa.listFactors();
+      if (data?.totp && data.totp.length > 0) {
+        setMfaFactors(prev => ({ ...prev, [user?.id || '']: true }));
+      }
+    };
+    if (user) checkMfa();
+  }, [user]);
+
   // KPI calculations
   const kpis = useMemo(() => {
     const total = profiles.length;
@@ -124,6 +150,18 @@ export default function GestaoUsuarios() {
     const pendentes = profiles.filter(p => p.ativo === false && !p.motivo_inativacao).length;
     const inativos = profiles.filter(p => p.ativo === false && !!p.motivo_inativacao).length;
     return { total, ativos, pendentes, inativos };
+  }, [profiles]);
+
+  // Sort: pendentes first, then ativos, then inativos
+  const sortedProfiles = useMemo(() => {
+    return [...profiles].sort((a, b) => {
+      const statusOrder = (p: Profile) => {
+        if (p.ativo === false && !p.motivo_inativacao) return 0; // pendente
+        if (p.ativo !== false) return 1; // ativo
+        return 2; // inativo
+      };
+      return statusOrder(a) - statusOrder(b);
+    });
   }, [profiles]);
 
   const getTemplateModulos = (role: string): string[] => {
@@ -135,7 +173,6 @@ export default function GestaoUsuarios() {
     setEditNome(profile.nome || '');
     setEditRole(profile.role);
 
-    // Load current permissions
     const userPerms = permissions.filter(p => p.user_id === profile.id);
     const permsMap: Record<string, boolean[]> = {};
     const moduloSet = new Set<string>();
@@ -149,7 +186,6 @@ export default function GestaoUsuarios() {
         if (p?.pode_ver) moduloSet.add(m.value);
       });
     } else {
-      // Use template defaults
       const templateMods = getTemplateModulos(profile.role);
       MODULOS_DISPONIVEIS.forEach(m => {
         const isInTemplate = templateMods.includes(m.value);
@@ -203,12 +239,10 @@ export default function GestaoUsuarios() {
   const togglePerm = (modKey: string, idx: number, val: boolean) => {
     const curr = [...(editPerms[modKey] || [false, false, false, false, false])];
     curr[idx] = val;
-    // If toggling "Ver" off, disable all
     if (idx === 0 && !val) {
       setEditPerms({ ...editPerms, [modKey]: [false, false, false, false, false] });
       setEditModulos(prev => { const n = new Set(prev); n.delete(modKey); return n; });
     } else {
-      // If enabling any permission, ensure "Ver" is on
       if (val && idx > 0) curr[0] = true;
       setEditPerms({ ...editPerms, [modKey]: curr });
       if (curr[0]) setEditModulos(prev => new Set(prev).add(modKey));
@@ -219,7 +253,6 @@ export default function GestaoUsuarios() {
     if (!editUser) return;
     setSaving(true);
     try {
-      // Update profile — include empresa_id filter for security
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
@@ -232,7 +265,6 @@ export default function GestaoUsuarios() {
 
       if (updateError) throw updateError;
 
-      // Save permissions
       await supabase.from('user_permissions').delete().eq('user_id', editUser.id) as any;
 
       const inserts = MODULOS_DISPONIVEIS.map(m => ({
@@ -306,13 +338,31 @@ export default function GestaoUsuarios() {
         .from('profiles')
         .update({
           ativo: true,
-          role: 'operacional',
           updated_at: new Date().toISOString(),
         } as any)
         .eq('id', profile.id)
         .eq('empresa_id', empresaId);
 
-      toast.success('Usuário aprovado!');
+      toast.success(`${profile.nome || profile.email} aprovado como ${getRoleInfo(profile.role).label}!`);
+      await loadData();
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message);
+    }
+  };
+
+  const handleReject = async (profile: Profile) => {
+    try {
+      await supabase
+        .from('profiles')
+        .update({
+          ativo: false,
+          motivo_inativacao: 'Acesso rejeitado',
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', profile.id)
+        .eq('empresa_id', empresaId);
+
+      toast.success('Acesso rejeitado');
       await loadData();
     } catch (e: any) {
       toast.error('Erro: ' + e.message);
@@ -322,7 +372,6 @@ export default function GestaoUsuarios() {
   const handleDelete = async () => {
     if (!deleteConfirm) return;
     try {
-      // Soft delete: deactivate with deletion marker
       await supabase
         .from('profiles')
         .update({
@@ -338,6 +387,52 @@ export default function GestaoUsuarios() {
       await loadData();
     } catch (e: any) {
       toast.error('Erro: ' + e.message);
+    }
+  };
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) {
+      toast.error('Informe o email');
+      return;
+    }
+    setInviting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) throw new Error('Sessão expirada');
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/convidar-usuario`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+            apikey: anonKey,
+          },
+          body: JSON.stringify({
+            email: inviteEmail.trim(),
+            role: inviteRole,
+            convidado_por: user?.id,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao convidar');
+
+      toast.success(`Convite enviado para ${inviteEmail}!`);
+      setInviteModalOpen(false);
+      setInviteEmail('');
+      setInviteRole('operacional');
+      await loadData();
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message);
+    } finally {
+      setInviting(false);
     }
   };
 
@@ -382,22 +477,30 @@ export default function GestaoUsuarios() {
           <Users className="h-4 w-4 text-primary" />
           <h2 className="text-base font-semibold">Usuários & Acesso</h2>
         </div>
-        <Button size="sm" disabled className="gap-1.5">
-          <UserPlus className="h-4 w-4" /> Convidar Usuário
-        </Button>
+        <div className="flex gap-2">
+          {canEdit && (
+            <Button size="sm" onClick={() => setMfaEnrollOpen(true)} variant="outline" className="gap-1.5">
+              <Lock className="h-4 w-4" /> Configurar 2FA
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setInviteModalOpen(true)} disabled={!canEdit} className="gap-1.5">
+            <UserPlus className="h-4 w-4" /> Convidar Usuário
+          </Button>
+        </div>
       </div>
 
       {/* User cards */}
       <div className="space-y-3">
-        {profiles.map(p => {
+        {sortedProfiles.map(p => {
           const status = getStatus(p);
           const roleInfo = getRoleInfo(p.role);
           const isMe = p.id === user?.id;
+          const hasMfa = mfaFactors[p.id];
 
           return (
             <Card
               key={p.id}
-              className={`border-border/60 ${status === 'inativo' ? 'opacity-60' : ''} ${status === 'pendente' ? 'border-amber-500/40' : ''}`}
+              className={`border-border/60 ${status === 'inativo' ? 'opacity-60' : ''} ${status === 'pendente' ? 'border-amber-500/40 bg-amber-500/5' : ''}`}
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
@@ -411,6 +514,7 @@ export default function GestaoUsuarios() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium text-sm truncate">{p.nome || p.email}</p>
                       {isMe && <span className="text-[10px] text-muted-foreground">(você)</span>}
+                      {hasMfa && <Lock className="h-3 w-3 text-emerald-500" title="2FA ativo" />}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{p.email}</p>
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -433,6 +537,11 @@ export default function GestaoUsuarios() {
                         </span>
                       )}
                     </div>
+                    {status === 'pendente' && p.convidado_em && (
+                      <p className="text-[10px] text-amber-500 mt-0.5">
+                        Convidado em {new Date(p.convidado_em).toLocaleDateString('pt-BR')}
+                      </p>
+                    )}
                     <p className="text-[10px] text-muted-foreground mt-1">
                       Último acesso: {formatUltimoAcesso(p.ultimo_acesso)}
                     </p>
@@ -440,11 +549,16 @@ export default function GestaoUsuarios() {
 
                   {/* Actions */}
                   {!isMe && canEdit && (
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-1 shrink-0 flex-wrap">
                       {status === 'pendente' && (
-                        <Button variant="default" size="sm" className="h-8 text-xs gap-1" onClick={() => handleApprove(p)}>
-                          <UserCheck className="h-3.5 w-3.5" /> Aprovar
-                        </Button>
+                        <>
+                          <Button variant="default" size="sm" className="h-8 text-xs gap-1" onClick={() => handleApprove(p)}>
+                            <UserCheck className="h-3.5 w-3.5" /> Aprovar
+                          </Button>
+                          <Button variant="outline" size="sm" className="h-8 text-xs gap-1 text-destructive" onClick={() => handleReject(p)}>
+                            <UserX className="h-3.5 w-3.5" /> Rejeitar
+                          </Button>
+                        </>
                       )}
                       <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => openEdit(p)}>
                         <Shield className="h-3.5 w-3.5" /> Editar
@@ -474,7 +588,6 @@ export default function GestaoUsuarios() {
                     </div>
                   )}
 
-                  {/* Non-master can see but not edit */}
                   {!isMe && !canEdit && (
                     <Button variant="outline" size="sm" className="h-8 text-xs gap-1 shrink-0" disabled>
                       <Shield className="h-3.5 w-3.5" /> Editar
@@ -486,6 +599,59 @@ export default function GestaoUsuarios() {
           );
         })}
       </div>
+
+      {/* Invite Modal */}
+      <Dialog open={inviteModalOpen} onOpenChange={o => !o && setInviteModalOpen(false)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm">
+              <Mail className="h-4 w-4 text-primary" />
+              Convidar Novo Usuário
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Email</Label>
+              <Input
+                type="email"
+                placeholder="nome@empresa.com"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                style={{ fontSize: '16px' }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Perfil inicial</Label>
+              <Select value={inviteRole} onValueChange={setInviteRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLES.filter(r => r.value !== 'master').map(r => (
+                    <SelectItem key={r.value} value={r.value}>
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full ${r.corDot}`} />
+                        <span>{r.label}</span>
+                        <span className="text-xs text-muted-foreground">— {r.descricao}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O usuário receberá um email com link para criar sua conta. Após criar, ficará como "Pendente" até você ativar.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleInvite} disabled={inviting || !inviteEmail.trim()}>
+              {inviting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Mail className="h-4 w-4 mr-1" />}
+              Enviar Convite
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Modal */}
       <Dialog open={editModalOpen} onOpenChange={o => !o && setEditModalOpen(false)}>
@@ -501,19 +667,16 @@ export default function GestaoUsuarios() {
           </DialogHeader>
 
           <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-1">
-            {/* Nome */}
             <div className="space-y-1.5">
               <Label className="text-xs uppercase">Nome</Label>
               <Input value={editNome} onChange={e => setEditNome(e.target.value)} />
             </div>
 
-            {/* Email (readonly) */}
             <div className="space-y-1.5">
               <Label className="text-xs uppercase">Email</Label>
               <Input value={editUser?.email || ''} disabled className="opacity-60" />
             </div>
 
-            {/* Role selector - radio buttons */}
             <div className="space-y-2">
               <Label className="text-xs uppercase">Perfil</Label>
               <div className="space-y-1">
@@ -547,7 +710,6 @@ export default function GestaoUsuarios() {
               </p>
             </div>
 
-            {/* Module checkboxes with fine-grained permissions */}
             <div className="space-y-2">
               <Label className="text-xs uppercase">Módulos (ajuste fino)</Label>
               <div
@@ -652,6 +814,15 @@ export default function GestaoUsuarios() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* MFA Enrollment */}
+      <MfaEnroll
+        open={mfaEnrollOpen}
+        onOpenChange={setMfaEnrollOpen}
+        onSuccess={() => {
+          setMfaFactors(prev => ({ ...prev, [user?.id || '']: true }));
+        }}
+      />
     </>
   );
 }
