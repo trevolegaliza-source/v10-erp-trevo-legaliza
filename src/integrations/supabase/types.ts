@@ -1398,35 +1398,55 @@ export type Database = {
       profiles: {
         Row: {
           ativo: boolean | null
+          convidado_em: string | null
+          convidado_por: string | null
           created_at: string | null
           email: string | null
           empresa_id: string
           id: string
+          motivo_inativacao: string | null
           nome: string | null
           role: string
+          ultimo_acesso: string | null
           updated_at: string | null
         }
         Insert: {
           ativo?: boolean | null
+          convidado_em?: string | null
+          convidado_por?: string | null
           created_at?: string | null
           email?: string | null
           empresa_id?: string
           id: string
+          motivo_inativacao?: string | null
           nome?: string | null
           role?: string
+          ultimo_acesso?: string | null
           updated_at?: string | null
         }
         Update: {
           ativo?: boolean | null
+          convidado_em?: string | null
+          convidado_por?: string | null
           created_at?: string | null
           email?: string | null
           empresa_id?: string
           id?: string
+          motivo_inativacao?: string | null
           nome?: string | null
           role?: string
+          ultimo_acesso?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_convidado_por_fkey"
+            columns: ["convidado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       proposta_eventos: {
         Row: {
@@ -1468,6 +1488,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      role_templates: {
+        Row: {
+          cor: string | null
+          descricao: string | null
+          id: string
+          modulos_padrao: string[]
+          nome_display: string
+          ordem: number | null
+          role: string
+        }
+        Insert: {
+          cor?: string | null
+          descricao?: string | null
+          id?: string
+          modulos_padrao?: string[]
+          nome_display: string
+          ordem?: number | null
+          role: string
+        }
+        Update: {
+          cor?: string | null
+          descricao?: string | null
+          id?: string
+          modulos_padrao?: string[]
+          nome_display?: string
+          ordem?: number | null
+          role?: string
+        }
+        Relationships: []
       }
       service_negotiations: {
         Row: {
