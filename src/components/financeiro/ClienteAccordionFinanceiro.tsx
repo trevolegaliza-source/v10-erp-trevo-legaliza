@@ -23,6 +23,7 @@ import { isLancamentoVencidoReal, invalidateFinanceiro } from '@/hooks/useFinanc
 import { useExtratos } from '@/hooks/useExtratos';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
 import { gerarMensagemCobranca } from '@/lib/mensagem-cobranca';
+import { getContatoCobranca } from '@/lib/contato-cobranca';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -465,7 +466,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         filename,
         clienteId: cliente.cliente_id,
         clienteNome: cliente.cliente_apelido || cliente.cliente_nome,
-        clienteTelefone: cliente.cliente_telefone || '',
+        clienteTelefone: (cliente as any).cliente_telefone_financeiro || cliente.cliente_telefone || '',
         total: result.totalGeral,
       });
 
@@ -745,8 +746,8 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
     const nomeRemetente = await getNomeRemetente();
     const msg = buildMensagemFromLancamentos({ lancamentos: cliente.lancamentos, vaMap, diasAtraso: 0, nomeRemetente });
-    const { data: clienteData } = await supabase.from('clientes').select('telefone').eq('id', cliente.cliente_id).single();
-    const telefone = (clienteData as any)?.telefone?.replace(/\D/g, '') || '';
+    const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
+    const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
       toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
       return;
@@ -987,8 +988,8 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
     const nomeRemetente = await getNomeRemetente();
     const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
-    const { data: clienteData } = await supabase.from('clientes').select('telefone').eq('id', cliente.cliente_id).single();
-    const telefone = (clienteData as any)?.telefone?.replace(/\D/g, '') || '';
+    const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
+    const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
       toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
       return;
@@ -1251,7 +1252,9 @@ export function ModalPosExtrato({
   onClose: () => void;
 }) {
   async function handleWhatsApp() {
-    const telefone = extratoGerado.clienteTelefone.replace(/\D/g, '');
+    // Fetch latest contact info (may have been updated since extrato was generated)
+    const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', extratoGerado.clienteId).single();
+    const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || extratoGerado.clienteTelefone || '').replace(/\D/g, '');
     if (!telefone) {
       toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
       return;

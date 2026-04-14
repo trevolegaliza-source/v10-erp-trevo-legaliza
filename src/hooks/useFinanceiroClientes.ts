@@ -14,6 +14,8 @@ export interface ClienteFinanceiro {
   cliente_telefone: string | null;
   cliente_email: string | null;
   cliente_nome_contador: string | null;
+  cliente_nome_contato_financeiro: string | null;
+  cliente_telefone_financeiro: string | null;
   cliente_valor_base: number | null;
   cliente_desconto_progressivo: number | null;
   cliente_valor_limite_desconto: number | null;
@@ -233,7 +235,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           ? supabase.from('processos').select('id, razao_social, tipo, etapa, notas, valor, created_at, etiquetas').in('id', processoIds)
           : { data: [], error: null },
         clienteIds.length > 0
-          ? supabase.from('clientes').select('id, nome, apelido, cnpj, tipo, momento_faturamento, dia_cobranca, dia_vencimento_mensal, telefone, email, nome_contador, valor_base, desconto_progressivo, valor_limite_desconto').in('id', clienteIds)
+          ? supabase.from('clientes').select('id, nome, apelido, cnpj, tipo, momento_faturamento, dia_cobranca, dia_vencimento_mensal, telefone, email, nome_contador, valor_base, desconto_progressivo, valor_limite_desconto, nome_contato_financeiro, telefone_financeiro').in('id', clienteIds)
           : { data: [], error: null },
         processoIds.length > 0
           ? supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds)
@@ -271,6 +273,8 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
             cliente_telefone: cliente?.telefone || null,
             cliente_email: cliente?.email || null,
             cliente_nome_contador: cliente?.nome_contador || null,
+            cliente_nome_contato_financeiro: cliente?.nome_contato_financeiro || null,
+            cliente_telefone_financeiro: cliente?.telefone_financeiro || null,
             cliente_valor_base: cliente?.valor_base || null,
             cliente_desconto_progressivo: cliente?.desconto_progressivo || null,
             cliente_valor_limite_desconto: cliente?.valor_limite_desconto || null,

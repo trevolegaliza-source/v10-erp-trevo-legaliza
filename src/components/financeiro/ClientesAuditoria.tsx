@@ -3,6 +3,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ClipboardCheck, Check, Pencil, Receipt, X, AlertTriangle, Phone } from 'lucide-react';
@@ -14,6 +15,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { clienteTemContatoCobranca } from '@/lib/contato-cobranca';
 
 function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -30,13 +32,6 @@ function tipoLabel(c: ClienteFinanceiro): string {
   if (c.cliente_tipo === 'PRE_PAGO') return 'Pré-Pago';
   if (c.cliente_dia_cobranca && c.cliente_dia_cobranca > 0) return `Avulso D+${c.cliente_dia_cobranca}`;
   return 'Avulso';
-}
-
-function formatPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-  if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-  return raw;
 }
 
 export function ClientesAuditoria({ clientes }: { clientes: ClienteFinanceiro[] }) {
@@ -77,9 +72,10 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const qc = useQueryClient();
   const [taxaModalOpen, setTaxaModalOpen] = useState(false);
   const [taxaProcessoId, setTaxaProcessoId] = useState('');
-  const [phoneModalOpen, setPhoneModalOpen] = useState(false);
-  const [phoneValue, setPhoneValue] = useState('');
-  const [phoneAction, setPhoneAction] = useState<'single' | 'all'>('single');
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactAction, setContactAction] = useState<'single' | 'all'>('single');
   const [pendingAuditId, setPendingAuditId] = useState('');
 
   const lancNaoAuditados = cliente.lancamentos.filter(l => !l.auditado && l.status !== 'pago');
@@ -87,6 +83,18 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
 
   const temMetodoTrevo = lancNaoAuditados.some(l => l.tem_etiqueta_metodo_trevo);
   const temPrioridade = lancNaoAuditados.some(l => l.tem_etiqueta_prioridade);
+
+  // Check if client has contact info for billing
+  const temContato = clienteTemContatoCobranca({
+    telefone: cliente.cliente_telefone,
+    telefone_financeiro: cliente.cliente_telefone_financeiro,
+    nome_contador: cliente.cliente_nome_contador,
+    nome_contato_financeiro: cliente.cliente_nome_contato_financeiro,
+  });
+
+  // Determine which fields are missing
+  const temNome = !!(cliente.cliente_nome_contato_financeiro || cliente.cliente_nome_contador);
+  const temTelefone = !!(cliente.cliente_telefone_financeiro || cliente.cliente_telefone);
 
   const executarAuditarTodos = () => {
     const ids = lancNaoAuditados.map(l => l.id);
@@ -101,59 +109,75 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
     });
   };
 
+  const openContactModal = (action: 'single' | 'all', lancamentoId?: string) => {
+    setContactAction(action);
+    setPendingAuditId(lancamentoId || '');
+    // Pre-fill name with nome_contador if available
+    setContactName(cliente.cliente_nome_contador || '');
+    setContactPhone('');
+    setContactModalOpen(true);
+  };
+
   const handleAuditarTodos = () => {
-    if (!cliente.cliente_telefone) {
-      setPhoneAction('all');
-      setPendingAuditId('');
-      setPhoneValue('');
-      setPhoneModalOpen(true);
+    if (!temContato) {
+      openContactModal('all');
       return;
     }
     executarAuditarTodos();
   };
 
   const handleAuditarUm = (lancamentoId: string) => {
-    if (!cliente.cliente_telefone) {
-      setPhoneAction('single');
-      setPendingAuditId(lancamentoId);
-      setPhoneValue('');
-      setPhoneModalOpen(true);
+    if (!temContato) {
+      openContactModal('single', lancamentoId);
       return;
     }
     executarAuditarUm(lancamentoId);
   };
 
-  const handlePhoneSave = async () => {
-    const digits = phoneValue.replace(/\D/g, '');
-    if (digits.length < 10 || digits.length > 11) {
+  const handleContactSave = async () => {
+    const digits = contactPhone.replace(/\D/g, '');
+    if (contactPhone && (digits.length < 10 || digits.length > 11)) {
       toast.error('Telefone inválido. Use (XX) XXXXX-XXXX');
       return;
     }
     try {
-      await supabase.from('clientes').update({ telefone: phoneValue }).eq('id', cliente.cliente_id);
-      qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
-      toast.success('Telefone salvo!');
+      const updates: Record<string, any> = {};
+      if (contactName) updates.nome_contato_financeiro = contactName;
+      if (contactPhone) {
+        updates.telefone_financeiro = contactPhone;
+        // Also set main phone if empty
+        if (!cliente.cliente_telefone) updates.telefone = contactPhone;
+      }
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('clientes').update(updates).eq('id', cliente.cliente_id);
+        qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+        toast.success('Contato salvo!');
+      }
     } catch {
-      toast.error('Erro ao salvar telefone');
+      toast.error('Erro ao salvar contato');
     }
-    setPhoneModalOpen(false);
-    if (phoneAction === 'all') executarAuditarTodos();
+    setContactModalOpen(false);
+    if (contactAction === 'all') executarAuditarTodos();
     else executarAuditarUm(pendingAuditId);
   };
 
-  const handlePhoneSkip = () => {
-    setPhoneModalOpen(false);
-    if (phoneAction === 'all') executarAuditarTodos();
+  const handleContactSkip = () => {
+    setContactModalOpen(false);
+    if (contactAction === 'all') executarAuditarTodos();
     else executarAuditarUm(pendingAuditId);
   };
 
   const handlePhoneInput = (val: string) => {
     let digits = val.replace(/\D/g, '');
     if (digits.length > 11) digits = digits.slice(0, 11);
-    if (digits.length <= 2) setPhoneValue(digits.length > 0 ? `(${digits}` : '');
-    else if (digits.length <= 7) setPhoneValue(`(${digits.slice(0, 2)}) ${digits.slice(2)}`);
-    else setPhoneValue(`(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`);
+    if (digits.length <= 2) setContactPhone(digits.length > 0 ? `(${digits}` : '');
+    else if (digits.length <= 7) setContactPhone(`(${digits.slice(0, 2)}) ${digits.slice(2)}`);
+    else setContactPhone(`(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`);
   };
+
+  // Decide what to show in the modal
+  const needsName = !temNome;
+  const needsPhone = !temTelefone;
 
   return (
     <>
@@ -218,34 +242,55 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
           clienteApelido={cliente.cliente_apelido || cliente.cliente_nome}
         />
       )}
-      {/* Phone Modal */}
-      <Dialog open={phoneModalOpen} onOpenChange={setPhoneModalOpen}>
+      {/* Contact Modal for Billing */}
+      <Dialog open={contactModalOpen} onOpenChange={setContactModalOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Phone className="h-4 w-4" /> Telefone do cliente
+              <Phone className="h-4 w-4" /> Contato para cobrança
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
+          <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              <strong>{cliente.cliente_apelido || cliente.cliente_nome}</strong> não tem telefone cadastrado. Informe para facilitar o envio de cobranças via WhatsApp.
+              <strong>{cliente.cliente_apelido || cliente.cliente_nome}</strong> não tem {!temTelefone ? 'telefone' : 'contato completo'} cadastrado para cobrança.
             </p>
-            <Input
-              type="tel"
-              inputMode="numeric"
-              placeholder="(XX) XXXXX-XXXX"
-              value={phoneValue}
-              onChange={e => handlePhoneInput(e.target.value)}
-              className="h-10"
-              style={{ fontSize: '16px' }}
-              autoFocus
-            />
+            <p className="text-xs text-muted-foreground">
+              Para quem a Carolina deve enviar a cobrança?
+            </p>
+            {needsName && (
+              <div className="space-y-1.5">
+                <Label className="text-sm">Nome do responsável</Label>
+                <Input
+                  type="text"
+                  placeholder="Ex: Fernando Barbosa"
+                  value={contactName}
+                  onChange={e => setContactName(e.target.value)}
+                  className="h-10"
+                  style={{ fontSize: 16 }}
+                />
+              </div>
+            )}
+            {needsPhone && (
+              <div className="space-y-1.5">
+                <Label className="text-sm">Telefone (WhatsApp)</Label>
+                <Input
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="(11) 99999-9999"
+                  value={contactPhone}
+                  onChange={e => handlePhoneInput(e.target.value)}
+                  className="h-10"
+                  style={{ fontSize: 16 }}
+                  autoFocus={!needsName}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={handlePhoneSkip} className="text-muted-foreground">
+            <Button variant="ghost" onClick={handleContactSkip} className="text-muted-foreground">
               Pular
             </Button>
-            <Button onClick={handlePhoneSave} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Button onClick={handleContactSave} className="bg-emerald-600 hover:bg-emerald-700 text-white">
               Salvar e Auditar
             </Button>
           </DialogFooter>
@@ -360,7 +405,7 @@ function AuditoriaFicha({
             onChange={e => setNovoValor(e.target.value)}
             placeholder="Novo valor"
             className="h-8 text-sm w-32"
-            style={{ fontSize: '16px' }}
+            style={{ fontSize: 16 }}
             autoFocus
           />
           <Button size="sm" variant="ghost" className="h-8 text-emerald-600" onClick={handleSalvarValor} disabled={alterarValorMut.isPending}>

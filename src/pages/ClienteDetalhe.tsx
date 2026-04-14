@@ -401,6 +401,8 @@ export default function ClienteDetalhe() {
       codigo_identificador: cliente.codigo_identificador || '',
       email: cliente.email || '',
       telefone: cliente.telefone || '',
+      nome_contato_financeiro: (cliente as any).nome_contato_financeiro || '',
+      telefone_financeiro: (cliente as any).telefone_financeiro || '',
       tipo: cliente.tipo,
       estado: (cliente as any).estado || '',
       cidade: (cliente as any).cidade || '',
@@ -469,6 +471,8 @@ export default function ClienteDetalhe() {
         codigo_identificador: editCadastroForm.codigo_identificador?.replace(/\D/g, '') || cliente.codigo_identificador,
         email: editCadastroForm.email || null,
         telefone: editCadastroForm.telefone || null,
+        nome_contato_financeiro: editCadastroForm.nome_contato_financeiro || null,
+        telefone_financeiro: editCadastroForm.telefone_financeiro || null,
         tipo: editCadastroForm.tipo,
         estado: editCadastroForm.estado || null,
         cidade: editCadastroForm.cidade || null,
@@ -1461,6 +1465,37 @@ export default function ClienteDetalhe() {
             <div className="grid gap-2">
               <Label className="text-muted-foreground">Telefone</Label>
               <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
+            </div>
+
+            {/* Contato para Cobrança */}
+            <div className="space-y-3 rounded-lg border border-border/40 bg-muted/20 p-3">
+              <div>
+                <Label className="text-sm font-semibold">Contato para Cobrança</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Se o contato financeiro for diferente do contador, preencha abaixo. Caso contrário, a cobrança será enviada para o contador.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs text-muted-foreground">Nome do responsável financeiro</Label>
+                  <Input
+                    value={editCadastroForm.nome_contato_financeiro || ''}
+                    onChange={e => setEditCadastroForm(f => ({ ...f, nome_contato_financeiro: e.target.value }))}
+                    placeholder={editCadastroForm.nome_contador || 'Ex: Fernando Barbosa'}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs text-muted-foreground">Telefone financeiro (WhatsApp)</Label>
+                  <Input
+                    type="tel"
+                    inputMode="numeric"
+                    value={editCadastroForm.telefone_financeiro || ''}
+                    onChange={e => setEditCadastroForm(f => ({ ...f, telefone_financeiro: e.target.value }))}
+                    placeholder={editCadastroForm.telefone || '(11) 99999-9999'}
+                    style={{ fontSize: 16 }}
+                  />
+                </div>
+              </div>
             </div>
             <div className="grid gap-2">
               <Label className="text-muted-foreground">Modalidade do Cliente</Label>
