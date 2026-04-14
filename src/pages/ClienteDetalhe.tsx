@@ -1462,6 +1462,37 @@ export default function ClienteDetalhe() {
               <Label className="text-muted-foreground">Telefone</Label>
               <Input value={editCadastroForm.telefone || ''} onChange={e => setEditCadastroForm(f => ({ ...f, telefone: e.target.value }))} />
             </div>
+
+            {/* Contato para Cobrança */}
+            <div className="space-y-3 rounded-lg border border-border/40 bg-muted/20 p-3">
+              <div>
+                <Label className="text-sm font-semibold">Contato para Cobrança</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Se o contato financeiro for diferente do contador, preencha abaixo. Caso contrário, a cobrança será enviada para o contador.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs text-muted-foreground">Nome do responsável financeiro</Label>
+                  <Input
+                    value={editCadastroForm.nome_contato_financeiro || ''}
+                    onChange={e => setEditCadastroForm(f => ({ ...f, nome_contato_financeiro: e.target.value }))}
+                    placeholder={editCadastroForm.nome_contador || 'Ex: Fernando Barbosa'}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs text-muted-foreground">Telefone financeiro (WhatsApp)</Label>
+                  <Input
+                    type="tel"
+                    inputMode="numeric"
+                    value={editCadastroForm.telefone_financeiro || ''}
+                    onChange={e => setEditCadastroForm(f => ({ ...f, telefone_financeiro: e.target.value }))}
+                    placeholder={editCadastroForm.telefone || '(11) 99999-9999'}
+                    style={{ fontSize: 16 }}
+                  />
+                </div>
+              </div>
+            </div>
             <div className="grid gap-2">
               <Label className="text-muted-foreground">Modalidade do Cliente</Label>
               <Select value={editCadastroForm.tipo} onValueChange={(v) => setEditCadastroForm(f => ({ ...f, tipo: v }))}>
