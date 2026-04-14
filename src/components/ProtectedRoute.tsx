@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import Login from '@/pages/Login';
+import { MfaChallenge } from '@/components/auth/MfaChallenge';
+import { MfaEnroll } from '@/components/auth/MfaEnroll';
 import { Loader2, Clock, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoTrevo from '@/assets/logo-trevo.png';
@@ -9,17 +11,20 @@ import logoTrevo from '@/assets/logo-trevo.png';
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, loading, signOut } = useAuth();
   const [profileStatus, setProfileStatus] = useState<'loading' | 'ativo' | 'inativo' | 'sem_profile'>('loading');
+  const [mfaStatus, setMfaStatus] = useState<'loading' | 'none' | 'needs_verify' | 'needs_enroll' | 'verified'>('loading');
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session?.user) {
       setProfileStatus('loading');
+      setMfaStatus('loading');
       return;
     }
 
     const check = async () => {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('ativo')
+        .select('ativo, role')
         .eq('id', session.user.id)
         .maybeSingle();
 
@@ -29,12 +34,33 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         setProfileStatus('inativo');
       } else {
         setProfileStatus('ativo');
+        setUserRole(profile.role);
+      }
+
+      // Check MFA status
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const totpFactors = factors?.totp || [];
+      const verifiedFactors = totpFactors.filter((f: any) => f.status === 'verified');
+      const unverifiedFactors = totpFactors.filter((f: any) => f.status === 'unverified');
+
+      if (verifiedFactors.length > 0) {
+        // Has verified TOTP — check AAL level
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aal?.currentLevel === 'aal2') {
+          setMfaStatus('verified');
+        } else {
+          setMfaStatus('needs_verify');
+        }
+      } else if (profile?.role === 'master' && profile?.ativo !== false) {
+        // Master without MFA — force enrollment
+        setMfaStatus('needs_enroll');
+      } else {
+        setMfaStatus('none');
       }
     };
 
     check();
 
-    // Poll every 10s to check if approved
     const interval = setInterval(check, 10000);
     return () => clearInterval(interval);
   }, [session?.user?.id]);
@@ -51,10 +77,34 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Login />;
   }
 
-  if (profileStatus === 'loading') {
+  if (profileStatus === 'loading' || mfaStatus === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // MFA challenge needed
+  if (mfaStatus === 'needs_verify') {
+    return (
+      <MfaChallenge
+        onVerified={() => setMfaStatus('verified')}
+        onCancel={signOut}
+      />
+    );
+  }
+
+  // Master needs to enroll MFA
+  if (mfaStatus === 'needs_enroll' && profileStatus === 'ativo') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <MfaEnroll
+          open={true}
+          onOpenChange={() => {}}
+          forceSetup
+          onSuccess={() => setMfaStatus('verified')}
+        />
       </div>
     );
   }
