@@ -466,7 +466,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         filename,
         clienteId: cliente.cliente_id,
         clienteNome: cliente.cliente_apelido || cliente.cliente_nome,
-        clienteTelefone: cliente.cliente_telefone || '',
+        clienteTelefone: (cliente as any).cliente_telefone_financeiro || cliente.cliente_telefone || '',
         total: result.totalGeral,
       });
 
