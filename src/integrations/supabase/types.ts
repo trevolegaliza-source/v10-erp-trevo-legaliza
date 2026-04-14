@@ -128,12 +128,14 @@ export type Database = {
           momento_faturamento: string | null
           nome: string
           nome_contador: string | null
+          nome_contato_financeiro: string | null
           numero: string | null
           observacoes: string | null
           qtd_processos: number | null
           saldo_prepago: number | null
           saldo_ultima_recarga: number | null
           telefone: string | null
+          telefone_financeiro: string | null
           tipo: Database["public"]["Enums"]["tipo_cliente"]
           tipo_desconto: string | null
           updated_at: string | null
@@ -171,12 +173,14 @@ export type Database = {
           momento_faturamento?: string | null
           nome: string
           nome_contador?: string | null
+          nome_contato_financeiro?: string | null
           numero?: string | null
           observacoes?: string | null
           qtd_processos?: number | null
           saldo_prepago?: number | null
           saldo_ultima_recarga?: number | null
           telefone?: string | null
+          telefone_financeiro?: string | null
           tipo?: Database["public"]["Enums"]["tipo_cliente"]
           tipo_desconto?: string | null
           updated_at?: string | null
@@ -214,12 +218,14 @@ export type Database = {
           momento_faturamento?: string | null
           nome?: string
           nome_contador?: string | null
+          nome_contato_financeiro?: string | null
           numero?: string | null
           observacoes?: string | null
           qtd_processos?: number | null
           saldo_prepago?: number | null
           saldo_ultima_recarga?: number | null
           telefone?: string | null
+          telefone_financeiro?: string | null
           tipo?: Database["public"]["Enums"]["tipo_cliente"]
           tipo_desconto?: string | null
           updated_at?: string | null
