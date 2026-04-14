@@ -143,15 +143,13 @@ export default function PropostaPublica() {
         body: JSON.stringify({ status: 'aguardando_pagamento', aprovado_em: new Date().toISOString() }),
       });
 
-      await fetch(`${SUPABASE_URL}/rest/v1/notificacoes`, {
+      await fetch(`${SUPABASE_URL}/rest/v1/rpc/criar_notificacao_proposta`, {
         method: 'POST',
         headers: anonHeaders,
         body: JSON.stringify({
-          tipo: 'aprovacao',
-          titulo: '🟢 PROPOSTA APROVADA',
-          mensagem: `${orc.prospect_nome} aprovou a proposta #${String(orc.numero).padStart(3, '0')} no valor de ${fmt(total)}. Aguardando pagamento.`,
-          orcamento_id: orc.id,
-          empresa_id: orc.empresa_id || null,
+          p_orcamento_id: orc.id,
+          p_tipo: 'aprovacao',
+          p_mensagem: `${orc.prospect_nome} aprovou a proposta #${String(orc.numero).padStart(3, '0')} no valor de ${fmt(total)}. Aguardando pagamento.`,
         }),
       });
 
@@ -180,15 +178,13 @@ export default function PropostaPublica() {
         body: JSON.stringify({ status: 'recusado', recusado_em: new Date().toISOString(), observacoes_recusa: motivoRecusa }),
       });
 
-      await fetch(`${SUPABASE_URL}/rest/v1/notificacoes`, {
+      await fetch(`${SUPABASE_URL}/rest/v1/rpc/criar_notificacao_proposta`, {
         method: 'POST',
         headers: anonHeaders,
         body: JSON.stringify({
-          tipo: 'recusa',
-          titulo: '🔴 PROPOSTA RECUSADA',
-          mensagem: `${orc.prospect_nome} recusou a proposta #${String(orc.numero).padStart(3, '0')}. Motivo: ${motivoRecusa}`,
-          orcamento_id: orc.id,
-          empresa_id: orc.empresa_id || null,
+          p_orcamento_id: orc.id,
+          p_tipo: 'recusa',
+          p_mensagem: `${orc.prospect_nome} recusou a proposta #${String(orc.numero).padStart(3, '0')}. Motivo: ${motivoRecusa}`,
         }),
       });
 
