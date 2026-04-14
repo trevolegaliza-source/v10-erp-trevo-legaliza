@@ -1703,6 +1703,10 @@ export type Database = {
         Returns: number
       }
       calcular_vencimento: { Args: { p_cliente_id: string }; Returns: string }
+      criar_notificacao_proposta: {
+        Args: { p_mensagem: string; p_orcamento_id: string; p_tipo: string }
+        Returns: undefined
+      }
       get_empresa_id: { Args: never; Returns: string }
       get_user_empresa_id: { Args: never; Returns: string }
       get_user_role: { Args: never; Returns: string }
