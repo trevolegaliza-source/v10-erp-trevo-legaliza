@@ -514,7 +514,7 @@ export default function GestaoUsuarios() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium text-sm truncate">{p.nome || p.email}</p>
                       {isMe && <span className="text-[10px] text-muted-foreground">(você)</span>}
-                      {hasMfa && <Lock className="h-3 w-3 text-emerald-500" title="2FA ativo" />}
+                      {hasMfa && <span title="2FA ativo"><Lock className="h-3 w-3 text-emerald-500" /></span>}
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{p.email}</p>
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
