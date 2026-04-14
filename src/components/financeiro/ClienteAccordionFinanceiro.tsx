@@ -1252,7 +1252,9 @@ export function ModalPosExtrato({
   onClose: () => void;
 }) {
   async function handleWhatsApp() {
-    const telefone = extratoGerado.clienteTelefone.replace(/\D/g, '');
+    // Fetch latest contact info (may have been updated since extrato was generated)
+    const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', extratoGerado.clienteId).single();
+    const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || extratoGerado.clienteTelefone || '').replace(/\D/g, '');
     if (!telefone) {
       toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
       return;
