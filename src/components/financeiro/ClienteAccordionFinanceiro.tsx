@@ -746,8 +746,8 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
     const nomeRemetente = await getNomeRemetente();
     const msg = buildMensagemFromLancamentos({ lancamentos: cliente.lancamentos, vaMap, diasAtraso: 0, nomeRemetente });
-    const { data: clienteData } = await supabase.from('clientes').select('telefone').eq('id', cliente.cliente_id).single();
-    const telefone = (clienteData as any)?.telefone?.replace(/\D/g, '') || '';
+    const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
+    const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
       toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
       return;
@@ -988,8 +988,8 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
     const nomeRemetente = await getNomeRemetente();
     const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
-    const { data: clienteData } = await supabase.from('clientes').select('telefone').eq('id', cliente.cliente_id).single();
-    const telefone = (clienteData as any)?.telefone?.replace(/\D/g, '') || '';
+    const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
+    const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
       toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
       return;
