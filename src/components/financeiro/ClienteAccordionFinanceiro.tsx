@@ -23,6 +23,7 @@ import { isLancamentoVencidoReal, invalidateFinanceiro } from '@/hooks/useFinanc
 import { useExtratos } from '@/hooks/useExtratos';
 import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
 import { gerarMensagemCobranca } from '@/lib/mensagem-cobranca';
+import { getContatoCobranca } from '@/lib/contato-cobranca';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
