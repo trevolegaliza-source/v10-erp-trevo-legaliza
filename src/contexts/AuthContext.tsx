@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
 
       if (session?.user) {
@@ -64,6 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 mensagem: `${session.user.email} solicitou acesso ao sistema. Vá em Configurações → Usuários para aprovar.`,
                 empresa_id: empresaId || null,
               } as any);
+            } else if (event === 'SIGNED_IN') {
+              // Register last access
+              await supabase
+                .from('profiles')
+                .update({ ultimo_acesso: new Date().toISOString() } as any)
+                .eq('id', session.user.id);
             }
           } catch (err) {
             console.error('Error checking/creating profile:', err);
