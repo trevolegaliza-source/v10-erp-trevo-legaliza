@@ -25,10 +25,25 @@ export function MfaEnroll({ open, onOpenChange, onSuccess, forceSetup }: MfaEnro
   const startEnroll = async () => {
     setEnrolling(true);
     try {
-      const { data, error } = await supabase.auth.mfa.enroll({
+      // Remove any pending unverified factor first
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const pendente = factors?.totp?.find((f: any) => f.status === 'unverified');
+      if (pendente) {
+        await supabase.auth.mfa.unenroll({ factorId: pendente.id });
+      }
+
+      let { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
         friendlyName: 'Trevo Legaliza',
       });
+
+      // Fallback: if name conflict persists, enroll without friendlyName
+      if (error?.message?.includes('already exists')) {
+        const retry = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+        data = retry.data;
+        error = retry.error;
+      }
+
       if (error) throw error;
       if (data?.totp?.qr_code) {
         setQrUri(data.totp.qr_code);
