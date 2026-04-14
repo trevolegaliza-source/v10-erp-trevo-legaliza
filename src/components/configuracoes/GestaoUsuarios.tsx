@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Shield, Users, Loader2, UserPlus, UserX, UserCheck, Trash2 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Users, Loader2, UserPlus, MoreHorizontal, UserX, UserCheck, Shield, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
+import { ROLES, MODULOS_DISPONIVEIS, GRUPOS_MODULOS, getRoleInfo, type RoleValue } from '@/constants/roles';
 
 interface Profile {
   id: string;
@@ -21,6 +23,9 @@ interface Profile {
   email: string | null;
   role: string;
   ativo: boolean | null;
+  ultimo_acesso: string | null;
+  motivo_inativacao: string | null;
+  convidado_em: string | null;
 }
 
 interface Permission {
@@ -35,104 +40,60 @@ interface Permission {
   pode_aprovar: boolean;
 }
 
-const MODULOS = [
-  { key: 'dashboard', label: 'Dashboard', grupo: 'Operação' },
-  { key: 'processos', label: 'Processos', grupo: 'Operação' },
-  { key: 'clientes', label: 'Clientes', grupo: 'Operação' },
-  { key: 'importar', label: 'Importar Planilha', grupo: 'Operação' },
-  { key: 'orcamentos', label: 'Orçamentos', grupo: 'Comercial' },
-  { key: 'catalogo', label: 'Portfólio & Preços', grupo: 'Comercial' },
-  { key: 'financeiro', label: 'Financeiro (Cobranças)', grupo: 'Financeiro' },
-  { key: 'contas_pagar', label: 'Contas a Pagar', grupo: 'Financeiro' },
-  { key: 'relatorios_dre', label: 'Relatórios DRE', grupo: 'Financeiro' },
-  { key: 'fluxo_caixa', label: 'Fluxo de Caixa', grupo: 'Financeiro' },
-  { key: 'colaboradores', label: 'Colaboradores', grupo: 'Gestão' },
-  { key: 'intel_geografica', label: 'Inteligência Geográfica', grupo: 'Gestão' },
-  { key: 'configuracoes', label: 'Configurações', grupo: 'Sistema' },
-];
-
-const GRUPOS = ['Operação', 'Comercial', 'Financeiro', 'Gestão', 'Sistema'];
-
-const ROLES = [
-  { value: 'master', label: 'Master' },
-  { value: 'financeiro', label: 'Financeiro' },
-  { value: 'operacional', label: 'Operacional' },
-  { value: 'visualizador', label: 'Visualizador' },
-  { value: 'usuario', label: 'Usuário' },
-];
-
-const ROLE_COLORS: Record<string, string> = {
-  master: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
-  financeiro: 'bg-blue-500/15 text-blue-500 border-blue-500/30',
-  operacional: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
-  visualizador: 'bg-gray-500/15 text-gray-500 border-gray-500/30',
-  usuario: 'bg-purple-500/15 text-purple-500 border-purple-500/30',
-};
-
-const ROLE_PRESETS: Record<string, Record<string, boolean[]>> = {
-  master: Object.fromEntries(
-    MODULOS.map(m => [m.key, [true, true, true, true, true]])
-  ),
-  financeiro: {
-    dashboard:        [true, false, false, false, false],
-    processos:        [true, false, false, false, false],
-    clientes:         [true, false, false, false, false],
-    importar:         [false, false, false, false, false],
-    orcamentos:       [true, false, false, false, false],
-    catalogo:         [true, false, false, false, false],
-    financeiro:       [true, true, true, false, true],
-    contas_pagar:     [true, true, true, false, true],
-    relatorios_dre:   [true, false, false, false, false],
-    fluxo_caixa:      [true, false, false, false, false],
-    colaboradores:    [true, false, false, false, false],
-    intel_geografica: [false, false, false, false, false],
-    configuracoes:    [false, false, false, false, false],
-  },
-  operacional: {
-    dashboard:        [true, false, false, false, false],
-    processos:        [true, true, true, false, false],
-    clientes:         [true, true, true, false, false],
-    importar:         [true, true, false, false, false],
-    orcamentos:       [true, true, true, false, false],
-    catalogo:         [true, false, false, false, false],
-    financeiro:       [false, false, false, false, false],
-    contas_pagar:     [false, false, false, false, false],
-    relatorios_dre:   [false, false, false, false, false],
-    fluxo_caixa:      [false, false, false, false, false],
-    colaboradores:    [false, false, false, false, false],
-    intel_geografica: [true, true, true, false, false],
-    configuracoes:    [false, false, false, false, false],
-  },
-  visualizador: {
-    dashboard:        [true, false, false, false, false],
-    processos:        [true, false, false, false, false],
-    clientes:         [true, false, false, false, false],
-    importar:         [false, false, false, false, false],
-    orcamentos:       [true, false, false, false, false],
-    catalogo:         [true, false, false, false, false],
-    financeiro:       [false, false, false, false, false],
-    contas_pagar:     [false, false, false, false, false],
-    relatorios_dre:   [false, false, false, false, false],
-    fluxo_caixa:      [false, false, false, false, false],
-    colaboradores:    [false, false, false, false, false],
-    intel_geografica: [true, false, false, false, false],
-    configuracoes:    [false, false, false, false, false],
-  },
-};
+interface RoleTemplate {
+  role: string;
+  modulos_padrao: string[];
+}
 
 const PERM_LABELS = ['Ver', 'Criar', 'Editar', 'Excluir', 'Aprovar'];
 
+function formatUltimoAcesso(date: string | null): string {
+  if (!date) return 'Nunca';
+  const d = new Date(date);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) {
+    return `Hoje ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  if (diffDays === 1) return 'Ontem';
+  if (diffDays < 7) return `Há ${diffDays} dias`;
+  if (diffDays < 30) return `Há ${Math.floor(diffDays / 7)} semanas`;
+  return d.toLocaleDateString('pt-BR');
+}
+
+function getInitials(name: string | null, email: string | null): string {
+  const src = name || email || '?';
+  const parts = src.split(/[\s@]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return src.substring(0, 2).toUpperCase();
+}
+
 export default function GestaoUsuarios() {
   const { user } = useAuth();
+  const { isMaster } = usePermissions();
+  const canEdit = isMaster();
+
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [roleTemplates, setRoleTemplates] = useState<RoleTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [empresaId, setEmpresaId] = useState('');
+
+  // Edit modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [editUser, setEditUser] = useState<Profile | null>(null);
+  const [editRole, setEditRole] = useState('operacional');
+  const [editModulos, setEditModulos] = useState<Set<string>>(new Set());
   const [editPerms, setEditPerms] = useState<Record<string, boolean[]>>({});
-  const [form, setForm] = useState({ nome: '', email: '', password: '', confirmPassword: '', role: 'operacional' });
+  const [editNome, setEditNome] = useState('');
   const [saving, setSaving] = useState(false);
-  const [empresaId, setEmpresaId] = useState<string>('');
+
+  // Deactivation state
+  const [deactivateUser, setDeactivateUser] = useState<Profile | null>(null);
+  const [deactivateMotivo, setDeactivateMotivo] = useState('');
+
+  // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<Profile | null>(null);
 
   const loadData = async () => {
@@ -142,401 +103,551 @@ export default function GestaoUsuarios() {
     if (!myProfile) { setLoading(false); return; }
     setEmpresaId(myProfile.empresa_id);
 
-    const { data: allProfiles } = await supabase
-      .from('profiles').select('*').eq('empresa_id', myProfile.empresa_id) as any;
-    const { data: allPerms } = await supabase
-      .from('user_permissions').select('*').eq('empresa_id', myProfile.empresa_id) as any;
+    const [profilesRes, permsRes, templatesRes] = await Promise.all([
+      supabase.from('profiles').select('*').eq('empresa_id', myProfile.empresa_id) as any,
+      supabase.from('user_permissions').select('*').eq('empresa_id', myProfile.empresa_id) as any,
+      supabase.from('role_templates').select('role, modulos_padrao').order('ordem') as any,
+    ]);
 
-    setProfiles(allProfiles || []);
-    setPermissions(allPerms || []);
+    setProfiles(profilesRes.data || []);
+    setPermissions(permsRes.data || []);
+    setRoleTemplates(templatesRes.data || []);
     setLoading(false);
   };
 
   useEffect(() => { loadData(); }, [user]);
 
-  const getRoleLabel = (role: string) => ROLES.find(r => r.value === role)?.label || role;
+  // KPI calculations
+  const kpis = useMemo(() => {
+    const total = profiles.length;
+    const ativos = profiles.filter(p => p.ativo !== false).length;
+    const pendentes = profiles.filter(p => p.ativo === false && !p.motivo_inativacao).length;
+    const inativos = profiles.filter(p => p.ativo === false && !!p.motivo_inativacao).length;
+    return { total, ativos, pendentes, inativos };
+  }, [profiles]);
 
-  const getPermCount = (profileId: string) => {
-    const userPerms = permissions.filter(p => p.user_id === profileId);
-    return userPerms.filter(p => p.pode_ver).length;
-  };
-
-  const openCreate = () => {
-    setEditUser(null);
-    setForm({ nome: '', email: '', password: '', confirmPassword: '', role: 'operacional' });
-    setEditPerms({ ...ROLE_PRESETS.operacional });
-    setModalOpen(true);
+  const getTemplateModulos = (role: string): string[] => {
+    return roleTemplates.find(t => t.role === role)?.modulos_padrao || [];
   };
 
   const openEdit = (profile: Profile) => {
+    setEditUser(profile);
+    setEditNome(profile.nome || '');
+    setEditRole(profile.role);
+
+    // Load current permissions
     const userPerms = permissions.filter(p => p.user_id === profile.id);
     const permsMap: Record<string, boolean[]> = {};
-    MODULOS.forEach(m => {
-      const p = userPerms.find(up => up.modulo === m.key);
-      permsMap[m.key] = p ? [p.pode_ver, p.pode_criar, p.pode_editar, p.pode_excluir, p.pode_aprovar] : [false, false, false, false, false];
-    });
+    const moduloSet = new Set<string>();
+
+    if (userPerms.length > 0) {
+      MODULOS_DISPONIVEIS.forEach(m => {
+        const p = userPerms.find(up => up.modulo === m.value);
+        permsMap[m.value] = p
+          ? [p.pode_ver, p.pode_criar, p.pode_editar, p.pode_excluir, p.pode_aprovar]
+          : [false, false, false, false, false];
+        if (p?.pode_ver) moduloSet.add(m.value);
+      });
+    } else {
+      // Use template defaults
+      const templateMods = getTemplateModulos(profile.role);
+      MODULOS_DISPONIVEIS.forEach(m => {
+        const isInTemplate = templateMods.includes(m.value);
+        permsMap[m.value] = isInTemplate
+          ? [true, profile.role !== 'visualizador', profile.role !== 'visualizador', false, false]
+          : [false, false, false, false, false];
+        if (isInTemplate) moduloSet.add(m.value);
+      });
+    }
+
     setEditPerms(permsMap);
-    setEditUser(profile);
-    setForm({ nome: profile.nome || '', email: profile.email || '', password: '', confirmPassword: '', role: profile.role });
-    setModalOpen(true);
+    setEditModulos(moduloSet);
+    setEditModalOpen(true);
   };
 
-  const handleRoleChange = (role: string) => {
-    setForm(f => ({ ...f, role }));
-    const preset = ROLE_PRESETS[role];
-    if (preset) setEditPerms({ ...preset });
+  const handleRoleChange = (newRole: string) => {
+    setEditRole(newRole);
+    const templateMods = getTemplateModulos(newRole);
+    const newModulos = new Set(templateMods);
+    const newPerms: Record<string, boolean[]> = {};
+
+    MODULOS_DISPONIVEIS.forEach(m => {
+      const isInTemplate = templateMods.includes(m.value);
+      newPerms[m.value] = isInTemplate
+        ? [true, newRole !== 'visualizador', newRole !== 'visualizador', false, false]
+        : [false, false, false, false, false];
+    });
+
+    setEditModulos(newModulos);
+    setEditPerms(newPerms);
   };
 
-  const applyPreset = (role: string) => {
-    const preset = ROLE_PRESETS[role];
-    if (preset) setEditPerms({ ...preset });
+  const toggleModulo = (modulo: string, checked: boolean) => {
+    const next = new Set(editModulos);
+    if (checked) {
+      next.add(modulo);
+      setEditPerms(prev => ({
+        ...prev,
+        [modulo]: [true, editRole !== 'visualizador', editRole !== 'visualizador', false, false],
+      }));
+    } else {
+      next.delete(modulo);
+      setEditPerms(prev => ({
+        ...prev,
+        [modulo]: [false, false, false, false, false],
+      }));
+    }
+    setEditModulos(next);
   };
 
   const togglePerm = (modKey: string, idx: number, val: boolean) => {
     const curr = [...(editPerms[modKey] || [false, false, false, false, false])];
     curr[idx] = val;
-    setEditPerms({ ...editPerms, [modKey]: curr });
-  };
-
-  const savePermissions = async (userId: string, empId: string) => {
-    const { error: delError } = await supabase.from('user_permissions').delete().eq('user_id', userId) as any;
-    if (delError) {
-      console.error('Erro ao deletar permissões antigas:', delError);
-      throw new Error('Erro ao limpar permissões: ' + delError.message);
-    }
-
-    const inserts = MODULOS.map(m => ({
-      user_id: userId,
-      empresa_id: empId,
-      modulo: m.key,
-      pode_ver: editPerms[m.key]?.[0] || false,
-      pode_criar: editPerms[m.key]?.[1] || false,
-      pode_editar: editPerms[m.key]?.[2] || false,
-      pode_excluir: editPerms[m.key]?.[3] || false,
-      pode_aprovar: editPerms[m.key]?.[4] || false,
-    }));
-
-    const { error: insError } = await supabase.from('user_permissions').insert(inserts as any);
-    if (insError) {
-      console.error('Erro ao inserir permissões:', insError);
-      throw new Error('Erro ao salvar permissões: ' + insError.message);
+    // If toggling "Ver" off, disable all
+    if (idx === 0 && !val) {
+      setEditPerms({ ...editPerms, [modKey]: [false, false, false, false, false] });
+      setEditModulos(prev => { const n = new Set(prev); n.delete(modKey); return n; });
+    } else {
+      // If enabling any permission, ensure "Ver" is on
+      if (val && idx > 0) curr[0] = true;
+      setEditPerms({ ...editPerms, [modKey]: curr });
+      if (curr[0]) setEditModulos(prev => new Set(prev).add(modKey));
     }
   };
 
   const handleSave = async () => {
-    if (editUser) {
-      setSaving(true);
-      try {
-        const { error: updateError } = await supabase.from('profiles').update({
-          role: form.role,
-          ativo: editUser.ativo,
-          nome: form.nome || editUser.nome,
+    if (!editUser) return;
+    setSaving(true);
+    try {
+      // Update profile — include empresa_id filter for security
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          role: editRole,
+          nome: editNome || editUser.nome,
           updated_at: new Date().toISOString(),
-        } as any).eq('id', editUser.id);
+        } as any)
+        .eq('id', editUser.id)
+        .eq('empresa_id', empresaId);
 
-        if (updateError) {
-          toast.error('Erro ao atualizar perfil: ' + updateError.message);
-          setSaving(false);
-          return;
-        }
+      if (updateError) throw updateError;
 
-        await savePermissions(editUser.id, empresaId);
-        toast.success('Usuário atualizado com sucesso!');
-        setModalOpen(false);
-        await loadData();
-      } catch (e: any) { toast.error('Erro: ' + e.message); }
-      finally { setSaving(false); }
-    } else {
-      if (!form.email.trim() || !form.password.trim()) { toast.error('E-mail e senha são obrigatórios'); return; }
-      if (form.password !== form.confirmPassword) { toast.error('As senhas não coincidem'); return; }
-      if (form.password.length < 6) { toast.error('Senha deve ter no mínimo 6 caracteres'); return; }
+      // Save permissions
+      await supabase.from('user_permissions').delete().eq('user_id', editUser.id) as any;
 
-      setSaving(true);
-      try {
-        const res = await supabase.functions.invoke('create-user', {
-          body: { email: form.email.trim(), password: form.password, nome: form.nome || form.email, role: form.role },
-        });
+      const inserts = MODULOS_DISPONIVEIS.map(m => ({
+        user_id: editUser.id,
+        empresa_id: empresaId,
+        modulo: m.value,
+        pode_ver: editPerms[m.value]?.[0] || false,
+        pode_criar: editPerms[m.value]?.[1] || false,
+        pode_editar: editPerms[m.value]?.[2] || false,
+        pode_excluir: editPerms[m.value]?.[3] || false,
+        pode_aprovar: editPerms[m.value]?.[4] || false,
+      }));
 
-        if (res.error) throw new Error(res.error.message || 'Erro ao criar usuário');
-        const newUserId = res.data?.user?.id;
-        if (!newUserId) throw new Error('ID do usuário não retornado');
+      const { error: insError } = await supabase.from('user_permissions').insert(inserts as any);
+      if (insError) throw insError;
 
-        await savePermissions(newUserId, empresaId);
-
-        toast.success(`Usuário criado com sucesso! Credenciais: ${form.email}`);
-        setModalOpen(false);
-        loadData();
-      } catch (e: any) { toast.error('Erro: ' + e.message); }
-      finally { setSaving(false); }
+      toast.success('Usuário atualizado!');
+      setEditModalOpen(false);
+      await loadData();
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const toggleAtivo = async (profile: Profile) => {
-    const newAtivo = !(profile.ativo ?? true);
-    await supabase.from('profiles').update({ ativo: newAtivo, updated_at: new Date().toISOString() } as any).eq('id', profile.id);
-    toast.success(newAtivo ? 'Usuário ativado' : 'Usuário desativado');
-    loadData();
+  const handleDeactivate = async () => {
+    if (!deactivateUser) return;
+    try {
+      await supabase
+        .from('profiles')
+        .update({
+          ativo: false,
+          motivo_inativacao: deactivateMotivo || 'Desativado pelo administrador',
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', deactivateUser.id)
+        .eq('empresa_id', empresaId);
+
+      toast.success('Usuário desativado');
+      setDeactivateUser(null);
+      setDeactivateMotivo('');
+      await loadData();
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message);
+    }
   };
 
-  const handleDeleteUser = async () => {
+  const handleReactivate = async (profile: Profile) => {
+    try {
+      await supabase
+        .from('profiles')
+        .update({
+          ativo: true,
+          motivo_inativacao: null,
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', profile.id)
+        .eq('empresa_id', empresaId);
+
+      toast.success('Usuário reativado');
+      await loadData();
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message);
+    }
+  };
+
+  const handleApprove = async (profile: Profile) => {
+    try {
+      await supabase
+        .from('profiles')
+        .update({
+          ativo: true,
+          role: 'operacional',
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', profile.id)
+        .eq('empresa_id', empresaId);
+
+      toast.success('Usuário aprovado!');
+      await loadData();
+    } catch (e: any) {
+      toast.error('Erro: ' + e.message);
+    }
+  };
+
+  const handleDelete = async () => {
     if (!deleteConfirm) return;
     try {
-      const { error: permError } = await supabase
-        .from('user_permissions')
-        .delete()
-        .eq('user_id', deleteConfirm.id) as any;
-
-      if (permError) {
-        console.error('Erro ao deletar permissões:', permError);
-        toast.error('Erro ao deletar permissões: ' + permError.message);
-        return;
-      }
-
-      const { error: profileError } = await supabase
+      // Soft delete: deactivate with deletion marker
+      await supabase
         .from('profiles')
-        .delete()
-        .eq('id', deleteConfirm.id) as any;
+        .update({
+          ativo: false,
+          motivo_inativacao: 'Removido pelo administrador',
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', deleteConfirm.id)
+        .eq('empresa_id', empresaId);
 
-      if (profileError) {
-        console.error('Erro ao deletar profile:', profileError);
-        toast.error('Erro ao deletar usuário: ' + profileError.message);
-        return;
-      }
-
-      toast.success(`Usuário ${deleteConfirm.nome || deleteConfirm.email} excluído`);
+      toast.success(`Usuário ${deleteConfirm.nome || deleteConfirm.email} removido`);
       setDeleteConfirm(null);
       await loadData();
     } catch (e: any) {
-      console.error('Erro geral:', e);
-      toast.error('Erro ao excluir: ' + e.message);
+      toast.error('Erro: ' + e.message);
     }
   };
 
+  const getStatus = (p: Profile) => {
+    if (p.ativo === false && p.motivo_inativacao) return 'inativo';
+    if (p.ativo === false) return 'pendente';
+    return 'ativo';
+  };
+
   if (loading) {
-    return <Card className="border-border/60"><CardContent className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></CardContent></Card>;
+    return (
+      <Card className="border-border/60">
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <>
-      <Card className="border-border/60 w-full">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4 text-primary" />USUÁRIOS & ACESSO</CardTitle>
-              <CardDescription>Gerencie quem acessa o sistema e o que cada um pode fazer.</CardDescription>
-            </div>
-            <Button size="sm" onClick={openCreate}><UserPlus className="h-4 w-4 mr-1" />Novo Usuário</Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {profiles.map((p) => (
-              <div
-                key={p.id}
-                className={`border rounded-lg p-4 space-y-3 ${p.ativo === false ? 'border-amber-500/40 bg-amber-500/5' : 'border-border/60'}`}
-              >
-                {/* Row 1: Avatar + Name + Role */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                      {(p.nome || p.email || '?')[0].toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">{p.nome || p.email}</p>
-                      <p className="text-xs text-muted-foreground truncate">{p.email}</p>
-                    </div>
-                  </div>
-                  <Badge className={`${ROLE_COLORS[p.role] || 'bg-muted text-muted-foreground'} border text-[10px] uppercase shrink-0`}>
-                    {getRoleLabel(p.role)}{p.id === user?.id ? ' (você)' : ''}
-                  </Badge>
-                </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        {[
+          { label: 'Total', value: kpis.total, color: 'text-foreground' },
+          { label: 'Ativos', value: kpis.ativos, color: 'text-emerald-500' },
+          { label: 'Pendentes', value: kpis.pendentes, color: 'text-amber-500' },
+          { label: 'Inativos', value: kpis.inativos, color: 'text-muted-foreground' },
+        ].map(kpi => (
+          <Card key={kpi.label} className="border-border/60">
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">{kpi.label}</p>
+              <p className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-                {/* Row 2: Status + Modules + Actions */}
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline" className={`text-[10px] ${p.ativo !== false ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500 animate-pulse'}`}>
-                      {p.ativo !== false ? 'ATIVO' : '⏳ AGUARDANDO APROVAÇÃO'}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {p.role === 'master' ? '13 módulos' : `${getPermCount(p.id)} módulos com acesso`}
-                    </span>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-primary" />
+          <h2 className="text-base font-semibold">Usuários & Acesso</h2>
+        </div>
+        <Button size="sm" disabled className="gap-1.5">
+          <UserPlus className="h-4 w-4" /> Convidar Usuário
+        </Button>
+      </div>
+
+      {/* User cards */}
+      <div className="space-y-3">
+        {profiles.map(p => {
+          const status = getStatus(p);
+          const roleInfo = getRoleInfo(p.role);
+          const isMe = p.id === user?.id;
+
+          return (
+            <Card
+              key={p.id}
+              className={`border-border/60 ${status === 'inativo' ? 'opacity-60' : ''} ${status === 'pendente' ? 'border-amber-500/40' : ''}`}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  {/* Avatar */}
+                  <div className={`h-10 w-10 shrink-0 rounded-full flex items-center justify-center text-xs font-bold text-white ${roleInfo.corDot}`}>
+                    {getInitials(p.nome, p.email)}
                   </div>
-                  {p.id !== user?.id ? (
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {p.ativo === false && (
-                        <Button variant="default" size="sm" className="h-7 text-xs" onClick={() => toggleAtivo(p)}>
-                          <UserCheck className="h-3 w-3 mr-1" />Aprovar
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(p)}>
-                        <Shield className="h-3 w-3 mr-1" />Permissões
-                      </Button>
-                      {p.ativo !== false && (
-                        <Button variant="ghost" size="sm" className="h-7" onClick={() => toggleAtivo(p)}>
-                          <UserX className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteConfirm(p)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-sm truncate">{p.nome || p.email}</p>
+                      {isMe && <span className="text-[10px] text-muted-foreground">(você)</span>}
                     </div>
-                  ) : (
-                    <span className="text-[10px] text-muted-foreground">—</span>
+                    <p className="text-xs text-muted-foreground truncate">{p.email}</p>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <Badge className={`${roleInfo.cor} border text-[10px] uppercase`}>
+                        {roleInfo.label}
+                      </Badge>
+                      {status === 'ativo' && (
+                        <span className="flex items-center gap-1 text-[10px] text-emerald-500">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Ativo
+                        </span>
+                      )}
+                      {status === 'pendente' && (
+                        <span className="flex items-center gap-1 text-[10px] text-amber-500 animate-pulse">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Pendente
+                        </span>
+                      )}
+                      {status === 'inativo' && (
+                        <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" /> Inativo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Último acesso: {formatUltimoAcesso(p.ultimo_acesso)}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  {!isMe && canEdit && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      {status === 'pendente' && (
+                        <Button variant="default" size="sm" className="h-8 text-xs gap-1" onClick={() => handleApprove(p)}>
+                          <UserCheck className="h-3.5 w-3.5" /> Aprovar
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={() => openEdit(p)}>
+                        <Shield className="h-3.5 w-3.5" /> Editar
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {status === 'ativo' && (
+                            <DropdownMenuItem onClick={() => setDeactivateUser(p)}>
+                              <UserX className="h-3.5 w-3.5 mr-2" /> Desativar
+                            </DropdownMenuItem>
+                          )}
+                          {status === 'inativo' && (
+                            <DropdownMenuItem onClick={() => handleReactivate(p)}>
+                              <UserCheck className="h-3.5 w-3.5 mr-2" /> Reativar
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem className="text-destructive" onClick={() => setDeleteConfirm(p)}>
+                            <UserX className="h-3.5 w-3.5 mr-2" /> Remover
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+
+                  {/* Non-master can see but not edit */}
+                  {!isMe && !canEdit && (
+                    <Button variant="outline" size="sm" className="h-8 text-xs gap-1 shrink-0" disabled>
+                      <Shield className="h-3.5 w-3.5" /> Editar
+                    </Button>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
-      {/* MODAL: Criar/Editar Usuário */}
-      <Dialog open={modalOpen} onOpenChange={(o) => !o && setModalOpen(false)}>
+      {/* Edit Modal */}
+      <Dialog open={editModalOpen} onOpenChange={o => !o && setEditModalOpen(false)}>
         <DialogContent
-          className="sm:max-w-2xl"
-          style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}
+          className="sm:max-w-lg"
+          style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
         >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
               <Shield className="h-4 w-4 text-primary" />
-              {editUser ? `Permissões — ${editUser.nome || editUser.email}` : 'Novo Usuário'}
+              Editar Usuário — {editUser?.nome || editUser?.email}
             </DialogTitle>
-            {editUser && (
-              <DialogDescription>
-                Role: <Badge className={`${ROLE_COLORS[form.role] || ''} border text-[10px] uppercase ml-1`}>{getRoleLabel(form.role)}</Badge>
-                <span className="ml-2">· Defina o acesso a cada módulo do sistema.</span>
-              </DialogDescription>
-            )}
           </DialogHeader>
 
           <div className="space-y-4 flex-1 min-h-0 overflow-y-auto pr-1">
-            {/* Form fields for new user */}
-            {!editUser && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs uppercase">Nome *</Label>
-                    <Input value={form.nome} onChange={(e) => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Nome completo" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs uppercase">E-mail *</Label>
-                    <Input type="email" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} placeholder="usuario@empresa.com" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs uppercase">Senha *</Label>
-                    <Input type="password" value={form.password} onChange={(e) => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Mínimo 6 caracteres" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs uppercase">Confirmar Senha *</Label>
-                    <Input type="password" value={form.confirmPassword} onChange={(e) => setForm(f => ({ ...f, confirmPassword: e.target.value }))} placeholder="Repetir senha" />
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Role selector */}
-            <div className="flex items-center gap-4">
-              <div className="space-y-1.5 flex-1">
-                <Label className="text-xs uppercase">Perfil Base *</Label>
-                <Select value={form.role} onValueChange={handleRoleChange}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ROLES.filter(r => editUser ? true : r.value !== 'master').map(r => (
-                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {editUser && (
-                <div className="flex items-center gap-2 pt-5">
-                  <Switch checked={editUser.ativo ?? true} onCheckedChange={(v) => setEditUser({ ...editUser, ativo: v })} />
-                  <Label className="text-xs uppercase">Ativo</Label>
-                </div>
-              )}
+            {/* Nome */}
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase">Nome</Label>
+              <Input value={editNome} onChange={e => setEditNome(e.target.value)} />
             </div>
 
-            {/* Preset buttons */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Aplicar preset:</span>
-              {ROLES.map(r => (
-                <Button key={r.value} variant="outline" size="sm" className="h-6 text-[10px] capitalize" onClick={() => applyPreset(r.value)}>
-                  {r.label}
-                </Button>
-              ))}
+            {/* Email (readonly) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs uppercase">Email</Label>
+              <Input value={editUser?.email || ''} disabled className="opacity-60" />
             </div>
 
-            {/* Permissions Grid — native scroll, no ScrollArea */}
-            <div
-              className="border rounded-lg border-border/40 overflow-y-auto"
-              style={{ maxHeight: '400px' }}
-            >
-              <div className="p-3 space-y-5">
-                {GRUPOS.map(grupo => {
-                  const modulosDoGrupo = MODULOS.filter(m => m.grupo === grupo);
-                  return (
-                    <div key={grupo}>
-                      <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 border-b border-border pb-1">
-                        {grupo}
-                      </h4>
-                      <div className="space-y-1">
-                        {modulosDoGrupo.map(modulo => (
-                          <div key={modulo.key} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-muted/30">
-                            <span className="text-sm font-medium flex-1 min-w-[160px]">{modulo.label}</span>
-                            <div className="flex gap-4">
-                              {PERM_LABELS.map((acao, idx) => (
-                                <label key={acao} className="flex flex-col items-center gap-1 cursor-pointer">
-                                  <span className="text-[10px] text-muted-foreground">{acao}</span>
-                                  <Checkbox
-                                    checked={editPerms[modulo.key]?.[idx] ?? false}
-                                    onCheckedChange={(checked) => togglePerm(modulo.key, idx, !!checked)}
-                                  />
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+            {/* Role selector - radio buttons */}
+            <div className="space-y-2">
+              <Label className="text-xs uppercase">Perfil</Label>
+              <div className="space-y-1">
+                {ROLES.map(r => (
+                  <label
+                    key={r.value}
+                    className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer border transition-colors ${
+                      editRole === r.value
+                        ? 'border-primary/50 bg-primary/5'
+                        : 'border-transparent hover:bg-muted/30'
+                    }`}
+                    onClick={() => handleRoleChange(r.value)}
+                  >
+                    <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      editRole === r.value ? 'border-primary' : 'border-muted-foreground/40'
+                    }`}>
+                      {editRole === r.value && <div className="h-2 w-2 rounded-full bg-primary" />}
                     </div>
-                  );
-                })}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full ${r.corDot}`} />
+                        <span className="text-sm font-medium">{r.label}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">{r.descricao}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Ao trocar o perfil, os módulos são atualizados automaticamente.
+              </p>
+            </div>
+
+            {/* Module checkboxes with fine-grained permissions */}
+            <div className="space-y-2">
+              <Label className="text-xs uppercase">Módulos (ajuste fino)</Label>
+              <div
+                className="border rounded-lg border-border/40 overflow-y-auto"
+                style={{ maxHeight: '300px' }}
+              >
+                <div className="p-3 space-y-4">
+                  {GRUPOS_MODULOS.map(grupo => {
+                    const modulosDoGrupo = MODULOS_DISPONIVEIS.filter(m => m.grupo === grupo);
+                    return (
+                      <div key={grupo}>
+                        <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 border-b border-border pb-1">
+                          {grupo}
+                        </h4>
+                        <div className="space-y-0.5">
+                          {modulosDoGrupo.map(modulo => (
+                            <div key={modulo.value} className="flex items-center gap-3 py-1.5 px-2 rounded hover:bg-muted/30">
+                              <Checkbox
+                                checked={editModulos.has(modulo.value)}
+                                onCheckedChange={(checked) => toggleModulo(modulo.value, !!checked)}
+                              />
+                              <span className="text-sm flex-1 min-w-0">{modulo.label}</span>
+                              {editModulos.has(modulo.value) && (
+                                <div className="flex gap-2">
+                                  {PERM_LABELS.slice(1).map((acao, idx) => (
+                                    <label key={acao} className="flex flex-col items-center gap-0.5 cursor-pointer">
+                                      <span className="text-[8px] text-muted-foreground">{acao}</span>
+                                      <Checkbox
+                                        className="h-3.5 w-3.5"
+                                        checked={editPerms[modulo.value]?.[idx + 1] ?? false}
+                                        onCheckedChange={(checked) => togglePerm(modulo.value, idx + 1, !!checked)}
+                                      />
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setEditModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              {editUser ? 'Salvar Permissões' : 'Salvar Usuário'}
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* DIALOG: Confirmar exclusão */}
-      <AlertDialog open={!!deleteConfirm} onOpenChange={(o) => !o && setDeleteConfirm(null)}>
+      {/* Deactivation Dialog */}
+      <Dialog open={!!deactivateUser} onOpenChange={o => !o && setDeactivateUser(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Desativar {deactivateUser?.nome || deactivateUser?.email}?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              O usuário não conseguirá mais acessar o sistema. Você pode reativá-lo depois.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Motivo (opcional)</Label>
+              <Textarea
+                value={deactivateMotivo}
+                onChange={e => setDeactivateMotivo(e.target.value)}
+                placeholder="Ex: Saiu da empresa"
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeactivateUser(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleDeactivate}>Desativar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={o => !o && setDeleteConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+            <AlertDialogTitle>Remover usuário?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir <strong>{deleteConfirm?.nome || deleteConfirm?.email}</strong>?
-              Esta ação remove o perfil e todas as permissões. O usuário não poderá mais acessar o sistema.
+              Tem certeza? <strong>{deleteConfirm?.nome || deleteConfirm?.email}</strong> será desativado permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={handleDeleteUser}
+              onClick={handleDelete}
             >
-              Excluir
+              Remover
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

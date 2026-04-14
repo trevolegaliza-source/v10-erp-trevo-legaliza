@@ -22,12 +22,14 @@ interface UsePermissionsReturn {
   podeAprovar: (modulo: string) => boolean;
   podeVerValores: () => boolean;
   isMaster: () => boolean;
+  isGerente: () => boolean;
 }
 
 export function usePermissions(): UsePermissionsReturn {
   const { user } = useAuth();
   const [role, setRole] = useState<string | null>(null);
   const [perms, setPerms] = useState<PermissionsMap>({});
+  const [templateModulos, setTemplateModulos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,12 +56,24 @@ export function usePermissions(): UsePermissionsReturn {
           return;
         }
 
+        // Fetch role template defaults
+        const { data: template } = await supabase
+          .from('role_templates')
+          .select('modulos_padrao')
+          .eq('role', profile.role)
+          .single() as any;
+
+        if (template?.modulos_padrao) {
+          setTemplateModulos(template.modulos_padrao);
+        }
+
+        // Fetch user-specific permissions (override)
         const { data: permissions } = await supabase
           .from('user_permissions')
           .select('modulo, pode_ver, pode_criar, pode_editar, pode_excluir, pode_aprovar')
           .eq('user_id', user.id) as any;
 
-        if (permissions) {
+        if (permissions && permissions.length > 0) {
           const map: PermissionsMap = {};
           for (const p of permissions) {
             map[p.modulo] = {
@@ -72,6 +86,7 @@ export function usePermissions(): UsePermissionsReturn {
           }
           setPerms(map);
         }
+        // If no user_permissions exist, templateModulos will be used as fallback
       }
       setLoading(false);
     };
@@ -80,13 +95,54 @@ export function usePermissions(): UsePermissionsReturn {
   }, [user]);
 
   const isMaster = () => role === 'master';
+  const isGerente = () => role === 'gerente';
 
-  const podeVer = (modulo: string) => isMaster() || (perms[modulo]?.pode_ver ?? false);
-  const podeCriar = (modulo: string) => isMaster() || (perms[modulo]?.pode_criar ?? false);
-  const podeEditar = (modulo: string) => isMaster() || (perms[modulo]?.pode_editar ?? false);
-  const podeExcluir = (modulo: string) => isMaster() || (perms[modulo]?.pode_excluir ?? false);
-  const podeAprovar = (modulo: string) => isMaster() || (perms[modulo]?.pode_aprovar ?? false);
-  const podeVerValores = () => isMaster() || role === 'financeiro';
+  const podeVer = (modulo: string) => {
+    if (isMaster()) return true;
+    // If user has specific permissions, use those
+    if (Object.keys(perms).length > 0) {
+      return perms[modulo]?.pode_ver ?? false;
+    }
+    // Fallback to role template
+    return templateModulos.includes(modulo);
+  };
 
-  return { loading, role, podeVer, podeCriar, podeEditar, podeExcluir, podeAprovar, podeVerValores, isMaster };
+  const podeCriar = (modulo: string) => {
+    if (isMaster()) return true;
+    if (role === 'visualizador') return false;
+    if (Object.keys(perms).length > 0) {
+      return perms[modulo]?.pode_criar ?? false;
+    }
+    // Template-based: non-visualizador can create in their modules
+    return templateModulos.includes(modulo);
+  };
+
+  const podeEditar = (modulo: string) => {
+    if (isMaster()) return true;
+    if (role === 'visualizador') return false;
+    if (Object.keys(perms).length > 0) {
+      return perms[modulo]?.pode_editar ?? false;
+    }
+    return templateModulos.includes(modulo);
+  };
+
+  const podeExcluir = (modulo: string) => {
+    if (isMaster()) return true;
+    if (Object.keys(perms).length > 0) {
+      return perms[modulo]?.pode_excluir ?? false;
+    }
+    return false;
+  };
+
+  const podeAprovar = (modulo: string) => {
+    if (isMaster()) return true;
+    if (Object.keys(perms).length > 0) {
+      return perms[modulo]?.pode_aprovar ?? false;
+    }
+    return false;
+  };
+
+  const podeVerValores = () => isMaster() || role === 'financeiro' || role === 'gerente';
+
+  return { loading, role, podeVer, podeCriar, podeEditar, podeExcluir, podeAprovar, podeVerValores, isMaster, isGerente };
 }
