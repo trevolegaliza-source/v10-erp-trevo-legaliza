@@ -1421,7 +1421,7 @@ export type Database = {
           created_at?: string | null
           data_nascimento?: string | null
           email?: string | null
-          empresa_id?: string
+          empresa_id: string
           foto_url?: string | null
           id: string
           motivo_inativacao?: string | null
@@ -1704,6 +1704,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      atualizar_proposta_por_token: {
+        Args: { p_motivo?: string; p_status: string; p_token: string }
+        Returns: undefined
+      }
       calcular_preco_processo: {
         Args: {
           p_cliente_id: string
@@ -1712,11 +1716,79 @@ export type Database = {
         Returns: number
       }
       calcular_vencimento: { Args: { p_cliente_id: string }; Returns: string }
+      criar_evento_proposta: {
+        Args: { p_dados?: Json; p_orcamento_id: string; p_tipo: string }
+        Returns: undefined
+      }
       criar_notificacao_proposta: {
         Args: { p_mensagem: string; p_orcamento_id: string; p_tipo: string }
         Returns: undefined
       }
       get_empresa_id: { Args: never; Returns: string }
+      get_proposta_por_token: {
+        Args: { p_token: string }
+        Returns: {
+          aprovado_em: string | null
+          beneficios_capa: Json | null
+          cenario_selecionado: string | null
+          cenarios: Json | null
+          clicksign_document_key: string | null
+          cliente_id: string | null
+          contexto: string | null
+          contrato_assinado_url: string | null
+          convertido_em: string | null
+          created_at: string | null
+          created_by: string | null
+          desconto_pct: number | null
+          desconto_progressivo_ativo: boolean | null
+          desconto_progressivo_limite: number | null
+          desconto_progressivo_pct: number | null
+          destinatario: string | null
+          empresa_id: string | null
+          enviado_em: string | null
+          escopo: Json
+          etapas_fluxo: Json | null
+          headline_cenario: string | null
+          id: string
+          itens_selecionados: Json | null
+          naturezas: Json
+          numero: number
+          observacoes: string | null
+          observacoes_recusa: string | null
+          ordem_execucao: string | null
+          pacotes: Json | null
+          pagamento: string | null
+          pago_em: string | null
+          pdf_url: string | null
+          prazo_execucao: string | null
+          prazo_pagamento_dias: number | null
+          prospect_cnpj: string | null
+          prospect_contato: string | null
+          prospect_email: string | null
+          prospect_nome: string
+          prospect_telefone: string | null
+          qtd_processos: number | null
+          recusado_em: string | null
+          riscos: Json | null
+          secoes: Json | null
+          senha_link: string | null
+          servicos: Json
+          share_token: string | null
+          sla: string | null
+          status: string | null
+          tipo_contrato: string
+          updated_at: string | null
+          validade_dias: number | null
+          valor_base: number
+          valor_final: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "orcamentos"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_user_empresa_id: { Args: never; Returns: string }
       get_user_role: { Args: never; Returns: string }
     }
