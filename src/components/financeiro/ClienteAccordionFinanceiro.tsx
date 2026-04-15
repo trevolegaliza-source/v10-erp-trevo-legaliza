@@ -540,7 +540,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
           .eq('tipo', 'receber');
       }
 
-      invalidateFinanceiro(queryClient);
+      // invalidateFinanceiro moved to ModalPosExtrato close
 
       toast.success('Extrato gerado com sucesso!');
 
@@ -830,7 +830,11 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
     const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
     const msgEncoded = encodeURIComponent(msg);
-    window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const waUrl = isMobile
+      ? `https://wa.me/${tel}?text=${msgEncoded}`
+      : `https://web.whatsapp.com/send?phone=${tel}&text=${msgEncoded}`;
+    window.open(waUrl, '_blank');
     setTimeout(() => {
       const confirmar = window.confirm('Você conseguiu enviar a mensagem no WhatsApp?\n\nClique OK para marcar como enviado no sistema.');
       if (confirmar) handleMarcarEnviado();
@@ -1069,7 +1073,11 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
     const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
     const msgEncoded = encodeURIComponent(msg);
-    window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const waUrl = isMobile
+      ? `https://wa.me/${tel}?text=${msgEncoded}`
+      : `https://web.whatsapp.com/send?phone=${tel}&text=${msgEncoded}`;
+    window.open(waUrl, '_blank');
   }
 
   async function handleCompartilharAguardando() {
@@ -1324,6 +1332,13 @@ export function ModalPosExtrato({
   extratoGerado: ExtratoGeradoPayload; 
   onClose: () => void;
 }) {
+  const queryClient = useQueryClient();
+
+  function handleClose() {
+    invalidateFinanceiro(queryClient);
+    onClose();
+  }
+
   async function handleWhatsApp() {
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', extratoGerado.clienteId).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || extratoGerado.clienteTelefone || '').replace(/\D/g, '');
@@ -1335,15 +1350,19 @@ export function ModalPosExtrato({
     
     const nomeRemetente = await getNomeRemetente();
     
-    // Use EXACTLY the lancamentos from the extrato, not all pending
     const lancsForMsg = extratoGerado.lancamentos;
-    const processoIds = lancsForMsg.map(l => l.processo_id).filter(Boolean) as string[];
     const vaMap = await buildValoresAdicionaisMap(lancsForMsg);
     
     if (lancsForMsg.length === 0) { toast.warning('Nenhum lançamento encontrado.'); return; }
     
     const msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, diasAtraso: 0, nomeRemetente });
-    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank');
+    const msgEncoded = encodeURIComponent(msg);
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const waUrl = isMobile
+      ? `https://wa.me/${tel}?text=${msgEncoded}`
+      : `https://web.whatsapp.com/send?phone=${tel}&text=${msgEncoded}`;
+    window.open(waUrl, '_blank');
+    handleClose();
   }
 
   async function handleCompartilhar() {
@@ -1367,6 +1386,7 @@ export function ModalPosExtrato({
         URL.revokeObjectURL(url);
         toast.success('PDF baixado!');
       }
+      handleClose();
     } catch (err: any) {
       if (err.name !== 'AbortError') toast.error('Erro ao compartilhar: ' + err.message);
     }
@@ -1378,10 +1398,11 @@ export function ModalPosExtrato({
     a.href = url; a.download = extratoGerado.filename; a.click();
     URL.revokeObjectURL(url);
     toast.success('PDF baixado!');
+    handleClose();
   }
 
   return (
-    <Dialog open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open={true} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -1405,7 +1426,7 @@ export function ModalPosExtrato({
             <Button variant="outline" className="w-full gap-2 h-11" onClick={handleBaixar}>
               <Download className="h-4 w-4" /> Baixar PDF
             </Button>
-            <Button variant="ghost" className="w-full text-muted-foreground h-11" onClick={onClose}>
+            <Button variant="ghost" className="w-full text-muted-foreground h-11" onClick={handleClose}>
               Fazer depois
             </Button>
           </div>
