@@ -60,6 +60,7 @@ export type ExtratoGeradoPayload = {
   total: number;
   /** Lancamentos included in this extrato — used for WhatsApp message */
   lancamentos: LancamentoFinanceiro[];
+  cleanup?: () => void;
 };
 
 export type ExtratoRequestPayload = {
@@ -575,14 +576,14 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         clienteTelefone: (clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || cliente.cliente_telefone || '',
         total: result.totalGeral,
         lancamentos: selecionados,
+        cleanup: () => {
+          setSelected(new Set());
+          setGenerating(false);
+        },
       });
     } catch (err: any) {
+      setGenerating(false);
       toast.error('Erro ao gerar extrato: ' + (err?.message || 'Erro'));
-    } finally {
-      setTimeout(() => {
-        setSelected(new Set());
-        setGenerating(false);
-      }, 0);
     }
   }
 
@@ -1350,6 +1351,7 @@ export function ModalPosExtrato({
   const queryClient = useQueryClient();
 
   function handleClose() {
+    extratoGerado.cleanup?.();
     invalidateFinanceiro(queryClient);
     onClose();
   }
