@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,11 +42,19 @@ export type ExtratoGeradoPayload = {
   total: number;
 };
 
+export type ExtratoRequestPayload = {
+  requestKey: string;
+  clienteId: string;
+  clienteNome: string;
+  clienteTelefone: string;
+  lancamentos: LancamentoFinanceiro[];
+};
+
 function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-async function getNomeRemetente(): Promise<string> {
+export async function getNomeRemetente(): Promise<string> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -65,7 +73,55 @@ interface MsgBuilderParams {
   observacao?: string;
 }
 
-function buildMensagemFromLancamentos({ lancamentos, vaMap, diasAtraso, nomeRemetente, observacao }: MsgBuilderParams): string {
+function getTipoProcessoLabel(tipo: string) {
+  return TIPO_PROCESSO_LABELS[tipo as keyof typeof TIPO_PROCESSO_LABELS] || (tipo ? tipo.charAt(0).toUpperCase() + tipo.slice(1) : 'Processo');
+}
+
+function sanitizeFileNamePart(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .replace(/_+/g, '_')
+    .toUpperCase();
+}
+
+export function buildExtratoFilename(clienteNome: string, date = new Date()) {
+  const safeName = sanitizeFileNamePart(clienteNome) || 'CLIENTE';
+  return `extrato_${safeName}_${date.toISOString().split('T')[0]}.pdf`;
+}
+
+async function buildValoresAdicionaisMap(lancamentos: Array<Pick<LancamentoFinanceiro, 'processo_id'>>) {
+  const processoIds = [...new Set(lancamentos.map(l => l.processo_id).filter(Boolean))] as string[];
+  const vaMap: Record<string, number> = {};
+  if (processoIds.length === 0) return vaMap;
+
+  const { data: vas } = await supabase
+    .from('valores_adicionais')
+    .select('processo_id, valor')
+    .in('processo_id', processoIds);
+
+  if (vas) {
+    for (const va of vas) {
+      vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor;
+    }
+  }
+
+  return vaMap;
+}
+
+function getExtratoIdAtual(cliente: ClienteFinanceiro) {
+  return cliente.extrato_mais_recente?.id || cliente.lancamentos.find(l => l.extrato_id)?.extrato_id || null;
+}
+
+function getLancamentosDoExtrato(cliente: ClienteFinanceiro, extratoId?: string | null) {
+  if (!extratoId) return cliente.lancamentos;
+  const lancamentos = cliente.lancamentos.filter(l => l.extrato_id === extratoId);
+  return lancamentos.length > 0 ? lancamentos : cliente.lancamentos;
+}
+
+export function buildMensagemFromLancamentos({ lancamentos, vaMap, diasAtraso, nomeRemetente, observacao }: MsgBuilderParams): string {
   const l = lancamentos[0];
   if (!l) return '';
   const honorarios = l.valor;
@@ -75,7 +131,7 @@ function buildMensagemFromLancamentos({ lancamentos, vaMap, diasAtraso, nomeReme
     const h = item.valor;
     const t = item.processo_id ? (vaMap[item.processo_id] || 0) : 0;
     return {
-      tipo: item.processo_tipo,
+      tipo: getTipoProcessoLabel(item.processo_tipo),
       razao_social: item.processo_razao_social,
       valor: h + t,
       honorarios: h,
@@ -83,7 +139,7 @@ function buildMensagemFromLancamentos({ lancamentos, vaMap, diasAtraso, nomeReme
     };
   });
   return gerarMensagemCobranca({
-    tipo: l.processo_tipo,
+    tipo: getTipoProcessoLabel(l.processo_tipo),
     razao_social: l.processo_razao_social,
     valor: valorPrimeiro,
     honorarios,
@@ -187,14 +243,14 @@ function ClienteHeaderBadges({ cliente }: { cliente: ClienteFinanceiro }) {
 }
 
 // ══════════ TAB: FATURAR ══════════
-export function ClientesFaturar({ 
+function ClientesFaturarBase({ 
   clientes, 
   mensalistasSemFatura = [],
-  onExtratoGerado,
+  onPrepararExtrato,
 }: { 
   clientes: ClienteFinanceiro[]; 
   mensalistasSemFatura?: MensalistaSemFatura[];
-  onExtratoGerado: (payload: ExtratoGeradoPayload) => void;
+  onPrepararExtrato: (payload: ExtratoRequestPayload) => void;
 }) {
   const queryClient = useQueryClient();
   const [gerandoFatura, setGerandoFatura] = useState<string | null>(null);
@@ -306,7 +362,7 @@ export function ClientesFaturar({
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5">✅ Prontos para cobrar</h3>
           <Accordion type="multiple" className="space-y-2">
-            {prontos.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={false} onExtratoGerado={onExtratoGerado} />)}
+            {prontos.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={false} onPrepararExtrato={onPrepararExtrato} />)}
           </Accordion>
         </div>
       )}
@@ -314,7 +370,7 @@ export function ClientesFaturar({
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">⏳ Aguardando deferimento — não cobrar ainda</h3>
           <Accordion type="multiple" className="space-y-2">
-            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} onExtratoGerado={onExtratoGerado} />)}
+            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} onPrepararExtrato={onPrepararExtrato} />)}
           </Accordion>
         </div>
       )}
@@ -322,10 +378,13 @@ export function ClientesFaturar({
   );
 }
 
+export const ClientesFaturar = memo(ClientesFaturarBase);
+ClientesFaturar.displayName = 'ClientesFaturar';
+
 function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: { 
   cliente: ClienteFinanceiro; 
   isDeferimento?: boolean;
-  onExtratoGerado: (payload: ExtratoGeradoPayload) => void;
+  onPrepararExtrato: (payload: ExtratoRequestPayload) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
@@ -339,8 +398,6 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
     tipo: string;
     data_deferimento_atual: string | null;
   }>>([]);
-  const { salvarExtrato } = useExtratos();
-  const qc = useQueryClient();
 
   const lancSemExtrato = cliente.lancamentos.filter(l => l.status !== 'pago' && l.etapa_financeiro !== 'honorario_pago');
   const totalSelecionado = lancSemExtrato.filter(l => selected.has(l.id)).reduce((s, l) => s + l.valor, 0);
@@ -354,13 +411,8 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
     const selecionados = lancSemExtrato.filter(l => selected.has(l.id));
     if (selecionados.length === 0) { toast.warning('Selecione ao menos um processo.'); return; }
 
-    const { data: clienteCheck } = await supabase
-      .from('clientes')
-      .select('momento_faturamento, nome')
-      .eq('id', cliente.cliente_id)
-      .single();
-
-    if (clienteCheck?.momento_faturamento === 'no_deferimento') {
+    if (cliente.cliente_momento_faturamento === 'no_deferimento') {
+      setGenerating(true);
       const processoIds = selecionados.map(l => l.processo_id).filter(Boolean);
       const { data: processosData } = await supabase
         .from('processos')
@@ -374,10 +426,11 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         data_deferimento_atual: p.data_deferimento || null,
       })));
       setDeferimentoOpen(true);
+      setGenerating(false);
       return;
     }
 
-    await executarGeracaoExtrato(selecionados);
+    executarGeracaoExtrato(selecionados);
   }
 
   async function handleDeferimentoConfirm(processoIdsDeferidos: string[]) {
@@ -389,94 +442,20 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
       toast.warning('Nenhum processo deferido selecionado.');
       return;
     }
-    await executarGeracaoExtrato(selecionadosDeferidos);
+    executarGeracaoExtrato(selecionadosDeferidos);
   }
 
-  async function executarGeracaoExtrato(selecionados: typeof lancSemExtrato) {
+  function executarGeracaoExtrato(selecionados: typeof lancSemExtrato) {
     setGenerating(true);
-    try {
-      const { data: clienteData } = await supabase
-        .from('clientes')
-        .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador, dia_cobranca, dia_vencimento_mensal')
-        .eq('id', cliente.cliente_id)
-        .single();
-
-      const processoIds = selecionados.map(l => l.processo_id).filter(Boolean);
-      const { data: processosData } = await supabase
-        .from('processos')
-        .select('*, cliente:clientes(*)')
-        .in('id', processoIds);
-
-      const { data: lancamentosData } = await supabase
-        .from('lancamentos')
-        .select('*, cliente:clientes(*)')
-        .eq('tipo', 'receber')
-        .in('processo_id', processoIds);
-
-      const lancMap = new Map<string, any>();
-      (lancamentosData || []).forEach((l: any) => { if (!lancMap.has(l.processo_id)) lancMap.set(l.processo_id, l); });
-
-      const processosFinanceiro: ProcessoFinanceiro[] = (processosData || []).map((p: any) => ({
-        ...p,
-        lancamento: lancMap.get(p.id) || null,
-        etapa_financeiro: lancMap.get(p.id)?.etapa_financeiro || 'solicitacao_criada',
-      }));
-
-      const [valoresAdicionais, allCompetencia] = await Promise.all([
-        fetchValoresAdicionaisMulti(processoIds),
-        fetchCompetenciaProcessos(cliente.cliente_id),
-      ]);
-
-      const allCompetenciaFinanceiro: ProcessoFinanceiro[] = (allCompetencia as any[]).map((p: any) => ({
-        ...p,
-        lancamento: lancMap.get(p.id) || null,
-        etapa_financeiro: lancMap.get(p.id)?.etapa_financeiro || 'solicitacao_criada',
-      }));
-
-      const result = await gerarExtratoPDF({
-        processos: processosFinanceiro,
-        allCompetencia: allCompetenciaFinanceiro,
-        valoresAdicionais,
-        cliente: clienteData as any,
-      });
-
-      const blob = result.doc.output('blob');
-      const clienteName = clienteData?.apelido || clienteData?.nome || 'extrato';
-      const filename = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-
-      // Save to storage (no auto-download)
-      const now = new Date();
-      await salvarExtrato.mutateAsync({
-        clienteId: cliente.cliente_id,
-        pdfBlob: blob,
-        filename,
-        totalHonorarios: result.totalHonorarios,
-        totalTaxas: result.totalTaxas,
-        totalGeral: result.totalGeral,
-        processoIds,
-        competenciaMes: now.getMonth() + 1,
-        competenciaAno: now.getFullYear(),
-      });
-
-      setSelected(new Set());
-
-      // Call parent callback BEFORE invalidating — modal lives in parent, survives re-render
-      onExtratoGerado({
-        blob,
-        filename,
-        clienteId: cliente.cliente_id,
-        clienteNome: cliente.cliente_apelido || cliente.cliente_nome,
-        clienteTelefone: (cliente as any).cliente_telefone_financeiro || cliente.cliente_telefone || '',
-        total: result.totalGeral,
-      });
-
-      // Invalidate AFTER — can re-render FaturarItem freely
-      invalidateFinanceiro(qc);
-    } catch (err: any) {
-      toast.error('Erro ao gerar extrato: ' + err.message);
-    } finally {
-      setGenerating(false);
-    }
+    onPrepararExtrato({
+      requestKey: `${cliente.cliente_id}-${Date.now()}-${selecionados.map(l => l.id).join('-')}`,
+      clienteId: cliente.cliente_id,
+      clienteNome: cliente.cliente_apelido || cliente.cliente_nome,
+      clienteTelefone: (cliente as any).cliente_telefone_financeiro || cliente.cliente_telefone || '',
+      lancamentos: [...selecionados],
+    });
+    setSelected(new Set());
+    setGenerating(false);
   }
 
   const nenhumDeferido = isDeferimento && cliente.lancamentos.every(l => {
@@ -593,15 +572,11 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const hasExtratoNoSistema = cliente.lancamentos.some(l => l.extrato_id);
 
   async function handleCopiarMensagem() {
-    const lancamentosComProcesso = cliente.lancamentos.filter(l => l.processo_id);
-    const processoIds = [...new Set(lancamentosComProcesso.map(l => l.processo_id).filter(Boolean))] as string[];
-    const vaMap: Record<string, number> = {};
-    if (processoIds.length > 0) {
-      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
-    }
+    const extratoId = getExtratoIdAtual(cliente);
+    const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoId).filter(l => l.processo_id);
+    const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: cliente.lancamentos, vaMap, diasAtraso: 0, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, diasAtraso: 0, nomeRemetente });
     await navigator.clipboard.writeText(msg);
     toast.success('✅ Mensagem copiada! Cole no WhatsApp.');
   }
@@ -641,13 +616,15 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   async function handleRegerarExtrato() {
     setRegenerating(true);
     try {
+      const extratoId = getExtratoIdAtual(cliente);
+      const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoId);
       const { data: clienteData } = await supabase
         .from('clientes')
         .select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, email, nome_contador, dia_cobranca, dia_vencimento_mensal')
         .eq('id', cliente.cliente_id)
         .single();
 
-      const processoIds = cliente.lancamentos.map(l => l.processo_id).filter(Boolean);
+      const processoIds = lancamentosExtrato.map(l => l.processo_id).filter(Boolean);
       const { data: processosData } = await supabase
         .from('processos')
         .select('*, cliente:clientes(*)')
@@ -687,8 +664,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       });
 
       const blob = result.doc.output('blob');
-      const clienteName = clienteData?.apelido || clienteData?.nome || 'extrato';
-      const filename = `extrato_${clienteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      const filename = buildExtratoFilename(clienteData?.apelido || clienteData?.nome || cliente.cliente_nome);
 
       // Download
       const url = URL.createObjectURL(blob);
@@ -722,7 +698,8 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   }
 
   async function handleMarcarEnviado() {
-    const ids = cliente.lancamentos.filter(l =>
+    const extratoId = getExtratoIdAtual(cliente);
+    const ids = getLancamentosDoExtrato(cliente, extratoId).filter(l =>
       l.etapa_financeiro === 'cobranca_gerada' ||
       (l.etapa_financeiro === 'solicitacao_criada' && l.extrato_id)
     ).map(l => l.id);
@@ -737,15 +714,11 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   }
 
   async function handleEnviarWhatsApp() {
-    const lancamentosComProcesso = cliente.lancamentos.filter(l => l.processo_id);
-    const processoIds = [...new Set(lancamentosComProcesso.map(l => l.processo_id).filter(Boolean))] as string[];
-    const vaMap: Record<string, number> = {};
-    if (processoIds.length > 0) {
-      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
-    }
+    const extratoId = getExtratoIdAtual(cliente);
+    const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoId).filter(l => l.processo_id);
+    const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: cliente.lancamentos, vaMap, diasAtraso: 0, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, diasAtraso: 0, nomeRemetente });
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
@@ -772,14 +745,11 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       const { data: fileData } = await supabase.storage.from('documentos').download(path);
       if (!fileData) { toast.error('Erro ao carregar extrato.'); return; }
       const file = new File([fileData], (extrato as any).filename, { type: 'application/pdf' });
-      const processoIds = [...new Set(cliente.lancamentos.map(it => it.processo_id).filter(Boolean))] as string[];
-      const vaMap: Record<string, number> = {};
-      if (processoIds.length > 0) {
-        const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-        if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
-      }
+      const extratoIdAtual = getExtratoIdAtual(cliente);
+      const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoIdAtual).filter(l => l.processo_id);
+      const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
       const nomeRemetente = await getNomeRemetente();
-      const msg = buildMensagemFromLancamentos({ lancamentos: cliente.lancamentos, vaMap, diasAtraso: 0, nomeRemetente });
+      const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, diasAtraso: 0, nomeRemetente });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
       } else {
