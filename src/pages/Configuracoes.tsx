@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Users, Webhook, UserCog, Loader2, CheckCircle2, Palette, BookOpen } from 'lucide-react';
+import { Shield, Users, Webhook, UserCog, Loader2, CheckCircle2, Palette, BookOpen, Lock } from 'lucide-react';
 import PlanoContasTab from '@/components/configuracoes/PlanoContasTab';
 import GestaoUsuarios from '@/components/configuracoes/GestaoUsuarios';
+import { MfaEnroll } from '@/components/auth/MfaEnroll';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -17,6 +18,17 @@ export default function Configuracoes() {
   const [webhookNovo, setWebhookNovo] = useState('');
   const [webhookQsa, setWebhookQsa] = useState('');
   const [savingWebhooks, setSavingWebhooks] = useState(false);
+  const [mfaOpen, setMfaOpen] = useState(false);
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+
+  useEffect(() => {
+    const checkMfa = async () => {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const verified = factors?.totp?.find((f: any) => f.status === 'verified');
+      setMfaEnabled(!!verified);
+    };
+    checkMfa();
+  }, []);
 
   useEffect(() => {
     const loadWebhooks = async () => {
