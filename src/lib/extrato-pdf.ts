@@ -14,6 +14,8 @@ const BRAND = {
 };
 
 const LOGO_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png';
+const PDF_SCOPE_CLASS = 'extrato-pdf-scope';
+const PDF_SCOPE_SELECTOR = `.${PDF_SCOPE_CLASS}`;
 
 function fmt(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -54,6 +56,22 @@ function truncateText(value: string | null | undefined, max = 50) {
   return safe.length > max ? `${safe.slice(0, max - 1)}…` : safe;
 }
 
+function scopePdfStyles(css: string) {
+  return css.replace(/([^{}]+)\{([^{}]*)\}/g, (_, selectorGroup: string, declarations: string) => {
+    const scopedSelectors = selectorGroup
+      .split(',')
+      .map((selector) => {
+        const trimmed = selector.trim();
+        if (!trimmed) return trimmed;
+        if (trimmed === ':root' || trimmed === 'html' || trimmed === 'body') return PDF_SCOPE_SELECTOR;
+        return `${PDF_SCOPE_SELECTOR} ${trimmed}`;
+      })
+      .join(', ');
+
+    return `${scopedSelectors} {${declarations}}`;
+  });
+}
+
 export interface ExtratoData {
   processos: ProcessoFinanceiro[];
   allCompetencia: ProcessoFinanceiro[];
@@ -90,7 +108,9 @@ interface StepInfo {
   mes: string;
 }
 
-const GLOBAL_STYLES = `
+const PDF_FONT_IMPORT = `@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');`;
+
+const PDF_BASE_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
   :root {
     --trevo: 142 71% 45%;
@@ -205,6 +225,8 @@ const GLOBAL_STYLES = `
   .footer-contact strong { color: hsl(var(--ink)); }
   .page-footer { position: absolute; left: 34px; right: 34px; bottom: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: hsl(var(--muted)); }
 `;
+
+const GLOBAL_STYLES = `${PDF_FONT_IMPORT}\n${scopePdfStyles(PDF_BASE_STYLES.replace(PDF_FONT_IMPORT, '').trim())}`;
 
 function buildEscadinha(data: ExtratoData): StepInfo[] {
   const base = data.cliente.valor_base ?? 580;
@@ -782,28 +804,32 @@ async function renderPageToCanvas(html: string, styles: string) {
   const container = document.createElement('div');
   // Use fixed + visibility:hidden + contain:strict to avoid visible reflow/repaint
   container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;visibility:hidden;pointer-events:none;contain:strict;z-index:-1;';
-  container.innerHTML = `<style>${styles}</style>${html}`;
+  container.innerHTML = `<style>${styles}</style><div class="${PDF_SCOPE_CLASS}">${html}</div>`;
   document.body.appendChild(container);
 
-  await document.fonts.ready;
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  try {
+    await document.fonts.ready;
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
-  const pageEl = container.querySelector('.page') as HTMLElement;
-  // Make page visible inside the off-screen container for html2canvas to capture
-  pageEl.style.visibility = 'visible';
-  const canvas = await html2canvas(pageEl, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    backgroundColor: '#ffffff',
-    allowTaint: true,
-    scrollX: 0,
-    scrollY: 0,
-    windowWidth: 794,
-  });
+    const pageEl = container.querySelector(`.${PDF_SCOPE_CLASS} .page`) as HTMLElement | null;
+    if (!pageEl) throw new Error('Falha ao montar página do extrato');
 
-  document.body.removeChild(container);
-  return canvas;
+    // Make page visible inside the off-screen container for html2canvas to capture
+    pageEl.style.visibility = 'visible';
+
+    return await html2canvas(pageEl, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      allowTaint: true,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: 794,
+    });
+  } finally {
+    document.body.removeChild(container);
+  }
 }
 
 let cachedLogoData: string | null = null;
@@ -854,20 +880,7 @@ function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
   doc.addImage(imgData, 'JPEG', offsetX, 0, imgWidth, imgHeight);
 }
 
-let fontLinkInjected = false;
-
 export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult> {
-  // Only inject the font link once
-  if (!fontLinkInjected) {
-    const fontLink = document.createElement('link');
-    fontLink.rel = 'stylesheet';
-    fontLink.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap';
-    document.head.appendChild(fontLink);
-    fontLinkInjected = true;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  await document.fonts.ready;
-
   const logoDataUrl = await preloadLogo();
   const steps = buildEscadinha(data);
   const selected = steps.filter((step) => step.isSelected);
