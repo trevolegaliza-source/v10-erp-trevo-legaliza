@@ -77,6 +77,7 @@ export default function Configuracoes() {
         <TabsList>
           <TabsTrigger value="aparencia" className="gap-1.5"><Palette className="h-3.5 w-3.5" />Aparência</TabsTrigger>
           {isMaster() && <TabsTrigger value="rbac" className="gap-1.5"><Shield className="h-3.5 w-3.5" />Usuários</TabsTrigger>}
+          <TabsTrigger value="seguranca" className="gap-1.5"><Lock className="h-3.5 w-3.5" />Segurança</TabsTrigger>
           <TabsTrigger value="webhooks" className="gap-1.5"><Webhook className="h-3.5 w-3.5" />Webhooks</TabsTrigger>
           <TabsTrigger value="plano_contas" className="gap-1.5"><BookOpen className="h-3.5 w-3.5" />Plano de Contas</TabsTrigger>
         </TabsList>
@@ -104,6 +105,40 @@ export default function Configuracoes() {
 
         <TabsContent value="rbac">
           <GestaoUsuarios />
+        </TabsContent>
+
+        <TabsContent value="seguranca">
+          <Card className="border-border/60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base"><Lock className="h-4 w-4 text-primary" />Autenticação em Dois Fatores (2FA)</CardTitle>
+              <CardDescription>Proteja sua conta com uma camada extra de segurança usando um app autenticador.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/30 border border-border/40">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Shield className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Status do 2FA</p>
+                  <p className="text-xs text-muted-foreground">
+                    {mfaEnabled ? 'Autenticação em dois fatores está ativa.' : 'Ainda não configurado.'}
+                  </p>
+                </div>
+                <Badge className={mfaEnabled ? 'bg-emerald-500/15 text-emerald-500 border-0' : 'bg-warning/15 text-warning border-0'}>
+                  {mfaEnabled ? 'Ativo' : 'Desativado'}
+                </Badge>
+              </div>
+              {!mfaEnabled && (
+                <Button size="sm" onClick={() => setMfaOpen(true)} className="gap-1.5">
+                  <Shield className="h-3.5 w-3.5" /> Configurar 2FA
+                </Button>
+              )}
+              {isMaster() && !mfaEnabled && (
+                <p className="text-xs text-destructive">⚠️ Obrigatório para usuários Master. Configure agora.</p>
+              )}
+            </CardContent>
+          </Card>
+          <MfaEnroll open={mfaOpen} onOpenChange={setMfaOpen} onSuccess={() => setMfaEnabled(true)} />
         </TabsContent>
 
         <TabsContent value="webhooks">
