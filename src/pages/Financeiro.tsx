@@ -20,7 +20,7 @@ import {
   ClientesRecebidos,
   ModalPosExtrato,
 } from '@/components/financeiro/ClienteAccordionFinanceiro';
-import type { ExtratoGeradoPayload } from '@/components/financeiro/ClienteAccordionFinanceiro';
+import type { ExtratoGeradoPayload, ExtratoRequestPayload } from '@/components/financeiro/ClienteAccordionFinanceiro';
 import { ClientesAuditoria } from '@/components/financeiro/ClientesAuditoria';
 import { formatBRL } from '@/lib/pricing-engine';
 import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';

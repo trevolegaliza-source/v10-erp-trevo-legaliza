@@ -381,7 +381,7 @@ function ClientesFaturarBase({
 export const ClientesFaturar = memo(ClientesFaturarBase);
 ClientesFaturar.displayName = 'ClientesFaturar';
 
-function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: { 
+function FaturarItem({ cliente, isDeferimento = false, onPrepararExtrato }: { 
   cliente: ClienteFinanceiro; 
   isDeferimento?: boolean;
   onPrepararExtrato: (payload: ExtratoRequestPayload) => void;
