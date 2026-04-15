@@ -500,8 +500,6 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
       const filename = buildExtratoFilename(clienteNome);
 
       // Save extrato to DB
-      const { salvarExtrato } = useExtratos();
-      // Actually we can't call hooks here - use supabase directly
       const path = `extratos/${clienteId}/${filename}`;
       await supabase.storage.from('documentos').upload(path, pdfBlob, { contentType: 'application/pdf', upsert: true });
       const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path);
@@ -539,7 +537,6 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
           .eq('tipo', 'receber');
       }
 
-      const queryClient = useQueryClient();
       invalidateFinanceiro(queryClient);
 
       toast.success('Extrato gerado com sucesso!');
