@@ -34,15 +34,20 @@ import { downloadExtrato } from '@/lib/storage-utils';
 
 // ══════════ WHATSAPP HELPER ══════════
 function openWhatsApp(phone: string, message: string) {
-  const encoded = encodeURIComponent(message);
-  const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encoded}`;
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener noreferrer';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  navigator.clipboard.writeText(message).then(() => {
+    toast.success('✅ Mensagem copiada! Cole no WhatsApp.', {
+      duration: 5000,
+      action: {
+        label: 'Abrir WhatsApp',
+        onClick: () => {
+          window.open(`https://wa.me/${phone}`, '_blank');
+        },
+      },
+    });
+  }).catch(() => {
+    // Fallback: try opening directly
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+  });
 }
 
 // ══════════ EXPORTED TYPE ══════════
@@ -463,6 +468,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
 
   async function executarGeracaoExtrato(selecionados: typeof lancSemExtrato) {
     setGenerating(true);
+    queryClient.cancelQueries({ queryKey: ['financeiro_clientes'] });
     try {
       const processoIds = selecionados.map(l => l.processo_id).filter(Boolean) as string[];
       const clienteId = cliente.cliente_id;
@@ -569,8 +575,10 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
     } catch (err: any) {
       toast.error('Erro ao gerar extrato: ' + (err?.message || 'Erro'));
     } finally {
-      setSelected(new Set());
-      setGenerating(false);
+      setTimeout(() => {
+        setSelected(new Set());
+        setGenerating(false);
+      }, 0);
     }
   }
 
