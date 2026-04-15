@@ -55,8 +55,8 @@ export default function PropostaPublica() {
     (async () => {
       try {
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/orcamentos?share_token=eq.${token}&select=*`,
-          { headers: anonHeaders }
+          `${SUPABASE_URL}/rest/v1/rpc/get_proposta_por_token`,
+          { method: 'POST', headers: anonHeaders, body: JSON.stringify({ p_token: token }) }
         );
         if (!response.ok) { setError('Erro ao carregar proposta.'); setLoading(false); return; }
 
@@ -95,11 +95,11 @@ export default function PropostaPublica() {
         setItens(rawItens);
         setOrc(orcData);
 
-        // Log view event (fire-and-forget)
-        fetch(`${SUPABASE_URL}/rest/v1/proposta_eventos`, {
+        // Log view event via RPC (fire-and-forget)
+        fetch(`${SUPABASE_URL}/rest/v1/rpc/criar_evento_proposta`, {
           method: 'POST',
           headers: anonHeaders,
-          body: JSON.stringify({ orcamento_id: orcData.id, tipo: 'visualizou', dados: { token } }),
+          body: JSON.stringify({ p_orcamento_id: orcData.id, p_tipo: 'visualizou', p_dados: { token } }),
         }).catch(() => {});
 
         setLoading(false);
@@ -137,10 +137,10 @@ export default function PropostaPublica() {
   async function handleAprovar() {
     setProcessando(true);
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/orcamentos?id=eq.${orc.id}`, {
-        method: 'PATCH',
-        headers: { ...anonHeaders, 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ status: 'aguardando_pagamento', aprovado_em: new Date().toISOString() }),
+      await fetch(`${SUPABASE_URL}/rest/v1/rpc/atualizar_proposta_por_token`, {
+        method: 'POST',
+        headers: anonHeaders,
+        body: JSON.stringify({ p_token: token, p_status: 'aprovado' }),
       });
 
       await fetch(`${SUPABASE_URL}/rest/v1/rpc/criar_notificacao_proposta`, {
@@ -153,10 +153,10 @@ export default function PropostaPublica() {
         }),
       });
 
-      fetch(`${SUPABASE_URL}/rest/v1/proposta_eventos`, {
+      fetch(`${SUPABASE_URL}/rest/v1/rpc/criar_evento_proposta`, {
         method: 'POST',
         headers: anonHeaders,
-        body: JSON.stringify({ orcamento_id: orc.id, tipo: 'aprovou', dados: { total, itens_count: itens.length } }),
+        body: JSON.stringify({ p_orcamento_id: orc.id, p_tipo: 'aprovou', p_dados: { total, itens_count: itens.length } }),
       }).catch(() => {});
 
       setStatusFinal('aprovado');
@@ -172,10 +172,10 @@ export default function PropostaPublica() {
     if (!motivoRecusa.trim()) return;
     setProcessando(true);
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/orcamentos?id=eq.${orc.id}`, {
-        method: 'PATCH',
-        headers: { ...anonHeaders, 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ status: 'recusado', recusado_em: new Date().toISOString(), observacoes_recusa: motivoRecusa }),
+      await fetch(`${SUPABASE_URL}/rest/v1/rpc/atualizar_proposta_por_token`, {
+        method: 'POST',
+        headers: anonHeaders,
+        body: JSON.stringify({ p_token: token, p_status: 'recusado', p_motivo: motivoRecusa }),
       });
 
       await fetch(`${SUPABASE_URL}/rest/v1/rpc/criar_notificacao_proposta`, {
@@ -188,10 +188,10 @@ export default function PropostaPublica() {
         }),
       });
 
-      fetch(`${SUPABASE_URL}/rest/v1/proposta_eventos`, {
+      fetch(`${SUPABASE_URL}/rest/v1/rpc/criar_evento_proposta`, {
         method: 'POST',
         headers: anonHeaders,
-        body: JSON.stringify({ orcamento_id: orc.id, tipo: 'recusou', dados: { motivo: motivoRecusa } }),
+        body: JSON.stringify({ p_orcamento_id: orc.id, p_tipo: 'recusou', p_dados: { motivo: motivoRecusa } }),
       }).catch(() => {});
 
       setStatusFinal('recusado');
