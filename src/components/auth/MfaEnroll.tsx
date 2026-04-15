@@ -17,6 +17,7 @@ interface MfaEnrollProps {
 export function MfaEnroll({ open, onOpenChange, onSuccess, forceSetup }: MfaEnrollProps) {
   const [step, setStep] = useState<'qr' | 'verify' | 'done'>('qr');
   const [qrUri, setQrUri] = useState('');
+  const [totpSecret, setTotpSecret] = useState('');
   const [factorId, setFactorId] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -47,6 +48,7 @@ export function MfaEnroll({ open, onOpenChange, onSuccess, forceSetup }: MfaEnro
       if (error) throw error;
       if (data?.totp?.qr_code) {
         setQrUri(data.totp.qr_code);
+        setTotpSecret(data.totp.secret || '');
         setFactorId(data.id);
         setStep('qr');
       }
@@ -89,6 +91,7 @@ export function MfaEnroll({ open, onOpenChange, onSuccess, forceSetup }: MfaEnro
       setStep('qr');
       setCode('');
       setQrUri('');
+      setTotpSecret('');
     }
     onOpenChange(o);
   };
@@ -123,6 +126,31 @@ export function MfaEnroll({ open, onOpenChange, onSuccess, forceSetup }: MfaEnro
             <div className="flex justify-center p-4 bg-white rounded-lg">
               <img src={qrUri} alt="QR Code 2FA" className="w-48 h-48" />
             </div>
+            {totpSecret && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Ou copie o código manualmente:</Label>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={totpSecret}
+                    className="font-mono text-sm tracking-[2px] text-foreground"
+                    style={{ fontSize: '14px', letterSpacing: '2px' }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1"
+                    onClick={() => {
+                      navigator.clipboard.writeText(totpSecret);
+                      toast.success('Código copiado!');
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" /> Copiar
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label className="text-xs">Código de verificação</Label>
               <Input
