@@ -1400,9 +1400,12 @@ export type Database = {
           ativo: boolean | null
           convidado_em: string | null
           convidado_por: string | null
+          cpf: string | null
           created_at: string | null
+          data_nascimento: string | null
           email: string | null
           empresa_id: string
+          foto_url: string | null
           id: string
           motivo_inativacao: string | null
           nome: string | null
@@ -1414,9 +1417,12 @@ export type Database = {
           ativo?: boolean | null
           convidado_em?: string | null
           convidado_por?: string | null
+          cpf?: string | null
           created_at?: string | null
+          data_nascimento?: string | null
           email?: string | null
           empresa_id?: string
+          foto_url?: string | null
           id: string
           motivo_inativacao?: string | null
           nome?: string | null
@@ -1428,9 +1434,12 @@ export type Database = {
           ativo?: boolean | null
           convidado_em?: string | null
           convidado_por?: string | null
+          cpf?: string | null
           created_at?: string | null
+          data_nascimento?: string | null
           email?: string | null
           empresa_id?: string
+          foto_url?: string | null
           id?: string
           motivo_inativacao?: string | null
           nome?: string | null

@@ -1,6 +1,8 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Session, User } from '@supabase/supabase-js';
+
+const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 interface AuthContextType {
   session: Session | null;
@@ -21,13 +23,36 @@ export const useAuth = () => useContext(AuthContext);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastActivityRef = useRef(Date.now());
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
+  }, []);
+
+  // Track user activity for session timeout
+  useEffect(() => {
+    const updateActivity = () => { lastActivityRef.current = Date.now(); };
+    const events = ['click', 'keydown', 'scroll', 'touchstart', 'mousemove'];
+    events.forEach(e => window.addEventListener(e, updateActivity, { passive: true }));
+
+    const interval = setInterval(() => {
+      if (session && (Date.now() - lastActivityRef.current) > SESSION_TIMEOUT_MS) {
+        signOut();
+        // Toast will show after redirect
+      }
+    }, 60_000);
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, updateActivity));
+      clearInterval(interval);
+    };
+  }, [session, signOut]);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
 
       if (session?.user) {
-        // Check if profile exists — use setTimeout to avoid Supabase deadlock on auth state change
         setTimeout(async () => {
           try {
             const { data: profile } = await supabase
@@ -37,7 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .maybeSingle();
 
             if (!profile) {
-              // Find master's empresa_id to link new user
               const { data: masterProfile } = await supabase
                 .from('profiles')
                 .select('empresa_id')
@@ -47,7 +71,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
               const empresaId = masterProfile?.empresa_id || '';
 
-              // Create inactive profile
               await supabase.from('profiles').insert({
                 id: session.user.id,
                 email: session.user.email,
@@ -57,7 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 empresa_id: empresaId,
               } as any);
 
-              // Notify admin
               await supabase.from('notificacoes').insert({
                 tipo: 'aprovacao',
                 titulo: '👤 NOVO USUÁRIO AGUARDANDO APROVAÇÃO',
@@ -65,7 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 empresa_id: empresaId || null,
               } as any);
             } else if (event === 'SIGNED_IN') {
-              // Register last access
               await supabase
                 .from('profiles')
                 .update({ ultimo_acesso: new Date().toISOString() } as any)
@@ -87,10 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
 
   return (
     <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signOut }}>

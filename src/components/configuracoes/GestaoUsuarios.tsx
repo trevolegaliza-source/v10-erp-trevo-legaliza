@@ -483,9 +483,6 @@ export default function GestaoUsuarios() {
               <Lock className="h-4 w-4" /> Configurar 2FA
             </Button>
           )}
-          <Button size="sm" onClick={() => setInviteModalOpen(true)} disabled={!canEdit} className="gap-1.5">
-            <UserPlus className="h-4 w-4" /> Convidar Usuário
-          </Button>
         </div>
       </div>
 
