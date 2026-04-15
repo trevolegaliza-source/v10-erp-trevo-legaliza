@@ -1324,7 +1324,6 @@ export function ModalPosExtrato({
   onClose: () => void;
 }) {
   async function handleWhatsApp() {
-    // Fetch latest contact info (may have been updated since extrato was generated)
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', extratoGerado.clienteId).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || extratoGerado.clienteTelefone || '').replace(/\D/g, '');
     if (!telefone) {
@@ -1335,25 +1334,10 @@ export function ModalPosExtrato({
     
     const nomeRemetente = await getNomeRemetente();
     
-    const { data: lancamentos } = await supabase
-      .from('lancamentos')
-      .select('id, valor, data_vencimento, processo_id, processo:processos(tipo, razao_social), observacoes_financeiro')
-      .eq('cliente_id', extratoGerado.clienteId)
-      .eq('tipo', 'receber')
-      .neq('status', 'pago');
-    
-    const processoIds = (lancamentos || []).map((l: any) => l.processo_id).filter(Boolean);
-    const vaMap: Record<string, number> = {};
-    if (processoIds.length > 0) {
-      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
-    }
-    
-    const lancsForMsg = (lancamentos || []).map((l: any) => ({
-      ...l,
-      processo_tipo: l.processo?.tipo || '',
-      processo_razao_social: l.processo?.razao_social || '',
-    }));
+    // Use EXACTLY the lancamentos from the extrato, not all pending
+    const lancsForMsg = extratoGerado.lancamentos;
+    const processoIds = lancsForMsg.map(l => l.processo_id).filter(Boolean) as string[];
+    const vaMap = await buildValoresAdicionaisMap(lancsForMsg);
     
     if (lancsForMsg.length === 0) { toast.warning('Nenhum lançamento encontrado.'); return; }
     
