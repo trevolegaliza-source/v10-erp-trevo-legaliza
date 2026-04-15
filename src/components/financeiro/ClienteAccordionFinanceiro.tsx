@@ -1350,25 +1350,8 @@ export function ModalPosExtrato({
       const file = new File([extratoGerado.blob], extratoGerado.filename, { type: 'application/pdf' });
       
       const nomeRemetente = await getNomeRemetente();
-      const { data: lancamentos } = await supabase
-        .from('lancamentos')
-        .select('id, valor, data_vencimento, processo_id, processo:processos(tipo, razao_social), observacoes_financeiro')
-        .eq('cliente_id', extratoGerado.clienteId)
-        .eq('tipo', 'receber')
-        .neq('status', 'pago');
-      
-      const processoIds = (lancamentos || []).map((l: any) => l.processo_id).filter(Boolean);
-      const vaMap: Record<string, number> = {};
-      if (processoIds.length > 0) {
-        const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-        if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
-      }
-      
-      const lancsForMsg = (lancamentos || []).map((l: any) => ({
-        ...l,
-        processo_tipo: l.processo?.tipo || '',
-        processo_razao_social: l.processo?.razao_social || '',
-      }));
+      const lancsForMsg = extratoGerado.lancamentos;
+      const vaMap = await buildValoresAdicionaisMap(lancsForMsg);
       
       const msg = lancsForMsg.length > 0 
         ? buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, diasAtraso: 0, nomeRemetente })
