@@ -32,6 +32,19 @@ import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { downloadExtrato } from '@/lib/storage-utils';
 
+// ══════════ WHATSAPP HELPER ══════════
+function openWhatsApp(phone: string, message: string) {
+  const encoded = encodeURIComponent(message);
+  const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encoded}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 // ══════════ EXPORTED TYPE ══════════
 export type ExtratoGeradoPayload = {
   blob: Blob;
@@ -829,12 +842,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       return;
     }
     const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
-    const msgEncoded = encodeURIComponent(msg);
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const waUrl = isMobile
-      ? `https://wa.me/${tel}?text=${msgEncoded}`
-      : `https://web.whatsapp.com/send?phone=${tel}&text=${msgEncoded}`;
-    window.open(waUrl, '_blank');
+    openWhatsApp(tel, msg);
     setTimeout(() => {
       const confirmar = window.confirm('Você conseguiu enviar a mensagem no WhatsApp?\n\nClique OK para marcar como enviado no sistema.');
       if (confirmar) handleMarcarEnviado();
@@ -1072,12 +1080,7 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
       return;
     }
     const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
-    const msgEncoded = encodeURIComponent(msg);
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const waUrl = isMobile
-      ? `https://wa.me/${tel}?text=${msgEncoded}`
-      : `https://web.whatsapp.com/send?phone=${tel}&text=${msgEncoded}`;
-    window.open(waUrl, '_blank');
+    openWhatsApp(tel, msg);
   }
 
   async function handleCompartilharAguardando() {
@@ -1356,12 +1359,7 @@ export function ModalPosExtrato({
     if (lancsForMsg.length === 0) { toast.warning('Nenhum lançamento encontrado.'); return; }
     
     const msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, diasAtraso: 0, nomeRemetente });
-    const msgEncoded = encodeURIComponent(msg);
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const waUrl = isMobile
-      ? `https://wa.me/${tel}?text=${msgEncoded}`
-      : `https://web.whatsapp.com/send?phone=${tel}&text=${msgEncoded}`;
-    window.open(waUrl, '_blank');
+    openWhatsApp(tel, msg);
     handleClose();
   }
 
