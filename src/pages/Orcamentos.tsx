@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
 import { useOrcamentos, useOrcamentoKPIs, useDeleteOrcamento, type Orcamento } from '@/hooks/useOrcamentos';
 import { gerarOrcamentoPDF } from '@/lib/orcamento-pdf';
