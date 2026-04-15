@@ -66,7 +66,6 @@ export default function Financeiro() {
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
   const [extratoGerado, setExtratoGerado] = useState<ExtratoGeradoPayload | null>(null);
-
   useEffect(() => {
     const stateTab = (location.state as any)?.tab;
     if (stateTab) setActiveTab(stateTab);
