@@ -40,6 +40,8 @@ export type ExtratoGeradoPayload = {
   clienteNome: string;
   clienteTelefone: string;
   total: number;
+  /** Lancamentos included in this extrato — used for WhatsApp message */
+  lancamentos: LancamentoFinanceiro[];
 };
 
 export type ExtratoRequestPayload = {
