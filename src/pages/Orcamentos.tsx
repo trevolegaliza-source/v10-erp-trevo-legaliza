@@ -38,6 +38,7 @@ export default function Orcamentos() {
   const { data: orcamentos, isLoading } = useOrcamentos(tab);
   const { data: kpis } = useOrcamentoKPIs();
   const deleteMutation = useDeleteOrcamento();
+  const { podeCriar } = usePermissions();
 
   // Status counts
   const [counts, setCounts] = useState<Record<string, number>>({});
