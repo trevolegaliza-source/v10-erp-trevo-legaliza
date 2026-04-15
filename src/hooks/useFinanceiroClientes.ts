@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -445,7 +446,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     },
   });
 
-  const clientes = query.data || [];
+  const clientes = useMemo(() => query.data || [], [query.data]);
 
   // ── Mensalistas without invoice this month ──
   const mensalistaQuery = useQuery({
@@ -488,127 +489,138 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     refetchOnMount: false,
   });
 
-  const mensalistasSemFatura = mensalistaQuery.data || [];
+  const mensalistasSemFatura = useMemo(() => mensalistaQuery.data || [], [mensalistaQuery.data]);
 
-  // KPI calculations
-  const allLanc = clientes.flatMap(c => c.lancamentos);
-  const totalFaturado = allLanc.reduce((s, l) => s + l.valor, 0);
-  const totalRecebido = allLanc
-    .filter(l => l.status === 'pago' && l.confirmado_recebimento === true && l.data_pagamento != null)
-    .reduce((s, l) => s + l.valor, 0);
-  const totalCobrado = allLanc
-    .filter(l => l.extrato_id != null || ['cobranca_gerada', 'cobranca_enviada', 'honorario_pago'].includes(l.etapa_financeiro))
-    .reduce((s, l) => s + l.valor, 0);
-  const totalPendente = totalFaturado - totalRecebido;
-  const taxaRecebimento = totalFaturado > 0 ? Math.round(totalRecebido / totalFaturado * 100) : 0;
+  // ── All derived structures memoized on query.data ──
+  const derived = useMemo(() => {
+    function buildClienteView(c: ClienteFinanceiro, filteredLancs: LancamentoFinanceiro[]): ClienteFinanceiro {
+      return {
+        ...c,
+        lancamentos: filteredLancs,
+        total_faturado: filteredLancs.reduce((s, l) => s + l.valor, 0),
+        total_pendente: filteredLancs.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+        qtd_processos: filteredLancs.length,
+        qtd_sem_extrato: filteredLancs.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+        qtd_auditados: filteredLancs.filter(l => l.status !== 'pago' && l.auditado).length,
+        qtd_nao_auditados: filteredLancs.filter(l => l.status !== 'pago' && !l.auditado).length,
+      };
+    }
 
-  // ── Multi-tab assignment ──
-  function buildClienteView(c: ClienteFinanceiro, filteredLancs: LancamentoFinanceiro[]): ClienteFinanceiro {
-    return {
-      ...c,
-      lancamentos: filteredLancs,
-      total_faturado: filteredLancs.reduce((s, l) => s + l.valor, 0),
-      total_pendente: filteredLancs.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
-      qtd_processos: filteredLancs.length,
-      qtd_sem_extrato: filteredLancs.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
-      qtd_auditados: filteredLancs.filter(l => l.status !== 'pago' && l.auditado).length,
-      qtd_nao_auditados: filteredLancs.filter(l => l.status !== 'pago' && !l.auditado).length,
+    function getLancamentoTab(l: LancamentoFinanceiro): string {
+      if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return 'pagos';
+      if (l.etapa_financeiro === 'cobranca_enviada') return 'aguardando';
+      if (l.etapa_financeiro === 'cobranca_gerada' && l.extrato_id) return 'enviados';
+      return 'cobrar';
+    }
+
+    // KPI calculations
+    const allLanc = clientes.flatMap(c => c.lancamentos);
+    const totalFaturado = allLanc.reduce((s, l) => s + l.valor, 0);
+    const totalRecebido = allLanc
+      .filter(l => l.status === 'pago' && l.confirmado_recebimento === true && l.data_pagamento != null)
+      .reduce((s, l) => s + l.valor, 0);
+    const totalCobrado = allLanc
+      .filter(l => l.extrato_id != null || ['cobranca_gerada', 'cobranca_enviada', 'honorario_pago'].includes(l.etapa_financeiro))
+      .reduce((s, l) => s + l.valor, 0);
+    const totalPendente = totalFaturado - totalRecebido;
+    const taxaRecebimento = totalFaturado > 0 ? Math.round(totalRecebido / totalFaturado * 100) : 0;
+
+    // Build per-tab client views
+    const tabMap: Record<string, Map<string, LancamentoFinanceiro[]>> = {
+      cobrar: new Map(), enviados: new Map(), aguardando: new Map(), pagos: new Map(),
     };
-  }
 
-  function getLancamentoTab(l: LancamentoFinanceiro): string {
-    if (l.status === 'pago' || l.etapa_financeiro === 'honorario_pago') return 'pagos';
-    if (l.etapa_financeiro === 'cobranca_enviada') return 'aguardando';
-    if (l.etapa_financeiro === 'cobranca_gerada' && l.extrato_id) return 'enviados';
-    return 'cobrar';
-  }
-
-  // Build per-tab client views
-  const tabMap: Record<string, Map<string, LancamentoFinanceiro[]>> = {
-    cobrar: new Map(), enviados: new Map(), aguardando: new Map(), pagos: new Map(),
-  };
-
-  for (const c of clientes) {
-    for (const l of c.lancamentos) {
-      const tab = getLancamentoTab(l);
-      if (!tabMap[tab].has(c.cliente_id)) tabMap[tab].set(c.cliente_id, []);
-      tabMap[tab].get(c.cliente_id)!.push(l);
+    for (const c of clientes) {
+      for (const l of c.lancamentos) {
+        const tab = getLancamentoTab(l);
+        if (!tabMap[tab].has(c.cliente_id)) tabMap[tab].set(c.cliente_id, []);
+        tabMap[tab].get(c.cliente_id)!.push(l);
+      }
     }
-  }
 
-  const clienteById = new Map(clientes.map(c => [c.cliente_id, c]));
+    const clienteById = new Map(clientes.map(c => [c.cliente_id, c]));
 
-  function buildTabClientes(tab: string): ClienteFinanceiro[] {
-    const entries = tabMap[tab];
-    const result: ClienteFinanceiro[] = [];
-    for (const [clienteId, lancs] of entries) {
+    function buildTabClientes(tab: string): ClienteFinanceiro[] {
+      const entries = tabMap[tab];
+      const result: ClienteFinanceiro[] = [];
+      for (const [clienteId, lancs] of entries) {
+        const original = clienteById.get(clienteId);
+        if (original) result.push(buildClienteView(original, lancs));
+      }
+      return result;
+    }
+
+    // "Cobrar" tab: only AUDITED lancamentos
+    const clientesCobrarRaw = buildTabClientes('cobrar');
+    const clientesCobrarAuditados: ClienteFinanceiro[] = [];
+    for (const c of clientesCobrarRaw) {
+      const auditadosLancs = c.lancamentos.filter(l => l.auditado);
+      if (auditadosLancs.length > 0) {
+        clientesCobrarAuditados.push(buildClienteView(c, auditadosLancs));
+      }
+    }
+    const cobrarResult = clientesCobrarAuditados.map(c => ({ c, result: clienteDeveAparecerEmCobrar(c) }));
+    const clientesCobrar = cobrarResult.filter(x => x.result.show).map(x => x.c);
+    const clientesFuturaFatura = cobrarResult.filter(x => x.result.isFutura).map(x => x.c);
+
+    // "Aguardando Auditoria" tab
+    const clientesAguardandoAuditoriaMap = new Map<string, LancamentoFinanceiro[]>();
+    for (const c of clientesCobrarRaw) {
+      const naoAuditados = c.lancamentos.filter(l => !l.auditado && l.status !== 'pago' && l.etapa_financeiro === 'solicitacao_criada');
+      if (naoAuditados.length > 0) {
+        clientesAguardandoAuditoriaMap.set(c.cliente_id, naoAuditados);
+      }
+    }
+    const clientesAguardandoAuditoria: ClienteFinanceiro[] = [];
+    for (const [clienteId, lancs] of clientesAguardandoAuditoriaMap) {
       const original = clienteById.get(clienteId);
-      if (original) result.push(buildClienteView(original, lancs));
+      if (original) clientesAguardandoAuditoria.push(buildClienteView(original, lancs));
     }
-    return result;
-  }
 
-  // ── "Cobrar" tab: only AUDITED lancamentos ──
-  const clientesCobrarRaw = buildTabClientes('cobrar');
-  // Filter each client's lancamentos to only audited ones for the "Cobrar" tab
-  const clientesCobrarAuditados: ClienteFinanceiro[] = [];
-  for (const c of clientesCobrarRaw) {
-    const auditadosLancs = c.lancamentos.filter(l => l.auditado);
-    if (auditadosLancs.length > 0) {
-      clientesCobrarAuditados.push(buildClienteView(c, auditadosLancs));
-    }
-  }
-  const cobrarResult = clientesCobrarAuditados.map(c => ({ c, result: clienteDeveAparecerEmCobrar(c) }));
-  const clientesCobrar = cobrarResult.filter(x => x.result.show).map(x => x.c);
-  const clientesFuturaFatura = cobrarResult.filter(x => x.result.isFutura).map(x => x.c);
+    const clientesEnviados = buildTabClientes('enviados');
+    const clientesAguardando = buildTabClientes('aguardando');
+    const clientesPagos = buildTabClientes('pagos');
 
-  // ── "Aguardando Auditoria" tab: non-audited pending lancamentos ──
-  const clientesAguardandoAuditoriaMap = new Map<string, LancamentoFinanceiro[]>();
-  for (const c of clientesCobrarRaw) {
-    const naoAuditados = c.lancamentos.filter(l => !l.auditado && l.status !== 'pago' && l.etapa_financeiro === 'solicitacao_criada');
-    if (naoAuditados.length > 0) {
-      clientesAguardandoAuditoriaMap.set(c.cliente_id, naoAuditados);
-    }
-  }
-  const clientesAguardandoAuditoria: ClienteFinanceiro[] = [];
-  for (const [clienteId, lancs] of clientesAguardandoAuditoriaMap) {
-    const original = clienteById.get(clienteId);
-    if (original) clientesAguardandoAuditoria.push(buildClienteView(original, lancs));
-  }
+    const metricas = {
+      totalFaturado,
+      totalCobrado,
+      totalPendente,
+      totalRecebido,
+      taxaRecebimento,
+      aguardandoExtrato: clientesCobrar.length,
+      valorAguardandoExtrato: clientesCobrar.reduce((s, c) => s + c.total_pendente, 0),
+      aguardandoEnvio: clientesEnviados.length,
+      valorAguardandoEnvio: clientesEnviados.reduce((s, c) => s + c.total_pendente, 0),
+      aguardandoPagamento: clientesAguardando.length,
+      valorAguardandoPagamento: clientesAguardando.reduce((s, c) => s + c.total_pendente, 0),
+      vencidos: clientesAguardando.filter(c => c.lancamentos.some(l => isLancamentoVencidoReal(l))).length,
+      valorVencido: clientesAguardando.reduce((s, c) => s + c.lancamentos.filter(l => isLancamentoVencidoReal(l)).reduce((ss, l) => ss + l.valor, 0), 0),
+      totalProcessos: allLanc.length,
+      clientesCobrados: clientes.filter(c => c.lancamentos.some(l => l.extrato_id != null || ['cobranca_gerada', 'cobranca_enviada', 'honorario_pago'].includes(l.etapa_financeiro))).length,
+      clientesPendentes: clientes.filter(c => c.lancamentos.some(l => l.status !== 'pago')).length,
+    };
 
-  const clientesEnviados = buildTabClientes('enviados');
-  const clientesAguardando = buildTabClientes('aguardando');
-  const clientesPagos = buildTabClientes('pagos');
-
-  const metricas = {
-    totalFaturado,
-    totalCobrado,
-    totalPendente,
-    totalRecebido,
-    taxaRecebimento,
-    aguardandoExtrato: clientesCobrar.length,
-    valorAguardandoExtrato: clientesCobrar.reduce((s, c) => s + c.total_pendente, 0),
-    aguardandoEnvio: clientesEnviados.length,
-    valorAguardandoEnvio: clientesEnviados.reduce((s, c) => s + c.total_pendente, 0),
-    aguardandoPagamento: clientesAguardando.length,
-    valorAguardandoPagamento: clientesAguardando.reduce((s, c) => s + c.total_pendente, 0),
-    vencidos: clientesAguardando.filter(c => c.lancamentos.some(l => isLancamentoVencidoReal(l))).length,
-    valorVencido: clientesAguardando.reduce((s, c) => s + c.lancamentos.filter(l => isLancamentoVencidoReal(l)).reduce((ss, l) => ss + l.valor, 0), 0),
-    totalProcessos: allLanc.length,
-    clientesCobrados: clientes.filter(c => c.lancamentos.some(l => l.extrato_id != null || ['cobranca_gerada', 'cobranca_enviada', 'honorario_pago'].includes(l.etapa_financeiro))).length,
-    clientesPendentes: clientes.filter(c => c.lancamentos.some(l => l.status !== 'pago')).length,
-  };
+    return {
+      clientesCobrar,
+      clientesFuturaFatura,
+      clientesAguardandoAuditoria,
+      clientesEnviados,
+      clientesAguardando,
+      clientesPagos,
+      metricas,
+    };
+  }, [clientes]);
 
   return {
     clientes,
-    clientesCobrar,
-    clientesFuturaFatura,
-    clientesAguardandoAuditoria,
-    clientesEnviados,
-    clientesAguardando,
-    clientesPagos,
+    clientesCobrar: derived.clientesCobrar,
+    clientesFuturaFatura: derived.clientesFuturaFatura,
+    clientesAguardandoAuditoria: derived.clientesAguardandoAuditoria,
+    clientesEnviados: derived.clientesEnviados,
+    clientesAguardando: derived.clientesAguardando,
+    clientesPagos: derived.clientesPagos,
     mensalistasSemFatura,
-    metricas,
+    metricas: derived.metricas,
     isLoading: query.isLoading,
     isVencido: isLancamentoVencidoReal,
     marcarEnviado,
