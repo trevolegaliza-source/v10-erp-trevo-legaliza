@@ -19,6 +19,7 @@ import {
   ClientesAguardando,
   ClientesRecebidos,
   ModalPosExtrato,
+  buildExtratoFilename,
 } from '@/components/financeiro/ClienteAccordionFinanceiro';
 import type { ExtratoGeradoPayload, ExtratoRequestPayload } from '@/components/financeiro/ClienteAccordionFinanceiro';
 import { ClientesAuditoria } from '@/components/financeiro/ClientesAuditoria';
@@ -28,6 +29,9 @@ import { ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { gerarExtratoPDF, fetchValoresAdicionaisMulti, fetchCompetenciaProcessos } from '@/lib/extrato-pdf';
+import { useExtratos } from '@/hooks/useExtratos';
+import { useQueryClient } from '@tanstack/react-query';
 
 function toISO(d: Date) { return d.toISOString().split('T')[0]; }
 
