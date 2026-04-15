@@ -550,6 +550,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         clienteNome,
         clienteTelefone: (clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || cliente.cliente_telefone || '',
         total: result.totalGeral,
+        lancamentos: selecionados,
       });
     } catch (err: any) {
       toast.error('Erro ao gerar extrato: ' + (err?.message || 'Erro'));
