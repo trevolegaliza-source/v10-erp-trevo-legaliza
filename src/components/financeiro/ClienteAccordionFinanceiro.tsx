@@ -246,11 +246,11 @@ function ClienteHeaderBadges({ cliente }: { cliente: ClienteFinanceiro }) {
 function ClientesFaturarBase({ 
   clientes, 
   mensalistasSemFatura = [],
-  onPrepararExtrato,
+  onExtratoGerado,
 }: { 
   clientes: ClienteFinanceiro[]; 
   mensalistasSemFatura?: MensalistaSemFatura[];
-  onPrepararExtrato: (payload: ExtratoRequestPayload) => void;
+  onExtratoGerado: (payload: ExtratoGeradoPayload) => void;
 }) {
   const queryClient = useQueryClient();
   const [gerandoFatura, setGerandoFatura] = useState<string | null>(null);
