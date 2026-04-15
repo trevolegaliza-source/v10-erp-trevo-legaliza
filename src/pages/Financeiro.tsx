@@ -70,6 +70,62 @@ export default function Financeiro() {
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
   const [extratoGerado, setExtratoGerado] = useState<ExtratoGeradoPayload | null>(null);
+  const queryClient = useQueryClient();
+  const { salvarExtrato } = useExtratos();
+
+  const handlePrepararExtrato = async (payload: ExtratoRequestPayload) => {
+    try {
+      const { clienteId, clienteNome, clienteTelefone, lancamentos } = payload;
+      const processoIds = lancamentos.map(l => l.processo_id).filter(Boolean) as string[];
+      
+      const [vaMulti, compMap] = await Promise.all([
+        fetchValoresAdicionaisMulti(processoIds),
+        fetchCompetenciaProcessos(processoIds),
+      ]);
+
+      const now = new Date();
+      const filename = buildExtratoFilename(clienteNome, now);
+
+      const pdfBlob = await gerarExtratoPDF({
+        clienteNome,
+        lancamentos: lancamentos.map(l => ({
+          processo_razao_social: l.processo_razao_social,
+          processo_tipo: l.processo_tipo,
+          valor: l.valor,
+          data_vencimento: l.data_vencimento,
+          processo_id: l.processo_id,
+        })),
+        valoresAdicionais: vaMulti,
+        competenciaMap: compMap,
+      });
+
+      const totalHonorarios = lancamentos.reduce((s, l) => s + l.valor, 0);
+      const totalTaxas = processoIds.reduce((s, pid) => s + (vaMulti[pid] || 0), 0);
+
+      await salvarExtrato.mutateAsync({
+        clienteId,
+        pdfBlob,
+        filename,
+        totalHonorarios,
+        totalTaxas,
+        totalGeral: totalHonorarios + totalTaxas,
+        processoIds,
+        competenciaMes: now.getMonth() + 1,
+        competenciaAno: now.getFullYear(),
+      });
+
+      setExtratoGerado({
+        blob: pdfBlob,
+        filename,
+        clienteId,
+        clienteNome,
+        clienteTelefone,
+        total: totalHonorarios + totalTaxas,
+      });
+    } catch (err: any) {
+      toast.error('Erro ao gerar extrato: ' + (err?.message || 'Erro desconhecido'));
+    }
+  };
 
   useEffect(() => {
     const stateTab = (location.state as any)?.tab;
