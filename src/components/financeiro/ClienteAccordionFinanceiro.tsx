@@ -540,7 +540,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
           .eq('tipo', 'receber');
       }
 
-      invalidateFinanceiro(queryClient);
+      // invalidateFinanceiro moved to ModalPosExtrato close
 
       toast.success('Extrato gerado com sucesso!');
 
@@ -830,7 +830,11 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
     const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
     const msgEncoded = encodeURIComponent(msg);
-    window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const waUrl = isMobile
+      ? `https://wa.me/${tel}?text=${msgEncoded}`
+      : `https://web.whatsapp.com/send?phone=${tel}&text=${msgEncoded}`;
+    window.open(waUrl, '_blank');
     setTimeout(() => {
       const confirmar = window.confirm('Você conseguiu enviar a mensagem no WhatsApp?\n\nClique OK para marcar como enviado no sistema.');
       if (confirmar) handleMarcarEnviado();
@@ -1069,7 +1073,11 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
     const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
     const msgEncoded = encodeURIComponent(msg);
-    window.open(`https://wa.me/${tel}?text=${msgEncoded}`, '_blank');
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const waUrl = isMobile
+      ? `https://wa.me/${tel}?text=${msgEncoded}`
+      : `https://web.whatsapp.com/send?phone=${tel}&text=${msgEncoded}`;
+    window.open(waUrl, '_blank');
   }
 
   async function handleCompartilharAguardando() {
