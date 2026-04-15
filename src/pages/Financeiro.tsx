@@ -332,10 +332,12 @@ export default function Financeiro() {
           {/* Tabs — horizontal scroll on mobile */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="flex w-full overflow-x-auto overflow-y-hidden no-scrollbar gap-1 h-auto flex-nowrap justify-start">
-              <TabsTrigger value="clientes" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
-                <Search className="h-3.5 w-3.5" />
-                Clientes
-              </TabsTrigger>
+              {!isFinanceiro && (
+                <TabsTrigger value="clientes" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
+                  <Search className="h-3.5 w-3.5" />
+                  Clientes
+                </TabsTrigger>
+              )}
               {!isFinanceiro && (
                 <TabsTrigger value="auditoria" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                   <ClipboardCheck className="h-3.5 w-3.5" />
