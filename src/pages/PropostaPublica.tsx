@@ -86,7 +86,7 @@ export default function PropostaPublica() {
           setStatusFinal('recusado');
         }
 
-        if (orcData.destinatario === 'contador' && orcData.senha_link) {
+        if (orcData.destinatario === 'contador' && orcData.has_password) {
           setSenhaRequerida(true);
         } else {
           setAutenticado(true);
@@ -112,11 +112,20 @@ export default function PropostaPublica() {
     })();
   }, [token]);
 
-  function verificarSenha() {
-    if (senhaInput === orc?.senha_link) {
-      setAutenticado(true);
-      setSenhaErro(false);
-    } else {
+  async function verificarSenha() {
+    try {
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/rpc/verificar_senha_proposta`,
+        { method: 'POST', headers: anonHeaders, body: JSON.stringify({ p_token: token, p_senha: senhaInput }) }
+      );
+      const result = await response.json();
+      if (result === true) {
+        setAutenticado(true);
+        setSenhaErro(false);
+      } else {
+        setSenhaErro(true);
+      }
+    } catch {
       setSenhaErro(true);
     }
   }
