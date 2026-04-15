@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle, XCircle, Lock } from 'lucide-react';
 import { normalizeItem, type OrcamentoItem, type CenarioOrcamento } from '@/components/orcamentos/types';
+import DOMPurify from 'dompurify';
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
