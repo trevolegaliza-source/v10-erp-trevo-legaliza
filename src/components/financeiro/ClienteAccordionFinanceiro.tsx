@@ -445,17 +445,118 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
     executarGeracaoExtrato(selecionadosDeferidos);
   }
 
-  function executarGeracaoExtrato(selecionados: typeof lancSemExtrato) {
+  async function executarGeracaoExtrato(selecionados: typeof lancSemExtrato) {
     setGenerating(true);
-    onPrepararExtrato({
-      requestKey: `${cliente.cliente_id}-${Date.now()}-${selecionados.map(l => l.id).join('-')}`,
-      clienteId: cliente.cliente_id,
-      clienteNome: cliente.cliente_apelido || cliente.cliente_nome,
-      clienteTelefone: (cliente as any).cliente_telefone_financeiro || cliente.cliente_telefone || '',
-      lancamentos: [...selecionados],
-    });
-    setSelected(new Set());
-    setGenerating(false);
+    try {
+      const processoIds = selecionados.map(l => l.processo_id).filter(Boolean) as string[];
+      const clienteId = cliente.cliente_id;
+      const clienteNome = cliente.cliente_apelido || cliente.cliente_nome;
+
+      // Fetch client data, valores adicionais, and competencia in parallel
+      const [clienteData, vaMulti, allComp] = await Promise.all([
+        supabase.from('clientes').select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, telefone_financeiro, email, nome_contador, dia_cobranca, dia_vencimento_mensal').eq('id', clienteId).single().then(r => r.data),
+        fetchValoresAdicionaisMulti(processoIds),
+        fetchCompetenciaProcessos(clienteId, selecionados.map(l => ({
+          id: l.processo_id || l.id,
+          created_at: l.created_at || new Date().toISOString(),
+        })) as any),
+      ]);
+
+      const processos = selecionados.map(l => ({
+        id: l.processo_id || l.id,
+        razao_social: l.processo_razao_social,
+        tipo: l.processo_tipo,
+        valor: l.valor,
+        valor_avulso: l.valor_original ?? null,
+        created_at: l.created_at || new Date().toISOString(),
+        etapa: l.processo_etapa || '',
+        cliente_id: clienteId,
+        notas: l.processo_notas || null,
+        data_deferimento: null,
+        etiquetas: [] as string[],
+      }));
+
+      const result = await gerarExtratoPDF({
+        processos: processos as any,
+        allCompetencia: allComp as any,
+        valoresAdicionais: vaMulti,
+        cliente: {
+          nome: clienteData?.nome || clienteNome,
+          cnpj: (clienteData as any)?.cnpj || null,
+          apelido: (clienteData as any)?.apelido || null,
+          valor_base: (clienteData as any)?.valor_base || null,
+          desconto_progressivo: (clienteData as any)?.desconto_progressivo || null,
+          valor_limite_desconto: (clienteData as any)?.valor_limite_desconto || null,
+          telefone: (clienteData as any)?.telefone || null,
+          email: (clienteData as any)?.email || null,
+          nome_contador: (clienteData as any)?.nome_contador || null,
+          dia_cobranca: (clienteData as any)?.dia_cobranca || null,
+          dia_vencimento_mensal: (clienteData as any)?.dia_vencimento_mensal || null,
+        },
+      });
+
+      const pdfBlob = result.doc.output('blob');
+      const filename = buildExtratoFilename(clienteNome);
+
+      // Save extrato to DB
+      const { salvarExtrato } = useExtratos();
+      // Actually we can't call hooks here - use supabase directly
+      const path = `extratos/${clienteId}/${filename}`;
+      await supabase.storage.from('documentos').upload(path, pdfBlob, { contentType: 'application/pdf', upsert: true });
+      const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path);
+
+      const now = new Date();
+      const { data: extrato, error: insertError } = await supabase
+        .from('extratos')
+        .insert({
+          cliente_id: clienteId,
+          pdf_url: urlData.publicUrl,
+          filename,
+          total_honorarios: result.totalHonorarios,
+          total_taxas: result.totalTaxas,
+          total_geral: result.totalGeral,
+          qtd_processos: result.processCount,
+          processo_ids: processoIds,
+          competencia_mes: now.getMonth() + 1,
+          competencia_ano: now.getFullYear(),
+          status: 'ativo',
+        })
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      // Link lancamentos to extrato
+      for (const pid of processoIds) {
+        await supabase
+          .from('lancamentos')
+          .update({
+            extrato_id: (extrato as any).id,
+            etapa_financeiro: 'cobranca_gerada',
+            observacoes_financeiro: `Extrato emitido em ${now.toLocaleDateString('pt-BR')}`,
+          } as any)
+          .eq('processo_id', pid)
+          .eq('tipo', 'receber');
+      }
+
+      const queryClient = useQueryClient();
+      invalidateFinanceiro(queryClient);
+
+      toast.success('Extrato gerado com sucesso!');
+
+      onExtratoGerado({
+        blob: pdfBlob,
+        filename,
+        clienteId,
+        clienteNome,
+        clienteTelefone: (clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || cliente.cliente_telefone || '',
+        total: result.totalGeral,
+      });
+    } catch (err: any) {
+      toast.error('Erro ao gerar extrato: ' + (err?.message || 'Erro'));
+    } finally {
+      setSelected(new Set());
+      setGenerating(false);
+    }
   }
 
   const nenhumDeferido = isDeferimento && cliente.lancamentos.every(l => {
