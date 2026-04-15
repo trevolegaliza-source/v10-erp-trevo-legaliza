@@ -780,10 +780,8 @@ function buildAttachmentPageHTML(label: string, imgData: string, logoDataUrl: st
 
 async function renderPageToCanvas(html: string, styles: string) {
   const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '0';
-  container.style.width = '794px';
+  // Use fixed + visibility:hidden + contain:strict to avoid visible reflow/repaint
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;visibility:hidden;pointer-events:none;contain:strict;z-index:-1;';
   container.innerHTML = `<style>${styles}</style>${html}`;
   document.body.appendChild(container);
 
@@ -791,13 +789,17 @@ async function renderPageToCanvas(html: string, styles: string) {
   await new Promise((resolve) => setTimeout(resolve, 300));
 
   const pageEl = container.querySelector('.page') as HTMLElement;
-  window.scrollTo(0, 0);
+  // Make page visible inside the off-screen container for html2canvas to capture
+  pageEl.style.visibility = 'visible';
   const canvas = await html2canvas(pageEl, {
     scale: 2,
     useCORS: true,
     logging: false,
     backgroundColor: '#ffffff',
     allowTaint: true,
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: 794,
   });
 
   document.body.removeChild(container);
@@ -852,12 +854,18 @@ function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
   doc.addImage(imgData, 'JPEG', offsetX, 0, imgWidth, imgHeight);
 }
 
+let fontLinkInjected = false;
+
 export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult> {
-  const fontLink = document.createElement('link');
-  fontLink.rel = 'stylesheet';
-  fontLink.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap';
-  document.head.appendChild(fontLink);
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  // Only inject the font link once
+  if (!fontLinkInjected) {
+    const fontLink = document.createElement('link');
+    fontLink.rel = 'stylesheet';
+    fontLink.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap';
+    document.head.appendChild(fontLink);
+    fontLinkInjected = true;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
   await document.fonts.ready;
 
   const logoDataUrl = await preloadLogo();
