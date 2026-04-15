@@ -71,21 +71,67 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user already exists
-    const { data: existingProfiles } = await adminClient
-      .from("profiles")
-      .select("id, email")
-      .eq("email", email)
-      .eq("empresa_id", callerProfile.empresa_id);
+    // Check if user already exists in auth.users
+    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+    const existingAuthUser = existingUsers?.users?.find(
+      (u: any) => u.email?.toLowerCase() === email.toLowerCase()
+    );
 
-    if (existingProfiles && existingProfiles.length > 0) {
-      return new Response(
-        JSON.stringify({ error: "Este email já possui uma conta no sistema" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (existingAuthUser) {
+      // User exists in auth — check profile
+      const { data: existingProfile } = await adminClient
+        .from("profiles")
+        .select("id, ativo, motivo_inativacao, empresa_id")
+        .eq("id", existingAuthUser.id)
+        .single();
+
+      if (existingProfile) {
+        if (existingProfile.ativo === true) {
+          return new Response(
+            JSON.stringify({ error: "Este usuário já está ativo no sistema." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        // User exists with ativo=false — inform admin
+        return new Response(
+          JSON.stringify({
+            error: "Usuário já cadastrado e aguardando aprovação. Vá em Gestão de Usuários para ativar.",
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } else {
+        // Auth user exists but no profile — create profile
+        await adminClient.from("profiles").insert({
+          id: existingAuthUser.id,
+          email: email,
+          nome: existingAuthUser.user_metadata?.full_name || email.split("@")[0],
+          role: role,
+          ativo: false,
+          empresa_id: callerProfile.empresa_id,
+          convidado_por: convidado_por || caller.id,
+          convidado_em: new Date().toISOString(),
+        });
+
+        // Create notification
+        await adminClient.from("notificacoes").insert({
+          tipo: "convite",
+          titulo: "📧 Convite enviado",
+          mensagem: `Perfil criado para ${email} com role ${role}. Aguardando aprovação.`,
+          empresa_id: callerProfile.empresa_id,
+        });
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            user: { id: existingAuthUser.id, email },
+            message: "Perfil criado. O usuário já possui conta e aguarda aprovação.",
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
-    // Invite user via admin API
+    // User does NOT exist — invite normally
     const { data: inviteData, error: inviteError } =
       await adminClient.auth.admin.inviteUserByEmail(email, {
         data: {
@@ -97,7 +143,7 @@ Deno.serve(async (req) => {
 
     if (inviteError) {
       return new Response(
-        JSON.stringify({ error: inviteError.message }),
+        JSON.stringify({ error: "Não foi possível enviar o convite. Tente novamente." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -133,7 +179,7 @@ Deno.serve(async (req) => {
     );
   } catch (err: any) {
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: "Erro interno. Tente novamente." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

@@ -17,6 +17,7 @@ interface MfaEnrollProps {
 export function MfaEnroll({ open, onOpenChange, onSuccess, forceSetup }: MfaEnrollProps) {
   const [step, setStep] = useState<'qr' | 'verify' | 'done'>('qr');
   const [qrUri, setQrUri] = useState('');
+  const [totpSecret, setTotpSecret] = useState('');
   const [factorId, setFactorId] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
