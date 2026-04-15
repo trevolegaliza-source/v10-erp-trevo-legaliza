@@ -386,7 +386,8 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
       return Array.from(result.values());
     },
-    staleTime: 60_000,
+    staleTime: 300_000,
+    refetchOnMount: false,
   });
 
   const marcarEnviado = useMutation({
@@ -483,7 +484,8 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           telefone: m.telefone,
         })) as MensalistaSemFatura[];
     },
-    staleTime: 60_000,
+    staleTime: 300_000,
+    refetchOnMount: false,
   });
 
   const mensalistasSemFatura = mensalistaQuery.data || [];
