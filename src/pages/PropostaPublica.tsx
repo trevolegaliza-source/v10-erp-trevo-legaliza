@@ -394,7 +394,7 @@ export default function PropostaPublica() {
             <div style={cardPad}>
               <h2 style={{ ...muted, fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Cenário e Oportunidade</h2>
               {headline && <p style={{ ...fg, fontWeight: 600, fontSize: 16, marginBottom: 12 }}>{headline}</p>}
-              <div style={{ background: '#f8fafc', borderRadius: 12, padding: 16, fontSize: 14, lineHeight: 1.6, color: '#374151' }} dangerouslySetInnerHTML={{ __html: (contexto || '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<iframe[\s\S]*?<\/iframe>/gi, '').replace(/on\w+="[^"]*"/gi, '') }} />
+              <div style={{ background: '#f8fafc', borderRadius: 12, padding: 16, fontSize: 14, lineHeight: 1.6, color: '#374151' }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(contexto || '') }} />
             </div>
           </div>
         )}
@@ -504,7 +504,7 @@ export default function PropostaPublica() {
                       </div>
                     </div>
                     {item.detalhes && (
-                      <div style={{ padding: '8px 16px', fontSize: 12, color: '#6b7280', borderTop: '1px solid #e2e8f0' }} dangerouslySetInnerHTML={{ __html: (item.detalhes || '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<iframe[\s\S]*?<\/iframe>/gi, '').replace(/on\w+="[^"]*"/gi, '') }} />
+                      <div style={{ padding: '8px 16px', fontSize: 12, color: '#6b7280', borderTop: '1px solid #e2e8f0' }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.detalhes || '') }} />
                     )}
                     {(item.prazo || hasTaxa) && (
                       <div style={{ padding: '8px 16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', fontSize: 12, color: '#6b7280', display: 'flex', justifyContent: 'space-between' }}>
@@ -637,7 +637,7 @@ export default function PropostaPublica() {
             </div>
             {orc?.observacoes && (
               <div style={{ marginTop: 12, background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: 12 }}>
-                <p style={{ fontSize: 12, color: '#92400e' }} dangerouslySetInnerHTML={{ __html: (orc.observacoes || '').replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<iframe[\s\S]*?<\/iframe>/gi, '').replace(/on\w+="[^"]*"/gi, '') }} />
+                <p style={{ fontSize: 12, color: '#92400e' }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(orc.observacoes || '') }} />
               </div>
             )}
           </div>
