@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useMemo, useCallback } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -263,7 +263,7 @@ function ClienteHeaderBadges({ cliente }: { cliente: ClienteFinanceiro }) {
 }
 
 // ══════════ TAB: FATURAR ══════════
-function ClientesFaturarBase({ 
+function ClientesFaturarBase({
   clientes, 
   mensalistasSemFatura = [],
   onExtratoGerado,
@@ -275,7 +275,7 @@ function ClientesFaturarBase({
   const queryClient = useQueryClient();
   const [gerandoFatura, setGerandoFatura] = useState<string | null>(null);
 
-  const handleGerarFaturaMensal = async (m: MensalistaSemFatura) => {
+  const handleGerarFaturaMensal = useCallback(async (m: MensalistaSemFatura) => {
     setGerandoFatura(m.id);
     try {
       const now = new Date();
@@ -303,50 +303,54 @@ function ClientesFaturarBase({
     } finally {
       setGerandoFatura(null);
     }
-  };
+  }, [queryClient]);
 
   const hasMensalistas = mensalistasSemFatura.length > 0;
   const hasClientes = clientes.length > 0;
 
+  const { prontos, aguardandoDef } = useMemo(() => {
+    const prontosMap = new Map<string, ClienteFinanceiro>();
+    const aguardandoDefMap = new Map<string, ClienteFinanceiro>();
+
+    for (const c of clientes) {
+      if (c.cliente_momento_faturamento !== 'no_deferimento') {
+        prontosMap.set(c.cliente_id, c);
+        continue;
+      }
+
+      const lancProntos = c.lancamentos.filter(l => ['baixa', 'avulso'].includes(l.processo_tipo));
+      const lancAguardando = c.lancamentos.filter(l => !['baixa', 'avulso'].includes(l.processo_tipo));
+
+      if (lancProntos.length > 0) {
+        prontosMap.set(c.cliente_id, {
+          ...c,
+          lancamentos: lancProntos,
+          qtd_processos: lancProntos.length,
+          total_faturado: lancProntos.reduce((s, l) => s + l.valor, 0),
+          total_pendente: lancProntos.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+          qtd_sem_extrato: lancProntos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+        });
+      }
+
+      if (lancAguardando.length > 0) {
+        aguardandoDefMap.set(c.cliente_id, {
+          ...c,
+          lancamentos: lancAguardando,
+          qtd_processos: lancAguardando.length,
+          total_faturado: lancAguardando.reduce((s, l) => s + l.valor, 0),
+          total_pendente: lancAguardando.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+          qtd_sem_extrato: lancAguardando.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+        });
+      }
+    }
+
+    return {
+      prontos: Array.from(prontosMap.values()),
+      aguardandoDef: Array.from(aguardandoDefMap.values()),
+    };
+  }, [clientes]);
+
   if (!hasMensalistas && !hasClientes) return <EmptyState text="Nenhum cliente aguardando geração de extrato." />;
-
-  const prontosMap = new Map<string, ClienteFinanceiro>();
-  const aguardandoDefMap = new Map<string, ClienteFinanceiro>();
-
-  for (const c of clientes) {
-    if (c.cliente_momento_faturamento !== 'no_deferimento') {
-      prontosMap.set(c.cliente_id, c);
-      continue;
-    }
-
-    const lancProntos = c.lancamentos.filter(l => ['baixa', 'avulso'].includes(l.processo_tipo));
-    const lancAguardando = c.lancamentos.filter(l => !['baixa', 'avulso'].includes(l.processo_tipo));
-
-    if (lancProntos.length > 0) {
-      prontosMap.set(c.cliente_id, {
-        ...c,
-        lancamentos: lancProntos,
-        qtd_processos: lancProntos.length,
-        total_faturado: lancProntos.reduce((s, l) => s + l.valor, 0),
-        total_pendente: lancProntos.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
-        qtd_sem_extrato: lancProntos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
-      });
-    }
-
-    if (lancAguardando.length > 0) {
-      aguardandoDefMap.set(c.cliente_id, {
-        ...c,
-        lancamentos: lancAguardando,
-        qtd_processos: lancAguardando.length,
-        total_faturado: lancAguardando.reduce((s, l) => s + l.valor, 0),
-        total_pendente: lancAguardando.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
-        qtd_sem_extrato: lancAguardando.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
-      });
-    }
-  }
-
-  const prontos = Array.from(prontosMap.values());
-  const aguardandoDef = Array.from(aguardandoDefMap.values());
 
   return (
     <div className="space-y-6">
