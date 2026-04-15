@@ -896,6 +896,24 @@ export type Database = {
           },
         ]
       }
+      master_password_attempts: {
+        Row: {
+          attempted_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          attempted_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          attempted_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notas_estado: {
         Row: {
           conteudo: string | null
