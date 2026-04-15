@@ -398,6 +398,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
     tipo: string;
     data_deferimento_atual: string | null;
   }>>([]);
+  const queryClient = useQueryClient();
 
   const lancSemExtrato = cliente.lancamentos.filter(l => l.status !== 'pago' && l.etapa_financeiro !== 'honorario_pago');
   const totalSelecionado = lancSemExtrato.filter(l => selected.has(l.id)).reduce((s, l) => s + l.valor, 0);
