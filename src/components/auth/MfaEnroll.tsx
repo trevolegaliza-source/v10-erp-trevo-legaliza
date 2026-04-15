@@ -48,6 +48,7 @@ export function MfaEnroll({ open, onOpenChange, onSuccess, forceSetup }: MfaEnro
       if (error) throw error;
       if (data?.totp?.qr_code) {
         setQrUri(data.totp.qr_code);
+        setTotpSecret(data.totp.secret || '');
         setFactorId(data.id);
         setStep('qr');
       }
@@ -90,6 +91,7 @@ export function MfaEnroll({ open, onOpenChange, onSuccess, forceSetup }: MfaEnro
       setStep('qr');
       setCode('');
       setQrUri('');
+      setTotpSecret('');
     }
     onOpenChange(o);
   };
