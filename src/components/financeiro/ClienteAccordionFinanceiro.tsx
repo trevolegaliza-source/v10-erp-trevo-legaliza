@@ -362,7 +362,7 @@ function ClientesFaturarBase({
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5">✅ Prontos para cobrar</h3>
           <Accordion type="multiple" className="space-y-2">
-            {prontos.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={false} onPrepararExtrato={onPrepararExtrato} />)}
+            {prontos.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={false} onExtratoGerado={onExtratoGerado} />)}
           </Accordion>
         </div>
       )}
@@ -370,7 +370,7 @@ function ClientesFaturarBase({
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">⏳ Aguardando deferimento — não cobrar ainda</h3>
           <Accordion type="multiple" className="space-y-2">
-            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} onPrepararExtrato={onPrepararExtrato} />)}
+            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} onExtratoGerado={onExtratoGerado} />)}
           </Accordion>
         </div>
       )}
@@ -381,10 +381,10 @@ function ClientesFaturarBase({
 export const ClientesFaturar = memo(ClientesFaturarBase);
 ClientesFaturar.displayName = 'ClientesFaturar';
 
-function FaturarItem({ cliente, isDeferimento = false, onPrepararExtrato }: { 
+function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: { 
   cliente: ClienteFinanceiro; 
   isDeferimento?: boolean;
-  onPrepararExtrato: (payload: ExtratoRequestPayload) => void;
+  onExtratoGerado: (payload: ExtratoGeradoPayload) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [generating, setGenerating] = useState(false);
