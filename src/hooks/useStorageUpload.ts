@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { STORAGE_BUCKETS } from '@/constants/storage';
+import { empresaPath } from '@/lib/storage-path';
 import { toast } from 'sonner';
 
 const BUCKET = STORAGE_BUCKETS.CONTRACTS;
@@ -10,7 +11,8 @@ export async function uploadFile(
   processoId: string,
 ): Promise<string> {
   const ext = file.name.split('.').pop();
-  const storagePath = `${folder}/${processoId}/${Date.now()}.${ext}`;
+  const relativePath = `${folder}/${processoId}/${Date.now()}.${ext}`;
+  const storagePath = await empresaPath(relativePath);
 
   const { error } = await supabase.storage
     .from(BUCKET)

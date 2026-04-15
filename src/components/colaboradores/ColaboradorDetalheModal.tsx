@@ -75,7 +75,8 @@ export default function ColaboradorDetalheModal({ colab, open, onOpenChange }: P
     setUploadingId(lancamentoId);
     try {
       const ext = (file.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const storagePath = `recibos/${lancamentoId}.${ext}`;
+      const { empresaPath } = await import('@/lib/storage-path');
+      const storagePath = await empresaPath(`recibos/${lancamentoId}.${ext}`);
       const { error: upErr } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(storagePath, file, { upsert: true });
       if (upErr) throw upErr;
       updateLancamento.mutate({ id: lancamentoId, recibo_assinado_url: storagePath } as any, {

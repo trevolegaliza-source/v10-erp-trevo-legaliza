@@ -65,7 +65,8 @@ export function useOrcamentoPDFs(orcamentoId: string | null | undefined) {
       const versao = (count || 0) + 1;
 
       // 3. Upload to Storage
-      const storagePath = `orcamentos/${orcId}/${modo}_v${versao}_${Date.now()}.pdf`;
+      const { empresaPath } = await import('@/lib/storage-path');
+      const storagePath = await empresaPath(`orcamentos/${orcId}/${modo}_v${versao}_${Date.now()}.pdf`);
       const { error: uploadError } = await supabase.storage
         .from('documentos')
         .upload(storagePath, blob, {
