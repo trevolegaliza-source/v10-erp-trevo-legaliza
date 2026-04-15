@@ -459,7 +459,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         fetchValoresAdicionaisMulti(processoIds),
         fetchCompetenciaProcessos(clienteId, selecionados.map(l => ({
           id: l.processo_id || l.id,
-          created_at: l.created_at || new Date().toISOString(),
+          created_at: l.processo_created_at || new Date().toISOString(),
         })) as any),
       ]);
 
@@ -469,7 +469,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         tipo: l.processo_tipo,
         valor: l.valor,
         valor_avulso: l.valor_original ?? null,
-        created_at: l.created_at || new Date().toISOString(),
+        created_at: l.processo_created_at || new Date().toISOString(),
         etapa: l.processo_etapa || '',
         cliente_id: clienteId,
         notas: l.processo_notas || null,
