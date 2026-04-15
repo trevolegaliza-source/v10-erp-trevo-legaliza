@@ -1728,69 +1728,67 @@ export type Database = {
       get_proposta_por_token: {
         Args: { p_token: string }
         Returns: {
-          aprovado_em: string | null
-          beneficios_capa: Json | null
-          cenario_selecionado: string | null
-          cenarios: Json | null
-          clicksign_document_key: string | null
-          cliente_id: string | null
-          contexto: string | null
-          contrato_assinado_url: string | null
-          convertido_em: string | null
-          created_at: string | null
-          created_by: string | null
-          desconto_pct: number | null
-          desconto_progressivo_ativo: boolean | null
-          desconto_progressivo_limite: number | null
-          desconto_progressivo_pct: number | null
-          destinatario: string | null
-          empresa_id: string | null
-          enviado_em: string | null
+          aprovado_em: string
+          beneficios_capa: Json
+          cenario_selecionado: string
+          cenarios: Json
+          clicksign_document_key: string
+          cliente_id: string
+          contexto: string
+          contrato_assinado_url: string
+          convertido_em: string
+          created_at: string
+          created_by: string
+          desconto_pct: number
+          desconto_progressivo_ativo: boolean
+          desconto_progressivo_limite: number
+          desconto_progressivo_pct: number
+          destinatario: string
+          empresa_id: string
+          enviado_em: string
           escopo: Json
-          etapas_fluxo: Json | null
-          headline_cenario: string | null
+          etapas_fluxo: Json
+          has_password: boolean
+          headline_cenario: string
           id: string
-          itens_selecionados: Json | null
+          itens_selecionados: Json
           naturezas: Json
           numero: number
-          observacoes: string | null
-          observacoes_recusa: string | null
-          ordem_execucao: string | null
-          pacotes: Json | null
-          pagamento: string | null
-          pago_em: string | null
-          pdf_url: string | null
-          prazo_execucao: string | null
-          prazo_pagamento_dias: number | null
-          prospect_cnpj: string | null
-          prospect_contato: string | null
-          prospect_email: string | null
+          observacoes: string
+          observacoes_recusa: string
+          ordem_execucao: string
+          pacotes: Json
+          pagamento: string
+          pago_em: string
+          pdf_url: string
+          prazo_execucao: string
+          prazo_pagamento_dias: number
+          prospect_cnpj: string
+          prospect_contato: string
+          prospect_email: string
           prospect_nome: string
-          prospect_telefone: string | null
-          qtd_processos: number | null
-          recusado_em: string | null
-          riscos: Json | null
-          secoes: Json | null
-          senha_link: string | null
+          prospect_telefone: string
+          qtd_processos: number
+          recusado_em: string
+          riscos: Json
+          secoes: Json
           servicos: Json
-          share_token: string | null
-          sla: string | null
-          status: string | null
+          share_token: string
+          sla: string
+          status: string
           tipo_contrato: string
-          updated_at: string | null
-          validade_dias: number | null
+          updated_at: string
+          validade_dias: number
           valor_base: number
           valor_final: number
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "orcamentos"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       get_user_empresa_id: { Args: never; Returns: string }
       get_user_role: { Args: never; Returns: string }
+      verificar_senha_proposta: {
+        Args: { p_senha: string; p_token: string }
+        Returns: boolean
+      }
     }
     Enums: {
       status_financeiro: "pendente" | "pago" | "atrasado" | "cancelado"
