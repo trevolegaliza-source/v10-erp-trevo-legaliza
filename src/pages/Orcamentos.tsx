@@ -373,9 +373,11 @@ export default function Orcamentos() {
           <h1 className="text-2xl font-bold text-foreground">Orçamentos</h1>
           <p className="text-sm text-muted-foreground">Propostas comerciais personalizadas</p>
         </div>
-        <Button onClick={() => navigate('/orcamentos/novo')} className="gap-2">
-          <Plus className="h-4 w-4" /> Novo Orçamento
-        </Button>
+        {podeCriar('orcamentos') && (
+          <Button onClick={() => navigate('/orcamentos/novo')} className="gap-2">
+            <Plus className="h-4 w-4" /> Novo Orçamento
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
