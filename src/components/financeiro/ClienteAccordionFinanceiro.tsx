@@ -502,7 +502,8 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
       const filename = buildExtratoFilename(clienteNome);
 
       // Save extrato to DB
-      const path = `extratos/${clienteId}/${filename}`;
+      const { empresaPath } = await import('@/lib/storage-path');
+      const path = await empresaPath(`extratos/${clienteId}/${filename}`);
       await supabase.storage.from('documentos').upload(path, pdfBlob, { contentType: 'application/pdf', upsert: true });
       const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(path);
 

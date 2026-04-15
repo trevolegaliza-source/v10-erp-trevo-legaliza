@@ -50,7 +50,8 @@ export default function RecargaModal({ open, onOpenChange, clienteId, clienteNom
       setUploading(true);
       try {
         const ext = file.name.split('.').pop();
-        const path = `comprovantes/recarga_${clienteId}_${Date.now()}.${ext}`;
+        const { empresaPath } = await import('@/lib/storage-path');
+        const path = await empresaPath(`comprovantes/recarga_${clienteId}_${Date.now()}.${ext}`);
         const { error } = await supabase.storage.from('documentos').upload(path, file, { upsert: true });
         if (error) throw error;
         comprovanteUrl = path;

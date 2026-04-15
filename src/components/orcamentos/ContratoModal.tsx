@@ -88,7 +88,8 @@ export default function ContratoModal({ open, onOpenChange, orcamento, onSuccess
       const blob = await gerarContratoPDF(contratoData);
 
       // Upload to storage
-      const storagePath = `${numero}.pdf`;
+      const { empresaPath } = await import('@/lib/storage-path');
+      const storagePath = await empresaPath(`${numero}.pdf`);
       const { error: uploadError } = await supabase.storage
         .from('contratos')
         .upload(storagePath, blob, { contentType: 'application/pdf', upsert: true });
