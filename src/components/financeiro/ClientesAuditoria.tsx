@@ -310,12 +310,14 @@ function AuditoriaFicha({
   lancamento: l,
   clienteApelido,
   clienteMomentoFaturamento,
+  clienteValorBase,
   onOpenTaxa,
   onAuditar,
 }: {
   lancamento: LancamentoFinanceiro;
   clienteApelido: string;
   clienteMomentoFaturamento: string;
+  clienteValorBase: number | null;
   onOpenTaxa: (processoId: string) => void;
   onAuditar: () => void;
 }) {
@@ -327,8 +329,13 @@ function AuditoriaFicha({
   const [deferidoOpen, setDeferidoOpen] = useState(false);
   const [deferidoData, setDeferidoData] = useState(() => new Date().toISOString().split('T')[0]);
   const [savingDeferido, setSavingDeferido] = useState(false);
+  const [trevoOpen, setTrevoOpen] = useState(false);
+  const [savingTrevo, setSavingTrevo] = useState(false);
 
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
+
+  const valorBase = Number(clienteValorBase ?? 0);
+  const novoValorTrevo = Math.round(valorBase * 1.5 * 100) / 100;
 
   // Show "Marcar Deferido" only for no_deferimento clients with processes still in pre-deferimento stage
   const podeMarcarDeferido =
