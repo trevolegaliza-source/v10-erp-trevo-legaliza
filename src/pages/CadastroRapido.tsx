@@ -263,7 +263,7 @@ export default function CadastroRapido() {
         .select('id', { count: 'exact', head: true })
         .eq('cliente_id', clienteId)
         .eq('razao_social', item.razaoSocial)
-        .eq('tipo', item.tipo === 'avulso' ? 'avulso' : item.tipo)
+        .eq('tipo', item.tipo as any)
         .gte('created_at', sixtySecondsAgo);
       if ((count ?? 0) > 0) {
         toast.error(`Processo "${item.razaoSocial}" já cadastrado nos últimos 60 segundos. Aguarde.`);
