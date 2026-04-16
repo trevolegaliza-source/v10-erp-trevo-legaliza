@@ -616,7 +616,12 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
               </p>
             </div>
             <p className="text-xs text-muted-foreground truncate">
-              {cliente.qtd_processos} proc. · {fmt(cliente.total_faturado)} · {tipoLabel(cliente)}
+              {cliente.qtd_processos} proc. · {fmt(cliente.total_faturado)}
+              {(() => {
+                const totalTaxas = cliente.lancamentos.reduce((s, l) => s + (l.total_valores_adicionais || 0), 0);
+                return totalTaxas > 0 ? <> + {fmt(totalTaxas)} taxas</> : null;
+              })()}
+              {' · '}{tipoLabel(cliente)}
             </p>
             <div className="flex flex-wrap gap-1 items-center">
               <ClienteHeaderBadges cliente={cliente} />
