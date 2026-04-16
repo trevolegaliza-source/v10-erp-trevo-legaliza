@@ -237,7 +237,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           ? supabase.from('processos').select('id, razao_social, tipo, etapa, notas, valor, created_at, etiquetas').in('id', processoIds)
           : { data: [], error: null },
         clienteIds.length > 0
-          ? supabase.from('clientes').select('id, nome, apelido, cnpj, tipo, momento_faturamento, dia_cobranca, dia_vencimento_mensal, telefone, email, nome_contador, valor_base, desconto_progressivo, valor_limite_desconto, nome_contato_financeiro, telefone_financeiro').in('id', clienteIds)
+          ? supabase.from('clientes').select('id, nome, apelido, codigo_identificador, cnpj, tipo, momento_faturamento, dia_cobranca, dia_vencimento_mensal, telefone, email, nome_contador, valor_base, desconto_progressivo, valor_limite_desconto, nome_contato_financeiro, telefone_financeiro').in('id', clienteIds)
           : { data: [], error: null },
         processoIds.length > 0
           ? supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds)
