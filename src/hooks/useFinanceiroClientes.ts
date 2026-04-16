@@ -578,7 +578,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
       if (original) clientesAguardandoAuditoria.push(buildClienteView(original, lancs));
     }
 
-    const clientesEnviados = buildTabClientes('enviados');
+    const clientesContestados = buildTabClientes('contestado');
     const clientesAguardando = buildTabClientes('aguardando');
     const clientesPagos = buildTabClientes('pagos');
 
