@@ -421,6 +421,15 @@ export default function Financeiro() {
               <ClientesAuditoria clientes={clientesAguardandoAuditoria} />
             </TabsContent>
 
+            <TabsContent value="cobrar_hoje" className="mt-4">
+              <CobrarHojeTab
+                clientesCobrar={clientesCobrar}
+                mensalistasSemFatura={mensalistasSemFatura}
+                aguardandoDeferimentoValor={cobrarHojeData.aguardandoDefValor}
+                onExtratoGerado={setExtratoGerado}
+              />
+            </TabsContent>
+
             <TabsContent value="cobrar" className="mt-4">
               <ClientesFaturar clientes={clientesCobrar} mensalistasSemFatura={mensalistasSemFatura} onExtratoGerado={setExtratoGerado} />
               
