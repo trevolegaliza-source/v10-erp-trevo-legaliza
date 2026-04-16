@@ -49,6 +49,16 @@ const PageFallback = () => (
   </div>
 );
 
+// Redirect based on role: financeiro goes to /financeiro, others to dashboard
+function SmartHome() {
+  const { role, loading, podeVer } = usePermissions();
+  if (loading) return <PageFallback />;
+  if (role === 'financeiro' || !podeVer('dashboard')) {
+    return <Navigate to="/financeiro" replace />;
+  }
+  return <RequirePermission modulo="dashboard"><Dashboard /></RequirePermission>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
