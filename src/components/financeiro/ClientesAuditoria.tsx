@@ -82,6 +82,7 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
 
   const lancNaoAuditados = cliente.lancamentos.filter(l => !l.auditado && l.status !== 'pago');
   const totalNaoAuditado = lancNaoAuditados.reduce((s, l) => s + l.valor, 0);
+  const totalTaxasNaoAuditado = lancNaoAuditados.reduce((s, l) => s + (l.total_valores_adicionais || 0), 0);
 
   const temMetodoTrevo = lancNaoAuditados.some(l => l.tem_etiqueta_metodo_trevo);
   const temPrioridade = lancNaoAuditados.some(l => l.tem_etiqueta_prioridade);
@@ -98,14 +99,35 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const temNome = !!(cliente.cliente_nome_contato_financeiro || cliente.cliente_nome_contador);
   const temTelefone = !!(cliente.cliente_telefone_financeiro || cliente.cliente_telefone);
 
+  // FIX 3: validate no_deferimento — block audit for processes without data_deferimento
+  const isNoDeferimento = cliente.cliente_momento_faturamento === 'no_deferimento';
+  const aguardandoDeferimento = (l: LancamentoFinanceiro) =>
+    isNoDeferimento && !l.processo_data_deferimento;
+
   const executarAuditarTodos = () => {
-    const ids = lancNaoAuditados.map(l => l.id);
+    const elegiveis = lancNaoAuditados.filter(l => !aguardandoDeferimento(l));
+    const pulados = lancNaoAuditados.length - elegiveis.length;
+    if (elegiveis.length === 0) {
+      toast.error('Nenhum processo elegível: todos aguardam deferimento. Marque a data antes de auditar.');
+      return;
+    }
+    const ids = elegiveis.map(l => l.id);
     auditarTodosMut.mutate({ lancamentoIds: ids }, {
-      onSuccess: () => toast.success(`${ids.length} processos auditados ✅ — movidos para Cobrar`),
+      onSuccess: () => {
+        toast.success(`${ids.length} processos auditados ✅ — movidos para Cobrar`);
+        if (pulados > 0) {
+          toast.warning(`${pulados} processo(s) pulado(s) — aguardam deferimento.`);
+        }
+      },
     });
   };
 
   const executarAuditarUm = (lancamentoId: string) => {
+    const l = lancNaoAuditados.find(x => x.id === lancamentoId);
+    if (l && aguardandoDeferimento(l)) {
+      toast.error(`Processo "${l.processo_razao_social}" aguarda deferimento. Marque como deferido antes de auditar.`);
+      return;
+    }
     auditarMut.mutate({ lancamentoId, auditado: true }, {
       onSuccess: () => toast.success('Processo auditado ✅ — movido para Cobrar'),
     });
