@@ -58,6 +58,7 @@ export default function CadastroRapido() {
   const [savedProcessos, setSavedProcessos] = useState<ProcessoSalvo[]>([]);
   const [totalEconomia, setTotalEconomia] = useState(0);
   const [isFirstProcess, setIsFirstProcess] = useState(false);
+  const isSubmitting = useRef(false);
 
   const selectedCliente = (clientes || []).find(c => c.id === clienteId) || null;
   const { data: negotiations } = useServiceNegotiations(clienteId || undefined);
