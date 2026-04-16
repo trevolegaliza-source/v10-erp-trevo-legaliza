@@ -228,6 +228,7 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 key={l.id}
                 lancamento={l}
                 clienteApelido={cliente.cliente_apelido || cliente.cliente_nome}
+                clienteMomentoFaturamento={cliente.cliente_momento_faturamento}
                 onOpenTaxa={(processoId) => {
                   setTaxaProcessoId(processoId);
                   setTaxaModalOpen(true);
@@ -307,25 +308,59 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
 function AuditoriaFicha({
   lancamento: l,
   clienteApelido,
+  clienteMomentoFaturamento,
   onOpenTaxa,
   onAuditar,
 }: {
   lancamento: LancamentoFinanceiro;
   clienteApelido: string;
+  clienteMomentoFaturamento: string;
   onOpenTaxa: (processoId: string) => void;
   onAuditar: () => void;
 }) {
   const auditarMut = useAuditarLancamento();
   const alterarValorMut = useAlterarValorLancamento();
+  const qc = useQueryClient();
   const [editingValor, setEditingValor] = useState(false);
   const [novoValor, setNovoValor] = useState('');
+  const [deferidoOpen, setDeferidoOpen] = useState(false);
+  const [deferidoData, setDeferidoData] = useState(() => new Date().toISOString().split('T')[0]);
+  const [savingDeferido, setSavingDeferido] = useState(false);
 
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
+
+  // Show "Marcar Deferido" only for no_deferimento clients with processes still in pre-deferimento stage
+  const podeMarcarDeferido =
+    clienteMomentoFaturamento === 'no_deferimento'
+    && ETAPAS_PRE_DEFERIMENTO.includes(l.processo_etapa)
+    && !l.processo_data_deferimento
+    && !!l.processo_id;
 
   const handleDesmarcar = () => {
     auditarMut.mutate({ lancamentoId: l.id, auditado: false }, {
       onSuccess: () => toast.success('Auditoria removida'),
     });
+  };
+
+  const handleConfirmarDeferido = async () => {
+    if (!l.processo_id) return;
+    if (!deferidoData) { toast.error('Selecione uma data'); return; }
+    setSavingDeferido(true);
+    try {
+      const { error } = await supabase
+        .from('processos')
+        .update({ data_deferimento: deferidoData, etapa: 'registro' } as any)
+        .eq('id', l.processo_id);
+      if (error) throw error;
+      toast.success('Processo marcado como deferido');
+      setDeferidoOpen(false);
+      invalidateFinanceiro(qc);
+      qc.invalidateQueries({ queryKey: ['processos'] });
+    } catch (err: any) {
+      toast.error('Erro ao marcar deferido: ' + (err?.message || 'Erro'));
+    } finally {
+      setSavingDeferido(false);
+    }
   };
 
   const handleSalvarValor = () => {
