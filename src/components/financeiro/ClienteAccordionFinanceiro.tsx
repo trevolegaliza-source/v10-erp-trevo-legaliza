@@ -311,6 +311,8 @@ function ClientesFaturarBase({
   const hasMensalistas = mensalistasSemFatura.length > 0;
   const hasClientes = clientes.length > 0;
 
+  const ETAPAS_DEFERIDAS = ['registro', 'finalizados', 'mat', 'inscricao_me', 'alvaras', 'conselho', 'deferido', 'concluido'];
+
   const { prontos, aguardandoDef } = useMemo(() => {
     const prontosMap = new Map<string, ClienteFinanceiro>();
     const aguardandoDefMap = new Map<string, ClienteFinanceiro>();
@@ -321,28 +323,28 @@ function ClientesFaturarBase({
         continue;
       }
 
-      const lancProntos = c.lancamentos.filter(l => ['baixa', 'avulso'].includes(l.processo_tipo));
-      const lancAguardando = c.lancamentos.filter(l => !['baixa', 'avulso'].includes(l.processo_tipo));
+      const lancDeferidos = c.lancamentos.filter(l => ETAPAS_DEFERIDAS.includes(l.processo_etapa));
+      const lancNaoDeferidos = c.lancamentos.filter(l => !ETAPAS_DEFERIDAS.includes(l.processo_etapa));
 
-      if (lancProntos.length > 0) {
+      if (lancDeferidos.length > 0) {
         prontosMap.set(c.cliente_id, {
           ...c,
-          lancamentos: lancProntos,
-          qtd_processos: lancProntos.length,
-          total_faturado: lancProntos.reduce((s, l) => s + l.valor, 0),
-          total_pendente: lancProntos.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
-          qtd_sem_extrato: lancProntos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+          lancamentos: lancDeferidos,
+          qtd_processos: lancDeferidos.length,
+          total_faturado: lancDeferidos.reduce((s, l) => s + l.valor, 0),
+          total_pendente: lancDeferidos.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+          qtd_sem_extrato: lancDeferidos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
         });
       }
 
-      if (lancAguardando.length > 0) {
+      if (lancNaoDeferidos.length > 0) {
         aguardandoDefMap.set(c.cliente_id, {
           ...c,
-          lancamentos: lancAguardando,
-          qtd_processos: lancAguardando.length,
-          total_faturado: lancAguardando.reduce((s, l) => s + l.valor, 0),
-          total_pendente: lancAguardando.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
-          qtd_sem_extrato: lancAguardando.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+          lancamentos: lancNaoDeferidos,
+          qtd_processos: lancNaoDeferidos.length,
+          total_faturado: lancNaoDeferidos.reduce((s, l) => s + l.valor, 0),
+          total_pendente: lancNaoDeferidos.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+          qtd_sem_extrato: lancNaoDeferidos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
         });
       }
     }
@@ -352,6 +354,8 @@ function ClientesFaturarBase({
       aguardandoDef: Array.from(aguardandoDefMap.values()),
     };
   }, [clientes]);
+
+  const [defOpen, setDefOpen] = useState(false);
 
   if (!hasMensalistas && !hasClientes) return <EmptyState text="Nenhum cliente aguardando geração de extrato." />;
 
@@ -394,12 +398,19 @@ function ClientesFaturarBase({
         </div>
       )}
       {aguardandoDef.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">⏳ Aguardando deferimento — não cobrar ainda</h3>
-          <Accordion type="multiple" className="space-y-2">
-            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} onExtratoGerado={onExtratoGerado} />)}
-          </Accordion>
-        </div>
+        <Collapsible open={defOpen} onOpenChange={setDefOpen}>
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors w-full text-left">
+              <ChevronDown className={cn("h-4 w-4 transition-transform", defOpen && "rotate-180")} />
+              ⏳ Aguardando deferimento — não cobrar ainda ({aguardandoDef.reduce((s, c) => s + c.qtd_processos, 0)} proc.)
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            <Accordion type="multiple" className="space-y-2">
+              {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} onExtratoGerado={onExtratoGerado} />)}
+            </Accordion>
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </div>
   );
