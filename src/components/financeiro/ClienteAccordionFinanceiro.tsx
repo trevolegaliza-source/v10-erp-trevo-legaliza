@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt, MessageCircle, Share2, Tags, ChevronDown, Upload, X, Image, File } from 'lucide-react';
+import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt, MessageCircle, Share2, Tags, ChevronDown, Upload, X, Image, File as FileIcon } from 'lucide-react';
 import { empresaPath } from '@/lib/storage-path';
 import { EtiquetasEdit } from '@/components/EtiquetasBadges';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
