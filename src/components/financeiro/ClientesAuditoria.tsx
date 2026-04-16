@@ -514,13 +514,13 @@ function AuditoriaFicha({
               <button
                 type="button"
                 className={cn(
-                  "inline-flex items-center rounded border text-[10px] px-1.5 py-0 h-5 transition-colors cursor-pointer",
+                  "inline-flex items-center rounded border text-sm font-bold px-2 py-0.5 h-6 transition-colors cursor-pointer",
                   l.tem_etiqueta_metodo_trevo
-                    ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/25"
-                    : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                    ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700"
+                    : "bg-amber-500/10 text-amber-700 border-amber-500/40 hover:bg-amber-500/20"
                 )}
               >
-                🍀 {l.tem_etiqueta_metodo_trevo ? 'Método Trevo' : 'Trevo'}
+                🍀 MÉTODO TREVO
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-72 p-3 space-y-2" align="start">
