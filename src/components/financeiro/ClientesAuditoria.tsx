@@ -229,6 +229,7 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 lancamento={l}
                 clienteApelido={cliente.cliente_apelido || cliente.cliente_nome}
                 clienteMomentoFaturamento={cliente.cliente_momento_faturamento}
+                clienteValorBase={cliente.cliente_valor_base}
                 onOpenTaxa={(processoId) => {
                   setTaxaProcessoId(processoId);
                   setTaxaModalOpen(true);
@@ -309,12 +310,14 @@ function AuditoriaFicha({
   lancamento: l,
   clienteApelido,
   clienteMomentoFaturamento,
+  clienteValorBase,
   onOpenTaxa,
   onAuditar,
 }: {
   lancamento: LancamentoFinanceiro;
   clienteApelido: string;
   clienteMomentoFaturamento: string;
+  clienteValorBase: number | null;
   onOpenTaxa: (processoId: string) => void;
   onAuditar: () => void;
 }) {
@@ -326,8 +329,13 @@ function AuditoriaFicha({
   const [deferidoOpen, setDeferidoOpen] = useState(false);
   const [deferidoData, setDeferidoData] = useState(() => new Date().toISOString().split('T')[0]);
   const [savingDeferido, setSavingDeferido] = useState(false);
+  const [trevoOpen, setTrevoOpen] = useState(false);
+  const [savingTrevo, setSavingTrevo] = useState(false);
 
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
+
+  const valorBase = Number(clienteValorBase ?? 0);
+  const novoValorTrevo = Math.round(valorBase * 1.5 * 100) / 100;
 
   // Show "Marcar Deferido" only for no_deferimento clients with processes still in pre-deferimento stage
   const podeMarcarDeferido =
@@ -375,6 +383,85 @@ function AuditoriaFicha({
     });
   };
 
+  const handleAtivarTrevo = async () => {
+    if (!l.processo_id) return;
+    if (valorBase <= 0) { toast.error('Cliente sem valor base cadastrado'); return; }
+    setSavingTrevo(true);
+    try {
+      // 1. Update processo: append etiqueta + recalc valor
+      const { data: procData, error: procFetchErr } = await supabase
+        .from('processos')
+        .select('etiquetas')
+        .eq('id', l.processo_id)
+        .single();
+      if (procFetchErr) throw procFetchErr;
+      const etiquetasAtuais: string[] = (procData?.etiquetas as string[]) || [];
+      const novasEtiquetas = etiquetasAtuais.includes('metodo_trevo')
+        ? etiquetasAtuais
+        : [...etiquetasAtuais, 'metodo_trevo'];
+
+      const { error: procErr } = await supabase
+        .from('processos')
+        .update({ etiquetas: novasEtiquetas, valor: novoValorTrevo } as any)
+        .eq('id', l.processo_id);
+      if (procErr) throw procErr;
+
+      // 2. Update lancamento (only if not pago)
+      if (l.status !== 'pago') {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { error: lancErr } = await supabase
+          .from('lancamentos')
+          .update({
+            valor: novoValorTrevo,
+            valor_original: l.valor,
+            valor_alterado_por: user?.id,
+            valor_alterado_em: new Date().toISOString(),
+          } as any)
+          .eq('id', l.id);
+        if (lancErr) throw lancErr;
+      }
+
+      toast.success(`Método Trevo ativado · ${fmt(novoValorTrevo)}`);
+      setTrevoOpen(false);
+      invalidateFinanceiro(qc);
+      qc.invalidateQueries({ queryKey: ['processos'] });
+    } catch (err: any) {
+      toast.error('Erro ao ativar Método Trevo: ' + (err?.message || 'Erro'));
+    } finally {
+      setSavingTrevo(false);
+    }
+  };
+
+  const handleDesativarTrevo = async () => {
+    if (!l.processo_id) return;
+    setSavingTrevo(true);
+    try {
+      const { data: procData, error: procFetchErr } = await supabase
+        .from('processos')
+        .select('etiquetas')
+        .eq('id', l.processo_id)
+        .single();
+      if (procFetchErr) throw procFetchErr;
+      const etiquetasAtuais: string[] = (procData?.etiquetas as string[]) || [];
+      const novasEtiquetas = etiquetasAtuais.filter(e => e !== 'metodo_trevo');
+
+      const { error } = await supabase
+        .from('processos')
+        .update({ etiquetas: novasEtiquetas } as any)
+        .eq('id', l.processo_id);
+      if (error) throw error;
+
+      toast.success('Método Trevo removido');
+      setTrevoOpen(false);
+      invalidateFinanceiro(qc);
+      qc.invalidateQueries({ queryKey: ['processos'] });
+    } catch (err: any) {
+      toast.error('Erro ao remover: ' + (err?.message || 'Erro'));
+    } finally {
+      setSavingTrevo(false);
+    }
+  };
+
   return (
     <div className={cn(
       "rounded-lg border p-3 space-y-2",
@@ -395,11 +482,54 @@ function AuditoriaFicha({
       </div>
 
       {/* Etiquetas */}
-      <div className="flex gap-1 flex-wrap">
-        {l.tem_etiqueta_metodo_trevo && (
-          <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
-            🍀 Método Trevo
-          </Badge>
+      <div className="flex gap-1 flex-wrap items-center">
+        {l.processo_id && (
+          <Popover open={trevoOpen} onOpenChange={setTrevoOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center rounded border text-[10px] px-1.5 py-0 h-5 transition-colors cursor-pointer",
+                  l.tem_etiqueta_metodo_trevo
+                    ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/25"
+                    : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                )}
+              >
+                🍀 {l.tem_etiqueta_metodo_trevo ? 'Método Trevo' : 'Trevo'}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-3 space-y-2" align="start">
+              {l.tem_etiqueta_metodo_trevo ? (
+                <>
+                  <p className="text-sm font-semibold">Remover Método Trevo?</p>
+                  <p className="text-xs text-muted-foreground">
+                    O valor voltará ao cálculo padrão. Use "Editar Valor" para ajustar manualmente se quiser.
+                  </p>
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="ghost" className="flex-1" onClick={() => setTrevoOpen(false)}>Cancelar</Button>
+                    <Button size="sm" variant="destructive" className="flex-1" onClick={handleDesativarTrevo} disabled={savingTrevo}>
+                      {savingTrevo ? 'Removendo...' : 'Remover'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold">Ativar Método Trevo</p>
+                  <div className="text-xs space-y-1">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Valor atual:</span><span className="font-mono">{fmt(l.valor)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Base × 1.5:</span><span className="font-mono font-bold text-emerald-600">{fmt(novoValorTrevo)}</span></div>
+                  </div>
+                  <p className="text-[10px] text-amber-600">⚠ Desconto progressivo será removido</p>
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="ghost" className="flex-1" onClick={() => setTrevoOpen(false)}>Cancelar</Button>
+                    <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleAtivarTrevo} disabled={savingTrevo || valorBase <= 0}>
+                      {savingTrevo ? 'Salvando...' : 'Confirmar'}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </PopoverContent>
+          </Popover>
         )}
         {l.tem_etiqueta_prioridade && (
           <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
