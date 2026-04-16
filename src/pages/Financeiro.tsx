@@ -62,7 +62,7 @@ export default function Financeiro() {
   const [activeTab, setActiveTab] = useState(() => {
     const stateTab = (location.state as any)?.tab;
     if (stateTab) return stateTab;
-    return isFinanceiro ? 'cobrar' : 'auditoria';
+    return isFinanceiro ? 'cobrar_hoje' : 'auditoria';
   });
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
