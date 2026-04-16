@@ -12,16 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown, ClipboardCheck } from 'lucide-react';
 import { useFinanceiroClientes, type LancamentoFinanceiro, isLancamentoVencidoReal } from '@/hooks/useFinanceiroClientes';
-import ClientesFinanceiroTab from '@/components/financeiro/ClientesFinanceiroTab';
 import {
   ClientesFaturar,
-  ClientesEnviar,
   ClientesAguardando,
   ClientesRecebidos,
   ModalPosExtrato,
 } from '@/components/financeiro/ClienteAccordionFinanceiro';
 import type { ExtratoGeradoPayload } from '@/components/financeiro/ClienteAccordionFinanceiro';
 import { ClientesAuditoria } from '@/components/financeiro/ClientesAuditoria';
+import ClientesContestados from '@/components/financeiro/ClientesContestados';
 import { formatBRL } from '@/lib/pricing-engine';
 import { downloadCSV, formatBRLPlain, formatDateBR } from '@/lib/export-utils';
 import { ETAPA_FINANCEIRO_LABELS } from '@/types/financial';
@@ -80,12 +79,14 @@ export default function Financeiro() {
     clientesCobrar,
     clientesFuturaFatura,
     clientesAguardandoAuditoria,
-    clientesEnviados,
+    clientesContestados,
     clientesAguardando,
     clientesPagos,
     mensalistasSemFatura,
     metricas,
     isLoading,
+    contestarLancamento,
+    resolverContestacao,
   } = useFinanceiroClientes(dates.inicio, dates.fim);
 
   const { data: despesasPagas = 0 } = useQuery({
@@ -118,6 +119,8 @@ export default function Financeiro() {
   const resultado = metricas.totalRecebido - despesasPagas;
 
   const qtdAguardandoAuditoria = clientesAguardandoAuditoria.reduce((s, c) => s + c.qtd_nao_auditados, 0);
+
+  const totalLancamentosContestados = clientesContestados.reduce((s, c) => s + c.qtd_processos, 0);
 
   const resumoMes = useMemo(() => {
     const now = new Date();
@@ -231,8 +234,8 @@ export default function Financeiro() {
               <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide mt-1">Faturado</p>
             </GlassCard>
 
-            {/* Cobrado */}
-            <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)" onClick={() => setActiveTab('enviados')} className="cursor-pointer">
+            {/* Cobrado — now goes to aguardando */}
+            <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)" onClick={() => setActiveTab('aguardando')} className="cursor-pointer">
               <div className="rounded-lg bg-blue-500/10 p-1.5 sm:p-2 w-fit">
                 <Send className="h-4 w-4 text-blue-400" />
               </div>
@@ -332,12 +335,6 @@ export default function Financeiro() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="flex w-full overflow-x-auto overflow-y-hidden no-scrollbar gap-1 h-auto flex-nowrap justify-start">
               {!isFinanceiro && (
-                <TabsTrigger value="clientes" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
-                  <Search className="h-3.5 w-3.5" />
-                  Clientes
-                </TabsTrigger>
-              )}
-              {!isFinanceiro && (
                 <TabsTrigger value="auditoria" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                   <ClipboardCheck className="h-3.5 w-3.5" />
                   Auditoria
@@ -353,19 +350,19 @@ export default function Financeiro() {
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesCobrar.length}</Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="enviados" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
-                <Send className="h-3.5 w-3.5" />
-                Enviados
-                {clientesEnviados.length > 0 && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesEnviados.length}</Badge>
-                )}
-              </TabsTrigger>
               <TabsTrigger value="aguardando" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                 <Clock className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Ag. Pagamento</span>
                 <span className="sm:hidden">Ag. Pgto</span>
                 {clientesAguardando.length > 0 && (
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesAguardando.length}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="contestado" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Contestado
+                {totalLancamentosContestados > 0 && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px] bg-amber-500/20 text-amber-600">{totalLancamentosContestados}</Badge>
                 )}
               </TabsTrigger>
               <TabsTrigger value="pagos" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
@@ -380,10 +377,6 @@ export default function Financeiro() {
                 Todos
               </TabsTrigger>
             </TabsList>
-
-            <TabsContent value="clientes" className="mt-4">
-              <ClientesFinanceiroTab />
-            </TabsContent>
 
             <TabsContent value="auditoria" className="mt-4">
               <ClientesAuditoria clientes={clientesAguardandoAuditoria} />
@@ -431,11 +424,15 @@ export default function Financeiro() {
                 </div>
               )}
             </TabsContent>
-            <TabsContent value="enviados" className="mt-4">
-              <ClientesEnviar clientes={clientesEnviados} />
-            </TabsContent>
             <TabsContent value="aguardando" className="mt-4">
-              <ClientesAguardando clientes={clientesAguardando} />
+              <ClientesAguardando clientes={clientesAguardando} contestarLancamento={contestarLancamento} />
+            </TabsContent>
+            <TabsContent value="contestado" className="mt-4">
+              <ClientesContestados
+                clientes={clientesContestados}
+                onResolver={(params) => resolverContestacao.mutate(params)}
+                userRole={role}
+              />
             </TabsContent>
             <TabsContent value="pagos" className="mt-4">
               <ClientesPagos clientes={clientesPagos} />

@@ -971,20 +971,22 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
 }
 
 // ══════════ TAB: AGUARDANDO ══════════
-export function ClientesAguardando({ clientes }: { clientes: ClienteFinanceiro[] }) {
+export function ClientesAguardando({ clientes, contestarLancamento }: { clientes: ClienteFinanceiro[]; contestarLancamento?: any }) {
   if (clientes.length === 0) return <EmptyState text="Nenhum pagamento pendente." />;
   return (
     <Accordion type="multiple" className="space-y-2">
-      {clientes.map(c => <AguardandoItem key={c.cliente_id} cliente={c} />)}
+      {clientes.map(c => <AguardandoItem key={c.cliente_id} cliente={c} contestarLancamento={contestarLancamento} />)}
     </Accordion>
   );
 }
 
-function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
+function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFinanceiro; contestarLancamento?: any }) {
   const [showPago, setShowPago] = useState(false);
   const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split('T')[0]);
   const [loadingExtrato, setLoadingExtrato] = useState(false);
   const [selectedPagar, setSelectedPagar] = useState<Set<string>>(new Set());
+  const [contestarModal, setContestarModal] = useState<string | null>(null);
+  const [contestarMotivo, setContestarMotivo] = useState('');
   const qc = useQueryClient();
 
   const vencimento = cliente.lancamentos[0]?.data_vencimento;
@@ -1223,6 +1225,11 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
               <Button size="sm" onClick={() => setShowPago(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white col-span-2 h-11 sm:h-9">
                 <CheckCircle className="h-4 w-4 mr-1" /> {selectedPagar.size > 0 ? `Pagar (${selectedPagar.size})` : 'Marcar como Pago'}
               </Button>
+              {contestarLancamento && selectedPagar.size === 1 && (
+                <Button size="sm" variant="outline" onClick={() => { setContestarModal(Array.from(selectedPagar)[0]); }} className="text-amber-600 border-amber-600/30 hover:bg-amber-500/10 h-11 sm:h-9">
+                  <AlertTriangle className="h-4 w-4 mr-1" /> Contestar
+                </Button>
+              )}
             </div>
           </div>
         </AccordionContent>
@@ -1245,6 +1252,40 @@ function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPago(false)}>Cancelar</Button>
             <Button onClick={confirmarPago} className="bg-emerald-600 hover:bg-emerald-700 text-white">Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!contestarModal} onOpenChange={(open) => { if (!open) { setContestarModal(null); setContestarMotivo(''); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Contestar Lançamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-medium">Motivo da contestação</label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                placeholder="Descreva o motivo da contestação..."
+                value={contestarMotivo}
+                onChange={e => setContestarMotivo(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setContestarModal(null); setContestarMotivo(''); }}>Cancelar</Button>
+            <Button
+              disabled={!contestarMotivo.trim()}
+              onClick={() => {
+                if (contestarModal && contestarMotivo.trim()) {
+                  contestarLancamento.mutate({ lancamentoId: contestarModal, motivo: contestarMotivo });
+                  setContestarModal(null);
+                  setContestarMotivo('');
+                }
+              }}
+            >
+              Confirmar Contestação
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

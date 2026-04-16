@@ -717,6 +717,9 @@ export type Database = {
           comprovante_url: string | null
           confirmado_recebimento: boolean | null
           conta_id: string | null
+          contestacao_anexo_url: string | null
+          contestacao_data: string | null
+          contestacao_motivo: string | null
           created_at: string | null
           data_pagamento: string | null
           data_retorno_cobranca: string | null
@@ -762,6 +765,9 @@ export type Database = {
           comprovante_url?: string | null
           confirmado_recebimento?: boolean | null
           conta_id?: string | null
+          contestacao_anexo_url?: string | null
+          contestacao_data?: string | null
+          contestacao_motivo?: string | null
           created_at?: string | null
           data_pagamento?: string | null
           data_retorno_cobranca?: string | null
@@ -807,6 +813,9 @@ export type Database = {
           comprovante_url?: string | null
           confirmado_recebimento?: boolean | null
           conta_id?: string | null
+          contestacao_anexo_url?: string | null
+          contestacao_data?: string | null
+          contestacao_motivo?: string | null
           created_at?: string | null
           data_pagamento?: string | null
           data_retorno_cobranca?: string | null
