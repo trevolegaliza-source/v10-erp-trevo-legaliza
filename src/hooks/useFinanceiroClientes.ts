@@ -7,6 +7,7 @@ export interface ClienteFinanceiro {
   cliente_id: string;
   cliente_nome: string;
   cliente_apelido: string | null;
+  cliente_codigo: string | null;
   cliente_cnpj: string | null;
   cliente_tipo: string;
   cliente_momento_faturamento: string;
