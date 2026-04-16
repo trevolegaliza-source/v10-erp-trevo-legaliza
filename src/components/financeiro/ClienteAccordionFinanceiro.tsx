@@ -1,4 +1,4 @@
-import { memo, useState, useMemo, useCallback } from 'react';
+import { memo, useState, useMemo, useCallback, useRef } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,7 +6,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt, MessageCircle, Share2, Tags, ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt, MessageCircle, Share2, Tags, ChevronDown, Upload, X, Image, File as FileIcon } from 'lucide-react';
+import { empresaPath } from '@/lib/storage-path';
 import { EtiquetasEdit } from '@/components/EtiquetasBadges';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import DeferimentoModal from './DeferimentoModal';
@@ -309,6 +311,8 @@ function ClientesFaturarBase({
   const hasMensalistas = mensalistasSemFatura.length > 0;
   const hasClientes = clientes.length > 0;
 
+  const ETAPAS_DEFERIDAS = ['registro', 'finalizados', 'mat', 'inscricao_me', 'alvaras', 'conselho', 'deferido', 'concluido'];
+
   const { prontos, aguardandoDef } = useMemo(() => {
     const prontosMap = new Map<string, ClienteFinanceiro>();
     const aguardandoDefMap = new Map<string, ClienteFinanceiro>();
@@ -319,28 +323,28 @@ function ClientesFaturarBase({
         continue;
       }
 
-      const lancProntos = c.lancamentos.filter(l => ['baixa', 'avulso'].includes(l.processo_tipo));
-      const lancAguardando = c.lancamentos.filter(l => !['baixa', 'avulso'].includes(l.processo_tipo));
+      const lancDeferidos = c.lancamentos.filter(l => ETAPAS_DEFERIDAS.includes(l.processo_etapa));
+      const lancNaoDeferidos = c.lancamentos.filter(l => !ETAPAS_DEFERIDAS.includes(l.processo_etapa));
 
-      if (lancProntos.length > 0) {
+      if (lancDeferidos.length > 0) {
         prontosMap.set(c.cliente_id, {
           ...c,
-          lancamentos: lancProntos,
-          qtd_processos: lancProntos.length,
-          total_faturado: lancProntos.reduce((s, l) => s + l.valor, 0),
-          total_pendente: lancProntos.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
-          qtd_sem_extrato: lancProntos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+          lancamentos: lancDeferidos,
+          qtd_processos: lancDeferidos.length,
+          total_faturado: lancDeferidos.reduce((s, l) => s + l.valor, 0),
+          total_pendente: lancDeferidos.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+          qtd_sem_extrato: lancDeferidos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
         });
       }
 
-      if (lancAguardando.length > 0) {
+      if (lancNaoDeferidos.length > 0) {
         aguardandoDefMap.set(c.cliente_id, {
           ...c,
-          lancamentos: lancAguardando,
-          qtd_processos: lancAguardando.length,
-          total_faturado: lancAguardando.reduce((s, l) => s + l.valor, 0),
-          total_pendente: lancAguardando.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
-          qtd_sem_extrato: lancAguardando.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+          lancamentos: lancNaoDeferidos,
+          qtd_processos: lancNaoDeferidos.length,
+          total_faturado: lancNaoDeferidos.reduce((s, l) => s + l.valor, 0),
+          total_pendente: lancNaoDeferidos.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
+          qtd_sem_extrato: lancNaoDeferidos.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
         });
       }
     }
@@ -350,6 +354,8 @@ function ClientesFaturarBase({
       aguardandoDef: Array.from(aguardandoDefMap.values()),
     };
   }, [clientes]);
+
+  const [defOpen, setDefOpen] = useState(false);
 
   if (!hasMensalistas && !hasClientes) return <EmptyState text="Nenhum cliente aguardando geração de extrato." />;
 
@@ -392,12 +398,19 @@ function ClientesFaturarBase({
         </div>
       )}
       {aguardandoDef.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-1.5">⏳ Aguardando deferimento — não cobrar ainda</h3>
-          <Accordion type="multiple" className="space-y-2">
-            {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} onExtratoGerado={onExtratoGerado} />)}
-          </Accordion>
-        </div>
+        <Collapsible open={defOpen} onOpenChange={setDefOpen}>
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors w-full text-left">
+              <ChevronDown className={cn("h-4 w-4 transition-transform", defOpen && "rotate-180")} />
+              ⏳ Aguardando deferimento — não cobrar ainda ({aguardandoDef.reduce((s, c) => s + c.qtd_processos, 0)} proc.)
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            <Accordion type="multiple" className="space-y-2">
+              {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} onExtratoGerado={onExtratoGerado} />)}
+            </Accordion>
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </div>
   );
@@ -987,6 +1000,10 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
   const [selectedPagar, setSelectedPagar] = useState<Set<string>>(new Set());
   const [contestarModal, setContestarModal] = useState<string | null>(null);
   const [contestarMotivo, setContestarMotivo] = useState('');
+  const [contestarAnexo, setContestarAnexo] = useState<File | null>(null);
+  const [contestarAnexoPreview, setContestarAnexoPreview] = useState<string | null>(null);
+  const [uploadingAnexo, setUploadingAnexo] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
   const vencimento = cliente.lancamentos[0]?.data_vencimento;
@@ -1256,7 +1273,14 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!contestarModal} onOpenChange={(open) => { if (!open) { setContestarModal(null); setContestarMotivo(''); } }}>
+      <Dialog open={!!contestarModal} onOpenChange={(open) => {
+        if (!open) {
+          setContestarModal(null);
+          setContestarMotivo('');
+          setContestarAnexo(null);
+          if (contestarAnexoPreview) { URL.revokeObjectURL(contestarAnexoPreview); setContestarAnexoPreview(null); }
+        }
+      }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Contestar Lançamento</DialogTitle>
@@ -1271,20 +1295,87 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
                 onChange={e => setContestarMotivo(e.target.value)}
               />
             </div>
+            <div>
+              <label className="text-xs font-medium">Anexo (opcional)</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  if (f.size > 5 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo: 5MB'); return; }
+                  setContestarAnexo(f);
+                  if (f.type.startsWith('image/')) {
+                    setContestarAnexoPreview(URL.createObjectURL(f));
+                  } else {
+                    setContestarAnexoPreview(null);
+                  }
+                }}
+              />
+              {contestarAnexo ? (
+                <div className="flex items-center gap-2 mt-1 p-2 rounded-md border bg-muted/30">
+                  {contestarAnexoPreview ? (
+                    <img src={contestarAnexoPreview} alt="preview" className="h-10 w-10 rounded object-cover shrink-0" />
+                  ) : (
+                    <FileIcon className="h-5 w-5 text-muted-foreground shrink-0" />
+                  )}
+                  <span className="text-xs truncate flex-1">{contestarAnexo.name}</span>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => {
+                    setContestarAnexo(null);
+                    if (contestarAnexoPreview) { URL.revokeObjectURL(contestarAnexoPreview); setContestarAnexoPreview(null); }
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}>
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" className="mt-1 w-full gap-1 text-xs" onClick={() => fileInputRef.current?.click()}>
+                  <Upload className="h-3.5 w-3.5" /> Selecionar arquivo
+                </Button>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-1">PNG, JPG ou PDF — máx. 5MB</p>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setContestarModal(null); setContestarMotivo(''); }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => {
+              setContestarModal(null);
+              setContestarMotivo('');
+              setContestarAnexo(null);
+              if (contestarAnexoPreview) { URL.revokeObjectURL(contestarAnexoPreview); setContestarAnexoPreview(null); }
+            }}>Cancelar</Button>
             <Button
-              disabled={!contestarMotivo.trim()}
-              onClick={() => {
-                if (contestarModal && contestarMotivo.trim()) {
-                  contestarLancamento.mutate({ lancamentoId: contestarModal, motivo: contestarMotivo });
-                  setContestarModal(null);
-                  setContestarMotivo('');
+              disabled={!contestarMotivo.trim() || uploadingAnexo}
+              onClick={async () => {
+                if (!contestarModal || !contestarMotivo.trim()) return;
+                let anexoUrl: string | null = null;
+                if (contestarAnexo) {
+                  setUploadingAnexo(true);
+                  try {
+                    const ext = contestarAnexo.name.split('.').pop();
+                    const relativePath = `contestacoes/${contestarModal}/${Date.now()}.${ext}`;
+                    const storagePath = await empresaPath(relativePath);
+                    const { error } = await supabase.storage
+                      .from('contestacoes')
+                      .upload(storagePath, contestarAnexo, { upsert: true });
+                    if (error) throw error;
+                    anexoUrl = storagePath;
+                  } catch (err: any) {
+                    toast.error('Erro no upload: ' + (err?.message || 'Erro'));
+                    setUploadingAnexo(false);
+                    return;
+                  }
+                  setUploadingAnexo(false);
                 }
+                contestarLancamento.mutate({ lancamentoId: contestarModal, motivo: contestarMotivo, anexoUrl });
+                setContestarModal(null);
+                setContestarMotivo('');
+                setContestarAnexo(null);
+                if (contestarAnexoPreview) { URL.revokeObjectURL(contestarAnexoPreview); setContestarAnexoPreview(null); }
               }}
             >
-              Confirmar Contestação
+              {uploadingAnexo ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Enviando...</> : 'Confirmar Contestação'}
             </Button>
           </DialogFooter>
         </DialogContent>
