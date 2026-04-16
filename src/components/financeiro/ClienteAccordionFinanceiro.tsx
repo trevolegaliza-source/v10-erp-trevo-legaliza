@@ -1308,7 +1308,7 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
                   {contestarAnexoPreview ? (
                     <img src={contestarAnexoPreview} alt="preview" className="h-10 w-10 rounded object-cover shrink-0" />
                   ) : (
-                    <File className="h-5 w-5 text-muted-foreground shrink-0" />
+                    <FileIcon className="h-5 w-5 text-muted-foreground shrink-0" />
                   )}
                   <span className="text-xs truncate flex-1">{contestarAnexo.name}</span>
                   <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0" onClick={() => {
