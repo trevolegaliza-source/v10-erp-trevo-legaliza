@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -81,6 +82,7 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
 
   const lancNaoAuditados = cliente.lancamentos.filter(l => !l.auditado && l.status !== 'pago');
   const totalNaoAuditado = lancNaoAuditados.reduce((s, l) => s + l.valor, 0);
+  const totalTaxasNaoAuditado = lancNaoAuditados.reduce((s, l) => s + (l.total_valores_adicionais || 0), 0);
 
   const temMetodoTrevo = lancNaoAuditados.some(l => l.tem_etiqueta_metodo_trevo);
   const temPrioridade = lancNaoAuditados.some(l => l.tem_etiqueta_prioridade);
@@ -97,14 +99,35 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const temNome = !!(cliente.cliente_nome_contato_financeiro || cliente.cliente_nome_contador);
   const temTelefone = !!(cliente.cliente_telefone_financeiro || cliente.cliente_telefone);
 
+  // FIX 3: validate no_deferimento — block audit for processes without data_deferimento
+  const isNoDeferimento = cliente.cliente_momento_faturamento === 'no_deferimento';
+  const aguardandoDeferimento = (l: LancamentoFinanceiro) =>
+    isNoDeferimento && !l.processo_data_deferimento;
+
   const executarAuditarTodos = () => {
-    const ids = lancNaoAuditados.map(l => l.id);
+    const elegiveis = lancNaoAuditados.filter(l => !aguardandoDeferimento(l));
+    const pulados = lancNaoAuditados.length - elegiveis.length;
+    if (elegiveis.length === 0) {
+      toast.error('Nenhum processo elegível: todos aguardam deferimento. Marque a data antes de auditar.');
+      return;
+    }
+    const ids = elegiveis.map(l => l.id);
     auditarTodosMut.mutate({ lancamentoIds: ids }, {
-      onSuccess: () => toast.success(`${ids.length} processos auditados ✅ — movidos para Cobrar`),
+      onSuccess: () => {
+        toast.success(`${ids.length} processos auditados ✅ — movidos para Cobrar`);
+        if (pulados > 0) {
+          toast.warning(`${pulados} processo(s) pulado(s) — aguardam deferimento.`);
+        }
+      },
     });
   };
 
   const executarAuditarUm = (lancamentoId: string) => {
+    const l = lancNaoAuditados.find(x => x.id === lancamentoId);
+    if (l && aguardandoDeferimento(l)) {
+      toast.error(`Processo "${l.processo_razao_social}" aguarda deferimento. Marque como deferido antes de auditar.`);
+      return;
+    }
     auditarMut.mutate({ lancamentoId, auditado: true }, {
       onSuccess: () => toast.success('Processo auditado ✅ — movido para Cobrar'),
     });
@@ -191,13 +214,15 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · {cliente.cliente_codigo}</span>}
               </p>
               <p className="text-xs text-muted-foreground truncate">
-                {lancNaoAuditados.length} proc. · {fmt(totalNaoAuditado)} · {tipoLabel(cliente)}
+                {lancNaoAuditados.length} proc. · {fmt(totalNaoAuditado)}
+                {totalTaxasNaoAuditado > 0 && <> + {fmt(totalTaxasNaoAuditado)} taxas</>}
+                {' · '}{tipoLabel(cliente)}
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
               {temMetodoTrevo && (
-                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0 hidden sm:inline-flex">
-                  🍀 Método Trevo
+                <Badge className="bg-emerald-600 text-white border-0 text-xs px-2 py-0.5 font-bold hidden sm:inline-flex">
+                  🍀 MÉTODO TREVO
                 </Badge>
               )}
               {temPrioridade && (
@@ -489,13 +514,13 @@ function AuditoriaFicha({
               <button
                 type="button"
                 className={cn(
-                  "inline-flex items-center rounded border text-[10px] px-1.5 py-0 h-5 transition-colors cursor-pointer",
+                  "inline-flex items-center rounded border text-sm font-bold px-2 py-0.5 h-6 transition-colors cursor-pointer",
                   l.tem_etiqueta_metodo_trevo
-                    ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/25"
-                    : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                    ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700"
+                    : "bg-amber-500/10 text-amber-700 border-amber-500/40 hover:bg-amber-500/20"
                 )}
               >
-                🍀 {l.tem_etiqueta_metodo_trevo ? 'Método Trevo' : 'Trevo'}
+                🍀 MÉTODO TREVO
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-72 p-3 space-y-2" align="start">
@@ -541,12 +566,7 @@ function AuditoriaFicha({
       {/* Valor + Vencimento */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-bold text-primary">{fmt(l.valor)}</span>
-          {l.valor_original != null && l.valor_original !== l.valor && (
-            <span className="text-[10px] text-muted-foreground line-through">
-              {fmt(l.valor_original)}
-            </span>
-          )}
+          <span className="text-sm font-bold text-primary">{fmt(l.valor + (l.total_valores_adicionais || 0))}</span>
           {l.valor_alterado_em && (
             <Badge variant="outline" className="text-[10px] px-1 py-0 text-amber-600 border-amber-500/30">
               ✏️ Alterado
@@ -556,10 +576,34 @@ function AuditoriaFicha({
         <span className="text-xs text-muted-foreground whitespace-nowrap">Vence {fmtDate(l.data_vencimento)}</span>
       </div>
 
-      {/* Taxas adicionais */}
-      <div className="text-xs text-muted-foreground">
-        Taxas adicionais: {l.total_valores_adicionais > 0 ? fmt(l.total_valores_adicionais) : 'R$ 0,00'}
+      {/* FIX 1 — Subtotal honorário + taxa + total */}
+      <div className="text-xs space-y-0.5 rounded bg-muted/30 p-2">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Honorários:</span>
+          <span className="font-mono">
+            {fmt(l.valor)}
+            {l.valor_original != null && l.valor_original !== l.valor && (
+              <span className="ml-1 text-[10px] text-muted-foreground line-through">{fmt(l.valor_original)}</span>
+            )}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Taxas reembolsáveis:</span>
+          <span className="font-mono">{fmt(l.total_valores_adicionais || 0)}</span>
+        </div>
+        <div className="flex justify-between border-t border-border/40 pt-0.5 mt-0.5 font-semibold">
+          <span>Total:</span>
+          <span className="font-mono">{fmt(l.valor + (l.total_valores_adicionais || 0))}</span>
+        </div>
       </div>
+
+      {/* FIX 3 — Aviso de aguardando deferimento */}
+      {clienteMomentoFaturamento === 'no_deferimento' && !l.processo_data_deferimento && (
+        <div className="flex items-center gap-1.5 p-2 rounded bg-amber-500/10 text-amber-700 text-xs">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span>Aguarda deferimento. Marque a data antes de auditar.</span>
+        </div>
+      )}
 
       {/* Alerta de taxas */}
       {alertaTaxas && (
@@ -591,10 +635,9 @@ function AuditoriaFicha({
         </div>
       )}
 
-      {/* Observações */}
-      {l.observacoes_financeiro && (
-        <p className="text-xs text-muted-foreground italic">Obs: {l.observacoes_financeiro}</p>
-      )}
+      {/* FIX 5 — Observação editável (debounce 1s) */}
+      <ObservacaoField lancamentoId={l.id} initialValue={l.observacoes_financeiro || ''} />
+
       {l.processo_notas && (
         <p className="text-xs text-muted-foreground italic">Notas: {l.processo_notas}</p>
       )}
@@ -664,6 +707,58 @@ function AuditoriaFicha({
           <Check className="h-3 w-3 mr-1" /> {l.auditado ? 'Auditado ✅' : 'Auditar'}
         </Button>
       </div>
+    </div>
+  );
+}
+
+// FIX 5 — Editable observação field with debounced autosave
+function ObservacaoField({ lancamentoId, initialValue }: { lancamentoId: string; initialValue: string }) {
+  const [value, setValue] = useState(initialValue);
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRef = useRef(initialValue);
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    setValue(initialValue);
+    lastSavedRef.current = initialValue;
+  }, [initialValue, lancamentoId]);
+
+  useEffect(() => {
+    if (value === lastSavedRef.current) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      setSaving(true);
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({ observacoes_financeiro: value || null } as any)
+        .eq('id', lancamentoId);
+      setSaving(false);
+      if (error) {
+        toast.error('Erro ao salvar observação');
+        return;
+      }
+      lastSavedRef.current = value;
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1200);
+      invalidateFinanceiro(qc);
+    }, 1000);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [value, lancamentoId, qc]);
+
+  return (
+    <div className="space-y-1">
+      <Textarea
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder="Observação (aparecerá no extrato)"
+        rows={1}
+        className="text-xs min-h-[32px] resize-y"
+        style={{ fontSize: 14 }}
+      />
+      {saving && <p className="text-[10px] text-muted-foreground">Salvando...</p>}
+      {savedFlash && !saving && <p className="text-[10px] text-emerald-600">✓ Salvo</p>}
     </div>
   );
 }
