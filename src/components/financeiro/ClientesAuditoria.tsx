@@ -386,6 +386,11 @@ function AuditoriaFicha({
         <p className="text-xs text-muted-foreground truncate">
           {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo}
           {l.processo_etapa && ` · ${l.processo_etapa}`}
+          {l.processo_data_deferimento && (
+            <span className="ml-2 inline-flex items-center font-mono text-emerald-600 text-[10px]">
+              · Deferido {fmtDate(l.processo_data_deferimento)}
+            </span>
+          )}
         </p>
       </div>
 
@@ -483,6 +488,37 @@ function AuditoriaFicha({
           >
             <Receipt className="h-3 w-3 mr-1" /> Add Taxa
           </Button>
+        )}
+        {podeMarcarDeferido && (
+          <Popover open={deferidoOpen} onOpenChange={setDeferidoOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-7 border-emerald-600/40 text-emerald-600 hover:bg-emerald-600/10 hover:text-emerald-700"
+              >
+                <CalendarCheck className="h-3 w-3 mr-1" /> Deferido ✅
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3 space-y-2" align="start">
+              <Label className="text-xs">Data do deferimento</Label>
+              <Input
+                type="date"
+                value={deferidoData}
+                onChange={e => setDeferidoData(e.target.value)}
+                className="h-9 text-sm"
+                style={{ fontSize: 16 }}
+              />
+              <Button
+                size="sm"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={handleConfirmarDeferido}
+                disabled={savingDeferido}
+              >
+                {savingDeferido ? 'Salvando...' : 'Confirmar'}
+              </Button>
+            </PopoverContent>
+          </Popover>
         )}
         <Button
           size="sm"
