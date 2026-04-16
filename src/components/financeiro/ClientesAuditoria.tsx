@@ -229,6 +229,7 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 lancamento={l}
                 clienteApelido={cliente.cliente_apelido || cliente.cliente_nome}
                 clienteMomentoFaturamento={cliente.cliente_momento_faturamento}
+                clienteValorBase={cliente.cliente_valor_base}
                 onOpenTaxa={(processoId) => {
                   setTaxaProcessoId(processoId);
                   setTaxaModalOpen(true);
