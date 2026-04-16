@@ -4,10 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, ChevronDown, ExternalLink, CheckCircle, RotateCcw } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ExternalLink, CheckCircle, RotateCcw, Loader2 } from 'lucide-react';
 import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -153,14 +155,7 @@ function ContestadoLancamentoCard({ lancamento: l, isMaster, onDevolver, onEncer
       )}
 
       {(l as any).contestacao_anexo_url && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="text-xs h-8 gap-1"
-          onClick={() => window.open((l as any).contestacao_anexo_url, '_blank')}
-        >
-          <ExternalLink className="h-3 w-3" /> Ver anexo
-        </Button>
+        <AnexoButton storagePath={(l as any).contestacao_anexo_url} />
       )}
 
       {isMaster && (
