@@ -10,8 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown, ClipboardCheck, Zap } from 'lucide-react';
-import CobrarHojeTab from '@/components/financeiro/CobrarHojeTab';
+import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown, ClipboardCheck } from 'lucide-react';
 import { useFinanceiroClientes, type LancamentoFinanceiro, isLancamentoVencidoReal } from '@/hooks/useFinanceiroClientes';
 import ClientesFinanceiroTab from '@/components/financeiro/ClientesFinanceiroTab';
 import {
@@ -62,7 +61,7 @@ export default function Financeiro() {
   const [activeTab, setActiveTab] = useState(() => {
     const stateTab = (location.state as any)?.tab;
     if (stateTab) return stateTab;
-    return isFinanceiro ? 'cobrar_hoje' : 'auditoria';
+    return isFinanceiro ? 'cobrar' : 'auditoria';
   });
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
@@ -119,36 +118,6 @@ export default function Financeiro() {
   const resultado = metricas.totalRecebido - despesasPagas;
 
   const qtdAguardandoAuditoria = clientesAguardandoAuditoria.reduce((s, c) => s + c.qtd_nao_auditados, 0);
-
-  const cobrarHojeData = useMemo(() => {
-    // Count unique clients that have at least 1 AUDITED lancamento
-    const clienteIds = new Set<string>();
-    for (const c of clientesCobrar) {
-      const auditados = c.lancamentos.filter(l => l.auditado === true);
-      if (auditados.length > 0) clienteIds.add(c.cliente_id);
-    }
-    // Add mensalistas within window
-    for (const m of mensalistasSemFatura) {
-      const dia = m.dia_vencimento_mensal || 10;
-      const now = new Date();
-      const venc = new Date(now.getFullYear(), now.getMonth(), dia);
-      const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-      const diff = Math.round((hoje.getTime() - new Date(venc.getFullYear(), venc.getMonth(), venc.getDate()).getTime()) / 86400000);
-      if (Math.max(0, diff) > 0 || Math.max(0, -diff) <= 5) {
-        clienteIds.add(m.id);
-      }
-    }
-    let aguardandoDefValor = 0;
-    for (const c of clientes) {
-      if (c.cliente_momento_faturamento !== 'no_deferimento') continue;
-      for (const l of c.lancamentos) {
-        if (l.status === 'pago' || l.etapa_financeiro !== 'solicitacao_criada' || !l.auditado) continue;
-        if (['baixa', 'avulso'].includes(l.processo_tipo)) continue;
-        aguardandoDefValor += l.valor;
-      }
-    }
-    return { count: clienteIds.size, aguardandoDefValor };
-  }, [clientesCobrar, mensalistasSemFatura, clientes]);
 
   const resumoMes = useMemo(() => {
     const now = new Date();
@@ -377,14 +346,6 @@ export default function Financeiro() {
                   )}
                 </TabsTrigger>
               )}
-              <TabsTrigger value="cobrar_hoje" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
-                <Zap className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Cobrar Hoje</span>
-                <span className="sm:hidden">Hoje</span>
-                {cobrarHojeData.count > 0 && (
-                  <Badge className="text-[10px] px-1.5 py-0 min-w-[18px] bg-red-500 text-white border-0">{cobrarHojeData.count}</Badge>
-                )}
-              </TabsTrigger>
               <TabsTrigger value="cobrar" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
                 <FileText className="h-3.5 w-3.5" />
                 Cobrar
@@ -426,15 +387,6 @@ export default function Financeiro() {
 
             <TabsContent value="auditoria" className="mt-4">
               <ClientesAuditoria clientes={clientesAguardandoAuditoria} />
-            </TabsContent>
-
-            <TabsContent value="cobrar_hoje" className="mt-4">
-              <CobrarHojeTab
-                clientesCobrar={clientesCobrar}
-                mensalistasSemFatura={mensalistasSemFatura}
-                aguardandoDeferimentoValor={cobrarHojeData.aguardandoDefValor}
-                onExtratoGerado={setExtratoGerado}
-              />
             </TabsContent>
 
             <TabsContent value="cobrar" className="mt-4">

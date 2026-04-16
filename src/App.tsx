@@ -9,7 +9,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { RequirePermission } from "@/components/auth/RequirePermission";
-import { usePermissions } from "@/hooks/usePermissions";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Processos = lazy(() => import("./pages/Processos"));
@@ -50,22 +49,6 @@ const PageFallback = () => (
   </div>
 );
 
-// Redirect based on role: financeiro goes to /financeiro, others to dashboard
-function SmartHome() {
-  const { role, loading, podeVer } = usePermissions();
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-40">
-        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
-      </div>
-    );
-  }
-  if (role === 'financeiro' || !podeVer('dashboard')) {
-    return <Navigate to="/financeiro" replace />;
-  }
-  return <RequirePermission modulo="dashboard"><Dashboard /></RequirePermission>;
-}
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
@@ -83,7 +66,11 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 >
-                  <Route path="/" element={<SmartHome />} />
+                  <Route path="/" element={
+                    <RequirePermission modulo="dashboard">
+                      <Dashboard />
+                    </RequirePermission>
+                  } />
                   <Route path="/processos" element={
                     <RequirePermission modulo="processos">
                       <Processos />
