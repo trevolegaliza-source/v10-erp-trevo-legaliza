@@ -66,11 +66,7 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 >
-                  <Route path="/" element={
-                    <RequirePermission modulo="dashboard">
-                      <Dashboard />
-                    </RequirePermission>
-                  } />
+                  <Route path="/" element={<SmartHome />} />
                   <Route path="/processos" element={
                     <RequirePermission modulo="processos">
                       <Processos />
