@@ -980,7 +980,7 @@ export function ClientesAguardando({ clientes, contestarLancamento }: { clientes
   );
 }
 
-function AguardandoItem({ cliente }: { cliente: ClienteFinanceiro }) {
+function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFinanceiro; contestarLancamento?: any }) {
   const [showPago, setShowPago] = useState(false);
   const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split('T')[0]);
   const [loadingExtrato, setLoadingExtrato] = useState(false);
