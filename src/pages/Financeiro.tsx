@@ -120,6 +120,29 @@ export default function Financeiro() {
 
   const qtdAguardandoAuditoria = clientesAguardandoAuditoria.reduce((s, c) => s + c.qtd_nao_auditados, 0);
 
+  const cobrarHojeData = useMemo(() => {
+    let count = 0;
+    let aguardandoDefValor = 0;
+    for (const c of clientesCobrar) count += c.lancamentos.length;
+    count += mensalistasSemFatura.filter(m => {
+      const dia = m.dia_vencimento_mensal || 10;
+      const now = new Date();
+      const venc = new Date(now.getFullYear(), now.getMonth(), dia);
+      const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+      const diff = Math.round((hoje.getTime() - new Date(venc.getFullYear(), venc.getMonth(), venc.getDate()).getTime()) / 86400000);
+      return Math.max(0, diff) > 0 || Math.max(0, -diff) <= 5;
+    }).length;
+    for (const c of clientes) {
+      if (c.cliente_momento_faturamento !== 'no_deferimento') continue;
+      for (const l of c.lancamentos) {
+        if (l.status === 'pago' || l.etapa_financeiro !== 'solicitacao_criada' || !l.auditado) continue;
+        if (['baixa', 'avulso'].includes(l.processo_tipo)) continue;
+        aguardandoDefValor += l.valor;
+      }
+    }
+    return { count, aguardandoDefValor };
+  }, [clientesCobrar, mensalistasSemFatura, clientes]);
+
   const resumoMes = useMemo(() => {
     const now = new Date();
     const mesNome = format(
