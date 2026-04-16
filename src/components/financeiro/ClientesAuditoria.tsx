@@ -482,11 +482,54 @@ function AuditoriaFicha({
       </div>
 
       {/* Etiquetas */}
-      <div className="flex gap-1 flex-wrap">
-        {l.tem_etiqueta_metodo_trevo && (
-          <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0">
-            🍀 Método Trevo
-          </Badge>
+      <div className="flex gap-1 flex-wrap items-center">
+        {l.processo_id && (
+          <Popover open={trevoOpen} onOpenChange={setTrevoOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center rounded border text-[10px] px-1.5 py-0 h-5 transition-colors cursor-pointer",
+                  l.tem_etiqueta_metodo_trevo
+                    ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/25"
+                    : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+                )}
+              >
+                🍀 {l.tem_etiqueta_metodo_trevo ? 'Método Trevo' : 'Trevo'}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-3 space-y-2" align="start">
+              {l.tem_etiqueta_metodo_trevo ? (
+                <>
+                  <p className="text-sm font-semibold">Remover Método Trevo?</p>
+                  <p className="text-xs text-muted-foreground">
+                    O valor voltará ao cálculo padrão. Use "Editar Valor" para ajustar manualmente se quiser.
+                  </p>
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="ghost" className="flex-1" onClick={() => setTrevoOpen(false)}>Cancelar</Button>
+                    <Button size="sm" variant="destructive" className="flex-1" onClick={handleDesativarTrevo} disabled={savingTrevo}>
+                      {savingTrevo ? 'Removendo...' : 'Remover'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold">Ativar Método Trevo</p>
+                  <div className="text-xs space-y-1">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Valor atual:</span><span className="font-mono">{fmt(l.valor)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Base × 1.5:</span><span className="font-mono font-bold text-emerald-600">{fmt(novoValorTrevo)}</span></div>
+                  </div>
+                  <p className="text-[10px] text-amber-600">⚠ Desconto progressivo será removido</p>
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="ghost" className="flex-1" onClick={() => setTrevoOpen(false)}>Cancelar</Button>
+                    <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleAtivarTrevo} disabled={savingTrevo || valorBase <= 0}>
+                      {savingTrevo ? 'Salvando...' : 'Confirmar'}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </PopoverContent>
+          </Popover>
         )}
         {l.tem_etiqueta_prioridade && (
           <Badge variant="outline" className="bg-red-500/15 text-red-500 border-red-500/30 text-[10px] px-1.5 py-0">
