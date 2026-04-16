@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useClientes, useCreateProcesso, calcularDescontoProgressivo } from '@/hooks/useFinanceiro';
 import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
@@ -58,6 +58,7 @@ export default function CadastroRapido() {
   const [savedProcessos, setSavedProcessos] = useState<ProcessoSalvo[]>([]);
   const [totalEconomia, setTotalEconomia] = useState(0);
   const [isFirstProcess, setIsFirstProcess] = useState(false);
+  const isSubmitting = useRef(false);
 
   const selectedCliente = (clientes || []).find(c => c.id === clienteId) || null;
   const { data: negotiations } = useServiceNegotiations(clienteId || undefined);
@@ -252,13 +253,45 @@ export default function CadastroRapido() {
     setFila([]);
   };
 
+  // Anti-duplicata: check for recent duplicate
+  const checkDuplicate = async (items: ProcessoNaFila[]): Promise<boolean> => {
+    if (!clienteId) return false;
+    const sixtySecondsAgo = new Date(Date.now() - 60000).toISOString();
+    for (const item of items) {
+      const { count } = await supabase
+        .from('processos')
+        .select('id', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId)
+        .eq('razao_social', item.razaoSocial)
+        .eq('tipo', item.tipo as any)
+        .gte('created_at', sixtySecondsAgo);
+      if ((count ?? 0) > 0) {
+        toast.error(`Processo "${item.razaoSocial}" já cadastrado nos últimos 60 segundos. Aguarde.`);
+        return true;
+      }
+    }
+    return false;
+  };
+
   // Save processes
   const saveProcessos = async (items: ProcessoNaFila[]) => {
+    // Double-click guard
+    if (isSubmitting.current) return;
+    isSubmitting.current = true;
     setIsSaving(true);
-    const saved: ProcessoSalvo[] = [];
-    let economia = 0;
 
     try {
+      // Anti-duplicata check
+      const hasDuplicate = await checkDuplicate(items);
+      if (hasDuplicate) {
+        setIsSaving(false);
+        isSubmitting.current = false;
+        return;
+      }
+
+      const saved: ProcessoSalvo[] = [];
+      let economia = 0;
+
       for (const item of items) {
         const neg = (negotiations || []).find(n => n.id === item.tipo);
         const tipoFinal = neg ? 'avulso' : item.tipo;
@@ -317,6 +350,7 @@ export default function CadastroRapido() {
       toast.error('Erro ao salvar: ' + err.message);
     } finally {
       setIsSaving(false);
+      isSubmitting.current = false;
     }
   };
 

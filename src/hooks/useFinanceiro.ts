@@ -267,7 +267,7 @@ export function useCreateProcesso() {
       const cliente = clienteData as any;
       const isPrePago = cliente.tipo === 'PRE_PAGO';
       const isMensalista = cliente.tipo === 'MENSALISTA';
-      const valorBaseCliente = isMensalista ? Number(cliente.valor_base ?? 0) : Number(cliente.valor_base ?? 0);
+      const valorBaseCliente = Number(cliente.valor_base ?? 0);
       const descontoPercent = Number(cliente.desconto_progressivo ?? 0);
       const valorLimite = cliente.valor_limite_desconto != null ? Number(cliente.valor_limite_desconto) : null;
 
@@ -295,20 +295,15 @@ export function useCreateProcesso() {
       } else if (isManualPrice) {
         valorFinal = Number(input.valor_manual);
       } else if (isPrePago) {
-        // For pre-paid, value should come from valor_manual (set by service negotiation)
         valorFinal = isManualPrice ? Number(input.valor_manual) : 0;
       } else if (isMensalista) {
         const franquia = Number(cliente.franquia_processos ?? 0);
         if (franquia > 0 && monthCount < franquia) {
-          // Within franchise
           valorFinal = 0;
           discountInfo = `Dentro da franquia (${monthCount + 1}/${franquia})`;
         } else {
-          // Exceeded franchise
           const excedenteCount = franquia > 0 ? monthCount - franquia : monthCount;
           if (isUrgente) {
-            // URGÊNCIA: valor fixo = base × 1.5, SEM desconto progressivo
-            // O slot é ocupado (monthCount já conta) mas o valor não muda
             valorFinal = valorBaseCliente * 1.5;
             discountInfo = `Método Trevo / Urgência | Base: R$ ${valorBaseCliente.toFixed(2)} × 1.5 = R$ ${valorFinal.toFixed(2)}`;
           } else if (descontoPercent > 0) {
@@ -321,8 +316,6 @@ export function useCreateProcesso() {
         }
       } else if (cliente.tipo !== 'MENSALISTA') {
         if (isUrgente) {
-          // URGÊNCIA: valor fixo = base × 1.5, SEM desconto progressivo
-          // O slot é ocupado mas o valor é fixo
           valorFinal = valorBaseCliente * 1.5;
           discountInfo = `Método Trevo / Urgência | Base: R$ ${valorBaseCliente.toFixed(2)} × 1.5 = R$ ${valorFinal.toFixed(2)}`;
         } else if (slots === 2 && descontoPercent > 0) {
@@ -346,17 +339,13 @@ export function useCreateProcesso() {
         valorFinal = isUrgente ? valorBaseCliente * 1.5 : valorBaseCliente;
       }
 
-      // Apply welcome discount (before anything else is added)
+      // Apply welcome discount
       let welcomeDiscountInfo = '';
       if (input.desconto_boas_vindas && input.desconto_boas_vindas > 0) {
         const discountAmt = valorFinal * (input.desconto_boas_vindas / 100);
         valorFinal = Math.round((valorFinal - discountAmt) * 100) / 100;
         welcomeDiscountInfo = `Desconto de Boas-vindas aplicado: ${input.desconto_boas_vindas}% (-R$ ${discountAmt.toFixed(2)})`;
       }
-
-      const { data: vencimento } = await supabase.rpc('calcular_vencimento', {
-        p_cliente_id: input.cliente_id,
-      });
 
       // Append discount info to notas
       let notasFinal = input.notas || '';
@@ -371,27 +360,7 @@ export function useCreateProcesso() {
         ? new Date(input.data_entrada + 'T12:00:00').toISOString()
         : new Date().toISOString();
 
-      const { data: processo, error } = await supabase
-        .from('processos')
-        .insert({
-          cliente_id: input.cliente_id,
-          razao_social: input.razao_social,
-          tipo: input.tipo,
-          prioridade: input.prioridade || 'normal',
-          responsavel: input.responsavel || null,
-          valor: valorFinal,
-          notas: notasFinal || null,
-          created_at: createdAt,
-          dentro_do_plano: input.dentro_do_plano ?? null,
-          valor_avulso: input.valor_avulso ?? 0,
-          justificativa_avulso: input.justificativa_avulso || null,
-          etiquetas: input.etiquetas || [],
-        } as any)
-        .select('*, cliente:clientes(*)')
-        .single();
-      if (error) throw error;
-
-      // Determine lancamento description
+      // Build lancamento description
       const serviceName = isAvulso && input.descricao_avulso
         ? input.descricao_avulso
         : `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)}`;
@@ -405,47 +374,49 @@ export function useCreateProcesso() {
       const momentoFat = cliente.momento_faturamento || 'na_solicitacao';
       const shouldCreateLancamento = input.ja_pago || momentoFat === 'na_solicitacao';
 
-      if (shouldCreateLancamento) {
-        const lancDate = input.data_entrada || new Date().toISOString().split('T')[0];
-        const { error: lancError } = await supabase.from('lancamentos').insert({
-          tipo: 'receber',
-          cliente_id: input.cliente_id,
-          processo_id: processo.id,
-          descricao: descParts.join(' '),
-          valor: valorFinal,
-          status: input.ja_pago ? 'pago' : 'pendente',
-          data_vencimento: input.ja_pago ? lancDate : (vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0]),
-          data_pagamento: input.ja_pago ? lancDate : null,
-          created_at: createdAt,
-          etapa_financeiro: input.ja_pago ? 'honorario_pago' : 'solicitacao_criada',
-        });
-        if (lancError) throw lancError;
-      }
+      const lancDate = input.data_entrada || new Date().toISOString().split('T')[0];
 
-      // Create separate lancamento for avulso honorário (fora do plano)
-      if (input.dentro_do_plano === false && input.valor_avulso && input.valor_avulso > 0) {
-        const lancDate = input.data_entrada || new Date().toISOString().split('T')[0];
-        await supabase.from('lancamentos').insert({
-          tipo: 'receber',
-          cliente_id: input.cliente_id,
-          processo_id: processo.id,
-          descricao: `Honorário avulso - ${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}${input.justificativa_avulso ? ` (${input.justificativa_avulso})` : ''}`,
-          valor: input.valor_avulso,
-          status: 'pendente',
-          data_vencimento: vencimento || new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0],
-          created_at: createdAt,
-          etapa_financeiro: 'solicitacao_criada',
-        });
-      }
+      // Avulso extra lancamento (fora do plano)
+      const criarAvulsoExtra = input.dentro_do_plano === false && !!input.valor_avulso && input.valor_avulso > 0;
+      const descAvulsoExtra = criarAvulsoExtra
+        ? `Honorário avulso - ${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}${input.justificativa_avulso ? ` (${input.justificativa_avulso})` : ''}`
+        : '';
 
-      if (input.ja_pago) {
-        await supabase
-          .from('processos')
-          .update({ etapa: 'finalizados', updated_at: new Date().toISOString() })
-          .eq('id', processo.id);
-      }
+      // Call SECURITY DEFINER function (atomic processo + lancamento)
+      const { data: processoId, error: rpcError } = await supabase.rpc('criar_processo_com_lancamento', {
+        p_cliente_id: input.cliente_id,
+        p_razao_social: input.razao_social,
+        p_tipo: input.tipo,
+        p_prioridade: input.prioridade || 'normal',
+        p_responsavel: input.responsavel || null,
+        p_valor: valorFinal,
+        p_notas: notasFinal || null,
+        p_created_at: createdAt,
+        p_dentro_do_plano: input.dentro_do_plano ?? null,
+        p_valor_avulso: input.valor_avulso ?? 0,
+        p_justificativa_avulso: input.justificativa_avulso || null,
+        p_etiquetas: input.etiquetas || [],
+        p_criar_lancamento: shouldCreateLancamento,
+        p_descricao_lancamento: descParts.join(' '),
+        p_ja_pago: input.ja_pago || false,
+        p_data_vencimento: null,
+        p_data_lancamento: lancDate,
+        p_criar_avulso_extra: criarAvulsoExtra,
+        p_valor_avulso_extra: criarAvulsoExtra ? input.valor_avulso! : 0,
+        p_descricao_avulso_extra: descAvulsoExtra,
+      });
 
-      // Debit prepaid balance if PRE_PAGO
+      if (rpcError) throw rpcError;
+
+      // Fetch complete processo object
+      const { data: processo, error: fetchError } = await supabase
+        .from('processos')
+        .select('*, cliente:clientes(*)')
+        .eq('id', processoId)
+        .single();
+      if (fetchError) throw fetchError;
+
+      // Debit prepaid balance if PRE_PAGO (uses permissive RLS)
       if (isPrePago && valorFinal > 0) {
         const saldoAtual = Number(cliente.saldo_prepago ?? 0);
         const novoSaldo = saldoAtual - valorFinal;
@@ -462,7 +433,7 @@ export function useCreateProcesso() {
             saldo_anterior: saldoAtual,
             saldo_posterior: novoSaldo,
             descricao: `${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}`,
-            processo_id: processo.id,
+            processo_id: processoId,
           } as any);
       }
 
