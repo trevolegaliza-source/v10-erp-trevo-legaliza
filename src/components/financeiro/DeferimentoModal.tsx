@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
@@ -27,7 +27,11 @@ interface DeferimentoModalProps {
 export default function DeferimentoModal({
   open, onOpenChange, clienteNome, processos, onConfirm,
 }: DeferimentoModalProps) {
-  const [items, setItems] = useState<Record<string, { checked: boolean; data: string }>>(() => {
+  const [items, setItems] = useState<Record<string, { checked: boolean; data: string }>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
     const initial: Record<string, { checked: boolean; data: string }> = {};
     processos.forEach(p => {
       initial[p.processo_id] = {
@@ -35,22 +39,21 @@ export default function DeferimentoModal({
         data: p.data_deferimento_atual || '',
       };
     });
-    return initial;
-  });
-  const [saving, setSaving] = useState(false);
+    setItems(initial);
+  }, [open, processos]);
 
   function toggleCheck(id: string) {
-    setItems(prev => ({
-      ...prev,
-      [id]: { ...prev[id], checked: !prev[id].checked },
-    }));
+    setItems(prev => {
+      const cur = prev[id] || { checked: false, data: '' };
+      return { ...prev, [id]: { ...cur, checked: !cur.checked } };
+    });
   }
 
   function setData(id: string, data: string) {
-    setItems(prev => ({
-      ...prev,
-      [id]: { ...prev[id], data, checked: true },
-    }));
+    setItems(prev => {
+      const cur = prev[id] || { checked: false, data: '' };
+      return { ...prev, [id]: { ...cur, data, checked: true } };
+    });
   }
 
   const deferidos = processos.filter(p => items[p.processo_id]?.checked && items[p.processo_id]?.data);
