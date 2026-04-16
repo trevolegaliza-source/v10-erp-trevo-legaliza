@@ -20,6 +20,25 @@ function fmtDate(d: string | null | undefined) {
   return new Date(d).toLocaleDateString('pt-BR');
 }
 
+function AnexoButton({ storagePath }: { storagePath: string }) {
+  const [loading, setLoading] = useState(false);
+  async function handleOpen() {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.storage.from('contestacoes').download(storagePath);
+      if (error || !data) { toast.error('Erro ao abrir anexo.'); return; }
+      const blobUrl = URL.createObjectURL(data);
+      window.open(blobUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch { toast.error('Erro ao abrir anexo.'); } finally { setLoading(false); }
+  }
+  return (
+    <Button variant="outline" size="sm" className="text-xs h-8 gap-1" onClick={handleOpen} disabled={loading}>
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />} Ver anexo
+    </Button>
+  );
+}
+
 interface Props {
   clientes: ClienteFinanceiro[];
   onResolver: (params: { lancamentoId: string; destino: 'aguardando' | 'pagos'; observacao: string }) => void;
