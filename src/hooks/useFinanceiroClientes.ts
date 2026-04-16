@@ -267,6 +267,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
             cliente_id: effectiveClienteId,
             cliente_nome: cliente?.nome || '⚠️ SEM CLIENTE VINCULADO',
             cliente_apelido: cliente?.apelido || null,
+            cliente_codigo: cliente?.codigo_identificador || null,
             cliente_cnpj: cliente?.cnpj || null,
             cliente_tipo: cliente?.tipo || 'AVULSO_4D',
             cliente_momento_faturamento: cliente?.momento_faturamento || 'na_solicitacao',
