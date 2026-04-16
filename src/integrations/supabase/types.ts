@@ -1751,6 +1751,31 @@ export type Database = {
         Args: { p_mensagem: string; p_orcamento_id: string; p_tipo: string }
         Returns: undefined
       }
+      criar_processo_com_lancamento: {
+        Args: {
+          p_cliente_id: string
+          p_created_at?: string
+          p_criar_avulso_extra?: boolean
+          p_criar_lancamento?: boolean
+          p_data_lancamento?: string
+          p_data_vencimento?: string
+          p_dentro_do_plano?: boolean
+          p_descricao_avulso_extra?: string
+          p_descricao_lancamento?: string
+          p_etiquetas?: string[]
+          p_ja_pago?: boolean
+          p_justificativa_avulso?: string
+          p_notas?: string
+          p_prioridade?: string
+          p_razao_social: string
+          p_responsavel?: string
+          p_tipo: string
+          p_valor?: number
+          p_valor_avulso?: number
+          p_valor_avulso_extra?: number
+        }
+        Returns: string
+      }
       get_empresa_id: { Args: never; Returns: string }
       get_proposta_por_token: {
         Args: { p_token: string }
