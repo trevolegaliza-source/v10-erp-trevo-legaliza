@@ -612,12 +612,71 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     };
   }, [clientes]);
 
+  const contestarLancamento = useMutation({
+    mutationFn: async ({ lancamentoId, motivo, anexoUrl }: { lancamentoId: string; motivo: string; anexoUrl?: string | null }) => {
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({
+          etapa_financeiro: 'contestado',
+          contestacao_motivo: motivo,
+          contestacao_anexo_url: anexoUrl || null,
+          contestacao_data: new Date().toISOString(),
+        } as any)
+        .eq('id', lancamentoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateFinanceiro(queryClient);
+      toast.success('Lançamento marcado como contestado!');
+    },
+  });
+
+  const resolverContestacao = useMutation({
+    mutationFn: async ({ lancamentoId, destino, observacao }: { lancamentoId: string; destino: 'aguardando' | 'pagos'; observacao: string }) => {
+      // Get current observacoes
+      const { data: current } = await supabase
+        .from('lancamentos')
+        .select('observacoes_financeiro')
+        .eq('id', lancamentoId)
+        .single();
+
+      const obsAnterior = (current as any)?.observacoes_financeiro || '';
+      const novaObs = obsAnterior
+        ? `${obsAnterior}\n[RESOLUÇÃO]: ${observacao}`
+        : `[RESOLUÇÃO]: ${observacao}`;
+
+      const updates: Record<string, any> = {
+        etapa_financeiro: destino === 'pagos' ? 'honorario_pago' : 'cobranca_enviada',
+        observacoes_financeiro: novaObs,
+        contestacao_motivo: null,
+        contestacao_anexo_url: null,
+        contestacao_data: null,
+      };
+
+      if (destino === 'pagos') {
+        updates.status = 'pago';
+        updates.data_pagamento = new Date().toISOString().split('T')[0];
+        updates.confirmado_recebimento = true;
+      }
+
+      const { error } = await supabase
+        .from('lancamentos')
+        .update(updates)
+        .eq('id', lancamentoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateFinanceiro(queryClient);
+      toast.success('Contestação resolvida!');
+    },
+  });
+
   return {
     clientes,
     clientesCobrar: derived.clientesCobrar,
     clientesFuturaFatura: derived.clientesFuturaFatura,
     clientesAguardandoAuditoria: derived.clientesAguardandoAuditoria,
-    clientesEnviados: derived.clientesEnviados,
+    clientesContestados: derived.clientesContestados,
     clientesAguardando: derived.clientesAguardando,
     clientesPagos: derived.clientesPagos,
     mensalistasSemFatura,
@@ -627,6 +686,8 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     marcarEnviado,
     marcarPago,
     desfazerPagamento,
+    contestarLancamento,
+    resolverContestacao,
     refetch: query.refetch,
   };
 }
