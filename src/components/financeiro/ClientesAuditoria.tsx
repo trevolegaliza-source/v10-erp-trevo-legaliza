@@ -214,13 +214,15 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · {cliente.cliente_codigo}</span>}
               </p>
               <p className="text-xs text-muted-foreground truncate">
-                {lancNaoAuditados.length} proc. · {fmt(totalNaoAuditado)} · {tipoLabel(cliente)}
+                {lancNaoAuditados.length} proc. · {fmt(totalNaoAuditado)}
+                {totalTaxasNaoAuditado > 0 && <> + {fmt(totalTaxasNaoAuditado)} taxas</>}
+                {' · '}{tipoLabel(cliente)}
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0 flex-wrap justify-end">
               {temMetodoTrevo && (
-                <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px] px-1.5 py-0 hidden sm:inline-flex">
-                  🍀 Método Trevo
+                <Badge className="bg-emerald-600 text-white border-0 text-xs px-2 py-0.5 font-bold hidden sm:inline-flex">
+                  🍀 MÉTODO TREVO
                 </Badge>
               )}
               {temPrioridade && (
