@@ -985,6 +985,8 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
   const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split('T')[0]);
   const [loadingExtrato, setLoadingExtrato] = useState(false);
   const [selectedPagar, setSelectedPagar] = useState<Set<string>>(new Set());
+  const [contestarModal, setContestarModal] = useState<string | null>(null);
+  const [contestarMotivo, setContestarMotivo] = useState('');
   const qc = useQueryClient();
 
   const vencimento = cliente.lancamentos[0]?.data_vencimento;
