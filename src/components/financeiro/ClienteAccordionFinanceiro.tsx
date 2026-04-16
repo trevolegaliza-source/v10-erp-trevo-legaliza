@@ -612,6 +612,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
             <div className="flex items-center gap-2 min-w-0">
               <p className="font-semibold text-sm truncate min-w-0 flex-1">
                 {cliente.cliente_apelido || cliente.cliente_nome}
+                {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · COD {cliente.cliente_codigo}</span>}
               </p>
             </div>
             <p className="text-xs text-muted-foreground truncate">
@@ -912,6 +913,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
             <div className="flex items-center gap-2 min-w-0">
               <p className="font-semibold text-sm truncate min-w-0 flex-1">
                 {cliente.cliente_apelido || cliente.cliente_nome}
+                {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · COD {cliente.cliente_codigo}</span>}
               </p>
             </div>
             <p className="text-xs text-muted-foreground truncate">
@@ -1159,6 +1161,7 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
               <div className="flex items-center gap-2 min-w-0">
                 <p className="font-semibold text-sm truncate min-w-0 flex-1">
                   {cliente.cliente_apelido || cliente.cliente_nome}
+                  {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · COD {cliente.cliente_codigo}</span>}
                 </p>
               </div>
               <p className="text-xs text-muted-foreground truncate">
@@ -1421,6 +1424,7 @@ function RecebidoItem({ cliente: c }: { cliente: ClienteFinanceiro }) {
             <div className="flex items-center gap-2 min-w-0">
               <p className="font-semibold text-sm truncate min-w-0 flex-1">
                 {c.cliente_apelido || c.cliente_nome}
+                {c.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · COD {c.cliente_codigo}</span>}
               </p>
             </div>
             <p className="text-xs text-muted-foreground">{fmt(c.total_faturado)} · {c.qtd_processos} proc.</p>
