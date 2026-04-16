@@ -185,7 +185,10 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
         <AccordionTrigger className="px-4 py-3 hover:no-underline">
           <div className="flex items-center gap-3 sm:gap-3 flex-1 text-left min-w-0">
             <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="font-semibold text-sm truncate">{cliente.cliente_apelido || cliente.cliente_nome}</p>
+              <p className="font-semibold text-sm truncate">
+                {cliente.cliente_apelido || cliente.cliente_nome}
+                {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · COD {cliente.cliente_codigo}</span>}
+              </p>
               <p className="text-xs text-muted-foreground truncate">
                 {lancNaoAuditados.length} proc. · {fmt(totalNaoAuditado)} · {tipoLabel(cliente)}
               </p>

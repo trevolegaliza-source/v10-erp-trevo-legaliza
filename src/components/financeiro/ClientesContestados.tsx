@@ -93,6 +93,7 @@ function ContestadoItem({ cliente, isMaster, onResolver }: {
             <div className="flex flex-col gap-1 min-w-0 flex-1">
               <p className="font-semibold text-sm truncate">
                 {cliente.cliente_apelido || cliente.cliente_nome}
+                {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · COD {cliente.cliente_codigo}</span>}
               </p>
               <p className="text-xs text-muted-foreground">
                 {fmt(cliente.total_faturado)} · {cliente.qtd_processos} processo(s) contestado(s)
