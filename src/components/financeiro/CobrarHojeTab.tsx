@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Receipt, Loader2, CheckCircle, AlertTriangle, Clock, Zap } from 'lucide-react';
+import { FileText, Receipt, Loader2, CheckCircle, Zap, ShieldCheck, Clock } from 'lucide-react';
 import type { ClienteFinanceiro, LancamentoFinanceiro, MensalistaSemFatura } from '@/hooks/useFinanceiroClientes';
 import { invalidateFinanceiro } from '@/hooks/useFinanceiroClientes';
 import type { ExtratoGeradoPayload } from './ClienteAccordionFinanceiro';
@@ -17,62 +17,59 @@ import { formatBRL } from '@/lib/pricing-engine';
 
 // ── Types ──
 
-interface CobrarHojeItem {
-  type: 'lancamento' | 'mensalista';
-  // Lancamento fields
-  lancamento?: LancamentoFinanceiro;
-  cliente?: ClienteFinanceiro;
-  // Mensalista fields
-  mensalista?: MensalistaSemFatura;
-  // Computed
+interface CobrarHojeCliente {
+  clienteId: string;
   clienteNome: string;
   clienteApelido: string | null;
-  clienteId: string;
-  valor: number;
-  dataVencimento: Date;
-  diasAtraso: number;
-  diasAteVencer: number;
+  cliente: ClienteFinanceiro | null;
+  lancamentos: LancamentoFinanceiro[];
+  mensalista: MensalistaSemFatura | null;
+  isMensalistaOnly: boolean;
+  totalValor: number;
+  qtdProcessos: number;
+  qtdAuditados: number;
+  qtdNaoAuditados: number;
+  todosAuditados: boolean;
   statusHumano: string;
-  corStatus: string;
   corBadge: string;
   sortLayer: number;
   sortSecondary: number;
-  id: string;
-}
-
-function computeStatus(diasAtraso: number, diasAteVencer: number, isDeferimento: boolean, isMensalista: boolean): { texto: string; cor: string; badge: string; layer: number } {
-  if (isDeferimento) {
-    return { texto: 'Deferido ✅ — gerar cobrança 🟢', cor: 'text-emerald-500', badge: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30', layer: 4 };
-  }
-
-  if (isMensalista && diasAtraso > 0) {
-    return { texto: `Fatura mensal — venceu há ${diasAtraso} dia${diasAtraso > 1 ? 's' : ''} 🔴`, cor: 'text-red-500', badge: 'bg-red-500/15 text-red-500 border-red-500/30', layer: 1 };
-  }
-
-  if (isMensalista) {
-    const diasRestantes = diasAteVencer;
-    return { texto: `Fatura mensal — gerar até ${diasRestantes} dia${diasRestantes !== 1 ? 's' : ''} 🔵`, cor: 'text-blue-500', badge: 'bg-blue-500/15 text-blue-500 border-blue-500/30', layer: 3 };
-  }
-
-  if (diasAtraso > 5) {
-    return { texto: `Venceu há ${diasAtraso} dias — URGENTE 🔴`, cor: 'text-red-600 font-bold', badge: 'bg-red-600/20 text-red-600 border-red-600/40', layer: 1 };
-  }
-  if (diasAtraso > 0) {
-    return { texto: `Venceu há ${diasAtraso} dia${diasAtraso > 1 ? 's' : ''} — cobrar agora 🔴`, cor: 'text-red-500', badge: 'bg-red-500/15 text-red-500 border-red-500/30', layer: 1 };
-  }
-  if (diasAteVencer === 0) {
-    return { texto: 'Vence hoje — enviar cobrança 🟡', cor: 'text-yellow-500', badge: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30', layer: 2 };
-  }
-  if (diasAteVencer <= 3) {
-    return { texto: `Vence em ${diasAteVencer} dia${diasAteVencer > 1 ? 's' : ''}`, cor: 'text-amber-500', badge: 'bg-amber-500/15 text-amber-600 border-amber-500/30', layer: 3 };
-  }
-  return { texto: `Vence em ${diasAteVencer} dias`, cor: 'text-muted-foreground', badge: 'bg-muted text-muted-foreground border-border', layer: 3 };
+  maiorAtraso: number;
+  dataVencimento: Date;
 }
 
 function diffDays(from: Date, to: Date): number {
   const a = new Date(from); a.setHours(0, 0, 0, 0);
   const b = new Date(to); b.setHours(0, 0, 0, 0);
   return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
+function computeGroupStatus(maiorAtraso: number, menorDiasAteVencer: number, isDeferimento: boolean, isMensalista: boolean, todosAuditados: boolean, qtdNaoAuditados: number): { texto: string; badge: string; layer: number } {
+  if (isMensalista && maiorAtraso > 0) {
+    return { texto: `Fatura mensal — venceu há ${maiorAtraso} dia${maiorAtraso > 1 ? 's' : ''} 🔴`, badge: 'bg-red-500/15 text-red-500 border-red-500/30', layer: 1 };
+  }
+  if (isMensalista) {
+    return { texto: `Fatura mensal — gerar até ${menorDiasAteVencer} dia${menorDiasAteVencer !== 1 ? 's' : ''} 🔵`, badge: 'bg-blue-500/15 text-blue-500 border-blue-500/30', layer: 3 };
+  }
+  if (isDeferimento) {
+    return { texto: 'Deferido ✅ — gerar cobrança 🟢', badge: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30', layer: 4 };
+  }
+  if (!todosAuditados && qtdNaoAuditados > 0) {
+    return { texto: `⏳ ${qtdNaoAuditados} processo${qtdNaoAuditados > 1 ? 's' : ''} aguardando auditoria`, badge: 'bg-amber-500/15 text-amber-600 border-amber-500/30', layer: 5 };
+  }
+  if (maiorAtraso > 5) {
+    return { texto: `Venceu há ${maiorAtraso} dias — URGENTE 🔴`, badge: 'bg-red-600/20 text-red-600 border-red-600/40', layer: 1 };
+  }
+  if (maiorAtraso > 0) {
+    return { texto: `Venceu há ${maiorAtraso} dia${maiorAtraso > 1 ? 's' : ''} — cobrar agora 🔴`, badge: 'bg-red-500/15 text-red-500 border-red-500/30', layer: 1 };
+  }
+  if (menorDiasAteVencer === 0) {
+    return { texto: 'Vence hoje — enviar cobrança 🟡', badge: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30', layer: 2 };
+  }
+  if (menorDiasAteVencer <= 3) {
+    return { texto: `Vence em ${menorDiasAteVencer} dia${menorDiasAteVencer > 1 ? 's' : ''}`, badge: 'bg-amber-500/15 text-amber-600 border-amber-500/30', layer: 3 };
+  }
+  return { texto: `Vence em ${menorDiasAteVencer} dias`, badge: 'bg-muted text-muted-foreground border-border', layer: 3 };
 }
 
 // ── Component ──
@@ -94,78 +91,113 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
   }, []);
 
-  const items = useMemo<CobrarHojeItem[]>(() => {
-    const result: CobrarHojeItem[] = [];
+  // Group by client instead of per-lancamento
+  const groups = useMemo<CobrarHojeCliente[]>(() => {
+    const map = new Map<string, CobrarHojeCliente>();
 
-    // Flatten lancamentos from clientesCobrar
+    // Group lancamentos by client
     for (const c of clientesCobrar) {
+      if (!map.has(c.cliente_id)) {
+        const isDef = c.cliente_momento_faturamento === 'no_deferimento';
+        map.set(c.cliente_id, {
+          clienteId: c.cliente_id,
+          clienteNome: c.cliente_nome,
+          clienteApelido: c.cliente_apelido,
+          cliente: c,
+          lancamentos: [],
+          mensalista: null,
+          isMensalistaOnly: false,
+          totalValor: 0,
+          qtdProcessos: 0,
+          qtdAuditados: 0,
+          qtdNaoAuditados: 0,
+          todosAuditados: true,
+          statusHumano: '',
+          corBadge: '',
+          sortLayer: 99,
+          sortSecondary: 0,
+          maiorAtraso: 0,
+          dataVencimento: new Date(),
+        });
+      }
+      const group = map.get(c.cliente_id)!;
       for (const l of c.lancamentos) {
+        group.lancamentos.push(l);
+        const totalVA = l.total_valores_adicionais || 0;
+        group.totalValor += l.valor + totalVA;
+        group.qtdProcessos++;
+        if (l.auditado) group.qtdAuditados++;
+        else { group.qtdNaoAuditados++; group.todosAuditados = false; }
+
         const venc = new Date(l.data_vencimento + 'T00:00:00');
         const diff = diffDays(venc, hoje);
         const atraso = Math.max(0, diff);
-        const ateVencer = Math.max(0, -diff);
-
-        // Check if this is a deferimento-liberado (client is no_deferimento but process is in post-deferimento stage)
-        const isDef = c.cliente_momento_faturamento === 'no_deferimento' && ['baixa', 'avulso'].includes(l.processo_tipo);
-
-        const status = computeStatus(atraso, ateVencer, isDef, false);
-
-        result.push({
-          type: 'lancamento',
-          lancamento: l,
-          cliente: c,
-          clienteNome: c.cliente_nome,
-          clienteApelido: c.cliente_apelido,
-          clienteId: c.cliente_id,
-          valor: l.valor + (l.total_valores_adicionais || 0),
-          dataVencimento: venc,
-          diasAtraso: atraso,
-          diasAteVencer: ateVencer,
-          statusHumano: status.texto,
-          corStatus: status.cor,
-          corBadge: status.badge,
-          sortLayer: status.layer,
-          sortSecondary: atraso > 0 ? -atraso * 1000000 - l.valor : ateVencer * 1000000 - l.valor,
-          id: l.id,
-        });
+        if (atraso > group.maiorAtraso) {
+          group.maiorAtraso = atraso;
+          group.dataVencimento = venc;
+        }
       }
     }
 
-    // Add mensalistas sem fatura (within 5-day window or overdue)
+    // Add mensalistas sem fatura
     for (const m of mensalistasSemFatura) {
       const dia = m.dia_vencimento_mensal || 10;
       const now = new Date();
-      let vencDate = new Date(now.getFullYear(), now.getMonth(), dia);
-      // If venc is in the past and we're past the day, it's overdue this month
+      const vencDate = new Date(now.getFullYear(), now.getMonth(), dia);
       const diff = diffDays(vencDate, hoje);
       const atraso = Math.max(0, diff);
       const ateVencer = Math.max(0, -diff);
 
-      // Only show if overdue OR within 5-day window before vencimento
       if (atraso === 0 && ateVencer > 5) continue;
 
-      const status = computeStatus(atraso, ateVencer, false, true);
-
-      result.push({
-        type: 'mensalista',
-        mensalista: m,
-        clienteNome: m.nome,
-        clienteApelido: m.apelido,
-        clienteId: m.id,
-        valor: m.valor_base,
-        dataVencimento: vencDate,
-        diasAtraso: atraso,
-        diasAteVencer: ateVencer,
-        statusHumano: status.texto,
-        corStatus: status.cor,
-        corBadge: status.badge,
-        sortLayer: status.layer,
-        sortSecondary: atraso > 0 ? -atraso * 1000000 - m.valor_base : ateVencer * 1000000 - m.valor_base,
-        id: 'mensal_' + m.id,
-      });
+      if (map.has(m.id)) {
+        // Client already has lancamentos — add mensalista info
+        const group = map.get(m.id)!;
+        group.mensalista = m;
+      } else {
+        // Pure mensalista without lancamentos
+        map.set(m.id, {
+          clienteId: m.id,
+          clienteNome: m.nome,
+          clienteApelido: m.apelido,
+          cliente: null,
+          lancamentos: [],
+          mensalista: m,
+          isMensalistaOnly: true,
+          totalValor: m.valor_base,
+          qtdProcessos: 0,
+          qtdAuditados: 0,
+          qtdNaoAuditados: 0,
+          todosAuditados: true,
+          statusHumano: '',
+          corBadge: '',
+          sortLayer: 99,
+          sortSecondary: 0,
+          maiorAtraso: atraso,
+          dataVencimento: vencDate,
+        });
+      }
     }
 
-    // Sort by layer ASC, then secondary ASC (vencidos first, higher values first within same day)
+    // Compute status for each group
+    const result: CobrarHojeCliente[] = [];
+    for (const group of map.values()) {
+      const isDef = group.cliente?.cliente_momento_faturamento === 'no_deferimento' && group.lancamentos.some(l => ['baixa', 'avulso'].includes(l.processo_tipo));
+      const menorDiasAteVencer = group.lancamentos.length > 0
+        ? Math.max(0, Math.min(...group.lancamentos.map(l => {
+            const venc = new Date(l.data_vencimento + 'T00:00:00');
+            return -diffDays(venc, hoje);
+          })))
+        : Math.max(0, -diffDays(group.dataVencimento, hoje));
+
+      const status = computeGroupStatus(group.maiorAtraso, menorDiasAteVencer, isDef, group.isMensalistaOnly, group.todosAuditados, group.qtdNaoAuditados);
+      group.statusHumano = status.texto;
+      group.corBadge = status.badge;
+      group.sortLayer = status.layer;
+      group.sortSecondary = group.maiorAtraso > 0 ? -group.maiorAtraso * 1000000 - group.totalValor : menorDiasAteVencer * 1000000 - group.totalValor;
+      result.push(group);
+    }
+
     result.sort((a, b) => {
       if (a.sortLayer !== b.sortLayer) return a.sortLayer - b.sortLayer;
       return a.sortSecondary - b.sortSecondary;
@@ -175,32 +207,32 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
   }, [clientesCobrar, mensalistasSemFatura, hoje]);
 
   // Totals
-  const totalCobrar = useMemo(() => items.reduce((s, i) => s + i.valor, 0), [items]);
-  const totalVencido = useMemo(() => items.filter(i => i.diasAtraso > 0).reduce((s, i) => s + i.valor, 0), [items]);
-  const totalSemana = useMemo(() => items.filter(i => i.diasAtraso === 0 && i.diasAteVencer <= 7).reduce((s, i) => s + i.valor, 0), [items]);
+  const totalCobrar = useMemo(() => groups.reduce((s, g) => s + g.totalValor, 0), [groups]);
+  const totalVencido = useMemo(() => groups.filter(g => g.maiorAtraso > 0).reduce((s, g) => s + g.totalValor, 0), [groups]);
+  const totalSemana = useMemo(() => groups.filter(g => g.maiorAtraso === 0).reduce((s, g) => s + g.totalValor, 0), [groups]);
 
-  // ── Gerar Extrato (single lancamento) ──
-  const handleGerarExtrato = useCallback(async (item: CobrarHojeItem) => {
-    if (item.type !== 'lancamento' || !item.lancamento || !item.cliente) return;
-    setGerando(item.id);
-    const l = item.lancamento;
-    const c = item.cliente;
+  // ── Gerar Extrato consolidado por cliente ──
+  const handleGerarExtrato = useCallback(async (group: CobrarHojeCliente) => {
+    if (!group.cliente || group.lancamentos.length === 0) return;
+    setGerando(group.clienteId);
+    const c = group.cliente;
+    const lancamentos = group.lancamentos;
 
     try {
-      const processoIds = [l.processo_id].filter(Boolean) as string[];
+      const processoIds = lancamentos.map(l => l.processo_id).filter(Boolean) as string[];
       const clienteId = c.cliente_id;
       const clienteNome = c.cliente_apelido || c.cliente_nome;
 
       const [clienteData, vaMulti, allComp] = await Promise.all([
         supabase.from('clientes').select('nome, cnpj, apelido, valor_base, desconto_progressivo, valor_limite_desconto, telefone, telefone_financeiro, email, nome_contador, dia_cobranca, dia_vencimento_mensal').eq('id', clienteId).single().then(r => r.data),
         fetchValoresAdicionaisMulti(processoIds),
-        fetchCompetenciaProcessos(clienteId, [{
+        fetchCompetenciaProcessos(clienteId, lancamentos.map(l => ({
           id: l.processo_id || l.id,
           created_at: l.processo_created_at || new Date().toISOString(),
-        }] as any),
+        })) as any),
       ]);
 
-      const processos = [{
+      const processos = lancamentos.map(l => ({
         id: l.processo_id || l.id,
         razao_social: l.processo_razao_social,
         tipo: l.processo_tipo,
@@ -212,7 +244,7 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
         notas: l.processo_notas || null,
         data_deferimento: null,
         etiquetas: [] as string[],
-      }];
+      }));
 
       const result = await gerarExtratoPDF({
         processos: processos as any,
@@ -236,7 +268,6 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
       const pdfBlob = result.doc.output('blob');
       const filename = buildExtratoFilename(clienteNome);
 
-      // Save to storage
       const { empresaPath } = await import('@/lib/storage-path');
       const path = await empresaPath(`extratos/${clienteId}/${filename}`);
       await supabase.storage.from('documentos').upload(path, pdfBlob, { contentType: 'application/pdf', upsert: true });
@@ -262,7 +293,7 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
         .single();
       if (insertError) throw insertError;
 
-      // Link lancamento to extrato
+      // Link ALL lancamentos to extrato
       for (const pid of processoIds) {
         await supabase
           .from('lancamentos')
@@ -275,7 +306,7 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
           .eq('tipo', 'receber');
       }
 
-      toast.success('Extrato gerado!');
+      toast.success(`Extrato gerado! ${processoIds.length} processo${processoIds.length > 1 ? 's' : ''} incluído${processoIds.length > 1 ? 's' : ''}.`);
 
       onExtratoGerado({
         blob: pdfBlob,
@@ -284,11 +315,10 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
         clienteNome,
         clienteTelefone: (clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || c.cliente_telefone || '',
         total: result.totalGeral,
-        lancamentos: [l],
+        lancamentos,
         cleanup: () => {
           setGerando(null);
-          // Fade out this card
-          setFadingOut(prev => new Set(prev).add(item.id));
+          setFadingOut(prev => new Set(prev).add(group.clienteId));
           setTimeout(() => {
             invalidateFinanceiro(queryClient);
           }, 1000);
@@ -301,10 +331,10 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
   }, [queryClient, onExtratoGerado]);
 
   // ── Gerar Fatura Mensal ──
-  const handleGerarFatura = useCallback(async (item: CobrarHojeItem) => {
-    if (item.type !== 'mensalista' || !item.mensalista) return;
-    const m = item.mensalista;
-    setGerandoFatura(item.id);
+  const handleGerarFatura = useCallback(async (group: CobrarHojeCliente) => {
+    if (!group.mensalista) return;
+    const m = group.mensalista;
+    setGerandoFatura(group.clienteId);
     try {
       const now = new Date();
       const dia = m.dia_vencimento_mensal || 10;
@@ -331,9 +361,9 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
     }
   }, [queryClient]);
 
-  const visibleItems = items.filter(i => !fadingOut.has(i.id));
+  const visibleGroups = groups.filter(g => !fadingOut.has(g.clienteId));
 
-  if (visibleItems.length === 0 && aguardandoDeferimentoValor === 0) {
+  if (visibleGroups.length === 0 && aguardandoDeferimentoValor === 0) {
     return (
       <Card className="border-dashed">
         <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -366,72 +396,113 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
         </div>
       </div>
 
-      {/* ── Cards ── */}
-      <div className="space-y-2">
-        {visibleItems.map(item => (
+      {/* ── Cards agrupados por cliente ── */}
+      <div className="space-y-3">
+        {visibleGroups.map(group => (
           <div
-            key={item.id}
+            key={group.clienteId}
             className={cn(
               'rounded-lg border bg-card p-4 transition-all duration-500',
-              fadingOut.has(item.id) && 'opacity-0 scale-95 pointer-events-none',
-              item.diasAtraso > 5 && 'border-red-500/40 bg-red-500/5',
-              item.diasAtraso > 0 && item.diasAtraso <= 5 && 'border-red-500/20',
+              fadingOut.has(group.clienteId) && 'opacity-0 scale-95 pointer-events-none',
+              group.maiorAtraso > 5 && 'border-red-500/40 bg-red-500/5',
+              group.maiorAtraso > 0 && group.maiorAtraso <= 5 && 'border-red-500/20',
             )}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1 space-y-1.5">
-                {/* Client name */}
-                <p className="font-semibold text-sm truncate">
-                  {item.clienteApelido || item.clienteNome}
-                </p>
-                {/* Value */}
-                <p className="text-xl font-bold text-foreground">
-                  {formatBRL(item.valor)}
-                </p>
-                {/* Status badge */}
-                <Badge variant="outline" className={cn('text-xs', item.corBadge)}>
-                  {item.statusHumano}
-                </Badge>
-                {/* Process info */}
-                {item.type === 'lancamento' && item.lancamento && (
-                  <p className="text-xs text-muted-foreground truncate">
-                    {TIPO_PROCESSO_LABELS[item.lancamento.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || item.lancamento.processo_tipo}
-                    {' — '}
-                    {item.lancamento.processo_razao_social}
+            <div className="space-y-2">
+              {/* Client name + count */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm truncate">
+                    {group.clienteApelido || group.clienteNome}
                   </p>
-                )}
-                {item.type === 'mensalista' && (
-                  <p className="text-xs text-muted-foreground">
-                    Mensalidade · Vencimento dia {item.mensalista?.dia_vencimento_mensal}
-                  </p>
-                )}
+                  {group.qtdProcessos > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {group.qtdProcessos} processo{group.qtdProcessos > 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+                <p className="text-xl font-bold text-foreground shrink-0">
+                  {formatBRL(group.totalValor)}
+                </p>
               </div>
+
+              {/* Status badge */}
+              <Badge variant="outline" className={cn('text-xs', group.corBadge)}>
+                {group.statusHumano}
+              </Badge>
+
+              {/* Audit status — KEY INFO for Carolina */}
+              {group.qtdProcessos > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  {group.todosAuditados ? (
+                    <span className="flex items-center gap-1 text-emerald-500">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      ✅ Todos auditados — pode cobrar
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-amber-500">
+                      <Clock className="h-3.5 w-3.5" />
+                      ⏳ {group.qtdAuditados}/{group.qtdProcessos} auditados
+                      {group.qtdNaoAuditados > 0 && ` — ${group.qtdNaoAuditados} aguardando Master`}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Process list summary */}
+              {group.lancamentos.length > 0 && (
+                <div className="text-xs text-muted-foreground space-y-0.5 border-t border-border/40 pt-2 mt-1">
+                  {group.lancamentos.slice(0, 5).map(l => (
+                    <div key={l.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate flex-1">
+                        {l.auditado ? '✅' : '⏳'}{' '}
+                        {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo}
+                        {' — '}
+                        {l.processo_razao_social}
+                      </span>
+                      <span className="shrink-0 font-medium">{formatBRL(l.valor + (l.total_valores_adicionais || 0))}</span>
+                    </div>
+                  ))}
+                  {group.lancamentos.length > 5 && (
+                    <p className="text-muted-foreground/60">+ {group.lancamentos.length - 5} mais...</p>
+                  )}
+                </div>
+              )}
+
+              {/* Mensalista info */}
+              {group.isMensalistaOnly && group.mensalista && (
+                <p className="text-xs text-muted-foreground">
+                  Mensalidade · Vencimento dia {group.mensalista.dia_vencimento_mensal}
+                </p>
+              )}
             </div>
 
             {/* Action button */}
             <div className="mt-3">
-              {item.type === 'lancamento' ? (
+              {group.isMensalistaOnly ? (
                 <Button
-                  className="w-full h-12 text-sm gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                  disabled={gerando === item.id}
-                  onClick={() => handleGerarExtrato(item)}
+                  className="w-full h-12 text-sm gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={gerandoFatura === group.clienteId}
+                  onClick={() => handleGerarFatura(group)}
                 >
-                  {gerando === item.id ? (
+                  {gerandoFatura === group.clienteId ? (
                     <><Loader2 className="h-4 w-4 animate-spin" /> Gerando...</>
                   ) : (
-                    <><FileText className="h-4 w-4" /> Gerar Extrato</>
+                    <><Receipt className="h-4 w-4" /> Gerar Fatura</>
                   )}
                 </Button>
               ) : (
                 <Button
-                  className="w-full h-12 text-sm gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={gerandoFatura === item.id}
-                  onClick={() => handleGerarFatura(item)}
+                  className="w-full h-12 text-sm gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  disabled={gerando === group.clienteId || !group.todosAuditados}
+                  onClick={() => handleGerarExtrato(group)}
                 >
-                  {gerandoFatura === item.id ? (
+                  {gerando === group.clienteId ? (
                     <><Loader2 className="h-4 w-4 animate-spin" /> Gerando...</>
+                  ) : !group.todosAuditados ? (
+                    <><Clock className="h-4 w-4" /> Aguardando auditoria ({group.qtdNaoAuditados})</>
                   ) : (
-                    <><Receipt className="h-4 w-4" /> Gerar Fatura</>
+                    <><FileText className="h-4 w-4" /> Gerar Extrato ({group.qtdProcessos} proc.)</>
                   )}
                 </Button>
               )}
@@ -442,7 +513,7 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
 
       {/* Count */}
       <p className="text-xs text-center text-muted-foreground">
-        {visibleItems.length} item{visibleItems.length !== 1 ? 's' : ''} para cobrar
+        {visibleGroups.length} cliente{visibleGroups.length !== 1 ? 's' : ''} para cobrar
       </p>
     </div>
   );
