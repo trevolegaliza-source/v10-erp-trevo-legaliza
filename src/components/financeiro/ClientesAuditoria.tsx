@@ -710,3 +710,55 @@ function AuditoriaFicha({
     </div>
   );
 }
+
+// FIX 5 — Editable observação field with debounced autosave
+function ObservacaoField({ lancamentoId, initialValue }: { lancamentoId: string; initialValue: string }) {
+  const [value, setValue] = useState(initialValue);
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRef = useRef(initialValue);
+  const qc = useQueryClient();
+
+  useEffect(() => {
+    setValue(initialValue);
+    lastSavedRef.current = initialValue;
+  }, [initialValue, lancamentoId]);
+
+  useEffect(() => {
+    if (value === lastSavedRef.current) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      setSaving(true);
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({ observacoes_financeiro: value || null } as any)
+        .eq('id', lancamentoId);
+      setSaving(false);
+      if (error) {
+        toast.error('Erro ao salvar observação');
+        return;
+      }
+      lastSavedRef.current = value;
+      setSavedFlash(true);
+      setTimeout(() => setSavedFlash(false), 1200);
+      invalidateFinanceiro(qc);
+    }, 1000);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [value, lancamentoId, qc]);
+
+  return (
+    <div className="space-y-1">
+      <Textarea
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder="Observação (aparecerá no extrato)"
+        rows={1}
+        className="text-xs min-h-[32px] resize-y"
+        style={{ fontSize: 14 }}
+      />
+      {saving && <p className="text-[10px] text-muted-foreground">Salvando...</p>}
+      {savedFlash && !saving && <p className="text-[10px] text-emerald-600">✓ Salvo</p>}
+    </div>
+  );
+}
