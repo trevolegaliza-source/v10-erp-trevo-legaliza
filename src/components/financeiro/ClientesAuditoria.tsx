@@ -566,12 +566,7 @@ function AuditoriaFicha({
       {/* Valor + Vencimento */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm font-bold text-primary">{fmt(l.valor)}</span>
-          {l.valor_original != null && l.valor_original !== l.valor && (
-            <span className="text-[10px] text-muted-foreground line-through">
-              {fmt(l.valor_original)}
-            </span>
-          )}
+          <span className="text-sm font-bold text-primary">{fmt(l.valor + (l.total_valores_adicionais || 0))}</span>
           {l.valor_alterado_em && (
             <Badge variant="outline" className="text-[10px] px-1 py-0 text-amber-600 border-amber-500/30">
               ✏️ Alterado
@@ -581,10 +576,34 @@ function AuditoriaFicha({
         <span className="text-xs text-muted-foreground whitespace-nowrap">Vence {fmtDate(l.data_vencimento)}</span>
       </div>
 
-      {/* Taxas adicionais */}
-      <div className="text-xs text-muted-foreground">
-        Taxas adicionais: {l.total_valores_adicionais > 0 ? fmt(l.total_valores_adicionais) : 'R$ 0,00'}
+      {/* FIX 1 — Subtotal honorário + taxa + total */}
+      <div className="text-xs space-y-0.5 rounded bg-muted/30 p-2">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Honorários:</span>
+          <span className="font-mono">
+            {fmt(l.valor)}
+            {l.valor_original != null && l.valor_original !== l.valor && (
+              <span className="ml-1 text-[10px] text-muted-foreground line-through">{fmt(l.valor_original)}</span>
+            )}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Taxas reembolsáveis:</span>
+          <span className="font-mono">{fmt(l.total_valores_adicionais || 0)}</span>
+        </div>
+        <div className="flex justify-between border-t border-border/40 pt-0.5 mt-0.5 font-semibold">
+          <span>Total:</span>
+          <span className="font-mono">{fmt(l.valor + (l.total_valores_adicionais || 0))}</span>
+        </div>
       </div>
+
+      {/* FIX 3 — Aviso de aguardando deferimento */}
+      {clienteMomentoFaturamento === 'no_deferimento' && !l.processo_data_deferimento && (
+        <div className="flex items-center gap-1.5 p-2 rounded bg-amber-500/10 text-amber-700 text-xs">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span>Aguarda deferimento. Marque a data antes de auditar.</span>
+        </div>
+      )}
 
       {/* Alerta de taxas */}
       {alertaTaxas && (
@@ -616,10 +635,9 @@ function AuditoriaFicha({
         </div>
       )}
 
-      {/* Observações */}
-      {l.observacoes_financeiro && (
-        <p className="text-xs text-muted-foreground italic">Obs: {l.observacoes_financeiro}</p>
-      )}
+      {/* FIX 5 — Observação editável (debounce 1s) */}
+      <ObservacaoField lancamentoId={l.id} initialValue={l.observacoes_financeiro || ''} />
+
       {l.processo_notas && (
         <p className="text-xs text-muted-foreground italic">Notas: {l.processo_notas}</p>
       )}
