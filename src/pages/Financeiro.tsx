@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown, ClipboardCheck } from 'lucide-react';
+import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown, ClipboardCheck, Zap } from 'lucide-react';
+import CobrarHojeTab from '@/components/financeiro/CobrarHojeTab';
 import { useFinanceiroClientes, type LancamentoFinanceiro, isLancamentoVencidoReal } from '@/hooks/useFinanceiroClientes';
 import ClientesFinanceiroTab from '@/components/financeiro/ClientesFinanceiroTab';
 import {
