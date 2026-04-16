@@ -42,6 +42,7 @@ export interface LancamentoFinanceiro {
   processo_notas: string | null;
   processo_valor: number;
   processo_created_at: string;
+  processo_data_deferimento: string | null;
   valor: number;
   data_vencimento: string;
   data_pagamento: string | null;
@@ -62,7 +63,7 @@ export interface LancamentoFinanceiro {
   valor_alterado_em: string | null;
 }
 
-const ETAPAS_PRE_DEFERIMENTO = [
+export const ETAPAS_PRE_DEFERIMENTO = [
   'recebidos', 'analise_documental', 'contrato', 'viabilidade',
   'dbe', 'vre', 'aguardando_pagamento', 'taxa_paga',
   'assinaturas', 'assinado', 'em_analise',
@@ -234,7 +235,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
       const [processosRes, clientesRes, valoresAdicionaisRes] = await Promise.all([
         processoIds.length > 0
-          ? supabase.from('processos').select('id, razao_social, tipo, etapa, notas, valor, created_at, etiquetas').in('id', processoIds)
+          ? supabase.from('processos').select('id, razao_social, tipo, etapa, notas, valor, created_at, etiquetas, data_deferimento').in('id', processoIds)
           : { data: [], error: null },
         clienteIds.length > 0
           ? supabase.from('clientes').select('id, nome, apelido, codigo_identificador, cnpj, tipo, momento_faturamento, dia_cobranca, dia_vencimento_mensal, telefone, email, nome_contador, valor_base, desconto_progressivo, valor_limite_desconto, nome_contato_financeiro, telefone_financeiro').in('id', clienteIds)
@@ -308,6 +309,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           processo_notas: processo?.notas || null,
           processo_valor: processo?.valor || 0,
           processo_created_at: processo?.created_at || '',
+          processo_data_deferimento: (processo as any)?.data_deferimento || null,
           valor: l.valor,
           data_vencimento: l.data_vencimento,
           data_pagamento: l.data_pagamento,

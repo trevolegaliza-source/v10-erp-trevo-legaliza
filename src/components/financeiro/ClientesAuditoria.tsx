@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ClipboardCheck, Check, Pencil, Receipt, X, AlertTriangle, Phone } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ClipboardCheck, Check, Pencil, Receipt, X, AlertTriangle, Phone, CalendarCheck } from 'lucide-react';
 import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
-import { useAuditarLancamento, useAuditarTodosCliente, useAlterarValorLancamento } from '@/hooks/useFinanceiroClientes';
+import { useAuditarLancamento, useAuditarTodosCliente, useAlterarValorLancamento, ETAPAS_PRE_DEFERIMENTO, invalidateFinanceiro } from '@/hooks/useFinanceiroClientes';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import { toast } from 'sonner';
@@ -227,6 +228,7 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 key={l.id}
                 lancamento={l}
                 clienteApelido={cliente.cliente_apelido || cliente.cliente_nome}
+                clienteMomentoFaturamento={cliente.cliente_momento_faturamento}
                 onOpenTaxa={(processoId) => {
                   setTaxaProcessoId(processoId);
                   setTaxaModalOpen(true);
@@ -306,25 +308,59 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
 function AuditoriaFicha({
   lancamento: l,
   clienteApelido,
+  clienteMomentoFaturamento,
   onOpenTaxa,
   onAuditar,
 }: {
   lancamento: LancamentoFinanceiro;
   clienteApelido: string;
+  clienteMomentoFaturamento: string;
   onOpenTaxa: (processoId: string) => void;
   onAuditar: () => void;
 }) {
   const auditarMut = useAuditarLancamento();
   const alterarValorMut = useAlterarValorLancamento();
+  const qc = useQueryClient();
   const [editingValor, setEditingValor] = useState(false);
   const [novoValor, setNovoValor] = useState('');
+  const [deferidoOpen, setDeferidoOpen] = useState(false);
+  const [deferidoData, setDeferidoData] = useState(() => new Date().toISOString().split('T')[0]);
+  const [savingDeferido, setSavingDeferido] = useState(false);
 
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
+
+  // Show "Marcar Deferido" only for no_deferimento clients with processes still in pre-deferimento stage
+  const podeMarcarDeferido =
+    clienteMomentoFaturamento === 'no_deferimento'
+    && ETAPAS_PRE_DEFERIMENTO.includes(l.processo_etapa)
+    && !l.processo_data_deferimento
+    && !!l.processo_id;
 
   const handleDesmarcar = () => {
     auditarMut.mutate({ lancamentoId: l.id, auditado: false }, {
       onSuccess: () => toast.success('Auditoria removida'),
     });
+  };
+
+  const handleConfirmarDeferido = async () => {
+    if (!l.processo_id) return;
+    if (!deferidoData) { toast.error('Selecione uma data'); return; }
+    setSavingDeferido(true);
+    try {
+      const { error } = await supabase
+        .from('processos')
+        .update({ data_deferimento: deferidoData, etapa: 'registro' } as any)
+        .eq('id', l.processo_id);
+      if (error) throw error;
+      toast.success('Processo marcado como deferido');
+      setDeferidoOpen(false);
+      invalidateFinanceiro(qc);
+      qc.invalidateQueries({ queryKey: ['processos'] });
+    } catch (err: any) {
+      toast.error('Erro ao marcar deferido: ' + (err?.message || 'Erro'));
+    } finally {
+      setSavingDeferido(false);
+    }
   };
 
   const handleSalvarValor = () => {
@@ -350,6 +386,11 @@ function AuditoriaFicha({
         <p className="text-xs text-muted-foreground truncate">
           {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo}
           {l.processo_etapa && ` · ${l.processo_etapa}`}
+          {l.processo_data_deferimento && (
+            <span className="ml-2 inline-flex items-center font-mono text-emerald-600 text-[10px]">
+              · Deferido {fmtDate(l.processo_data_deferimento)}
+            </span>
+          )}
         </p>
       </div>
 
@@ -447,6 +488,37 @@ function AuditoriaFicha({
           >
             <Receipt className="h-3 w-3 mr-1" /> Add Taxa
           </Button>
+        )}
+        {podeMarcarDeferido && (
+          <Popover open={deferidoOpen} onOpenChange={setDeferidoOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs h-7 border-emerald-600/40 text-emerald-600 hover:bg-emerald-600/10 hover:text-emerald-700"
+              >
+                <CalendarCheck className="h-3 w-3 mr-1" /> Deferido ✅
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3 space-y-2" align="start">
+              <Label className="text-xs">Data do deferimento</Label>
+              <Input
+                type="date"
+                value={deferidoData}
+                onChange={e => setDeferidoData(e.target.value)}
+                className="h-9 text-sm"
+                style={{ fontSize: 16 }}
+              />
+              <Button
+                size="sm"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={handleConfirmarDeferido}
+                disabled={savingDeferido}
+              >
+                {savingDeferido ? 'Salvando...' : 'Confirmar'}
+              </Button>
+            </PopoverContent>
+          </Popover>
         )}
         <Button
           size="sm"
