@@ -971,11 +971,11 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
 }
 
 // ══════════ TAB: AGUARDANDO ══════════
-export function ClientesAguardando({ clientes }: { clientes: ClienteFinanceiro[] }) {
+export function ClientesAguardando({ clientes, contestarLancamento }: { clientes: ClienteFinanceiro[]; contestarLancamento?: any }) {
   if (clientes.length === 0) return <EmptyState text="Nenhum pagamento pendente." />;
   return (
     <Accordion type="multiple" className="space-y-2">
-      {clientes.map(c => <AguardandoItem key={c.cliente_id} cliente={c} />)}
+      {clientes.map(c => <AguardandoItem key={c.cliente_id} cliente={c} contestarLancamento={contestarLancamento} />)}
     </Accordion>
   );
 }
