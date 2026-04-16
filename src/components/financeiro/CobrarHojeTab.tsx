@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Receipt, Loader2, CheckCircle, Zap, ShieldCheck, Clock } from 'lucide-react';
+import { FileText, Receipt, Loader2, CheckCircle, Zap } from 'lucide-react';
 import type { ClienteFinanceiro, LancamentoFinanceiro, MensalistaSemFatura } from '@/hooks/useFinanceiroClientes';
 import { invalidateFinanceiro } from '@/hooks/useFinanceiroClientes';
 import type { ExtratoGeradoPayload } from './ClienteAccordionFinanceiro';
@@ -22,14 +22,11 @@ interface CobrarHojeCliente {
   clienteNome: string;
   clienteApelido: string | null;
   cliente: ClienteFinanceiro | null;
-  lancamentos: LancamentoFinanceiro[];
+  lancamentos: LancamentoFinanceiro[]; // only auditado === true
   mensalista: MensalistaSemFatura | null;
   isMensalistaOnly: boolean;
   totalValor: number;
   qtdProcessos: number;
-  qtdAuditados: number;
-  qtdNaoAuditados: number;
-  todosAuditados: boolean;
   statusHumano: string;
   corBadge: string;
   sortLayer: number;
@@ -44,32 +41,38 @@ function diffDays(from: Date, to: Date): number {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
-function computeGroupStatus(maiorAtraso: number, menorDiasAteVencer: number, isDeferimento: boolean, isMensalista: boolean, todosAuditados: boolean, qtdNaoAuditados: number): { texto: string; badge: string; layer: number } {
+// Status hierarchy: most critical wins
+function computeGroupStatus(maiorAtraso: number, menorDiasAteVencer: number, isDeferimento: boolean, isMensalista: boolean): { texto: string; badge: string; layer: number } {
+  // Mensalista overdue
   if (isMensalista && maiorAtraso > 0) {
     return { texto: `Fatura mensal — venceu há ${maiorAtraso} dia${maiorAtraso > 1 ? 's' : ''} 🔴`, badge: 'bg-red-500/15 text-red-500 border-red-500/30', layer: 1 };
   }
-  if (isMensalista) {
-    return { texto: `Fatura mensal — gerar até ${menorDiasAteVencer} dia${menorDiasAteVencer !== 1 ? 's' : ''} 🔵`, badge: 'bg-blue-500/15 text-blue-500 border-blue-500/30', layer: 3 };
-  }
-  if (isDeferimento) {
-    return { texto: 'Deferido ✅ — gerar cobrança 🟢', badge: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30', layer: 4 };
-  }
-  if (!todosAuditados && qtdNaoAuditados > 0) {
-    return { texto: `⏳ ${qtdNaoAuditados} processo${qtdNaoAuditados > 1 ? 's' : ''} aguardando auditoria`, badge: 'bg-amber-500/15 text-amber-600 border-amber-500/30', layer: 5 };
-  }
+  // Vencido > 5 dias — URGENTE
   if (maiorAtraso > 5) {
     return { texto: `Venceu há ${maiorAtraso} dias — URGENTE 🔴`, badge: 'bg-red-600/20 text-red-600 border-red-600/40', layer: 1 };
   }
+  // Vencido ≤ 5 dias
   if (maiorAtraso > 0) {
     return { texto: `Venceu há ${maiorAtraso} dia${maiorAtraso > 1 ? 's' : ''} — cobrar agora 🔴`, badge: 'bg-red-500/15 text-red-500 border-red-500/30', layer: 1 };
   }
+  // Vence hoje
   if (menorDiasAteVencer === 0) {
     return { texto: 'Vence hoje — enviar cobrança 🟡', badge: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/30', layer: 2 };
   }
+  // Vence em 1-3 dias
   if (menorDiasAteVencer <= 3) {
     return { texto: `Vence em ${menorDiasAteVencer} dia${menorDiasAteVencer > 1 ? 's' : ''}`, badge: 'bg-amber-500/15 text-amber-600 border-amber-500/30', layer: 3 };
   }
-  return { texto: `Vence em ${menorDiasAteVencer} dias`, badge: 'bg-muted text-muted-foreground border-border', layer: 3 };
+  // Deferimento liberado
+  if (isDeferimento) {
+    return { texto: 'Deferido ✅ — gerar cobrança 🟢', badge: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30', layer: 4 };
+  }
+  // Mensalista na janela
+  if (isMensalista) {
+    return { texto: `Fatura mensal — gerar cobrança 🔵`, badge: 'bg-blue-500/15 text-blue-500 border-blue-500/30', layer: 5 };
+  }
+  // A vencer 4-7 dias
+  return { texto: `Vence em ${menorDiasAteVencer} dias`, badge: 'bg-muted text-muted-foreground border-border', layer: 6 };
 }
 
 // ── Component ──
@@ -91,14 +94,16 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
     const d = new Date(); d.setHours(0, 0, 0, 0); return d;
   }, []);
 
-  // Group by client instead of per-lancamento
+  // Group by client — ONLY auditado === true lancamentos
   const groups = useMemo<CobrarHojeCliente[]>(() => {
     const map = new Map<string, CobrarHojeCliente>();
 
-    // Group lancamentos by client
     for (const c of clientesCobrar) {
+      // Filter to audited-only lancamentos
+      const auditados = c.lancamentos.filter(l => l.auditado === true);
+      if (auditados.length === 0) continue; // skip client entirely if no audited processes
+
       if (!map.has(c.cliente_id)) {
-        const isDef = c.cliente_momento_faturamento === 'no_deferimento';
         map.set(c.cliente_id, {
           clienteId: c.cliente_id,
           clienteNome: c.cliente_nome,
@@ -109,9 +114,6 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
           isMensalistaOnly: false,
           totalValor: 0,
           qtdProcessos: 0,
-          qtdAuditados: 0,
-          qtdNaoAuditados: 0,
-          todosAuditados: true,
           statusHumano: '',
           corBadge: '',
           sortLayer: 99,
@@ -121,13 +123,11 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
         });
       }
       const group = map.get(c.cliente_id)!;
-      for (const l of c.lancamentos) {
+      for (const l of auditados) {
         group.lancamentos.push(l);
         const totalVA = l.total_valores_adicionais || 0;
         group.totalValor += l.valor + totalVA;
         group.qtdProcessos++;
-        if (l.auditado) group.qtdAuditados++;
-        else { group.qtdNaoAuditados++; group.todosAuditados = false; }
 
         const venc = new Date(l.data_vencimento + 'T00:00:00');
         const diff = diffDays(venc, hoje);
@@ -151,11 +151,9 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
       if (atraso === 0 && ateVencer > 5) continue;
 
       if (map.has(m.id)) {
-        // Client already has lancamentos — add mensalista info
         const group = map.get(m.id)!;
         group.mensalista = m;
       } else {
-        // Pure mensalista without lancamentos
         map.set(m.id, {
           clienteId: m.id,
           clienteNome: m.nome,
@@ -166,9 +164,6 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
           isMensalistaOnly: true,
           totalValor: m.valor_base,
           qtdProcessos: 0,
-          qtdAuditados: 0,
-          qtdNaoAuditados: 0,
-          todosAuditados: true,
           statusHumano: '',
           corBadge: '',
           sortLayer: 99,
@@ -179,22 +174,33 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
       }
     }
 
-    // Compute status for each group
+    // Compute status for each group — most critical lancamento wins
     const result: CobrarHojeCliente[] = [];
     for (const group of map.values()) {
       const isDef = group.cliente?.cliente_momento_faturamento === 'no_deferimento' && group.lancamentos.some(l => ['baixa', 'avulso'].includes(l.processo_tipo));
-      const menorDiasAteVencer = group.lancamentos.length > 0
-        ? Math.max(0, Math.min(...group.lancamentos.map(l => {
-            const venc = new Date(l.data_vencimento + 'T00:00:00');
-            return -diffDays(venc, hoje);
-          })))
-        : Math.max(0, -diffDays(group.dataVencimento, hoje));
 
-      const status = computeGroupStatus(group.maiorAtraso, menorDiasAteVencer, isDef, group.isMensalistaOnly, group.todosAuditados, group.qtdNaoAuditados);
+      // Find the most critical status among all lancamentos
+      let worstAtraso = group.maiorAtraso;
+      let bestAteVencer = Infinity;
+
+      for (const l of group.lancamentos) {
+        const venc = new Date(l.data_vencimento + 'T00:00:00');
+        const diff = diffDays(venc, hoje);
+        const atraso = Math.max(0, diff);
+        const ateVencer = Math.max(0, -diff);
+        if (atraso > worstAtraso) worstAtraso = atraso;
+        if (ateVencer < bestAteVencer) bestAteVencer = ateVencer;
+      }
+
+      if (bestAteVencer === Infinity) {
+        bestAteVencer = Math.max(0, -diffDays(group.dataVencimento, hoje));
+      }
+
+      const status = computeGroupStatus(worstAtraso, bestAteVencer, isDef, group.isMensalistaOnly);
       group.statusHumano = status.texto;
       group.corBadge = status.badge;
       group.sortLayer = status.layer;
-      group.sortSecondary = group.maiorAtraso > 0 ? -group.maiorAtraso * 1000000 - group.totalValor : menorDiasAteVencer * 1000000 - group.totalValor;
+      group.sortSecondary = worstAtraso > 0 ? -worstAtraso * 1000000 - group.totalValor : bestAteVencer * 1000000 - group.totalValor;
       result.push(group);
     }
 
@@ -398,117 +404,107 @@ export default function CobrarHojeTab({ clientesCobrar, mensalistasSemFatura, ag
 
       {/* ── Cards agrupados por cliente ── */}
       <div className="space-y-3">
-        {visibleGroups.map(group => (
-          <div
-            key={group.clienteId}
-            className={cn(
-              'rounded-lg border bg-card p-4 transition-all duration-500',
-              fadingOut.has(group.clienteId) && 'opacity-0 scale-95 pointer-events-none',
-              group.maiorAtraso > 5 && 'border-red-500/40 bg-red-500/5',
-              group.maiorAtraso > 0 && group.maiorAtraso <= 5 && 'border-red-500/20',
-            )}
-          >
-            <div className="space-y-2">
-              {/* Client name + count */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-sm truncate">
-                    {group.clienteApelido || group.clienteNome}
-                  </p>
-                  {group.qtdProcessos > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {group.qtdProcessos} processo{group.qtdProcessos > 1 ? 's' : ''}
+        {visibleGroups.map(group => {
+          // Card border color = most critical status
+          const isUrgent = group.maiorAtraso > 5;
+          const isOverdue = group.maiorAtraso > 0 && group.maiorAtraso <= 5;
+          const isDueToday = group.maiorAtraso === 0 && group.lancamentos.some(l => {
+            const venc = new Date(l.data_vencimento + 'T00:00:00');
+            return diffDays(venc, hoje) === 0;
+          });
+
+          return (
+            <div
+              key={group.clienteId}
+              className={cn(
+                'rounded-lg border bg-card p-4 transition-all duration-500',
+                fadingOut.has(group.clienteId) && 'opacity-0 scale-95 pointer-events-none',
+                isUrgent && 'border-red-500/40 bg-red-500/5',
+                isOverdue && 'border-red-500/20 bg-red-500/[0.02]',
+                isDueToday && 'border-yellow-500/30 bg-yellow-500/[0.02]',
+              )}
+            >
+              <div className="space-y-2">
+                {/* Client name + count */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm truncate">
+                      {group.clienteApelido || group.clienteNome}
                     </p>
-                  )}
+                    {group.qtdProcessos > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {group.qtdProcessos} processo{group.qtdProcessos > 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-xl font-bold text-foreground shrink-0">
+                    {formatBRL(group.totalValor)}
+                  </p>
                 </div>
-                <p className="text-xl font-bold text-foreground shrink-0">
-                  {formatBRL(group.totalValor)}
-                </p>
+
+                {/* Status badge — most critical */}
+                <Badge variant="outline" className={cn('text-xs', group.corBadge)}>
+                  {group.statusHumano}
+                </Badge>
+
+                {/* Process list summary — only audited ones */}
+                {group.lancamentos.length > 0 && (
+                  <div className="text-xs text-muted-foreground space-y-0.5 border-t border-border/40 pt-2 mt-1">
+                    {group.lancamentos.slice(0, 5).map(l => (
+                      <div key={l.id} className="flex items-center justify-between gap-2">
+                        <span className="truncate flex-1">
+                          {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo}
+                          {' — '}
+                          {l.processo_razao_social}
+                        </span>
+                        <span className="shrink-0 font-medium">{formatBRL(l.valor + (l.total_valores_adicionais || 0))}</span>
+                      </div>
+                    ))}
+                    {group.lancamentos.length > 5 && (
+                      <p className="text-muted-foreground/60">+ {group.lancamentos.length - 5} mais...</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Mensalista info */}
+                {group.isMensalistaOnly && group.mensalista && (
+                  <p className="text-xs text-muted-foreground">
+                    Mensalidade · Vencimento dia {group.mensalista.dia_vencimento_mensal}
+                  </p>
+                )}
               </div>
 
-              {/* Status badge */}
-              <Badge variant="outline" className={cn('text-xs', group.corBadge)}>
-                {group.statusHumano}
-              </Badge>
-
-              {/* Audit status — KEY INFO for Carolina */}
-              {group.qtdProcessos > 0 && (
-                <div className="flex items-center gap-2 text-xs">
-                  {group.todosAuditados ? (
-                    <span className="flex items-center gap-1 text-emerald-500">
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      ✅ Todos auditados — pode cobrar
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-amber-500">
-                      <Clock className="h-3.5 w-3.5" />
-                      ⏳ {group.qtdAuditados}/{group.qtdProcessos} auditados
-                      {group.qtdNaoAuditados > 0 && ` — ${group.qtdNaoAuditados} aguardando Master`}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Process list summary */}
-              {group.lancamentos.length > 0 && (
-                <div className="text-xs text-muted-foreground space-y-0.5 border-t border-border/40 pt-2 mt-1">
-                  {group.lancamentos.slice(0, 5).map(l => (
-                    <div key={l.id} className="flex items-center justify-between gap-2">
-                      <span className="truncate flex-1">
-                        {l.auditado ? '✅' : '⏳'}{' '}
-                        {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo}
-                        {' — '}
-                        {l.processo_razao_social}
-                      </span>
-                      <span className="shrink-0 font-medium">{formatBRL(l.valor + (l.total_valores_adicionais || 0))}</span>
-                    </div>
-                  ))}
-                  {group.lancamentos.length > 5 && (
-                    <p className="text-muted-foreground/60">+ {group.lancamentos.length - 5} mais...</p>
-                  )}
-                </div>
-              )}
-
-              {/* Mensalista info */}
-              {group.isMensalistaOnly && group.mensalista && (
-                <p className="text-xs text-muted-foreground">
-                  Mensalidade · Vencimento dia {group.mensalista.dia_vencimento_mensal}
-                </p>
-              )}
+              {/* Action button */}
+              <div className="mt-3">
+                {group.isMensalistaOnly ? (
+                  <Button
+                    className="w-full h-12 text-sm gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={gerandoFatura === group.clienteId}
+                    onClick={() => handleGerarFatura(group)}
+                  >
+                    {gerandoFatura === group.clienteId ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Gerando...</>
+                    ) : (
+                      <><Receipt className="h-4 w-4" /> Gerar Fatura</>
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full h-12 text-sm gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    disabled={gerando === group.clienteId}
+                    onClick={() => handleGerarExtrato(group)}
+                  >
+                    {gerando === group.clienteId ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Gerando...</>
+                    ) : (
+                      <><FileText className="h-4 w-4" /> Gerar Extrato ({group.qtdProcessos} proc.)</>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
-
-            {/* Action button */}
-            <div className="mt-3">
-              {group.isMensalistaOnly ? (
-                <Button
-                  className="w-full h-12 text-sm gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-                  disabled={gerandoFatura === group.clienteId}
-                  onClick={() => handleGerarFatura(group)}
-                >
-                  {gerandoFatura === group.clienteId ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Gerando...</>
-                  ) : (
-                    <><Receipt className="h-4 w-4" /> Gerar Fatura</>
-                  )}
-                </Button>
-              ) : (
-                <Button
-                  className="w-full h-12 text-sm gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                  disabled={gerando === group.clienteId || !group.todosAuditados}
-                  onClick={() => handleGerarExtrato(group)}
-                >
-                  {gerando === group.clienteId ? (
-                    <><Loader2 className="h-4 w-4 animate-spin" /> Gerando...</>
-                  ) : !group.todosAuditados ? (
-                    <><Clock className="h-4 w-4" /> Aguardando auditoria ({group.qtdNaoAuditados})</>
-                  ) : (
-                    <><FileText className="h-4 w-4" /> Gerar Extrato ({group.qtdProcessos} proc.)</>
-                  )}
-                </Button>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Count */}

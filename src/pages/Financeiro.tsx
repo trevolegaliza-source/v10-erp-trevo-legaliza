@@ -121,10 +121,11 @@ export default function Financeiro() {
   const qtdAguardandoAuditoria = clientesAguardandoAuditoria.reduce((s, c) => s + c.qtd_nao_auditados, 0);
 
   const cobrarHojeData = useMemo(() => {
-    // Count unique clients, not individual lancamentos
+    // Count unique clients that have at least 1 AUDITED lancamento
     const clienteIds = new Set<string>();
     for (const c of clientesCobrar) {
-      if (c.lancamentos.length > 0) clienteIds.add(c.cliente_id);
+      const auditados = c.lancamentos.filter(l => l.auditado === true);
+      if (auditados.length > 0) clienteIds.add(c.cliente_id);
     }
     // Add mensalistas within window
     for (const m of mensalistasSemFatura) {

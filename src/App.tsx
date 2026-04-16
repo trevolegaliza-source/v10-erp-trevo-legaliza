@@ -53,7 +53,13 @@ const PageFallback = () => (
 // Redirect based on role: financeiro goes to /financeiro, others to dashboard
 function SmartHome() {
   const { role, loading, podeVer } = usePermissions();
-  if (loading) return <PageFallback />;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
   if (role === 'financeiro' || !podeVer('dashboard')) {
     return <Navigate to="/financeiro" replace />;
   }
