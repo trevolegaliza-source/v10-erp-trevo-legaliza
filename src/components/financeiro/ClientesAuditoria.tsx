@@ -383,6 +383,85 @@ function AuditoriaFicha({
     });
   };
 
+  const handleAtivarTrevo = async () => {
+    if (!l.processo_id) return;
+    if (valorBase <= 0) { toast.error('Cliente sem valor base cadastrado'); return; }
+    setSavingTrevo(true);
+    try {
+      // 1. Update processo: append etiqueta + recalc valor
+      const { data: procData, error: procFetchErr } = await supabase
+        .from('processos')
+        .select('etiquetas')
+        .eq('id', l.processo_id)
+        .single();
+      if (procFetchErr) throw procFetchErr;
+      const etiquetasAtuais: string[] = (procData?.etiquetas as string[]) || [];
+      const novasEtiquetas = etiquetasAtuais.includes('metodo_trevo')
+        ? etiquetasAtuais
+        : [...etiquetasAtuais, 'metodo_trevo'];
+
+      const { error: procErr } = await supabase
+        .from('processos')
+        .update({ etiquetas: novasEtiquetas, valor: novoValorTrevo } as any)
+        .eq('id', l.processo_id);
+      if (procErr) throw procErr;
+
+      // 2. Update lancamento (only if not pago)
+      if (l.status !== 'pago') {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { error: lancErr } = await supabase
+          .from('lancamentos')
+          .update({
+            valor: novoValorTrevo,
+            valor_original: l.valor,
+            valor_alterado_por: user?.id,
+            valor_alterado_em: new Date().toISOString(),
+          } as any)
+          .eq('id', l.id);
+        if (lancErr) throw lancErr;
+      }
+
+      toast.success(`Método Trevo ativado · ${fmt(novoValorTrevo)}`);
+      setTrevoOpen(false);
+      invalidateFinanceiro(qc);
+      qc.invalidateQueries({ queryKey: ['processos'] });
+    } catch (err: any) {
+      toast.error('Erro ao ativar Método Trevo: ' + (err?.message || 'Erro'));
+    } finally {
+      setSavingTrevo(false);
+    }
+  };
+
+  const handleDesativarTrevo = async () => {
+    if (!l.processo_id) return;
+    setSavingTrevo(true);
+    try {
+      const { data: procData, error: procFetchErr } = await supabase
+        .from('processos')
+        .select('etiquetas')
+        .eq('id', l.processo_id)
+        .single();
+      if (procFetchErr) throw procFetchErr;
+      const etiquetasAtuais: string[] = (procData?.etiquetas as string[]) || [];
+      const novasEtiquetas = etiquetasAtuais.filter(e => e !== 'metodo_trevo');
+
+      const { error } = await supabase
+        .from('processos')
+        .update({ etiquetas: novasEtiquetas } as any)
+        .eq('id', l.processo_id);
+      if (error) throw error;
+
+      toast.success('Método Trevo removido');
+      setTrevoOpen(false);
+      invalidateFinanceiro(qc);
+      qc.invalidateQueries({ queryKey: ['processos'] });
+    } catch (err: any) {
+      toast.error('Erro ao remover: ' + (err?.message || 'Erro'));
+    } finally {
+      setSavingTrevo(false);
+    }
+  };
+
   return (
     <div className={cn(
       "rounded-lg border p-3 space-y-2",
