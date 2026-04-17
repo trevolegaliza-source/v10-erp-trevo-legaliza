@@ -132,9 +132,13 @@ const PDF_BASE_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body, div, span, p, td, th { font-family: 'DM Sans', sans-serif; color: hsl(var(--ink)); }
   body { background: hsl(var(--surface-soft)); }
+  /* Página A4 a 96dpi: 794x1123. Margens físicas (25mm = ~94px) já são aplicadas pelo jsPDF
+     via addCanvasToDoc. Mantemos um padding interno menor apenas para respiro visual,
+     e reservamos espaço inferior para o footer absoluto. */
   .page { width: 794px; min-height: 1123px; background: hsl(var(--surface)); position: relative; overflow: visible; }
-  .page-inner { padding: 24px 60px 140px; }
-  .page#page1 .page-inner { padding: 28px 60px 140px; }
+  .page-inner { padding: 18px 28px 150px; }
+  .page#page1 .page-inner { padding: 22px 28px 150px; }
+  .page#page2 .page-inner { padding: 22px 28px 150px; }
   .top-accent { width: 100%; height: 6px; background: linear-gradient(90deg, hsl(var(--trevo)) 0%, hsl(89 80% 55%) 100%); }
   .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 60px 16px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
   .header-logo img { width: 190px; height: auto; object-fit: contain; display: block; }
