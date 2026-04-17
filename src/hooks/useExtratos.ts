@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { empresaPath } from '@/lib/storage-path';
 
 export interface Extrato {
   id: string;
@@ -54,7 +55,7 @@ export function useExtratos(clienteId?: string) {
       competenciaMes: number;
       competenciaAno: number;
     }) => {
-      const path = `extratos/${input.clienteId}/${input.filename}`;
+      const path = await empresaPath(`extratos/${input.clienteId}/${input.filename}`);
       const { error: uploadError } = await supabase.storage
         .from('documentos')
         .upload(path, input.pdfBlob, {
@@ -143,7 +144,7 @@ export function useExtratos(clienteId?: string) {
         .eq('id', extratoId);
 
       // Remove PDF
-      const path = `extratos/${ext.cliente_id}/${ext.filename}`;
+      const path = await empresaPath(`extratos/${ext.cliente_id}/${ext.filename}`);
       await supabase.storage.from('documentos').remove([path]);
     },
     onSuccess: () => {
