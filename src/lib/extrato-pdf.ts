@@ -1047,6 +1047,18 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
   const detailPageGroups = shouldCreateDetailPages(selected, data) ? paginateDetailSteps(selected, data) : [];
   const attachmentCount = countAttachments(data);
 
+  // Numeração SEQUENCIAL (1°..Nº) por ordem cronológica de cadastro,
+  // usada no resumo da página 1 e nos cards do detalhamento.
+  // É independente do slot da escadinha (que pode ter gaps).
+  const sequentialIndex = new Map<string, number>();
+  [...selected]
+    .sort((a, b) => {
+      const ta = new Date(a.processo.created_at).getTime();
+      const tb = new Date(b.processo.created_at).getTime();
+      return ta - tb || a.processo.id.localeCompare(b.processo.id);
+    })
+    .forEach((step, idx) => sequentialIndex.set(step.processo.id, idx + 1));
+
   // Página 1 (cobrança) + Página 2 (transparência/escadinha) só se houver desconto progressivo aplicável
   const descPct = data.cliente.desconto_progressivo ?? 0;
   const hasTransparencyPage = descPct > 0 && steps.length > 0;
@@ -1071,7 +1083,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
   }
 
   for (let index = 0; index < detailPageGroups.length; index += 1) {
-    const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, nextPageNumber, totalPages, detailPageGroups.length);
+    const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, nextPageNumber, totalPages, detailPageGroups.length, sequentialIndex);
     const detailCanvas = await renderPageToCanvas(detailHtml, GLOBAL_STYLES);
     doc.addPage();
     addCanvasToDoc(doc, detailCanvas);
