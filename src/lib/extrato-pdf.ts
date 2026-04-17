@@ -1004,7 +1004,13 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
 
   const detailPageGroups = shouldCreateDetailPages(selected, data) ? paginateDetailSteps(selected, data) : [];
   const attachmentCount = countAttachments(data);
-  const totalPages = 1 + detailPageGroups.length + attachmentCount;
+
+  // Página 1 (cobrança) + Página 2 (transparência/escadinha) só se houver desconto progressivo aplicável
+  const descPct = data.cliente.desconto_progressivo ?? 0;
+  const hasTransparencyPage = descPct > 0 && steps.length > 0;
+  const transparencyPages = hasTransparencyPage ? 1 : 0;
+
+  const totalPages = 1 + transparencyPages + detailPageGroups.length + attachmentCount;
 
   const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -1012,14 +1018,25 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
   const page1Canvas = await renderPageToCanvas(page1Html, GLOBAL_STYLES);
   addCanvasToDoc(doc, page1Canvas);
 
+  let nextPageNumber = 2;
+
+  if (hasTransparencyPage) {
+    const page2Html = buildPage2HTML(data, steps, selected, logoDataUrl, nextPageNumber, totalPages);
+    const page2Canvas = await renderPageToCanvas(page2Html, GLOBAL_STYLES);
+    doc.addPage();
+    addCanvasToDoc(doc, page2Canvas);
+    nextPageNumber += 1;
+  }
+
   for (let index = 0; index < detailPageGroups.length; index += 1) {
-    const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, index + 2, totalPages, detailPageGroups.length);
+    const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, nextPageNumber, totalPages, detailPageGroups.length);
     const detailCanvas = await renderPageToCanvas(detailHtml, GLOBAL_STYLES);
     doc.addPage();
     addCanvasToDoc(doc, detailCanvas);
+    nextPageNumber += 1;
   }
 
-  await renderAttachments(doc, data, totalPages, detailPageGroups.length + 2, logoDataUrl);
+  await renderAttachments(doc, data, totalPages, nextPageNumber, logoDataUrl);
 
   return {
     doc,
