@@ -27,16 +27,19 @@ interface ValoresAdicionaisModalProps {
   clienteApelido: string;
 }
 
-const TIPOS_TAXA = [
-  'Taxa Junta Comercial',
-  'Taxa de Balcão',
-  'DARE',
-  'Regional',
-  'MÉTODO TREVO',
-  'Agilidade Garantida',
-] as const;
+interface TipoTaxa {
+  label: string;
+  valorPadrao: number;
+}
 
-const OUTRO = 'Adicionar outro reembolso';
+const TIPOS_TAXA: TipoTaxa[] = [
+  { label: 'Taxa Junta Comercial', valorPadrao: 218.99 },
+  { label: 'Escritório Regional', valorPadrao: 239 },
+  { label: 'Motoboy', valorPadrao: 80 },
+  { label: 'MÉTODO TREVO', valorPadrao: 750 },
+];
+
+const OUTRO = 'Outros';
 
 const IMG_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
 
@@ -52,9 +55,10 @@ export default function ValoresAdicionaisModal({
   const updateMut = useUpdateValorAdicional();
   const deleteMut = useDeleteValorAdicional();
 
-  const [tipoSelecionado, setTipoSelecionado] = useState<string>(TIPOS_TAXA[0]);
+  const [tipoSelecionado, setTipoSelecionado] = useState<string>(TIPOS_TAXA[0].label);
   const [descLivre, setDescLivre] = useState('');
-  const [newValor, setNewValor] = useState('');
+  const [newValor, setNewValor] = useState(String(TIPOS_TAXA[0].valorPadrao));
+  const [pagoPeloCliente, setPagoPeloCliente] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editDesc, setEditDesc] = useState('');
   const [editValor, setEditValor] = useState('');
@@ -72,11 +76,37 @@ export default function ValoresAdicionaisModal({
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const isOutro = tipoSelecionado === OUTRO;
-  const descricaoFinal = isOutro ? descLivre.trim() : tipoSelecionado;
+  const isJuntaComercial = tipoSelecionado === 'Taxa Junta Comercial';
+  const descricaoFinal = isOutro
+    ? descLivre.trim()
+    : (isJuntaComercial && pagoPeloCliente
+        ? 'Taxa Junta Comercial (pago pelo cliente)'
+        : tipoSelecionado);
+
+  const handleTipoChange = (novoTipo: string) => {
+    setTipoSelecionado(novoTipo);
+    setPagoPeloCliente(false);
+    if (novoTipo === OUTRO) {
+      setNewValor('0');
+    } else {
+      const tipo = TIPOS_TAXA.find(t => t.label === novoTipo);
+      setNewValor(tipo ? String(tipo.valorPadrao) : '0');
+    }
+  };
+
+  const handlePagoPeloClienteChange = (checked: boolean) => {
+    setPagoPeloCliente(checked);
+    if (checked) setNewValor('0');
+    else {
+      const tipo = TIPOS_TAXA.find(t => t.label === tipoSelecionado);
+      setNewValor(tipo ? String(tipo.valorPadrao) : '0');
+    }
+  };
 
   const handleAdd = () => {
     const valor = parseFloat(newValor.replace(',', '.')) || 0;
-    if (!descricaoFinal || valor <= 0) {
+    const isPagoCliente = isJuntaComercial && pagoPeloCliente;
+    if (!descricaoFinal || (valor <= 0 && !isPagoCliente)) {
       toast.error('Preencha descrição e valor');
       return;
     }
@@ -84,10 +114,13 @@ export default function ValoresAdicionaisModal({
       { processo_id: processoId, descricao: descricaoFinal, valor },
       {
         onSuccess: () => {
-          toast.success('Taxa adicionada — anexe o comprovante na coluna Comprov.');
+          toast.success(isPagoCliente
+            ? 'Taxa registrada (pago pelo cliente)'
+            : 'Taxa adicionada — anexe o comprovante na coluna Comprov.');
           setDescLivre('');
-          setNewValor('');
-          setTipoSelecionado(TIPOS_TAXA[0]);
+          setPagoPeloCliente(false);
+          setTipoSelecionado(TIPOS_TAXA[0].label);
+          setNewValor(String(TIPOS_TAXA[0].valorPadrao));
         },
       },
     );
@@ -270,13 +303,13 @@ export default function ValoresAdicionaisModal({
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-2 items-end">
               <div className="space-y-1">
                 <label className="text-[11px] text-muted-foreground">Tipo de taxa</label>
-                <Select value={tipoSelecionado} onValueChange={setTipoSelecionado}>
+                <Select value={tipoSelecionado} onValueChange={handleTipoChange}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {TIPOS_TAXA.map((t) => (
-                      <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>
+                      <SelectItem key={t.label} value={t.label} className="text-xs">{t.label}</SelectItem>
                     ))}
                     <SelectItem value={OUTRO} className="text-xs italic">{OUTRO}</SelectItem>
                   </SelectContent>
@@ -289,9 +322,22 @@ export default function ValoresAdicionaisModal({
                   onChange={(e) => setNewValor(e.target.value)}
                   placeholder="0,00"
                   className="h-8 text-xs"
+                  disabled={isJuntaComercial && pagoPeloCliente}
                 />
               </div>
             </div>
+
+            {isJuntaComercial && (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={pagoPeloCliente}
+                  onChange={(e) => handlePagoPeloClienteChange(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-primary"
+                />
+                Pago pelo cliente (valor R$ 0,00)
+              </label>
+            )}
 
             {isOutro && (
               <Input

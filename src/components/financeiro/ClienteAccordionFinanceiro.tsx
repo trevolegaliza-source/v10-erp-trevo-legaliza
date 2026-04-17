@@ -614,7 +614,6 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
           .update({
             extrato_id: (extrato as any).id,
             etapa_financeiro: 'cobranca_gerada',
-            observacoes_financeiro: `Extrato emitido em ${now.toLocaleDateString('pt-BR')}`,
           } as any)
           .eq('processo_id', pid)
           .eq('tipo', 'receber');

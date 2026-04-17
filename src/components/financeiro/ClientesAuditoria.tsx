@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,9 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ClipboardCheck, Check, Pencil, Receipt, X, AlertTriangle, Phone, CalendarCheck } from 'lucide-react';
+import { ClipboardCheck, Check, Pencil, Receipt, X, AlertTriangle, Phone, CalendarCheck, Trash2, ArrowDownAZ, CalendarClock } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import { useAuditarLancamento, useAuditarTodosCliente, useAlterarValorLancamento, ETAPAS_PRE_DEFERIMENTO, invalidateFinanceiro } from '@/hooks/useFinanceiroClientes';
@@ -20,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { clienteTemContatoCobranca } from '@/lib/contato-cobranca';
+import { usePermissions } from '@/hooks/usePermissions';
 
 function fmt(v: number) {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -39,6 +44,22 @@ function tipoLabel(c: ClienteFinanceiro): string {
 }
 
 export function ClientesAuditoria({ clientes }: { clientes: ClienteFinanceiro[] }) {
+  const [sortMode, setSortMode] = useState<'alpha' | 'deferimento'>('alpha');
+
+  const sortedClientes = useMemo(() => {
+    const arr = [...clientes];
+    const byName = (a: ClienteFinanceiro, b: ClienteFinanceiro) =>
+      (a.cliente_apelido || a.cliente_nome).localeCompare(b.cliente_apelido || b.cliente_nome, 'pt-BR');
+    if (sortMode === 'alpha') return arr.sort(byName);
+    // Deferimento primeiro: no_deferimento ↑ topo, demais ↓
+    return arr.sort((a, b) => {
+      const aDef = a.cliente_momento_faturamento === 'no_deferimento' ? 0 : 1;
+      const bDef = b.cliente_momento_faturamento === 'no_deferimento' ? 0 : 1;
+      if (aDef !== bDef) return aDef - bDef;
+      return byName(a, b);
+    });
+  }, [clientes, sortMode]);
+
   if (clientes.length === 0) {
     return (
       <Card className="border-dashed">
@@ -57,14 +78,40 @@ export function ClientesAuditoria({ clientes }: { clientes: ClienteFinanceiro[] 
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-muted-foreground">
           {clientes.length} clientes · {totalProcessos} processos aguardando
         </p>
+        <div className="inline-flex rounded-md border border-border overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setSortMode('alpha')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 h-8 text-xs font-medium transition-colors",
+              sortMode === 'alpha'
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:bg-muted"
+            )}
+          >
+            <ArrowDownAZ className="h-3.5 w-3.5" /> A-Z
+          </button>
+          <button
+            type="button"
+            onClick={() => setSortMode('deferimento')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 h-8 text-xs font-medium transition-colors border-l border-border",
+              sortMode === 'deferimento'
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:bg-muted"
+            )}
+          >
+            <CalendarClock className="h-3.5 w-3.5" /> Deferimento primeiro
+          </button>
+        </div>
       </div>
 
       <Accordion type="multiple" className="space-y-2">
-        {clientes.map(c => <AuditoriaItem key={c.cliente_id} cliente={c} />)}
+        {sortedClientes.map(c => <AuditoriaItem key={c.cliente_id} cliente={c} />)}
       </Accordion>
     </div>
   );
@@ -211,9 +258,20 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
         <AccordionTrigger className="px-4 py-3 hover:no-underline">
           <div className="flex items-center gap-3 sm:gap-3 flex-1 text-left min-w-0">
             <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="font-semibold text-sm truncate">
-                {cliente.cliente_apelido || cliente.cliente_nome}
-                {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · {cliente.cliente_codigo}</span>}
+              <p className="font-semibold text-sm truncate flex items-center gap-2 flex-wrap">
+                <span className="truncate">
+                  {cliente.cliente_apelido || cliente.cliente_nome}
+                  {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · {cliente.cliente_codigo}</span>}
+                </span>
+                {cliente.cliente_momento_faturamento === 'no_deferimento' ? (
+                  <Badge className="bg-amber-500 text-white border-0 text-[10px] px-1.5 py-0 font-bold whitespace-nowrap">
+                    COBRAR NO DEFERIMENTO
+                  </Badge>
+                ) : (
+                  <Badge className="bg-emerald-600 text-white border-0 text-[10px] px-1.5 py-0 font-bold whitespace-nowrap">
+                    COBRAR
+                  </Badge>
+                )}
               </p>
               <p className="text-xs text-muted-foreground truncate">
                 {lancNaoAuditados.length} proc. · {fmt(totalNaoAuditado)}
@@ -354,6 +412,7 @@ function AuditoriaFicha({
   const auditarMut = useAuditarLancamento();
   const alterarValorMut = useAlterarValorLancamento();
   const qc = useQueryClient();
+  const { isMaster } = usePermissions();
   const [editingValor, setEditingValor] = useState(false);
   const [novoValor, setNovoValor] = useState('');
   const [deferidoOpen, setDeferidoOpen] = useState(false);
@@ -361,6 +420,34 @@ function AuditoriaFicha({
   const [savingDeferido, setSavingDeferido] = useState(false);
   const [trevoOpen, setTrevoOpen] = useState(false);
   const [savingTrevo, setSavingTrevo] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deletingProcesso, setDeletingProcesso] = useState(false);
+
+  const handleExcluirProcesso = async () => {
+    if (!l.processo_id) return;
+    setDeletingProcesso(true);
+    try {
+      // Delete lancamentos first (FK)
+      const { error: lancErr } = await supabase
+        .from('lancamentos')
+        .delete()
+        .eq('processo_id', l.processo_id);
+      if (lancErr) throw lancErr;
+      const { error: procErr } = await supabase
+        .from('processos')
+        .delete()
+        .eq('id', l.processo_id);
+      if (procErr) throw procErr;
+      toast.success('Processo excluído');
+      setConfirmDeleteOpen(false);
+      invalidateFinanceiro(qc);
+      qc.invalidateQueries({ queryKey: ['processos'] });
+    } catch (err: any) {
+      toast.error('Erro ao excluir: ' + (err?.message || 'Erro'));
+    } finally {
+      setDeletingProcesso(false);
+    }
+  };
 
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
 
@@ -727,7 +814,39 @@ function AuditoriaFicha({
         >
           <Check className="h-3 w-3 mr-1" /> {l.auditado ? 'Auditado ✅' : 'Auditar'}
         </Button>
+        {isMaster() && l.processo_id && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-xs h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => setConfirmDeleteOpen(true)}
+            title="Excluir processo"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir processo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Excluir processo <strong>{l.processo_razao_social}</strong>? Esta ação não pode ser desfeita e removerá também o lançamento financeiro vinculado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingProcesso}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleExcluirProcesso(); }}
+              disabled={deletingProcesso}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingProcesso ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
