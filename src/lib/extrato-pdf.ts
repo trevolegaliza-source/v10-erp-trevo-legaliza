@@ -133,9 +133,10 @@ const PDF_BASE_STYLES = `
   body, div, span, p, td, th { font-family: 'DM Sans', sans-serif; color: hsl(var(--ink)); }
   body { background: hsl(var(--surface-soft)); }
   .page { width: 794px; min-height: 1123px; background: hsl(var(--surface)); position: relative; overflow: visible; }
-  .page-inner { padding: 22px 34px 126px; }
+  .page-inner { padding: 24px 60px 140px; }
+  .page#page1 .page-inner { padding: 28px 60px 140px; }
   .top-accent { width: 100%; height: 6px; background: linear-gradient(90deg, hsl(var(--trevo)) 0%, hsl(89 80% 55%) 100%); }
-  .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 34px 16px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
+  .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 60px 16px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
   .header-logo img { width: 190px; height: auto; object-fit: contain; display: block; }
   .header-fallback { font-size: 14px; font-weight: 800; color: hsl(var(--trevo)); }
   .header-right { text-align: right; }
