@@ -678,8 +678,9 @@ function buildPage1HTML(
   const maiorData = datasSelecionadas.length > 0 ? new Date(Math.max(...datasSelecionadas.map((date) => date.getTime()))) : emissaoDate;
   const periodoTexto = `${menorData.toLocaleDateString('pt-BR')} até ${maiorData.toLocaleDateString('pt-BR')}`;
 
-  const previewCount = detailPageCount > 0 ? Math.min(selected.length, 4) : Math.min(selected.length, 6);
-  const hiddenCount = Math.max(selected.length - previewCount, 0);
+  // Página 1: lista TODOS os processos selecionados (sem corte). Sem "+N detalhados".
+  const previewCount = selected.length;
+  const hiddenCount = 0;
 
   return `
     <div class="page" id="page1">
