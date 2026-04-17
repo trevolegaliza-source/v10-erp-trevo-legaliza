@@ -27,16 +27,19 @@ interface ValoresAdicionaisModalProps {
   clienteApelido: string;
 }
 
-const TIPOS_TAXA = [
-  'Taxa Junta Comercial',
-  'Taxa de Balcão',
-  'DARE',
-  'Regional',
-  'MÉTODO TREVO',
-  'Agilidade Garantida',
-] as const;
+interface TipoTaxa {
+  label: string;
+  valorPadrao: number;
+}
 
-const OUTRO = 'Adicionar outro reembolso';
+const TIPOS_TAXA: TipoTaxa[] = [
+  { label: 'Taxa Junta Comercial', valorPadrao: 218.99 },
+  { label: 'Escritório Regional', valorPadrao: 239 },
+  { label: 'Motoboy', valorPadrao: 80 },
+  { label: 'MÉTODO TREVO', valorPadrao: 750 },
+];
+
+const OUTRO = 'Outros';
 
 const IMG_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
 
