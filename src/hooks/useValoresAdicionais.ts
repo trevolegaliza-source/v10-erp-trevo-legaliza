@@ -39,6 +39,9 @@ export function useAddValorAdicional() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['valores_adicionais', vars.processo_id] });
       qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
+      qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      qc.invalidateQueries({ queryKey: ['lancamentos_receber'] });
+      qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -57,6 +60,9 @@ export function useUpdateValorAdicional() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['valores_adicionais', vars.processo_id] });
       qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
+      qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      qc.invalidateQueries({ queryKey: ['lancamentos_receber'] });
+      qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -72,6 +78,9 @@ export function useDeleteValorAdicional() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['valores_adicionais', vars.processo_id] });
       qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
+      qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
+      qc.invalidateQueries({ queryKey: ['lancamentos_receber'] });
+      qc.invalidateQueries({ queryKey: ['financeiro_dashboard'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
