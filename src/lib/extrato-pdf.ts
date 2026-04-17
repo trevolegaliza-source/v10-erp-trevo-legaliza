@@ -926,17 +926,24 @@ function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
   const pdfHeight = doc.internal.pageSize.getHeight();
   const imgData = canvas.toDataURL('image/jpeg', 0.85);
 
-  let imgWidth = pdfWidth;
-  let imgHeight = (canvas.height / canvas.width) * pdfWidth;
+  // Margem mínima de 12mm em todos os lados (o template HTML já reserva 24-60px de padding
+  // interno; o offset físico evita que o header/conteúdo encoste na borda da folha A4).
+  const margin = 12;
+  const maxWidth = pdfWidth - margin * 2;
+  const maxHeight = pdfHeight - margin * 2;
 
-  if (imgHeight > pdfHeight) {
-    const scaleFactor = pdfHeight / imgHeight;
-    imgWidth = pdfWidth * scaleFactor;
-    imgHeight = pdfHeight;
+  const ratio = canvas.height / canvas.width;
+  let imgWidth = maxWidth;
+  let imgHeight = imgWidth * ratio;
+
+  if (imgHeight > maxHeight) {
+    imgHeight = maxHeight;
+    imgWidth = imgHeight / ratio;
   }
 
   const offsetX = (pdfWidth - imgWidth) / 2;
-  doc.addImage(imgData, 'JPEG', offsetX, 0, imgWidth, imgHeight);
+  const offsetY = (pdfHeight - imgHeight) / 2;
+  doc.addImage(imgData, 'JPEG', offsetX, offsetY, imgWidth, imgHeight);
 }
 
 export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult> {
