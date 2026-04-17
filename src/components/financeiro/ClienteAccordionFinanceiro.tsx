@@ -1689,17 +1689,31 @@ function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: Lanca
       <div className="flex-1 min-w-0 space-y-1">
         <p className="text-sm font-medium truncate">{l.processo_razao_social}</p>
         <p className="text-xs text-muted-foreground">
-          {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo} · {fmt(l.valor)}
-          {l.valor_original != null && l.valor_original !== l.valor && (
-            <span className="text-amber-600 font-medium"> (orig. {fmt(l.valor_original)})</span>
-          )}
-          {l.total_valores_adicionais > 0 && (
-            <span className="text-amber-600 font-medium"> + {fmt(l.total_valores_adicionais)} taxas</span>
-          )}
+          {TIPO_PROCESSO_LABELS[l.processo_tipo as keyof typeof TIPO_PROCESSO_LABELS] || l.processo_tipo}
           {l.data_vencimento && ` · Vence ${fmtDate(l.data_vencimento)}`}
           {l.extrato_id && <span className="text-emerald-500 font-medium"> · Extrato ✓</span>}
           {l.valor_alterado_em && <span className="text-amber-600 font-medium"> · ✏️ Alterado</span>}
         </p>
+        {/* FIX 1 — Subtotal honorário + taxa + total expandido */}
+        <div className="text-xs space-y-0.5 rounded bg-muted/30 p-2">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Honorários:</span>
+            <span className="font-mono">
+              {fmt(l.valor)}
+              {l.valor_original != null && l.valor_original !== l.valor && (
+                <span className="ml-1 text-[10px] text-muted-foreground line-through">{fmt(l.valor_original)}</span>
+              )}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Taxas reembolsáveis:</span>
+            <span className="font-mono">{fmt(l.total_valores_adicionais || 0)}</span>
+          </div>
+          <div className="flex justify-between border-t border-border/40 pt-0.5 mt-0.5 font-semibold">
+            <span>Total:</span>
+            <span className="font-mono">{fmt(l.valor + (l.total_valores_adicionais || 0))}</span>
+          </div>
+        </div>
         {alertaTaxas && (
           <p className="text-[10px] text-amber-600 mt-0.5">⚠️ Verificar taxas adicionais</p>
         )}
