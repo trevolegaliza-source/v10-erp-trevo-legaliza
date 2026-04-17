@@ -12,6 +12,7 @@ import { empresaPath } from '@/lib/storage-path';
 import { EtiquetasEdit } from '@/components/EtiquetasBadges';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import DeferimentoModal from './DeferimentoModal';
+import { useHighlightOnModal } from '@/hooks/useHighlightOnModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
