@@ -258,9 +258,20 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
         <AccordionTrigger className="px-4 py-3 hover:no-underline">
           <div className="flex items-center gap-3 sm:gap-3 flex-1 text-left min-w-0">
             <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="font-semibold text-sm truncate">
-                {cliente.cliente_apelido || cliente.cliente_nome}
-                {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · {cliente.cliente_codigo}</span>}
+              <p className="font-semibold text-sm truncate flex items-center gap-2 flex-wrap">
+                <span className="truncate">
+                  {cliente.cliente_apelido || cliente.cliente_nome}
+                  {cliente.cliente_codigo && <span className="text-muted-foreground font-mono font-normal text-xs"> · {cliente.cliente_codigo}</span>}
+                </span>
+                {cliente.cliente_momento_faturamento === 'no_deferimento' ? (
+                  <Badge className="bg-amber-500 text-white border-0 text-[10px] px-1.5 py-0 font-bold whitespace-nowrap">
+                    COBRAR NO DEFERIMENTO
+                  </Badge>
+                ) : (
+                  <Badge className="bg-emerald-600 text-white border-0 text-[10px] px-1.5 py-0 font-bold whitespace-nowrap">
+                    COBRAR
+                  </Badge>
+                )}
               </p>
               <p className="text-xs text-muted-foreground truncate">
                 {lancNaoAuditados.length} proc. · {fmt(totalNaoAuditado)}
