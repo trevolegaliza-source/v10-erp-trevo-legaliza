@@ -7,7 +7,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt, MessageCircle, Share2, Tags, ChevronDown, Upload, X, Image, File as FileIcon } from 'lucide-react';
+import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt, MessageCircle, Share2, Tags, ChevronDown, Upload, X, Image, File as FileIcon, Undo2 } from 'lucide-react';
+import { usePermissions } from '@/hooks/usePermissions';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { empresaPath } from '@/lib/storage-path';
 import { EtiquetasEdit } from '@/components/EtiquetasBadges';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
@@ -447,6 +458,37 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
     else setSelected(new Set(lancSemExtrato.map(l => l.id)));
   }
 
+  const { isMaster } = usePermissions();
+  const [confirmDesauditarOpen, setConfirmDesauditarOpen] = useState(false);
+  const [desauditando, setDesauditando] = useState(false);
+
+  const lancsParaDesauditar = cliente.lancamentos.filter(
+    (l) => (l as any).auditado === true && l.status !== 'pago' && !l.extrato_id
+  );
+
+  async function handleDesauditar() {
+    setDesauditando(true);
+    try {
+      const ids = lancsParaDesauditar.map((l) => l.id);
+      if (ids.length === 0) {
+        toast.warning('Nenhum processo elegível para desauditar (já possuem extrato ou estão pagos).');
+        return;
+      }
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({ auditado: false, auditado_por: null, auditado_em: null } as any)
+        .in('id', ids);
+      if (error) throw error;
+      toast.success(`${ids.length} processo${ids.length > 1 ? 's' : ''} devolvido${ids.length > 1 ? 's' : ''} para auditoria`);
+      invalidateFinanceiro(queryClient);
+    } catch (err: any) {
+      toast.error('Erro ao desauditar: ' + (err?.message || 'Erro'));
+    } finally {
+      setDesauditando(false);
+      setConfirmDesauditarOpen(false);
+    }
+  }
+
   async function handleGerarExtrato() {
     const selecionados = lancSemExtrato.filter(l => selected.has(l.id));
     if (selecionados.length === 0) { toast.warning('Selecione ao menos um processo.'); return; }
@@ -637,6 +679,21 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0 ml-2">
+            {isMaster() && lancsParaDesauditar.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setConfirmDesauditarOpen(true);
+                }}
+              >
+                <Undo2 className="h-3 w-3" />
+                Voltar pra Auditoria
+              </Button>
+            )}
             <MoverParaMenu cliente={cliente} />
             <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0" />
           </div>
@@ -692,6 +749,22 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         processos={deferimentoProcessos}
         onConfirm={handleDeferimentoConfirm}
       />
+      <AlertDialog open={confirmDesauditarOpen} onOpenChange={setConfirmDesauditarOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Devolver para auditoria?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lancsParaDesauditar.length} processo{lancsParaDesauditar.length > 1 ? 's' : ''} de <strong>{cliente.cliente_apelido || cliente.cliente_nome}</strong> voltará{lancsParaDesauditar.length > 1 ? 'ão' : ''} para a aba <strong>Auditoria</strong>. Processos com extrato já gerado ou já pagos não serão afetados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={desauditando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDesauditar} disabled={desauditando}>
+              {desauditando ? 'Devolvendo...' : 'Devolver para auditoria'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AccordionItem>
   );
 }
