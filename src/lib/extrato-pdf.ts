@@ -538,9 +538,20 @@ function buildNextDiscountCardHTML(steps: StepInfo[], selected: StepInfo[], data
   const onlyManual = selected.length > 0 && selected.every((step) => step.isManual || step.isCortesia);
   if (descPct <= 0 || onlyManual || steps.length === 0) return '';
 
-  const monthGroups = groupStepsByMonth(steps);
-  const [latestMonthKey, latestSteps] = monthGroups[monthGroups.length - 1];
-  const nextSlot = latestSteps.reduce((sum, step) => sum + step.slotsUsados, 0) + 1;
+  // O mês de referência é o mais recente entre os SELECIONADOS.
+  const selectedIds = new Set(selected.map((s) => s.processo.id));
+  const selectedSteps = steps.filter((s) => selectedIds.has(s.processo.id));
+  if (selectedSteps.length === 0) return '';
+  const latestMonthKey = groupStepsByMonth(selectedSteps).pop()?.[0];
+  if (!latestMonthKey) return '';
+
+  // O slot do próximo considera TODOS os processos do mês (selecionados + não selecionados).
+  const fullMonth = steps.filter((s) => s.mes === latestMonthKey);
+  const maxSlot = fullMonth.reduce(
+    (max, s) => Math.max(max, s.index + (s.isMudancaUF ? 1 : 0)),
+    0,
+  );
+  const nextSlot = maxSlot + 1;
   const nextValue = calculateNextStepValue(nextSlot, data);
   const minimoTexto = data.cliente.valor_limite_desconto ? fmt(data.cliente.valor_limite_desconto) : 'não definido';
 
