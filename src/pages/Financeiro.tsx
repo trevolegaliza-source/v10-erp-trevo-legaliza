@@ -384,9 +384,13 @@ export default function Financeiro() {
             </TabsContent>
 
             <TabsContent value="cobrar" className="mt-4">
-              <ClientesFaturar clientes={clientesCobrar} mensalistasSemFatura={mensalistasSemFatura} onExtratoGerado={setExtratoGerado} />
-              
-              {clientesFuturaFatura.length > 0 && (
+              <ClientesFaturar
+                clientes={masterBypassJanela ? [...clientesCobrar, ...clientesFuturaFatura] : clientesCobrar}
+                mensalistasSemFatura={mensalistasSemFatura}
+                onExtratoGerado={setExtratoGerado}
+              />
+
+              {!masterBypassJanela && clientesFuturaFatura.length > 0 && (
                 <div className="mt-6">
                   <button
                     onClick={() => setShowFuturas(!showFuturas)}
