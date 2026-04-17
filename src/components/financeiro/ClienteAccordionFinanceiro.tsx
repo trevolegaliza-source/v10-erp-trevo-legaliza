@@ -458,6 +458,37 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
     else setSelected(new Set(lancSemExtrato.map(l => l.id)));
   }
 
+  const { isMaster } = usePermissions();
+  const [confirmDesauditarOpen, setConfirmDesauditarOpen] = useState(false);
+  const [desauditando, setDesauditando] = useState(false);
+
+  const lancsParaDesauditar = cliente.lancamentos.filter(
+    (l) => (l as any).auditado === true && l.status !== 'pago' && !l.extrato_id
+  );
+
+  async function handleDesauditar() {
+    setDesauditando(true);
+    try {
+      const ids = lancsParaDesauditar.map((l) => l.id);
+      if (ids.length === 0) {
+        toast.warning('Nenhum processo elegível para desauditar (já possuem extrato ou estão pagos).');
+        return;
+      }
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({ auditado: false, auditado_por: null, auditado_em: null } as any)
+        .in('id', ids);
+      if (error) throw error;
+      toast.success(`${ids.length} processo${ids.length > 1 ? 's' : ''} devolvido${ids.length > 1 ? 's' : ''} para auditoria`);
+      invalidateFinanceiro(queryClient);
+    } catch (err: any) {
+      toast.error('Erro ao desauditar: ' + (err?.message || 'Erro'));
+    } finally {
+      setDesauditando(false);
+      setConfirmDesauditarOpen(false);
+    }
+  }
+
   async function handleGerarExtrato() {
     const selecionados = lancSemExtrato.filter(l => selected.has(l.id));
     if (selecionados.length === 0) { toast.warning('Selecione ao menos um processo.'); return; }
