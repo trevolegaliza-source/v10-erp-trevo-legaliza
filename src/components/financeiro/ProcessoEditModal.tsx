@@ -129,8 +129,15 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
   const handleSalvarComSenha = async () => {
     setIsSaving(true);
     try {
+      const timestamp = new Date().toISOString();
       const valorAnterior = Number(lanc?.valor ?? processo.valor ?? 0);
       const valorMudou = editValor !== valorAnterior;
+      let currentUserId: string | null = null;
+
+      if (valorMudou) {
+        const { data: { user } } = await supabase.auth.getUser();
+        currentUserId = user?.id ?? null;
+      }
 
       // Build notas for processo
       let notasProcesso = processo.notas || '';
@@ -145,7 +152,7 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
       }
 
       // 1. Update processo
-      const procUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
+      const procUpdates: Record<string, any> = { updated_at: timestamp };
       if (valorMudou) {
         procUpdates.valor = editValor;
         procUpdates.notas = notasProcesso;
@@ -160,10 +167,13 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
       if (lanc?.id) {
         const lancUpdates: Record<string, any> = {
           observacoes_financeiro: editObservacoes,
-          updated_at: new Date().toISOString(),
+          updated_at: timestamp,
         };
         if (valorMudou) {
           lancUpdates.valor = editValor;
+          lancUpdates.valor_original = (lanc as any)?.valor_original ?? valorAnterior;
+          lancUpdates.valor_alterado_em = timestamp;
+          lancUpdates.valor_alterado_por = currentUserId;
         }
         const { error: errLanc } = await supabase
           .from('lancamentos')

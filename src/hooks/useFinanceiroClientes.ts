@@ -174,20 +174,58 @@ export function useAlterarValorLancamento() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ lancamentoId, novoValor, valorAtual }: { lancamentoId: string; novoValor: number; valorAtual: number }) => {
+      const timestamp = new Date().toISOString();
       const { data: { user } } = await supabase.auth.getUser();
+
+      const { data: lancamentoAtual, error: fetchError } = await supabase
+        .from('lancamentos')
+        .select('processo_id, valor_original')
+        .eq('id', lancamentoId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      if (lancamentoAtual?.processo_id) {
+        const { error: processoError } = await supabase
+          .from('processos')
+          .update({
+            valor: novoValor,
+            updated_at: timestamp,
+          } as any)
+          .eq('id', lancamentoAtual.processo_id);
+
+        if (processoError) throw processoError;
+      }
+
       const { error } = await supabase
         .from('lancamentos')
         .update({
           valor: novoValor,
-          valor_original: valorAtual,
-          valor_alterado_por: user?.id,
-          valor_alterado_em: new Date().toISOString(),
+          valor_original: lancamentoAtual?.valor_original ?? valorAtual,
+          valor_alterado_por: user?.id ?? null,
+          valor_alterado_em: timestamp,
+          updated_at: timestamp,
         } as any)
         .eq('id', lancamentoId);
-      if (error) throw error;
+
+      if (error) {
+        if (lancamentoAtual?.processo_id) {
+          await supabase
+            .from('processos')
+            .update({
+              valor: valorAtual,
+              updated_at: timestamp,
+            } as any)
+            .eq('id', lancamentoAtual.processo_id);
+        }
+
+        throw error;
+      }
     },
     onSuccess: () => {
       invalidateFinanceiro(qc);
+      qc.invalidateQueries({ queryKey: ['processos'] });
+      qc.invalidateQueries({ queryKey: ['processos_financeiro'] });
       toast.success('Valor alterado com sucesso!');
     },
   });
