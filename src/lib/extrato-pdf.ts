@@ -720,7 +720,16 @@ function buildPage1HTML(
 
         ${buildNextDiscountCardHTML(steps, selected, data)}
         ${buildProgressionTableHTML(steps, selected, data)}
-        ${totalTaxas > 0 ? '<div class="transparency-note">Os comprovantes originais das taxas reembolsáveis continuam disponíveis para conferência na plataforma interna.</div>' : ''}
+        ${(() => {
+          // FIX 13: nota apenas se houver alguma taxa SEM comprovante anexado
+          const taxasSemComprovante = Object.entries(data.valoresAdicionais)
+            .filter(([processoId]) => selectedIds.has(processoId))
+            .flatMap(([, valores]) => valores)
+            .some((v) => !v.comprovante_url);
+          return taxasSemComprovante
+            ? '<div class="transparency-note">ℹ️ Os comprovantes originais das taxas reembolsáveis continuam disponíveis para conferência na plataforma interna.</div>'
+            : '';
+        })()}
       </div>
       ${buildFooterHTML(1, totalPages)}
     </div>
