@@ -44,6 +44,22 @@ function tipoLabel(c: ClienteFinanceiro): string {
 }
 
 export function ClientesAuditoria({ clientes }: { clientes: ClienteFinanceiro[] }) {
+  const [sortMode, setSortMode] = useState<'alpha' | 'deferimento'>('alpha');
+
+  const sortedClientes = useMemo(() => {
+    const arr = [...clientes];
+    const byName = (a: ClienteFinanceiro, b: ClienteFinanceiro) =>
+      (a.cliente_apelido || a.cliente_nome).localeCompare(b.cliente_apelido || b.cliente_nome, 'pt-BR');
+    if (sortMode === 'alpha') return arr.sort(byName);
+    // Deferimento primeiro: no_deferimento ↑ topo, demais ↓
+    return arr.sort((a, b) => {
+      const aDef = a.cliente_momento_faturamento === 'no_deferimento' ? 0 : 1;
+      const bDef = b.cliente_momento_faturamento === 'no_deferimento' ? 0 : 1;
+      if (aDef !== bDef) return aDef - bDef;
+      return byName(a, b);
+    });
+  }, [clientes, sortMode]);
+
   if (clientes.length === 0) {
     return (
       <Card className="border-dashed">
@@ -62,14 +78,40 @@ export function ClientesAuditoria({ clientes }: { clientes: ClienteFinanceiro[] 
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-muted-foreground">
           {clientes.length} clientes · {totalProcessos} processos aguardando
         </p>
+        <div className="inline-flex rounded-md border border-border overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setSortMode('alpha')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 h-8 text-xs font-medium transition-colors",
+              sortMode === 'alpha'
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:bg-muted"
+            )}
+          >
+            <ArrowDownAZ className="h-3.5 w-3.5" /> A-Z
+          </button>
+          <button
+            type="button"
+            onClick={() => setSortMode('deferimento')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 h-8 text-xs font-medium transition-colors border-l border-border",
+              sortMode === 'deferimento'
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:bg-muted"
+            )}
+          >
+            <CalendarClock className="h-3.5 w-3.5" /> Deferimento primeiro
+          </button>
+        </div>
       </div>
 
       <Accordion type="multiple" className="space-y-2">
-        {clientes.map(c => <AuditoriaItem key={c.cliente_id} cliente={c} />)}
+        {sortedClientes.map(c => <AuditoriaItem key={c.cliente_id} cliente={c} />)}
       </Accordion>
     </div>
   );
