@@ -55,7 +55,7 @@ export function useExtratos(clienteId?: string) {
       competenciaMes: number;
       competenciaAno: number;
     }) => {
-      const path = `extratos/${input.clienteId}/${input.filename}`;
+      const path = await empresaPath(`extratos/${input.clienteId}/${input.filename}`);
       const { error: uploadError } = await supabase.storage
         .from('documentos')
         .upload(path, input.pdfBlob, {
