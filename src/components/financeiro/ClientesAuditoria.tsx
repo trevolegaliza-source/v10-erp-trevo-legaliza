@@ -412,6 +412,7 @@ function AuditoriaFicha({
   const auditarMut = useAuditarLancamento();
   const alterarValorMut = useAlterarValorLancamento();
   const qc = useQueryClient();
+  const { isMaster } = usePermissions();
   const [editingValor, setEditingValor] = useState(false);
   const [novoValor, setNovoValor] = useState('');
   const [deferidoOpen, setDeferidoOpen] = useState(false);
@@ -419,6 +420,34 @@ function AuditoriaFicha({
   const [savingDeferido, setSavingDeferido] = useState(false);
   const [trevoOpen, setTrevoOpen] = useState(false);
   const [savingTrevo, setSavingTrevo] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deletingProcesso, setDeletingProcesso] = useState(false);
+
+  const handleExcluirProcesso = async () => {
+    if (!l.processo_id) return;
+    setDeletingProcesso(true);
+    try {
+      // Delete lancamentos first (FK)
+      const { error: lancErr } = await supabase
+        .from('lancamentos')
+        .delete()
+        .eq('processo_id', l.processo_id);
+      if (lancErr) throw lancErr;
+      const { error: procErr } = await supabase
+        .from('processos')
+        .delete()
+        .eq('id', l.processo_id);
+      if (procErr) throw procErr;
+      toast.success('Processo excluído');
+      setConfirmDeleteOpen(false);
+      invalidateFinanceiro(qc);
+      qc.invalidateQueries({ queryKey: ['processos'] });
+    } catch (err: any) {
+      toast.error('Erro ao excluir: ' + (err?.message || 'Erro'));
+    } finally {
+      setDeletingProcesso(false);
+    }
+  };
 
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
 
