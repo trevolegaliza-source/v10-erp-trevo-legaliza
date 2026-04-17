@@ -6,12 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import {
-  Plus, Trash2, Paperclip, CheckCircle2, Pencil, X, Check, Upload, Eye, Download,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  Plus, Trash2, Paperclip, Pencil, X, Check, Upload, Eye, Download,
 } from 'lucide-react';
 import {
   useValoresAdicionais, useAddValorAdicional, useUpdateValorAdicional, useDeleteValorAdicional,
 } from '@/hooks/useValoresAdicionais';
-import { uploadFile, viewFile, getSignedUrl } from '@/hooks/useStorageUpload';
+import { uploadFile, getSignedUrl } from '@/hooks/useStorageUpload';
+import { supabase } from '@/integrations/supabase/client';
+import { STORAGE_BUCKETS } from '@/constants/storage';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { toast } from 'sonner';
 
@@ -22,6 +27,23 @@ interface ValoresAdicionaisModalProps {
   clienteApelido: string;
 }
 
+const TIPOS_TAXA = [
+  'Taxa Junta Comercial',
+  'Taxa de Balcão',
+  'DARE',
+  'Regional',
+  'MÉTODO TREVO',
+  'Agilidade Garantida',
+] as const;
+
+const OUTRO = 'Adicionar outro reembolso';
+
+const IMG_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+
+function getExt(path: string): string {
+  return (path.split('.').pop() || '').toLowerCase();
+}
+
 export default function ValoresAdicionaisModal({
   open, onOpenChange, processoId, clienteApelido,
 }: ValoresAdicionaisModalProps) {
@@ -30,7 +52,8 @@ export default function ValoresAdicionaisModal({
   const updateMut = useUpdateValorAdicional();
   const deleteMut = useDeleteValorAdicional();
 
-  const [newDesc, setNewDesc] = useState('');
+  const [tipoSelecionado, setTipoSelecionado] = useState<string>(TIPOS_TAXA[0]);
+  const [descLivre, setDescLivre] = useState('');
   const [newValor, setNewValor] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [editDesc, setEditDesc] = useState('');
@@ -38,6 +61,7 @@ export default function ValoresAdicionaisModal({
   const [deleteTarget, setDeleteTarget] = useState<{ id: string } | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const guiaRef = useRef<HTMLInputElement>(null);
   const comprovanteRef = useRef<HTMLInputElement>(null);
@@ -47,12 +71,26 @@ export default function ValoresAdicionaisModal({
   const subtotal = items.reduce((s, i) => s + Number(i.valor), 0);
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+  const isOutro = tipoSelecionado === OUTRO;
+  const descricaoFinal = isOutro ? descLivre.trim() : tipoSelecionado;
+
   const handleAdd = () => {
     const valor = parseFloat(newValor.replace(',', '.')) || 0;
-    if (!newDesc.trim() || valor <= 0) return;
-    addMut.mutate({ processo_id: processoId, descricao: newDesc.trim(), valor });
-    setNewDesc('');
-    setNewValor('');
+    if (!descricaoFinal || valor <= 0) {
+      toast.error('Preencha descrição e valor');
+      return;
+    }
+    addMut.mutate(
+      { processo_id: processoId, descricao: descricaoFinal, valor },
+      {
+        onSuccess: () => {
+          toast.success('Taxa adicionada — anexe o comprovante na coluna Comprov.');
+          setDescLivre('');
+          setNewValor('');
+          setTipoSelecionado(TIPOS_TAXA[0]);
+        },
+      },
+    );
   };
 
   const handleSaveEdit = (id: string) => {
@@ -83,6 +121,10 @@ export default function ValoresAdicionaisModal({
   };
 
   const handleFileUpload = async (itemId: string, file: File, field: 'anexo_url' | 'comprovante_url') => {
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Arquivo maior que 5MB');
+      return;
+    }
     try {
       setUploading(`${itemId}_${field}`);
       const folder = field === 'anexo_url' ? 'guias' : 'comprovantes_adicionais';
@@ -108,12 +150,44 @@ export default function ValoresAdicionaisModal({
   };
 
   const handleDownload = async (storagePath: string) => {
-    const url = await getSignedUrl(storagePath);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = storagePath.split('/').pop() || 'arquivo';
-    a.target = '_blank';
-    a.click();
+    try {
+      const url = await getSignedUrl(storagePath);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = storagePath.split('/').pop() || 'arquivo';
+      a.target = '_blank';
+      a.click();
+    } catch {
+      toast.error('Comprovante não encontrado');
+    }
+  };
+
+  /** FIX 8: Eye click → image preview modal OR PDF in new tab + error toast */
+  const handleView = async (storagePath: string) => {
+    if (!storagePath) {
+      toast.error('Comprovante não encontrado');
+      return;
+    }
+    const ext = getExt(storagePath);
+    try {
+      const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKETS.CONTRACTS)
+        .download(storagePath);
+      if (error || !data) {
+        toast.error('Comprovante não encontrado');
+        return;
+      }
+      const blobUrl = URL.createObjectURL(data);
+      if (IMG_EXTS.includes(ext)) {
+        setPreviewImage(blobUrl);
+      } else {
+        // PDF and others → new tab
+        window.open(blobUrl, '_blank');
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      }
+    } catch {
+      toast.error('Comprovante não encontrado');
+    }
   };
 
   const triggerUpload = (itemId: string, field: 'anexo_url' | 'comprovante_url') => {
@@ -140,7 +214,7 @@ export default function ValoresAdicionaisModal({
       return (
         <div className="flex items-center gap-0.5">
           <button
-            onClick={() => viewFile(storagePath)}
+            onClick={() => handleView(storagePath)}
             title={`Visualizar ${label}`}
             className="text-info hover:text-info/80 p-0.5"
           >
@@ -191,27 +265,50 @@ export default function ValoresAdicionaisModal({
             </DialogDescription>
           </DialogHeader>
 
-          {/* Add new */}
-          <div className="flex items-end gap-2">
-            <div className="flex-1 space-y-1">
-              <label className="text-[11px] text-muted-foreground">Descrição</label>
-              <Input
-                value={newDesc}
-                onChange={(e) => setNewDesc(e.target.value)}
-                placeholder="Ex: DARE, Taxa TFE..."
-                className="h-8 text-xs"
-              />
+          {/* FIX 7 — Add new with dropdown */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-2 items-end">
+              <div className="space-y-1">
+                <label className="text-[11px] text-muted-foreground">Tipo de taxa</label>
+                <Select value={tipoSelecionado} onValueChange={setTipoSelecionado}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_TAXA.map((t) => (
+                      <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>
+                    ))}
+                    <SelectItem value={OUTRO} className="text-xs italic">{OUTRO}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] text-muted-foreground">Valor R$</label>
+                <Input
+                  value={newValor}
+                  onChange={(e) => setNewValor(e.target.value)}
+                  placeholder="0,00"
+                  className="h-8 text-xs"
+                />
+              </div>
             </div>
-            <div className="w-28 space-y-1">
-              <label className="text-[11px] text-muted-foreground">Valor R$</label>
+
+            {isOutro && (
               <Input
-                value={newValor}
-                onChange={(e) => setNewValor(e.target.value)}
-                placeholder="0,00"
+                value={descLivre}
+                onChange={(e) => setDescLivre(e.target.value)}
+                placeholder="Descreva o reembolso..."
                 className="h-8 text-xs"
+                autoFocus
               />
-            </div>
-            <Button size="sm" className="h-8 px-3" onClick={handleAdd} disabled={addMut.isPending}>
+            )}
+
+            <Button
+              size="sm"
+              className="h-8 px-3 w-full sm:w-auto"
+              onClick={handleAdd}
+              disabled={addMut.isPending}
+            >
               <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar
             </Button>
           </div>
@@ -304,6 +401,28 @@ export default function ValoresAdicionaisModal({
             <span className="text-sm font-semibold">Subtotal de Adicionais</span>
             <span className="text-sm font-bold text-primary">{fmt(subtotal)}</span>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* FIX 8 — Image preview modal */}
+      <Dialog
+        open={!!previewImage}
+        onOpenChange={(o) => {
+          if (!o && previewImage) {
+            URL.revokeObjectURL(previewImage);
+            setPreviewImage(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Comprovante</DialogTitle>
+          </DialogHeader>
+          {previewImage && (
+            <div className="flex items-center justify-center bg-muted/30 rounded-md p-2 max-h-[70vh] overflow-auto">
+              <img src={previewImage} alt="Comprovante" className="max-w-full h-auto rounded" />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

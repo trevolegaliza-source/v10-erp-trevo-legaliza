@@ -12,6 +12,7 @@ import { empresaPath } from '@/lib/storage-path';
 import { EtiquetasEdit } from '@/components/EtiquetasBadges';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
 import DeferimentoModal from './DeferimentoModal';
+import { useHighlightOnModal } from '@/hooks/useHighlightOnModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -648,28 +649,22 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
             <span className="text-xs text-muted-foreground">Selecionar todos</span>
           </div>
           {lancSemExtrato.map(l => (
-            <div key={l.id} className="flex items-center gap-1">
-              <div className="flex-1 min-w-0">
-                <LancamentoRow lancamento={l} checked={selected.has(l.id)} onToggle={() => {
-                  const next = new Set(selected);
-                  if (next.has(l.id)) next.delete(l.id); else next.add(l.id);
-                  setSelected(next);
-                }} />
-              </div>
-              {l.processo_id && (
-                <button
-                  onClick={() => {
-                    setTaxaProcessoId(l.processo_id!);
-                    setTaxaClienteApelido(cliente.cliente_apelido || cliente.cliente_nome);
-                    setTaxaModalOpen(true);
-                  }}
-                  title="Adicionar taxa / valor adicional"
-                  className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                >
-                  <Receipt className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <LancamentoRowWithHighlight
+              key={l.id}
+              lancamento={l}
+              checked={selected.has(l.id)}
+              isTaxaSourceOpen={taxaModalOpen && l.processo_id === taxaProcessoId}
+              onToggle={() => {
+                const next = new Set(selected);
+                if (next.has(l.id)) next.delete(l.id); else next.add(l.id);
+                setSelected(next);
+              }}
+              onOpenTaxa={() => {
+                setTaxaProcessoId(l.processo_id!);
+                setTaxaClienteApelido(cliente.cliente_apelido || cliente.cliente_nome);
+                setTaxaModalOpen(true);
+              }}
+            />
           ))}
           {selected.size > 0 && (
             <div className="flex items-center justify-between bg-muted/50 rounded-lg p-3 mt-3">
@@ -1668,6 +1663,44 @@ function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
 }
 
 // ══════════ SHARED COMPONENTS ══════════
+function LancamentoRowWithHighlight({
+  lancamento: l,
+  checked,
+  isTaxaSourceOpen,
+  onToggle,
+  onOpenTaxa,
+}: {
+  lancamento: LancamentoFinanceiro;
+  checked: boolean;
+  isTaxaSourceOpen: boolean;
+  onToggle: () => void;
+  onOpenTaxa: () => void;
+}) {
+  const { highlight, ref } = useHighlightOnModal(isTaxaSourceOpen);
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "flex items-center gap-1 rounded-md transition-all duration-700",
+        highlight && "border-l-4 border-l-primary bg-primary/5 shadow-md pl-1"
+      )}
+    >
+      <div className="flex-1 min-w-0">
+        <LancamentoRow lancamento={l} checked={checked} onToggle={onToggle} />
+      </div>
+      {l.processo_id && (
+        <button
+          onClick={onOpenTaxa}
+          title="Adicionar taxa / valor adicional"
+          className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+        >
+          <Receipt className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: LancamentoFinanceiro; checked?: boolean; onToggle?: () => void }) {
   const badges = parseBadges(l.processo_notas);
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;

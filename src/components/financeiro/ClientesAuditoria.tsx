@@ -12,6 +12,7 @@ import { ClipboardCheck, Check, Pencil, Receipt, X, AlertTriangle, Phone, Calend
 import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import { useAuditarLancamento, useAuditarTodosCliente, useAlterarValorLancamento, ETAPAS_PRE_DEFERIMENTO, invalidateFinanceiro } from '@/hooks/useFinanceiroClientes';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
+import { useHighlightOnModal } from '@/hooks/useHighlightOnModal';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -255,6 +256,7 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
                 clienteApelido={cliente.cliente_apelido || cliente.cliente_nome}
                 clienteMomentoFaturamento={cliente.cliente_momento_faturamento}
                 clienteValorBase={cliente.cliente_valor_base}
+                isTaxaSourceOpen={taxaModalOpen && taxaProcessoId === l.processo_id}
                 onOpenTaxa={(processoId) => {
                   setTaxaProcessoId(processoId);
                   setTaxaModalOpen(true);
@@ -336,6 +338,7 @@ function AuditoriaFicha({
   clienteApelido,
   clienteMomentoFaturamento,
   clienteValorBase,
+  isTaxaSourceOpen,
   onOpenTaxa,
   onAuditar,
 }: {
@@ -343,6 +346,7 @@ function AuditoriaFicha({
   clienteApelido: string;
   clienteMomentoFaturamento: string;
   clienteValorBase: number | null;
+  isTaxaSourceOpen: boolean;
   onOpenTaxa: (processoId: string) => void;
   onAuditar: () => void;
 }) {
@@ -487,11 +491,17 @@ function AuditoriaFicha({
     }
   };
 
+  const { highlight, ref: highlightRef } = useHighlightOnModal(isTaxaSourceOpen);
+
   return (
-    <div className={cn(
-      "rounded-lg border p-3 space-y-2",
-      l.auditado ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-muted/20"
-    )}>
+    <div
+      ref={highlightRef}
+      className={cn(
+        "rounded-lg border p-3 space-y-2 transition-all duration-700",
+        l.auditado ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-muted/20",
+        highlight && "border-l-4 border-l-primary bg-primary/5 shadow-md"
+      )}
+    >
       {/* Header */}
       <div>
         <p className="text-sm font-semibold truncate">{l.processo_razao_social}</p>
