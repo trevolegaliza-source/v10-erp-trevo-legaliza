@@ -418,6 +418,7 @@ function AuditoriaFicha({
     if (valorBase <= 0) { toast.error('Cliente sem valor base cadastrado'); return; }
     setSavingTrevo(true);
     try {
+      const timestamp = new Date().toISOString();
       // 1. Update processo: append etiqueta + recalc valor
       const { data: procData, error: procFetchErr } = await supabase
         .from('processos')
@@ -432,7 +433,7 @@ function AuditoriaFicha({
 
       const { error: procErr } = await supabase
         .from('processos')
-        .update({ etiquetas: novasEtiquetas, valor: novoValorTrevo } as any)
+        .update({ etiquetas: novasEtiquetas, valor: novoValorTrevo, updated_at: timestamp } as any)
         .eq('id', l.processo_id);
       if (procErr) throw procErr;
 
@@ -443,9 +444,10 @@ function AuditoriaFicha({
           .from('lancamentos')
           .update({
             valor: novoValorTrevo,
-            valor_original: l.valor,
+            valor_original: l.valor_original ?? l.valor,
             valor_alterado_por: user?.id,
-            valor_alterado_em: new Date().toISOString(),
+            valor_alterado_em: timestamp,
+            updated_at: timestamp,
           } as any)
           .eq('id', l.id);
         if (lancErr) throw lancErr;

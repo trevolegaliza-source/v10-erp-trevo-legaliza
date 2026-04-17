@@ -292,20 +292,21 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
         const notas = notasRaw.toLowerCase();
         const isMudancaUF = notas.includes('mudança de uf') || notas.includes('mudanca de uf');
         const isUrgencia = notas.includes('urgência') || notas.includes('urgencia');
-        const hasManualFlag = notas.includes('valor manual') || notas.includes('is_manual');
+        const lancamento = (processo as any).lancamento;
+        const hasManualFlag = notas.includes('valor manual') || notas.includes('is_manual') || Boolean(lancamento?.valor_alterado_em);
         const hasBoasVindas = notas.includes('boas-vindas') || notas.includes('boas vindas');
         const hasCortesia = notas.includes('cortesia');
 
         const valorProcesso = processo.valor != null ? Number(processo.valor) : Number.NaN;
-        const valorLancamento = (processo as any).lancamento?.valor != null ? Number((processo as any).lancamento.valor) : Number.NaN;
-        const valorReal = Number.isFinite(valorProcesso)
-          ? valorProcesso
-          : (Number.isFinite(valorLancamento) ? valorLancamento : 0);
+        const valorLancamento = lancamento?.valor != null ? Number(lancamento.valor) : Number.NaN;
+        const valorFinanceiro = Number.isFinite(valorLancamento)
+          ? valorLancamento
+          : (Number.isFinite(valorProcesso) ? valorProcesso : Number.NaN);
 
         if (isMudancaUF) {
           const startSlot = slot + 1;
           slot += 2;
-          const valorFinal = round2(valorReal || 0);
+          const valorFinal = round2(Number.isFinite(valorFinanceiro) ? valorFinanceiro : 0);
           steps.push({
             index: startSlot,
             processo,
@@ -329,7 +330,7 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
 
         if (hasManualFlag || hasBoasVindas || hasCortesia) {
           const matchBoasVindas = notasRaw.match(/[Bb]oas[- ]?[Vv]indas\s*(\d+)\s*%/);
-          const valorFinal = round2(hasCortesia ? 0 : valorReal);
+          const valorFinal = round2(hasCortesia ? 0 : (Number.isFinite(valorFinanceiro) ? valorFinanceiro : 0));
           steps.push({
             index: slot,
             processo,
@@ -353,29 +354,33 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
           return;
         }
 
-        let valorFinal = base;
+        let valorCalculado = base;
         let desconto = 0;
         let label = '(base)';
 
         if (slot > 1 && descPct > 0) {
           const fator = Math.pow(1 - descPct / 100, slot - 1);
-          valorFinal = base * fator;
-          if (limite > 0 && valorFinal < limite) valorFinal = limite;
-          desconto = Math.round((1 - valorFinal / base) * 100);
+          valorCalculado = base * fator;
+          if (limite > 0 && valorCalculado < limite) valorCalculado = limite;
+          desconto = Math.round((1 - valorCalculado / base) * 100);
           label = `-${desconto}% sobre base`;
         }
 
         if (isUrgencia) {
-          valorFinal *= 1.5;
+          valorCalculado *= 1.5;
           label += ' +50% URG';
         }
+
+        const valorFinal = Number.isFinite(valorFinanceiro)
+          ? round2(valorFinanceiro)
+          : round2(valorCalculado);
 
         steps.push({
           index: slot,
           processo,
           valorBase: base,
           desconto,
-          valorFinal: round2(valorFinal),
+          valorFinal,
           isSelected: selectedIds.has(processo.id),
           isMudancaUF: false,
           isManual: false,
