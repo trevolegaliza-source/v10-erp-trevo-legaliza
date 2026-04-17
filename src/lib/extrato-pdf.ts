@@ -140,7 +140,7 @@ const PDF_BASE_STYLES = `
   .page#page1 .page-inner { padding: 22px 28px 150px; }
   .page#page2 .page-inner { padding: 22px 28px 150px; }
   .top-accent { width: 100%; height: 6px; background: linear-gradient(90deg, hsl(var(--trevo)) 0%, hsl(89 80% 55%) 100%); }
-  .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 60px 16px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
+  .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 28px 12px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
   .header-logo img { width: 190px; height: auto; object-fit: contain; display: block; }
   .header-fallback { font-size: 14px; font-weight: 800; color: hsl(var(--trevo)); }
   .header-right { text-align: right; }
