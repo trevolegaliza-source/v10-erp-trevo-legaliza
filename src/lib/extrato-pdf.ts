@@ -563,8 +563,20 @@ function buildProgressionTableHTML(steps: StepInfo[], selected: StepInfo[], data
   if (descPct <= 0 || steps.length === 0) return '';
 
   const selectedIds = new Set(selected.map((step) => step.processo.id));
-  const monthGroups = groupStepsByMonth(steps);
+  // Mostrar SOMENTE os selecionados, mantendo slot REAL (com gaps).
+  const visibleSteps = steps.filter((step) => selectedIds.has(step.processo.id));
+  if (visibleSteps.length === 0) return '';
+
+  const monthGroups = groupStepsByMonth(visibleSteps);
   const latestMonthKey = monthGroups[monthGroups.length - 1]?.[0];
+
+  // Para a linha "PRÓXIMO": slot real considera TODOS os processos do mês
+  // (selecionados + não selecionados), pois a contagem do desconto não pula.
+  const stepsByMonthFull = new Map<string, StepInfo[]>();
+  steps.forEach((s) => {
+    if (!stepsByMonthFull.has(s.mes)) stepsByMonthFull.set(s.mes, []);
+    stepsByMonthFull.get(s.mes)!.push(s);
+  });
 
   const rows = monthGroups.map(([monthKey, monthSteps]) => {
     const monthRows = monthSteps.map((step) => `
@@ -579,7 +591,12 @@ function buildProgressionTableHTML(steps: StepInfo[], selected: StepInfo[], data
 
     const nextRow = monthKey === latestMonthKey
       ? (() => {
-          const nextSlot = monthSteps.reduce((sum, step) => sum + step.slotsUsados, 0) + 1;
+          const fullMonth = stepsByMonthFull.get(monthKey) || [];
+          const maxSlot = fullMonth.reduce(
+            (max, s) => Math.max(max, s.index + (s.isMudancaUF ? 1 : 0)),
+            0,
+          );
+          const nextSlot = maxSlot + 1;
           const nextValue = calculateNextStepValue(nextSlot, data);
           return `
             <tr class="next-row">
@@ -602,7 +619,7 @@ function buildProgressionTableHTML(steps: StepInfo[], selected: StepInfo[], data
 
   const legalText = `Regra: desconto progressivo de ${descPct}% por processo dentro da mesma competência mensal${
     data.cliente.valor_limite_desconto ? `, respeitando o mínimo de ${fmt(data.cliente.valor_limite_desconto)}` : ''
-  }. No mês seguinte, a contagem reinicia no valor base.`;
+  }. No mês seguinte, a contagem reinicia no valor base. Esta tabela exibe apenas os processos cobrados neste extrato; processos não selecionados do mesmo mês não aparecem aqui mas continuam contando para a numeração do slot.`;
 
   return `
     <div class="progress-card">
