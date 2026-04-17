@@ -12,6 +12,7 @@ import { ClipboardCheck, Check, Pencil, Receipt, X, AlertTriangle, Phone, Calend
 import type { ClienteFinanceiro, LancamentoFinanceiro } from '@/hooks/useFinanceiroClientes';
 import { useAuditarLancamento, useAuditarTodosCliente, useAlterarValorLancamento, ETAPAS_PRE_DEFERIMENTO, invalidateFinanceiro } from '@/hooks/useFinanceiroClientes';
 import ValoresAdicionaisModal from './ValoresAdicionaisModal';
+import { useHighlightOnModal } from '@/hooks/useHighlightOnModal';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
