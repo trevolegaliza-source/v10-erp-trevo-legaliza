@@ -679,6 +679,21 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0 ml-2">
+            {isMaster() && lancsParaDesauditar.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setConfirmDesauditarOpen(true);
+                }}
+              >
+                <Undo2 className="h-3 w-3" />
+                Voltar pra Auditoria
+              </Button>
+            )}
             <MoverParaMenu cliente={cliente} />
             <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 shrink-0" />
           </div>
