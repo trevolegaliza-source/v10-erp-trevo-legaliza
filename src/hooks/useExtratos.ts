@@ -144,7 +144,7 @@ export function useExtratos(clienteId?: string) {
         .eq('id', extratoId);
 
       // Remove PDF
-      const path = `extratos/${ext.cliente_id}/${ext.filename}`;
+      const path = await empresaPath(`extratos/${ext.cliente_id}/${ext.filename}`);
       await supabase.storage.from('documentos').remove([path]);
     },
     onSuccess: () => {
