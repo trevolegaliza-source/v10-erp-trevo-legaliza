@@ -303,13 +303,13 @@ export default function ValoresAdicionaisModal({
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-2 items-end">
               <div className="space-y-1">
                 <label className="text-[11px] text-muted-foreground">Tipo de taxa</label>
-                <Select value={tipoSelecionado} onValueChange={setTipoSelecionado}>
+                <Select value={tipoSelecionado} onValueChange={handleTipoChange}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {TIPOS_TAXA.map((t) => (
-                      <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>
+                      <SelectItem key={t.label} value={t.label} className="text-xs">{t.label}</SelectItem>
                     ))}
                     <SelectItem value={OUTRO} className="text-xs italic">{OUTRO}</SelectItem>
                   </SelectContent>
@@ -322,9 +322,22 @@ export default function ValoresAdicionaisModal({
                   onChange={(e) => setNewValor(e.target.value)}
                   placeholder="0,00"
                   className="h-8 text-xs"
+                  disabled={isJuntaComercial && pagoPeloCliente}
                 />
               </div>
             </div>
+
+            {isJuntaComercial && (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={pagoPeloCliente}
+                  onChange={(e) => handlePagoPeloClienteChange(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-primary"
+                />
+                Pago pelo cliente (valor R$ 0,00)
+              </label>
+            )}
 
             {isOutro && (
               <Input
