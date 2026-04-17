@@ -736,23 +736,57 @@ function buildPage1HTML(
             <div class="section-counter">${selected.length} cobrado(s)</div>
           </div>
           ${buildSelectedProcessesHTML(selected, previewCount)}
-          ${hiddenCount > 0 ? `<div class="section-note">+ ${hiddenCount} processo(s) detalhado(s) nas próximas páginas.</div>` : ''}
         </div>
 
-        ${buildNextDiscountCardHTML(steps, selected, data)}
-        ${buildProgressionTableHTML(steps, selected, data)}
-        ${(() => {
-          // FIX 13: nota apenas se houver alguma taxa SEM comprovante anexado
-          const taxasSemComprovante = Object.entries(data.valoresAdicionais)
-            .filter(([processoId]) => selectedIds.has(processoId))
-            .flatMap(([, valores]) => valores)
-            .some((v) => !v.comprovante_url);
-          return taxasSemComprovante
-            ? '<div class="transparency-note">ℹ️ Os comprovantes originais das taxas reembolsáveis continuam disponíveis para conferência na plataforma interna.</div>'
-            : '';
-        })()}
+        <div class="next-card" style="margin-top:14px;">
+          <div class="next-card-title">Condições de pagamento</div>
+          <div class="next-card-main">
+            Vencimento <strong>${escapeHtml(vencimento)}</strong> · Pagamento via PIX (CNPJ) ou boleto sob solicitação.
+          </div>
+          <div class="next-card-sub">
+            A próxima página apresenta a transparência do cálculo (escadinha de incentivo por volume).
+          </div>
+        </div>
       </div>
       ${buildFooterHTML(1, totalPages)}
+    </div>
+  `;
+}
+
+function buildPage2HTML(
+  data: ExtratoData,
+  steps: StepInfo[],
+  selected: StepInfo[],
+  logoDataUrl: string | null,
+  pageNumber: number,
+  totalPages: number,
+) {
+  const selectedIds = new Set(selected.map((step) => step.processo.id));
+  const taxasSemComprovante = Object.entries(data.valoresAdicionais)
+    .filter(([processoId]) => selectedIds.has(processoId))
+    .flatMap(([, valores]) => valores)
+    .some((v) => !v.comprovante_url);
+
+  const progressao = buildProgressionTableHTML(steps, selected, data);
+  const nextDiscount = buildNextDiscountCardHTML(steps, selected, data);
+
+  return `
+    <div class="page" id="page2">
+      <div class="top-accent"></div>
+      ${buildHeaderHTML(logoDataUrl)}
+      <div class="page-inner">
+        <div class="transparency-banner">
+          <div class="eyebrow">Como calculamos</div>
+          <div class="section-title">Progressão de incentivo por volume</div>
+          <div class="transparency-banner-meta">Esta página explica a formação do valor cobrado. O desconto progressivo reinicia a cada competência mensal.</div>
+        </div>
+        ${progressao || '<div class="section-card"><div class="section-note">Nenhuma escadinha aplicável a esta cobrança.</div></div>'}
+        ${nextDiscount}
+        ${taxasSemComprovante
+          ? '<div class="transparency-note">ℹ️ Os comprovantes originais das taxas reembolsáveis continuam disponíveis para conferência na plataforma interna.</div>'
+          : ''}
+      </div>
+      ${buildFooterHTML(pageNumber, totalPages)}
     </div>
   `;
 }
