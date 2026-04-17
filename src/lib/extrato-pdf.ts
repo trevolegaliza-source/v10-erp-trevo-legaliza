@@ -445,16 +445,37 @@ function buildStepBadges(step: StepInfo) {
 }
 
 function getStepStatusText(step: StepInfo) {
-  if (step.isMudancaUF) return 'Mudança de UF';
-  if (step.isCortesia) return 'Cortesia';
-  if (step.isBoasVindas) return 'Boas-vindas';
-  if (step.isManual) return 'Valor manual';
-  if (step.isUrgencia) return 'Urgência +50%';
-  return '—';
+  const parts: string[] = [];
+  const processo: any = step.processo;
+  const etiquetas: string[] = Array.isArray(processo.etiquetas) ? processo.etiquetas : [];
+  const lanc: any = processo.lancamento;
+
+  if (etiquetas.includes('metodo_trevo')) parts.push('MÉTODO TREVO 🍀');
+  if (step.isUrgencia || processo.prioridade === 'urgente') parts.push('Urgência +50%');
+  if (processo.data_deferimento) parts.push(`Deferido ${fmtDate(processo.data_deferimento)}`);
+  if (lanc?.valor_alterado_em || step.isManual) parts.push('Valor manual');
+  if (step.isMudancaUF) parts.push('Mudança de UF');
+  if (step.isCortesia) parts.push('Cortesia');
+  if (step.isBoasVindas) parts.push('Boas-vindas');
+
+  return parts.length > 0 ? parts.join(' · ') : '—';
 }
 
 function getStepDiscountText(step: StepInfo) {
   return !step.isManual && !step.isMudancaUF && !step.isBoasVindas && step.desconto > 0 ? `-${step.desconto}%` : '—';
+}
+
+function getStepExtratoText(step: StepInfo) {
+  const base = step.valorBase;
+  const baseLabel = `Base ${fmt(base)}`;
+  if (step.isCortesia) return 'Cortesia';
+  if (step.isMudancaUF) return `${baseLabel} (UF)`;
+  if (step.isManual) return 'Manual';
+  if (step.isBoasVindas) return `${baseLabel} · ${step.label}`;
+  if (step.isUrgencia && step.desconto > 0) return `${baseLabel} × 1.5 · -${step.desconto}%`;
+  if (step.isUrgencia) return `${baseLabel} × 1.5 (Urg.)`;
+  if (step.desconto > 0) return `${baseLabel} · -${step.desconto}%`;
+  return baseLabel;
 }
 
 function buildSelectedProcessesHTML(selected: StepInfo[], maxVisible: number) {
