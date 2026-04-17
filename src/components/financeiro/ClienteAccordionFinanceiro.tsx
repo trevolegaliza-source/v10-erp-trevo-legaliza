@@ -1662,6 +1662,45 @@ function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
 }
 
 // ══════════ SHARED COMPONENTS ══════════
+function LancamentoRowWithHighlight({
+  lancamento: l,
+  checked,
+  isTaxaSourceOpen,
+  onToggle,
+  onOpenTaxa,
+}: {
+  lancamento: LancamentoFinanceiro;
+  checked: boolean;
+  isTaxaSourceOpen: boolean;
+  onToggle: () => void;
+  onOpenTaxa: () => void;
+}) {
+  const { useHighlightOnModal } = require('@/hooks/useHighlightOnModal') as typeof import('@/hooks/useHighlightOnModal');
+  const { highlight, ref } = useHighlightOnModal(isTaxaSourceOpen);
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "flex items-center gap-1 rounded-md transition-all duration-700",
+        highlight && "border-l-4 border-l-primary bg-primary/5 shadow-md pl-1"
+      )}
+    >
+      <div className="flex-1 min-w-0">
+        <LancamentoRow lancamento={l} checked={checked} onToggle={onToggle} />
+      </div>
+      {l.processo_id && (
+        <button
+          onClick={onOpenTaxa}
+          title="Adicionar taxa / valor adicional"
+          className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+        >
+          <Receipt className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function LancamentoRow({ lancamento: l, checked, onToggle }: { lancamento: LancamentoFinanceiro; checked?: boolean; onToggle?: () => void }) {
   const badges = parseBadges(l.processo_notas);
   const alertaTaxas = (l.tem_etiqueta_metodo_trevo || l.tem_etiqueta_prioridade) && l.total_valores_adicionais === 0;
