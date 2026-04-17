@@ -237,14 +237,25 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
   const limite = data.cliente.valor_limite_desconto ?? 0;
   const selectedIds = new Set(data.processos.map((processo) => processo.id));
 
-  // FIX 11: Reset mensal — escadinha considera SOMENTE processos do mês da competência do extrato
-  const competenciaKey = data.processos.length > 0
-    ? monthKeyFromDate(data.processos[0].created_at)
-    : monthKeyFromDate(new Date().toISOString());
+  // FIX CRÍTICO: NÃO filtrar por competência única.
+  // Selecionados podem abranger MÚLTIPLOS meses (ex: março + abril no mesmo extrato).
+  // O reset mensal do desconto progressivo já acontece naturalmente via agrupamento por mês abaixo
+  // (cada mês tem seu próprio `slot` zerado), então totais e listagens consolidam tudo
+  // enquanto a escadinha permanece corretamente segmentada por mês.
+  const selectedMonths = new Set(
+    data.processos.map((processo) => monthKeyFromDate(processo.created_at)),
+  );
 
   const unique = new Map<string, ProcessoFinanceiro>();
-  [...data.allCompetencia, ...data.processos].forEach((processo) => {
-    if (monthKeyFromDate(processo.created_at) !== competenciaKey) return;
+  // Sempre incluir TODOS os selecionados (independente de mês).
+  data.processos.forEach((processo) => {
+    if (!unique.has(processo.id)) unique.set(processo.id, processo);
+  });
+  // Incluir contexto da competência APENAS para meses presentes nos selecionados,
+  // para que a escadinha de cada mês reflita a posição correta dos slots.
+  data.allCompetencia.forEach((processo) => {
+    const mes = monthKeyFromDate(processo.created_at);
+    if (!selectedMonths.has(mes)) return;
     if (!unique.has(processo.id)) unique.set(processo.id, processo);
   });
 
