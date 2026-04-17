@@ -38,8 +38,10 @@ interface Props {
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function StepValor({ form, onChange, isFirstProcess, isAvulso, clienteTipo, negotiations, saldoPrepago, valorPreview, franquiaProcessos, processosNoMes, onBack, onNext }: Props) {
-  const { podeVerValores } = usePermissions();
-  const vfmt = (v: number) => podeVerValores() ? fmt(v) : '•••••';
+  const { podeVerValores, role } = usePermissions();
+  // Operacional precisa ver valores no Cadastro Rápido para confirmar antes de salvar
+  const podeVer = podeVerValores() || role === 'operacional';
+  const vfmt = (v: number) => podeVer ? fmt(v) : '•••••';
   const update = (field: keyof ValorFormData, value: any) => onChange({ ...form, [field]: value });
   const isPrePago = clienteTipo === 'PRE_PAGO';
   const isMensalista = clienteTipo === 'MENSALISTA';
