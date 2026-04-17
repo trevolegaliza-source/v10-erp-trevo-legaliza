@@ -491,11 +491,17 @@ function AuditoriaFicha({
     }
   };
 
+  const { highlight, ref: highlightRef } = useHighlightOnModal(isTaxaSourceOpen);
+
   return (
-    <div className={cn(
-      "rounded-lg border p-3 space-y-2",
-      l.auditado ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-muted/20"
-    )}>
+    <div
+      ref={highlightRef}
+      className={cn(
+        "rounded-lg border p-3 space-y-2 transition-all duration-700",
+        l.auditado ? "border-emerald-500/30 bg-emerald-500/5" : "border-border bg-muted/20",
+        highlight && "border-l-4 border-l-primary bg-primary/5 shadow-md"
+      )}
+    >
       {/* Header */}
       <div>
         <p className="text-sm font-semibold truncate">{l.processo_razao_social}</p>
