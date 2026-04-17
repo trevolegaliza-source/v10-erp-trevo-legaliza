@@ -338,6 +338,7 @@ function AuditoriaFicha({
   clienteApelido,
   clienteMomentoFaturamento,
   clienteValorBase,
+  isTaxaSourceOpen,
   onOpenTaxa,
   onAuditar,
 }: {
@@ -345,6 +346,7 @@ function AuditoriaFicha({
   clienteApelido: string;
   clienteMomentoFaturamento: string;
   clienteValorBase: number | null;
+  isTaxaSourceOpen: boolean;
   onOpenTaxa: (processoId: string) => void;
   onAuditar: () => void;
 }) {
