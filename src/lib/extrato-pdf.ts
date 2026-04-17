@@ -133,9 +133,10 @@ const PDF_BASE_STYLES = `
   body, div, span, p, td, th { font-family: 'DM Sans', sans-serif; color: hsl(var(--ink)); }
   body { background: hsl(var(--surface-soft)); }
   .page { width: 794px; min-height: 1123px; background: hsl(var(--surface)); position: relative; overflow: visible; }
-  .page-inner { padding: 22px 34px 126px; }
+  .page-inner { padding: 24px 60px 140px; }
+  .page#page1 .page-inner { padding: 28px 60px 140px; }
   .top-accent { width: 100%; height: 6px; background: linear-gradient(90deg, hsl(var(--trevo)) 0%, hsl(89 80% 55%) 100%); }
-  .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 34px 16px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
+  .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 60px 16px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
   .header-logo img { width: 190px; height: auto; object-fit: contain; display: block; }
   .header-fallback { font-size: 14px; font-weight: 800; color: hsl(var(--trevo)); }
   .header-right { text-align: right; }
@@ -221,9 +222,11 @@ const PDF_BASE_STYLES = `
   .tax-total { margin-top: 10px; display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 14px; background: hsl(var(--surface-soft)); font-size: 10px; }
   .tax-total strong { color: hsl(var(--trevo-dark)); }
   .transparency-note { margin-top: 12px; padding: 9px 12px; border-radius: 14px; background: hsl(var(--warning-bg)); color: hsl(var(--warning-fg)); font-size: 8.5px; line-height: 1.5; }
-  .footer-contact { position: absolute; left: 34px; right: 34px; bottom: 34px; border-top: 1px solid hsl(var(--line)); padding-top: 12px; display: flex; justify-content: space-between; gap: 16px; font-size: 8.5px; color: hsl(var(--muted)); }
+  .footer-contact { position: absolute; left: 60px; right: 60px; bottom: 38px; border-top: 1px solid hsl(var(--line)); padding-top: 12px; display: flex; justify-content: space-between; gap: 16px; font-size: 8.5px; color: hsl(var(--muted)); }
   .footer-contact strong { color: hsl(var(--ink)); }
-  .page-footer { position: absolute; left: 34px; right: 34px; bottom: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: hsl(var(--muted)); }
+  .page-footer { position: absolute; left: 60px; right: 60px; bottom: 14px; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: hsl(var(--muted)); }
+  .obs-financeiro { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: hsl(var(--surface-soft)); font-style: italic; font-size: 9px; line-height: 1.45; color: hsl(215 14% 42%); }
+  .obs-financeiro strong { font-style: normal; font-weight: 700; color: hsl(var(--muted)); margin-right: 4px; }
 `;
 
 const GLOBAL_STYLES = `${PDF_FONT_IMPORT}\n${scopePdfStyles(PDF_BASE_STYLES.replace(PDF_FONT_IMPORT, '').trim())}`;
@@ -234,8 +237,14 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
   const limite = data.cliente.valor_limite_desconto ?? 0;
   const selectedIds = new Set(data.processos.map((processo) => processo.id));
 
+  // FIX 11: Reset mensal — escadinha considera SOMENTE processos do mês da competência do extrato
+  const competenciaKey = data.processos.length > 0
+    ? monthKeyFromDate(data.processos[0].created_at)
+    : monthKeyFromDate(new Date().toISOString());
+
   const unique = new Map<string, ProcessoFinanceiro>();
   [...data.allCompetencia, ...data.processos].forEach((processo) => {
+    if (monthKeyFromDate(processo.created_at) !== competenciaKey) return;
     if (!unique.has(processo.id)) unique.set(processo.id, processo);
   });
 
@@ -442,28 +451,53 @@ function buildStepBadges(step: StepInfo) {
 }
 
 function getStepStatusText(step: StepInfo) {
-  if (step.isMudancaUF) return 'Mudança de UF';
-  if (step.isCortesia) return 'Cortesia';
-  if (step.isBoasVindas) return 'Boas-vindas';
-  if (step.isManual) return 'Valor manual';
-  if (step.isUrgencia) return 'Urgência +50%';
-  return '—';
+  const parts: string[] = [];
+  const processo: any = step.processo;
+  const etiquetas: string[] = Array.isArray(processo.etiquetas) ? processo.etiquetas : [];
+  const lanc: any = processo.lancamento;
+
+  if (etiquetas.includes('metodo_trevo')) parts.push('MÉTODO TREVO 🍀');
+  if (step.isUrgencia || processo.prioridade === 'urgente') parts.push('Urgência +50%');
+  if (processo.data_deferimento) parts.push(`Deferido ${fmtDate(processo.data_deferimento)}`);
+  if (lanc?.valor_alterado_em || step.isManual) parts.push('Valor manual');
+  if (step.isMudancaUF) parts.push('Mudança de UF');
+  if (step.isCortesia) parts.push('Cortesia');
+  if (step.isBoasVindas) parts.push('Boas-vindas');
+
+  return parts.length > 0 ? parts.join(' · ') : '—';
 }
 
 function getStepDiscountText(step: StepInfo) {
   return !step.isManual && !step.isMudancaUF && !step.isBoasVindas && step.desconto > 0 ? `-${step.desconto}%` : '—';
 }
 
+function getStepExtratoText(step: StepInfo) {
+  const base = step.valorBase;
+  const baseLabel = `Base ${fmt(base)}`;
+  if (step.isCortesia) return 'Cortesia';
+  if (step.isMudancaUF) return `${baseLabel} (UF)`;
+  if (step.isManual) return 'Manual';
+  if (step.isBoasVindas) return `${baseLabel} · ${step.label}`;
+  if (step.isUrgencia && step.desconto > 0) return `${baseLabel} × 1.5 · -${step.desconto}%`;
+  if (step.isUrgencia) return `${baseLabel} × 1.5 (Urg.)`;
+  if (step.desconto > 0) return `${baseLabel} · -${step.desconto}%`;
+  return baseLabel;
+}
+
 function buildSelectedProcessesHTML(selected: StepInfo[], maxVisible: number) {
   const visible = selected.slice(0, maxVisible);
   const groups = groupStepsByMonth(visible);
+  let runningIndex = 0;
 
   return groups.map(([monthKey, monthSteps], index) => `
     ${index > 0 ? `<div class="month-divider"><div class="line"></div><div class="text">Processos de ${escapeHtml(formatMonthLabel(monthKey))}</div><div class="line"></div></div>` : ''}
-    ${monthSteps.map((step) => `
+    ${monthSteps.map((step) => {
+      runningIndex += 1;
+      const seq = runningIndex;
+      return `
       <div class="process-row">
         <div class="process-left">
-          <div class="process-slot">${step.isMudancaUF ? `${step.index}º-${step.index + 1}º` : `${step.index}º`}</div>
+          <div class="process-slot">${seq}º</div>
           <div class="process-copy">
             <div class="process-title">
               <span>${escapeHtml(`${String(step.processo.tipo).toUpperCase()} — ${truncateText(step.processo.razao_social, 46)}`)}</span>
@@ -474,7 +508,8 @@ function buildSelectedProcessesHTML(selected: StepInfo[], maxVisible: number) {
         </div>
         <div class="process-value">${fmt(step.valorFinal)}</div>
       </div>
-    `).join('')}
+    `;
+    }).join('')}
   `).join('');
 }
 
@@ -518,7 +553,7 @@ function buildProgressionTableHTML(steps: StepInfo[], selected: StepInfo[], data
         <td class="value-cell">${fmt(step.valorFinal)}</td>
         <td class="desc-cell">${escapeHtml(getStepDiscountText(step))}</td>
         <td>${escapeHtml(getStepStatusText(step))}</td>
-        <td>${selectedIds.has(step.processo.id) ? 'COBRADO' : '—'}</td>
+        <td class="desc-cell">${escapeHtml(getStepExtratoText(step))}</td>
       </tr>
     `).join('');
 
@@ -685,7 +720,16 @@ function buildPage1HTML(
 
         ${buildNextDiscountCardHTML(steps, selected, data)}
         ${buildProgressionTableHTML(steps, selected, data)}
-        ${totalTaxas > 0 ? '<div class="transparency-note">Os comprovantes originais das taxas reembolsáveis continuam disponíveis para conferência na plataforma interna.</div>' : ''}
+        ${(() => {
+          // FIX 13: nota apenas se houver alguma taxa SEM comprovante anexado
+          const taxasSemComprovante = Object.entries(data.valoresAdicionais)
+            .filter(([processoId]) => selectedIds.has(processoId))
+            .flatMap(([, valores]) => valores)
+            .some((v) => !v.comprovante_url);
+          return taxasSemComprovante
+            ? '<div class="transparency-note">ℹ️ Os comprovantes originais das taxas reembolsáveis continuam disponíveis para conferência na plataforma interna.</div>'
+            : '';
+        })()}
       </div>
       ${buildFooterHTML(1, totalPages)}
     </div>
@@ -756,6 +800,9 @@ function buildDetailPageHTML(
             <span>Status aplicado</span>
             <strong>${escapeHtml(getStepStatusText(step))}</strong>
           </div>
+          ${(processo as any).lancamento?.observacoes_financeiro
+            ? `<div class="obs-financeiro"><strong>Obs:</strong>${escapeHtml((processo as any).lancamento.observacoes_financeiro)}</div>`
+            : ''}
           ${taxTable}
         </div>
       </div>
