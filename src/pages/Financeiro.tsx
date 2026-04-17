@@ -51,8 +51,9 @@ function getPeriodoDates(preset: PeriodoPreset): { inicio: string; fim: string }
 }
 
 export default function Financeiro() {
-  const { role } = usePermissions();
+  const { role, isMaster } = usePermissions();
   const isFinanceiro = role === 'financeiro';
+  const masterBypassJanela = isMaster();
   const [periodo, setPeriodo] = useState<PeriodoPreset>('este_mes');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
