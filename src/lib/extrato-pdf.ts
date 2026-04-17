@@ -538,9 +538,20 @@ function buildNextDiscountCardHTML(steps: StepInfo[], selected: StepInfo[], data
   const onlyManual = selected.length > 0 && selected.every((step) => step.isManual || step.isCortesia);
   if (descPct <= 0 || onlyManual || steps.length === 0) return '';
 
-  const monthGroups = groupStepsByMonth(steps);
-  const [latestMonthKey, latestSteps] = monthGroups[monthGroups.length - 1];
-  const nextSlot = latestSteps.reduce((sum, step) => sum + step.slotsUsados, 0) + 1;
+  // O mês de referência é o mais recente entre os SELECIONADOS.
+  const selectedIds = new Set(selected.map((s) => s.processo.id));
+  const selectedSteps = steps.filter((s) => selectedIds.has(s.processo.id));
+  if (selectedSteps.length === 0) return '';
+  const latestMonthKey = groupStepsByMonth(selectedSteps).pop()?.[0];
+  if (!latestMonthKey) return '';
+
+  // O slot do próximo considera TODOS os processos do mês (selecionados + não selecionados).
+  const fullMonth = steps.filter((s) => s.mes === latestMonthKey);
+  const maxSlot = fullMonth.reduce(
+    (max, s) => Math.max(max, s.index + (s.isMudancaUF ? 1 : 0)),
+    0,
+  );
+  const nextSlot = maxSlot + 1;
   const nextValue = calculateNextStepValue(nextSlot, data);
   const minimoTexto = data.cliente.valor_limite_desconto ? fmt(data.cliente.valor_limite_desconto) : 'não definido';
 
@@ -563,8 +574,20 @@ function buildProgressionTableHTML(steps: StepInfo[], selected: StepInfo[], data
   if (descPct <= 0 || steps.length === 0) return '';
 
   const selectedIds = new Set(selected.map((step) => step.processo.id));
-  const monthGroups = groupStepsByMonth(steps);
+  // Mostrar SOMENTE os selecionados, mantendo slot REAL (com gaps).
+  const visibleSteps = steps.filter((step) => selectedIds.has(step.processo.id));
+  if (visibleSteps.length === 0) return '';
+
+  const monthGroups = groupStepsByMonth(visibleSteps);
   const latestMonthKey = monthGroups[monthGroups.length - 1]?.[0];
+
+  // Para a linha "PRÓXIMO": slot real considera TODOS os processos do mês
+  // (selecionados + não selecionados), pois a contagem do desconto não pula.
+  const stepsByMonthFull = new Map<string, StepInfo[]>();
+  steps.forEach((s) => {
+    if (!stepsByMonthFull.has(s.mes)) stepsByMonthFull.set(s.mes, []);
+    stepsByMonthFull.get(s.mes)!.push(s);
+  });
 
   const rows = monthGroups.map(([monthKey, monthSteps]) => {
     const monthRows = monthSteps.map((step) => `
@@ -579,7 +602,12 @@ function buildProgressionTableHTML(steps: StepInfo[], selected: StepInfo[], data
 
     const nextRow = monthKey === latestMonthKey
       ? (() => {
-          const nextSlot = monthSteps.reduce((sum, step) => sum + step.slotsUsados, 0) + 1;
+          const fullMonth = stepsByMonthFull.get(monthKey) || [];
+          const maxSlot = fullMonth.reduce(
+            (max, s) => Math.max(max, s.index + (s.isMudancaUF ? 1 : 0)),
+            0,
+          );
+          const nextSlot = maxSlot + 1;
           const nextValue = calculateNextStepValue(nextSlot, data);
           return `
             <tr class="next-row">
@@ -602,7 +630,7 @@ function buildProgressionTableHTML(steps: StepInfo[], selected: StepInfo[], data
 
   const legalText = `Regra: desconto progressivo de ${descPct}% por processo dentro da mesma competência mensal${
     data.cliente.valor_limite_desconto ? `, respeitando o mínimo de ${fmt(data.cliente.valor_limite_desconto)}` : ''
-  }. No mês seguinte, a contagem reinicia no valor base.`;
+  }. No mês seguinte, a contagem reinicia no valor base. Esta tabela exibe apenas os processos cobrados neste extrato; processos não selecionados do mesmo mês não aparecem aqui mas continuam contando para a numeração do slot.`;
 
   return `
     <div class="progress-card">
@@ -798,12 +826,14 @@ function buildDetailPageHTML(
   pageNumber: number,
   totalPages: number,
   detailPageCount: number,
+  sequentialIndex: Map<string, number>,
 ) {
   const detailCards = detailSteps.map((step) => {
     const processo = step.processo;
     const taxas = data.valoresAdicionais[processo.id] || [];
     const totalTaxas = taxas.reduce((sum, valorAdicional) => sum + Number(valorAdicional.valor), 0);
     const totalBloco = step.valorFinal + totalTaxas;
+    const seqNum = sequentialIndex.get(processo.id) ?? step.index;
 
     const taxTable = taxas.length > 0 ? `
       <table class="tax-table">
@@ -815,13 +845,20 @@ function buildDetailPageHTML(
           </tr>
         </thead>
         <tbody>
-          ${taxas.map((valorAdicional) => `
-            <tr>
-              <td>${fmtDate(valorAdicional.created_at)}</td>
-              <td>${escapeHtml(valorAdicional.descricao)}</td>
-              <td>${fmt(Number(valorAdicional.valor))}</td>
-            </tr>
-          `).join('')}
+          ${taxas.map((valorAdicional) => {
+            // Renomear "MÉTODO TREVO" para descrição clara ao cliente.
+            const descRaw = (valorAdicional.descricao || '').trim();
+            const desc = /m[ée]todo\s+trevo/i.test(descRaw)
+              ? 'Assessoria de deferimento ágil (Método Trevo)'
+              : descRaw;
+            return `
+              <tr>
+                <td>${fmtDate(valorAdicional.created_at)}</td>
+                <td>${escapeHtml(desc)}</td>
+                <td>${fmt(Number(valorAdicional.valor))}</td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
       <div class="tax-total">
@@ -830,11 +867,18 @@ function buildDetailPageHTML(
       </div>
     ` : '';
 
+    const obsRaw = (((processo as any).lancamento?.observacoes_financeiro) || '').trim();
+    // Filtra metadata legada auto-gerada que não é observação real do operador.
+    const isAutoMeta = /^extrato emitido em\b/i.test(obsRaw);
+    const obsHtml = obsRaw && !isAutoMeta
+      ? `<div class="obs-financeiro"><strong>Obs:</strong>${escapeHtml(obsRaw)}</div>`
+      : '';
+
     return `
       <div class="detail-card">
         <div class="detail-card-head">
           <div class="detail-left">
-            <div class="detail-index">${step.isMudancaUF ? `${step.index}º-${step.index + 1}º` : `${step.index}º`}</div>
+            <div class="detail-index">${seqNum}º</div>
             <div>
               <div class="detail-title">${escapeHtml(`${String(processo.tipo).toUpperCase()} — ${processo.razao_social}`)}</div>
               <div class="detail-meta">${fmtDate(processo.created_at)} · ${escapeHtml(formatMonthLabel(step.mes))} · ${escapeHtml(step.label)}</div>
@@ -855,9 +899,7 @@ function buildDetailPageHTML(
             <span>Status aplicado</span>
             <strong>${escapeHtml(getStepStatusText(step))}</strong>
           </div>
-          ${(processo as any).lancamento?.observacoes_financeiro
-            ? `<div class="obs-financeiro"><strong>Obs:</strong>${escapeHtml((processo as any).lancamento.observacoes_financeiro)}</div>`
-            : ''}
+          ${obsHtml}
           ${taxTable}
         </div>
       </div>
@@ -1005,6 +1047,18 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
   const detailPageGroups = shouldCreateDetailPages(selected, data) ? paginateDetailSteps(selected, data) : [];
   const attachmentCount = countAttachments(data);
 
+  // Numeração SEQUENCIAL (1°..Nº) por ordem cronológica de cadastro,
+  // usada no resumo da página 1 e nos cards do detalhamento.
+  // É independente do slot da escadinha (que pode ter gaps).
+  const sequentialIndex = new Map<string, number>();
+  [...selected]
+    .sort((a, b) => {
+      const ta = new Date(a.processo.created_at).getTime();
+      const tb = new Date(b.processo.created_at).getTime();
+      return ta - tb || a.processo.id.localeCompare(b.processo.id);
+    })
+    .forEach((step, idx) => sequentialIndex.set(step.processo.id, idx + 1));
+
   // Página 1 (cobrança) + Página 2 (transparência/escadinha) só se houver desconto progressivo aplicável
   const descPct = data.cliente.desconto_progressivo ?? 0;
   const hasTransparencyPage = descPct > 0 && steps.length > 0;
@@ -1029,7 +1083,7 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
   }
 
   for (let index = 0; index < detailPageGroups.length; index += 1) {
-    const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, nextPageNumber, totalPages, detailPageGroups.length);
+    const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, nextPageNumber, totalPages, detailPageGroups.length, sequentialIndex);
     const detailCanvas = await renderPageToCanvas(detailHtml, GLOBAL_STYLES);
     doc.addPage();
     addCanvasToDoc(doc, detailCanvas);
