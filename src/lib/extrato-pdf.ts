@@ -481,13 +481,17 @@ function getStepExtratoText(step: StepInfo) {
 function buildSelectedProcessesHTML(selected: StepInfo[], maxVisible: number) {
   const visible = selected.slice(0, maxVisible);
   const groups = groupStepsByMonth(visible);
+  let runningIndex = 0;
 
   return groups.map(([monthKey, monthSteps], index) => `
     ${index > 0 ? `<div class="month-divider"><div class="line"></div><div class="text">Processos de ${escapeHtml(formatMonthLabel(monthKey))}</div><div class="line"></div></div>` : ''}
-    ${monthSteps.map((step) => `
+    ${monthSteps.map((step) => {
+      runningIndex += 1;
+      const seq = runningIndex;
+      return `
       <div class="process-row">
         <div class="process-left">
-          <div class="process-slot">${step.isMudancaUF ? `${step.index}º-${step.index + 1}º` : `${step.index}º`}</div>
+          <div class="process-slot">${seq}º</div>
           <div class="process-copy">
             <div class="process-title">
               <span>${escapeHtml(`${String(step.processo.tipo).toUpperCase()} — ${truncateText(step.processo.razao_social, 46)}`)}</span>
@@ -498,7 +502,8 @@ function buildSelectedProcessesHTML(selected: StepInfo[], maxVisible: number) {
         </div>
         <div class="process-value">${fmt(step.valorFinal)}</div>
       </div>
-    `).join('')}
+    `;
+    }).join('')}
   `).join('');
 }
 
