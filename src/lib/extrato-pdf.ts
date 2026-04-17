@@ -237,8 +237,14 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
   const limite = data.cliente.valor_limite_desconto ?? 0;
   const selectedIds = new Set(data.processos.map((processo) => processo.id));
 
+  // FIX 11: Reset mensal — escadinha considera SOMENTE processos do mês da competência do extrato
+  const competenciaKey = data.processos.length > 0
+    ? monthKeyFromDate(data.processos[0].created_at)
+    : monthKeyFromDate(new Date().toISOString());
+
   const unique = new Map<string, ProcessoFinanceiro>();
   [...data.allCompetencia, ...data.processos].forEach((processo) => {
+    if (monthKeyFromDate(processo.created_at) !== competenciaKey) return;
     if (!unique.has(processo.id)) unique.set(processo.id, processo);
   });
 
