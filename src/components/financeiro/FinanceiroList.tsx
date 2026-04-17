@@ -237,7 +237,6 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
             .from('lancamentos')
             .update({
               etapa_financeiro: 'cobranca_gerada',
-              observacoes_financeiro: `Extrato emitido em ${dateStr}`,
               updated_at: now,
             })
             .eq('id', p.lancamento.id);
