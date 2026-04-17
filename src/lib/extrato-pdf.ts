@@ -237,14 +237,25 @@ function buildEscadinha(data: ExtratoData): StepInfo[] {
   const limite = data.cliente.valor_limite_desconto ?? 0;
   const selectedIds = new Set(data.processos.map((processo) => processo.id));
 
-  // FIX 11: Reset mensal — escadinha considera SOMENTE processos do mês da competência do extrato
-  const competenciaKey = data.processos.length > 0
-    ? monthKeyFromDate(data.processos[0].created_at)
-    : monthKeyFromDate(new Date().toISOString());
+  // FIX CRÍTICO: NÃO filtrar por competência única.
+  // Selecionados podem abranger MÚLTIPLOS meses (ex: março + abril no mesmo extrato).
+  // O reset mensal do desconto progressivo já acontece naturalmente via agrupamento por mês abaixo
+  // (cada mês tem seu próprio `slot` zerado), então totais e listagens consolidam tudo
+  // enquanto a escadinha permanece corretamente segmentada por mês.
+  const selectedMonths = new Set(
+    data.processos.map((processo) => monthKeyFromDate(processo.created_at)),
+  );
 
   const unique = new Map<string, ProcessoFinanceiro>();
-  [...data.allCompetencia, ...data.processos].forEach((processo) => {
-    if (monthKeyFromDate(processo.created_at) !== competenciaKey) return;
+  // Sempre incluir TODOS os selecionados (independente de mês).
+  data.processos.forEach((processo) => {
+    if (!unique.has(processo.id)) unique.set(processo.id, processo);
+  });
+  // Incluir contexto da competência APENAS para meses presentes nos selecionados,
+  // para que a escadinha de cada mês reflita a posição correta dos slots.
+  data.allCompetencia.forEach((processo) => {
+    const mes = monthKeyFromDate(processo.created_at);
+    if (!selectedMonths.has(mes)) return;
     if (!unique.has(processo.id)) unique.set(processo.id, processo);
   });
 
@@ -485,16 +496,18 @@ function getStepExtratoText(step: StepInfo) {
 }
 
 function buildSelectedProcessesHTML(selected: StepInfo[], maxVisible: number) {
-  const visible = selected.slice(0, maxVisible);
-  const groups = groupStepsByMonth(visible);
-  let runningIndex = 0;
+  // Lista única consolidada (sem divisor por mês). Numeração sequencial 1°, 2°, 3°...
+  // Ordena por data (mais antigo primeiro) para preservar narrativa cronológica.
+  const ordered = [...selected].sort((a, b) => {
+    const ta = new Date(a.processo.created_at).getTime();
+    const tb = new Date(b.processo.created_at).getTime();
+    return ta - tb || a.processo.id.localeCompare(b.processo.id);
+  });
+  const visible = ordered.slice(0, maxVisible);
 
-  return groups.map(([monthKey, monthSteps], index) => `
-    ${index > 0 ? `<div class="month-divider"><div class="line"></div><div class="text">Processos de ${escapeHtml(formatMonthLabel(monthKey))}</div><div class="line"></div></div>` : ''}
-    ${monthSteps.map((step) => {
-      runningIndex += 1;
-      const seq = runningIndex;
-      return `
+  return visible.map((step, idx) => {
+    const seq = idx + 1;
+    return `
       <div class="process-row">
         <div class="process-left">
           <div class="process-slot">${seq}º</div>
@@ -509,8 +522,7 @@ function buildSelectedProcessesHTML(selected: StepInfo[], maxVisible: number) {
         <div class="process-value">${fmt(step.valorFinal)}</div>
       </div>
     `;
-    }).join('')}
-  `).join('');
+  }).join('');
 }
 
 function buildNextDiscountCardHTML(steps: StepInfo[], selected: StepInfo[], data: ExtratoData) {
@@ -914,17 +926,24 @@ function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
   const pdfHeight = doc.internal.pageSize.getHeight();
   const imgData = canvas.toDataURL('image/jpeg', 0.85);
 
-  let imgWidth = pdfWidth;
-  let imgHeight = (canvas.height / canvas.width) * pdfWidth;
+  // Margem mínima de 12mm em todos os lados (o template HTML já reserva 24-60px de padding
+  // interno; o offset físico evita que o header/conteúdo encoste na borda da folha A4).
+  const margin = 12;
+  const maxWidth = pdfWidth - margin * 2;
+  const maxHeight = pdfHeight - margin * 2;
 
-  if (imgHeight > pdfHeight) {
-    const scaleFactor = pdfHeight / imgHeight;
-    imgWidth = pdfWidth * scaleFactor;
-    imgHeight = pdfHeight;
+  const ratio = canvas.height / canvas.width;
+  let imgWidth = maxWidth;
+  let imgHeight = imgWidth * ratio;
+
+  if (imgHeight > maxHeight) {
+    imgHeight = maxHeight;
+    imgWidth = imgHeight / ratio;
   }
 
   const offsetX = (pdfWidth - imgWidth) / 2;
-  doc.addImage(imgData, 'JPEG', offsetX, 0, imgWidth, imgHeight);
+  const offsetY = (pdfHeight - imgHeight) / 2;
+  doc.addImage(imgData, 'JPEG', offsetX, offsetY, imgWidth, imgHeight);
 }
 
 export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult> {
