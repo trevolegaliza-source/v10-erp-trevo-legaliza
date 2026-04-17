@@ -547,7 +547,7 @@ function buildProgressionTableHTML(steps: StepInfo[], selected: StepInfo[], data
         <td class="value-cell">${fmt(step.valorFinal)}</td>
         <td class="desc-cell">${escapeHtml(getStepDiscountText(step))}</td>
         <td>${escapeHtml(getStepStatusText(step))}</td>
-        <td>${selectedIds.has(step.processo.id) ? 'COBRADO' : '—'}</td>
+        <td class="desc-cell">${escapeHtml(getStepExtratoText(step))}</td>
       </tr>
     `).join('');
 
