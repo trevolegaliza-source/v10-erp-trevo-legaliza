@@ -109,9 +109,11 @@ export function calcPreview(props: Props): PreviewResult {
 
 export default function PreviewFinanceiro(props: Props) {
   const { cliente, processosNoMes, filaLength, prioridade, mudancaUF, boasVindas, boasVindasPct, isAvulso, metodoPreco } = props;
-  const { podeVerValores } = usePermissions();
+  const { podeVerValores, role } = usePermissions();
+  // Operacional precisa ver valores no Cadastro Rápido para confirmar antes de salvar
+  const podeVer = podeVerValores() || role === 'operacional';
   const preview = calcPreview(props);
-  const vfmt = (v: number) => podeVerValores() ? fmt(v) : mask;
+  const vfmt = (v: number) => podeVer ? fmt(v) : mask;
   const valorBase = Number(cliente.valor_base ?? 0);
   const isManual = metodoPreco === 'manual' || isAvulso;
   const isPrePago = cliente.tipo === 'PRE_PAGO';

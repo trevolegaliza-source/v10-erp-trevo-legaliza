@@ -17,6 +17,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { STORAGE_BUCKETS } from '@/constants/storage';
+import { empresaPath } from '@/lib/storage-path';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { formatCNPJ, maskCNPJ, isValidCNPJ, maskCodigo } from '@/lib/cnpj';
@@ -97,7 +98,8 @@ export default function Clientes() {
   };
 
   const loadContracts = async (clienteId: string) => {
-    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(clienteId);
+    const folder = await empresaPath(clienteId);
+    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(folder);
     setContracts((data || []).map(f => ({ name: f.name, id: f.id })));
   };
 
@@ -107,7 +109,8 @@ export default function Clientes() {
     if (!allowed.includes(file.type)) { toast.error('Formato inválido. Aceitos: PDF, PNG, JPG'); throw new Error('invalid'); }
     if (file.size > 10 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo: 10MB'); throw new Error('too large'); }
     setUploadingContract(true);
-    const path = `${editClient.id}/contrato_${Date.now()}.${file.name.split('.').pop()}`;
+    const relativePath = `${editClient.id}/contrato_${Date.now()}.${file.name.split('.').pop()}`;
+    const path = await empresaPath(relativePath);
     const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(path, file);
     if (error) { toast.error('Erro no upload: ' + error.message); setUploadingContract(false); throw error; }
     // Update contrato_url
@@ -119,7 +122,7 @@ export default function Clientes() {
 
   const handlePreviewContract = async (fileName: string) => {
     if (!editClient) return;
-    const storagePath = `${editClient.id}/${fileName}`;
+    const storagePath = await empresaPath(`${editClient.id}/${fileName}`);
     const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(storagePath, 3600);
     if (data?.signedUrl) {
       setPreviewUrl(data.signedUrl);
@@ -132,7 +135,8 @@ export default function Clientes() {
 
   const handleDownloadContract = async (fileName: string) => {
     if (!editClient) return;
-    const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).download(`${editClient.id}/${fileName}`);
+    const storagePath = await empresaPath(`${editClient.id}/${fileName}`);
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).download(storagePath);
     if (error) { toast.error('Erro ao baixar'); return; }
     const url = URL.createObjectURL(data);
     const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
@@ -142,7 +146,8 @@ export default function Clientes() {
   const handleDeleteContract = async (fileName: string) => {
     if (!editClient) return;
     setPendingDeleteAction(() => async () => {
-      const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).remove([`${editClient.id}/${fileName}`]);
+      const storagePath = await empresaPath(`${editClient.id}/${fileName}`);
+      const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).remove([storagePath]);
       if (error) toast.error('Erro ao excluir');
       else { toast.success('Contrato removido'); loadContracts(editClient.id); }
     });
