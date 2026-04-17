@@ -132,11 +132,15 @@ const PDF_BASE_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body, div, span, p, td, th { font-family: 'DM Sans', sans-serif; color: hsl(var(--ink)); }
   body { background: hsl(var(--surface-soft)); }
+  /* Página A4 a 96dpi: 794x1123. Margens físicas (25mm = ~94px) já são aplicadas pelo jsPDF
+     via addCanvasToDoc. Mantemos um padding interno menor apenas para respiro visual,
+     e reservamos espaço inferior para o footer absoluto. */
   .page { width: 794px; min-height: 1123px; background: hsl(var(--surface)); position: relative; overflow: visible; }
-  .page-inner { padding: 24px 60px 140px; }
-  .page#page1 .page-inner { padding: 28px 60px 140px; }
+  .page-inner { padding: 18px 28px 150px; }
+  .page#page1 .page-inner { padding: 22px 28px 150px; }
+  .page#page2 .page-inner { padding: 22px 28px 150px; }
   .top-accent { width: 100%; height: 6px; background: linear-gradient(90deg, hsl(var(--trevo)) 0%, hsl(89 80% 55%) 100%); }
-  .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 60px 16px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
+  .pdf-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 28px 12px; border-bottom: 1px solid hsl(var(--line)); background: hsl(var(--surface)); }
   .header-logo img { width: 190px; height: auto; object-fit: contain; display: block; }
   .header-fallback { font-size: 14px; font-weight: 800; color: hsl(var(--trevo)); }
   .header-right { text-align: right; }
@@ -222,11 +226,15 @@ const PDF_BASE_STYLES = `
   .tax-total { margin-top: 10px; display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 14px; background: hsl(var(--surface-soft)); font-size: 10px; }
   .tax-total strong { color: hsl(var(--trevo-dark)); }
   .transparency-note { margin-top: 12px; padding: 9px 12px; border-radius: 14px; background: hsl(var(--warning-bg)); color: hsl(var(--warning-fg)); font-size: 8.5px; line-height: 1.5; }
-  .footer-contact { position: absolute; left: 60px; right: 60px; bottom: 38px; border-top: 1px solid hsl(var(--line)); padding-top: 12px; display: flex; justify-content: space-between; gap: 16px; font-size: 8.5px; color: hsl(var(--muted)); }
+  .footer-contact { position: absolute; left: 28px; right: 28px; bottom: 38px; border-top: 1px solid hsl(var(--line)); padding-top: 12px; display: flex; justify-content: space-between; gap: 16px; font-size: 8.5px; color: hsl(var(--muted)); }
   .footer-contact strong { color: hsl(var(--ink)); }
-  .page-footer { position: absolute; left: 60px; right: 60px; bottom: 14px; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: hsl(var(--muted)); }
+  .page-footer { position: absolute; left: 28px; right: 28px; bottom: 14px; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: hsl(var(--muted)); }
   .obs-financeiro { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: hsl(var(--surface-soft)); font-style: italic; font-size: 9px; line-height: 1.45; color: hsl(215 14% 42%); }
   .obs-financeiro strong { font-style: normal; font-weight: 700; color: hsl(var(--muted)); margin-right: 4px; }
+  .transparency-banner { margin-top: 18px; border-radius: 22px; background: linear-gradient(135deg, hsl(var(--trevo-deep)) 0%, hsl(var(--trevo-dark)) 100%); padding: 18px 22px; }
+  .transparency-banner .section-title { color: hsl(0 0% 100%); }
+  .transparency-banner .eyebrow { color: hsl(var(--trevo)); }
+  .transparency-banner-meta { font-size: 9px; color: hsl(0 0% 100% / 0.72); margin-top: 6px; }
 `;
 
 const GLOBAL_STYLES = `${PDF_FONT_IMPORT}\n${scopePdfStyles(PDF_BASE_STYLES.replace(PDF_FONT_IMPORT, '').trim())}`;
@@ -670,8 +678,9 @@ function buildPage1HTML(
   const maiorData = datasSelecionadas.length > 0 ? new Date(Math.max(...datasSelecionadas.map((date) => date.getTime()))) : emissaoDate;
   const periodoTexto = `${menorData.toLocaleDateString('pt-BR')} até ${maiorData.toLocaleDateString('pt-BR')}`;
 
-  const previewCount = detailPageCount > 0 ? Math.min(selected.length, 4) : Math.min(selected.length, 6);
-  const hiddenCount = Math.max(selected.length - previewCount, 0);
+  // Página 1: lista TODOS os processos selecionados (sem corte). Sem "+N detalhados".
+  const previewCount = selected.length;
+  const hiddenCount = 0;
 
   return `
     <div class="page" id="page1">
@@ -727,23 +736,57 @@ function buildPage1HTML(
             <div class="section-counter">${selected.length} cobrado(s)</div>
           </div>
           ${buildSelectedProcessesHTML(selected, previewCount)}
-          ${hiddenCount > 0 ? `<div class="section-note">+ ${hiddenCount} processo(s) detalhado(s) nas próximas páginas.</div>` : ''}
         </div>
 
-        ${buildNextDiscountCardHTML(steps, selected, data)}
-        ${buildProgressionTableHTML(steps, selected, data)}
-        ${(() => {
-          // FIX 13: nota apenas se houver alguma taxa SEM comprovante anexado
-          const taxasSemComprovante = Object.entries(data.valoresAdicionais)
-            .filter(([processoId]) => selectedIds.has(processoId))
-            .flatMap(([, valores]) => valores)
-            .some((v) => !v.comprovante_url);
-          return taxasSemComprovante
-            ? '<div class="transparency-note">ℹ️ Os comprovantes originais das taxas reembolsáveis continuam disponíveis para conferência na plataforma interna.</div>'
-            : '';
-        })()}
+        <div class="next-card" style="margin-top:14px;">
+          <div class="next-card-title">Condições de pagamento</div>
+          <div class="next-card-main">
+            Vencimento <strong>${escapeHtml(vencimento)}</strong> · Pagamento via PIX (CNPJ) ou boleto sob solicitação.
+          </div>
+          <div class="next-card-sub">
+            A próxima página apresenta a transparência do cálculo (escadinha de incentivo por volume).
+          </div>
+        </div>
       </div>
       ${buildFooterHTML(1, totalPages)}
+    </div>
+  `;
+}
+
+function buildPage2HTML(
+  data: ExtratoData,
+  steps: StepInfo[],
+  selected: StepInfo[],
+  logoDataUrl: string | null,
+  pageNumber: number,
+  totalPages: number,
+) {
+  const selectedIds = new Set(selected.map((step) => step.processo.id));
+  const taxasSemComprovante = Object.entries(data.valoresAdicionais)
+    .filter(([processoId]) => selectedIds.has(processoId))
+    .flatMap(([, valores]) => valores)
+    .some((v) => !v.comprovante_url);
+
+  const progressao = buildProgressionTableHTML(steps, selected, data);
+  const nextDiscount = buildNextDiscountCardHTML(steps, selected, data);
+
+  return `
+    <div class="page" id="page2">
+      <div class="top-accent"></div>
+      ${buildHeaderHTML(logoDataUrl)}
+      <div class="page-inner">
+        <div class="transparency-banner">
+          <div class="eyebrow">Como calculamos</div>
+          <div class="section-title">Progressão de incentivo por volume</div>
+          <div class="transparency-banner-meta">Esta página explica a formação do valor cobrado. O desconto progressivo reinicia a cada competência mensal.</div>
+        </div>
+        ${progressao || '<div class="section-card"><div class="section-note">Nenhuma escadinha aplicável a esta cobrança.</div></div>'}
+        ${nextDiscount}
+        ${taxasSemComprovante
+          ? '<div class="transparency-note">ℹ️ Os comprovantes originais das taxas reembolsáveis continuam disponíveis para conferência na plataforma interna.</div>'
+          : ''}
+      </div>
+      ${buildFooterHTML(pageNumber, totalPages)}
     </div>
   `;
 }
@@ -926,9 +969,9 @@ function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
   const pdfHeight = doc.internal.pageSize.getHeight();
   const imgData = canvas.toDataURL('image/jpeg', 0.85);
 
-  // Margem mínima de 12mm em todos os lados (o template HTML já reserva 24-60px de padding
-  // interno; o offset físico evita que o header/conteúdo encoste na borda da folha A4).
-  const margin = 12;
+  // Margem física obrigatória de 25mm em TODOS os lados (regra do CEO).
+  // Conteúdo NUNCA encosta na borda da folha A4.
+  const margin = 25;
   const maxWidth = pdfWidth - margin * 2;
   const maxHeight = pdfHeight - margin * 2;
 
@@ -942,7 +985,7 @@ function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
   }
 
   const offsetX = (pdfWidth - imgWidth) / 2;
-  const offsetY = (pdfHeight - imgHeight) / 2;
+  const offsetY = margin; // ancorar no topo (não centralizar verticalmente)
   doc.addImage(imgData, 'JPEG', offsetX, offsetY, imgWidth, imgHeight);
 }
 
@@ -961,7 +1004,13 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
 
   const detailPageGroups = shouldCreateDetailPages(selected, data) ? paginateDetailSteps(selected, data) : [];
   const attachmentCount = countAttachments(data);
-  const totalPages = 1 + detailPageGroups.length + attachmentCount;
+
+  // Página 1 (cobrança) + Página 2 (transparência/escadinha) só se houver desconto progressivo aplicável
+  const descPct = data.cliente.desconto_progressivo ?? 0;
+  const hasTransparencyPage = descPct > 0 && steps.length > 0;
+  const transparencyPages = hasTransparencyPage ? 1 : 0;
+
+  const totalPages = 1 + transparencyPages + detailPageGroups.length + attachmentCount;
 
   const doc = new jsPDF('p', 'mm', 'a4');
 
@@ -969,14 +1018,25 @@ export async function gerarExtratoPDF(data: ExtratoData): Promise<ExtratoResult>
   const page1Canvas = await renderPageToCanvas(page1Html, GLOBAL_STYLES);
   addCanvasToDoc(doc, page1Canvas);
 
+  let nextPageNumber = 2;
+
+  if (hasTransparencyPage) {
+    const page2Html = buildPage2HTML(data, steps, selected, logoDataUrl, nextPageNumber, totalPages);
+    const page2Canvas = await renderPageToCanvas(page2Html, GLOBAL_STYLES);
+    doc.addPage();
+    addCanvasToDoc(doc, page2Canvas);
+    nextPageNumber += 1;
+  }
+
   for (let index = 0; index < detailPageGroups.length; index += 1) {
-    const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, index + 2, totalPages, detailPageGroups.length);
+    const detailHtml = buildDetailPageHTML(data, detailPageGroups[index], logoDataUrl, nextPageNumber, totalPages, detailPageGroups.length);
     const detailCanvas = await renderPageToCanvas(detailHtml, GLOBAL_STYLES);
     doc.addPage();
     addCanvasToDoc(doc, detailCanvas);
+    nextPageNumber += 1;
   }
 
-  await renderAttachments(doc, data, totalPages, detailPageGroups.length + 2, logoDataUrl);
+  await renderAttachments(doc, data, totalPages, nextPageNumber, logoDataUrl);
 
   return {
     doc,
