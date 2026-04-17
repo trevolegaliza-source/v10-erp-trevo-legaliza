@@ -53,7 +53,18 @@ function ClienteAccordionItem({
     try {
       const extrato = await buscarExtratoPorId(extratoId);
       if (!extrato) { toast.error('Extrato não encontrado'); return; }
-      const storagePath = `extratos/${extrato.cliente_id}/${extrato.filename}`;
+
+      // Deriva o path real do pdf_url salvo (suporta layouts antigos e novos:
+      // "extratos/<cli>/file" ou "<empresa>/extratos/<cli>/file")
+      let storagePath = `extratos/${extrato.cliente_id}/${extrato.filename}`;
+      if (extrato.pdf_url) {
+        const marker = '/object/public/documentos/';
+        const idx = extrato.pdf_url.indexOf(marker);
+        if (idx >= 0) {
+          storagePath = decodeURIComponent(extrato.pdf_url.substring(idx + marker.length));
+        }
+      }
+
       await downloadExtrato('documentos', storagePath, extrato.filename);
     } catch (err) {
       console.error('Erro ao baixar extrato:', err);
