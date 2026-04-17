@@ -800,6 +800,9 @@ function buildDetailPageHTML(
             <span>Status aplicado</span>
             <strong>${escapeHtml(getStepStatusText(step))}</strong>
           </div>
+          ${(processo as any).lancamento?.observacoes_financeiro
+            ? `<div class="obs-financeiro"><strong>Obs:</strong>${escapeHtml((processo as any).lancamento.observacoes_financeiro)}</div>`
+            : ''}
           ${taxTable}
         </div>
       </div>
