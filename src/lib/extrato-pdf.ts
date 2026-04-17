@@ -496,16 +496,18 @@ function getStepExtratoText(step: StepInfo) {
 }
 
 function buildSelectedProcessesHTML(selected: StepInfo[], maxVisible: number) {
-  const visible = selected.slice(0, maxVisible);
-  const groups = groupStepsByMonth(visible);
-  let runningIndex = 0;
+  // Lista única consolidada (sem divisor por mês). Numeração sequencial 1°, 2°, 3°...
+  // Ordena por data (mais antigo primeiro) para preservar narrativa cronológica.
+  const ordered = [...selected].sort((a, b) => {
+    const ta = new Date(a.processo.created_at).getTime();
+    const tb = new Date(b.processo.created_at).getTime();
+    return ta - tb || a.processo.id.localeCompare(b.processo.id);
+  });
+  const visible = ordered.slice(0, maxVisible);
 
-  return groups.map(([monthKey, monthSteps], index) => `
-    ${index > 0 ? `<div class="month-divider"><div class="line"></div><div class="text">Processos de ${escapeHtml(formatMonthLabel(monthKey))}</div><div class="line"></div></div>` : ''}
-    ${monthSteps.map((step) => {
-      runningIndex += 1;
-      const seq = runningIndex;
-      return `
+  return visible.map((step, idx) => {
+    const seq = idx + 1;
+    return `
       <div class="process-row">
         <div class="process-left">
           <div class="process-slot">${seq}º</div>
@@ -520,8 +522,7 @@ function buildSelectedProcessesHTML(selected: StepInfo[], maxVisible: number) {
         <div class="process-value">${fmt(step.valorFinal)}</div>
       </div>
     `;
-    }).join('')}
-  `).join('');
+  }).join('');
 }
 
 function buildNextDiscountCardHTML(steps: StepInfo[], selected: StepInfo[], data: ExtratoData) {
