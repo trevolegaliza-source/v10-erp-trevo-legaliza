@@ -226,11 +226,15 @@ const PDF_BASE_STYLES = `
   .tax-total { margin-top: 10px; display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 14px; background: hsl(var(--surface-soft)); font-size: 10px; }
   .tax-total strong { color: hsl(var(--trevo-dark)); }
   .transparency-note { margin-top: 12px; padding: 9px 12px; border-radius: 14px; background: hsl(var(--warning-bg)); color: hsl(var(--warning-fg)); font-size: 8.5px; line-height: 1.5; }
-  .footer-contact { position: absolute; left: 60px; right: 60px; bottom: 38px; border-top: 1px solid hsl(var(--line)); padding-top: 12px; display: flex; justify-content: space-between; gap: 16px; font-size: 8.5px; color: hsl(var(--muted)); }
+  .footer-contact { position: absolute; left: 28px; right: 28px; bottom: 38px; border-top: 1px solid hsl(var(--line)); padding-top: 12px; display: flex; justify-content: space-between; gap: 16px; font-size: 8.5px; color: hsl(var(--muted)); }
   .footer-contact strong { color: hsl(var(--ink)); }
-  .page-footer { position: absolute; left: 60px; right: 60px; bottom: 14px; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: hsl(var(--muted)); }
+  .page-footer { position: absolute; left: 28px; right: 28px; bottom: 14px; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: hsl(var(--muted)); }
   .obs-financeiro { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: hsl(var(--surface-soft)); font-style: italic; font-size: 9px; line-height: 1.45; color: hsl(215 14% 42%); }
   .obs-financeiro strong { font-style: normal; font-weight: 700; color: hsl(var(--muted)); margin-right: 4px; }
+  .transparency-banner { margin-top: 18px; border-radius: 22px; background: linear-gradient(135deg, hsl(var(--trevo-deep)) 0%, hsl(var(--trevo-dark)) 100%); padding: 18px 22px; }
+  .transparency-banner .section-title { color: hsl(0 0% 100%); }
+  .transparency-banner .eyebrow { color: hsl(var(--trevo)); }
+  .transparency-banner-meta { font-size: 9px; color: hsl(0 0% 100% / 0.72); margin-top: 6px; }
 `;
 
 const GLOBAL_STYLES = `${PDF_FONT_IMPORT}\n${scopePdfStyles(PDF_BASE_STYLES.replace(PDF_FONT_IMPORT, '').trim())}`;
