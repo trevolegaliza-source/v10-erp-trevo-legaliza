@@ -517,29 +517,37 @@ function AuditoriaFicha({
         </p>
       </div>
 
-      {/* Etiquetas */}
-      <div className="flex gap-1 flex-wrap items-center">
+      {/* Etiquetas + Switch Método Trevo */}
+      <div className="flex gap-3 flex-wrap items-center">
         {l.processo_id && (
           <Popover open={trevoOpen} onOpenChange={setTrevoOpen}>
             <PopoverTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  "inline-flex items-center rounded border text-sm font-bold px-2 py-0.5 h-6 transition-colors cursor-pointer",
-                  l.tem_etiqueta_metodo_trevo
-                    ? "bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700"
-                    : "bg-amber-500/10 text-amber-700 border-amber-500/40 hover:bg-amber-500/20"
-                )}
-              >
-                🍀 MÉTODO TREVO
-              </button>
+              <div className="flex items-center gap-2 cursor-pointer select-none">
+                <Switch
+                  checked={l.tem_etiqueta_metodo_trevo}
+                  onCheckedChange={() => setTrevoOpen(true)}
+                  className={cn(
+                    l.tem_etiqueta_metodo_trevo && "data-[state=checked]:bg-emerald-600"
+                  )}
+                />
+                <span
+                  className={cn(
+                    "text-sm font-bold",
+                    l.tem_etiqueta_metodo_trevo
+                      ? "text-emerald-500"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {l.tem_etiqueta_metodo_trevo ? '🍀 MÉTODO TREVO' : 'Ativar Método Trevo'}
+                </span>
+              </div>
             </PopoverTrigger>
             <PopoverContent className="w-72 p-3 space-y-2" align="start">
               {l.tem_etiqueta_metodo_trevo ? (
                 <>
                   <p className="text-sm font-semibold">Remover Método Trevo?</p>
                   <p className="text-xs text-muted-foreground">
-                    O valor voltará ao cálculo padrão. Use "Editar Valor" para ajustar manualmente se quiser.
+                    O valor não será recalculado. Use "Editar Valor" para ajustar manualmente se quiser.
                   </p>
                   <div className="flex gap-2 pt-1">
                     <Button size="sm" variant="ghost" className="flex-1" onClick={() => setTrevoOpen(false)}>Cancelar</Button>
@@ -553,9 +561,9 @@ function AuditoriaFicha({
                   <p className="text-sm font-semibold">Ativar Método Trevo</p>
                   <div className="text-xs space-y-1">
                     <div className="flex justify-between"><span className="text-muted-foreground">Valor atual:</span><span className="font-mono">{fmt(l.valor)}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Base × 1.5:</span><span className="font-mono font-bold text-emerald-600">{fmt(novoValorTrevo)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Novo valor (base × 1.5):</span><span className="font-mono font-bold text-emerald-500">{fmt(novoValorTrevo)}</span></div>
                   </div>
-                  <p className="text-[10px] text-amber-600">⚠ Desconto progressivo será removido</p>
+                  <p className="text-[10px] text-amber-600">⚠ O desconto progressivo será removido</p>
                   <div className="flex gap-2 pt-1">
                     <Button size="sm" variant="ghost" className="flex-1" onClick={() => setTrevoOpen(false)}>Cancelar</Button>
                     <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleAtivarTrevo} disabled={savingTrevo || valorBase <= 0}>
