@@ -826,12 +826,14 @@ function buildDetailPageHTML(
   pageNumber: number,
   totalPages: number,
   detailPageCount: number,
+  sequentialIndex: Map<string, number>,
 ) {
   const detailCards = detailSteps.map((step) => {
     const processo = step.processo;
     const taxas = data.valoresAdicionais[processo.id] || [];
     const totalTaxas = taxas.reduce((sum, valorAdicional) => sum + Number(valorAdicional.valor), 0);
     const totalBloco = step.valorFinal + totalTaxas;
+    const seqNum = sequentialIndex.get(processo.id) ?? step.index;
 
     const taxTable = taxas.length > 0 ? `
       <table class="tax-table">
@@ -843,13 +845,20 @@ function buildDetailPageHTML(
           </tr>
         </thead>
         <tbody>
-          ${taxas.map((valorAdicional) => `
-            <tr>
-              <td>${fmtDate(valorAdicional.created_at)}</td>
-              <td>${escapeHtml(valorAdicional.descricao)}</td>
-              <td>${fmt(Number(valorAdicional.valor))}</td>
-            </tr>
-          `).join('')}
+          ${taxas.map((valorAdicional) => {
+            // Renomear "MÉTODO TREVO" para descrição clara ao cliente.
+            const descRaw = (valorAdicional.descricao || '').trim();
+            const desc = /m[ée]todo\s+trevo/i.test(descRaw)
+              ? 'Assessoria de deferimento ágil (Método Trevo)'
+              : descRaw;
+            return `
+              <tr>
+                <td>${fmtDate(valorAdicional.created_at)}</td>
+                <td>${escapeHtml(desc)}</td>
+                <td>${fmt(Number(valorAdicional.valor))}</td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
       <div class="tax-total">
@@ -858,11 +867,18 @@ function buildDetailPageHTML(
       </div>
     ` : '';
 
+    const obsRaw = (((processo as any).lancamento?.observacoes_financeiro) || '').trim();
+    // Filtra metadata legada auto-gerada que não é observação real do operador.
+    const isAutoMeta = /^extrato emitido em\b/i.test(obsRaw);
+    const obsHtml = obsRaw && !isAutoMeta
+      ? `<div class="obs-financeiro"><strong>Obs:</strong>${escapeHtml(obsRaw)}</div>`
+      : '';
+
     return `
       <div class="detail-card">
         <div class="detail-card-head">
           <div class="detail-left">
-            <div class="detail-index">${step.isMudancaUF ? `${step.index}º-${step.index + 1}º` : `${step.index}º`}</div>
+            <div class="detail-index">${seqNum}º</div>
             <div>
               <div class="detail-title">${escapeHtml(`${String(processo.tipo).toUpperCase()} — ${processo.razao_social}`)}</div>
               <div class="detail-meta">${fmtDate(processo.created_at)} · ${escapeHtml(formatMonthLabel(step.mes))} · ${escapeHtml(step.label)}</div>
@@ -883,9 +899,7 @@ function buildDetailPageHTML(
             <span>Status aplicado</span>
             <strong>${escapeHtml(getStepStatusText(step))}</strong>
           </div>
-          ${(processo as any).lancamento?.observacoes_financeiro
-            ? `<div class="obs-financeiro"><strong>Obs:</strong>${escapeHtml((processo as any).lancamento.observacoes_financeiro)}</div>`
-            : ''}
+          ${obsHtml}
           ${taxTable}
         </div>
       </div>
