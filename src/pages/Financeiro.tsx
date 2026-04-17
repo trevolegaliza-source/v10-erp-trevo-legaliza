@@ -51,8 +51,9 @@ function getPeriodoDates(preset: PeriodoPreset): { inicio: string; fim: string }
 }
 
 export default function Financeiro() {
-  const { role } = usePermissions();
+  const { role, isMaster } = usePermissions();
   const isFinanceiro = role === 'financeiro';
+  const masterBypassJanela = isMaster();
   const [periodo, setPeriodo] = useState<PeriodoPreset>('este_mes');
   const [customInicio, setCustomInicio] = useState('');
   const [customFim, setCustomFim] = useState('');
@@ -383,9 +384,13 @@ export default function Financeiro() {
             </TabsContent>
 
             <TabsContent value="cobrar" className="mt-4">
-              <ClientesFaturar clientes={clientesCobrar} mensalistasSemFatura={mensalistasSemFatura} onExtratoGerado={setExtratoGerado} />
-              
-              {clientesFuturaFatura.length > 0 && (
+              <ClientesFaturar
+                clientes={masterBypassJanela ? [...clientesCobrar, ...clientesFuturaFatura] : clientesCobrar}
+                mensalistasSemFatura={mensalistasSemFatura}
+                onExtratoGerado={setExtratoGerado}
+              />
+
+              {!masterBypassJanela && clientesFuturaFatura.length > 0 && (
                 <div className="mt-6">
                   <button
                     onClick={() => setShowFuturas(!showFuturas)}
