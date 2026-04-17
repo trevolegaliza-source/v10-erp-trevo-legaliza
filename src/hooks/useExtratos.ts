@@ -88,14 +88,14 @@ export function useExtratos(clienteId?: string) {
 
       const extratoTyped = extrato as unknown as Extrato;
 
-      // Vincular lançamentos ao extrato
+      // Vincular lançamentos ao extrato (NÃO sobrescrever observacoes_financeiro;
+      // esse campo é exclusivo do operador — metadata de extrato não vai pra lá)
       for (const pid of input.processoIds) {
         await supabase
           .from('lancamentos')
           .update({
             extrato_id: extratoTyped.id,
             etapa_financeiro: 'cobranca_gerada',
-            observacoes_financeiro: `Extrato emitido em ${new Date().toLocaleDateString('pt-BR')}`,
           } as any)
           .eq('processo_id', pid)
           .eq('tipo', 'receber');
