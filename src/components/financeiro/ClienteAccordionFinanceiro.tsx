@@ -1676,7 +1676,6 @@ function LancamentoRowWithHighlight({
   onToggle: () => void;
   onOpenTaxa: () => void;
 }) {
-  const { useHighlightOnModal } = require('@/hooks/useHighlightOnModal') as typeof import('@/hooks/useHighlightOnModal');
   const { highlight, ref } = useHighlightOnModal(isTaxaSourceOpen);
   return (
     <div
