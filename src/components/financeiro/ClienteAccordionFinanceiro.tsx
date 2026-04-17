@@ -749,6 +749,22 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         processos={deferimentoProcessos}
         onConfirm={handleDeferimentoConfirm}
       />
+      <AlertDialog open={confirmDesauditarOpen} onOpenChange={setConfirmDesauditarOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Devolver para auditoria?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {lancsParaDesauditar.length} processo{lancsParaDesauditar.length > 1 ? 's' : ''} de <strong>{cliente.cliente_apelido || cliente.cliente_nome}</strong> voltará{lancsParaDesauditar.length > 1 ? 'ão' : ''} para a aba <strong>Auditoria</strong>. Processos com extrato já gerado ou já pagos não serão afetados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={desauditando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDesauditar} disabled={desauditando}>
+              {desauditando ? 'Devolvendo...' : 'Devolver para auditoria'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AccordionItem>
   );
 }
