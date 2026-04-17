@@ -934,9 +934,9 @@ function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
   const pdfHeight = doc.internal.pageSize.getHeight();
   const imgData = canvas.toDataURL('image/jpeg', 0.85);
 
-  // Margem mínima de 12mm em todos os lados (o template HTML já reserva 24-60px de padding
-  // interno; o offset físico evita que o header/conteúdo encoste na borda da folha A4).
-  const margin = 12;
+  // Margem física obrigatória de 25mm em TODOS os lados (regra do CEO).
+  // Conteúdo NUNCA encosta na borda da folha A4.
+  const margin = 25;
   const maxWidth = pdfWidth - margin * 2;
   const maxHeight = pdfHeight - margin * 2;
 
@@ -950,7 +950,7 @@ function addCanvasToDoc(doc: jsPDF, canvas: HTMLCanvasElement) {
   }
 
   const offsetX = (pdfWidth - imgWidth) / 2;
-  const offsetY = (pdfHeight - imgHeight) / 2;
+  const offsetY = margin; // ancorar no topo (não centralizar verticalmente)
   doc.addImage(imgData, 'JPEG', offsetX, offsetY, imgWidth, imgHeight);
 }
 
