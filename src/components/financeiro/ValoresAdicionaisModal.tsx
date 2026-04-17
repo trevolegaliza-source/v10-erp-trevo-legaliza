@@ -55,9 +55,10 @@ export default function ValoresAdicionaisModal({
   const updateMut = useUpdateValorAdicional();
   const deleteMut = useDeleteValorAdicional();
 
-  const [tipoSelecionado, setTipoSelecionado] = useState<string>(TIPOS_TAXA[0]);
+  const [tipoSelecionado, setTipoSelecionado] = useState<string>(TIPOS_TAXA[0].label);
   const [descLivre, setDescLivre] = useState('');
-  const [newValor, setNewValor] = useState('');
+  const [newValor, setNewValor] = useState(String(TIPOS_TAXA[0].valorPadrao));
+  const [pagoPeloCliente, setPagoPeloCliente] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editDesc, setEditDesc] = useState('');
   const [editValor, setEditValor] = useState('');
@@ -75,11 +76,37 @@ export default function ValoresAdicionaisModal({
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const isOutro = tipoSelecionado === OUTRO;
-  const descricaoFinal = isOutro ? descLivre.trim() : tipoSelecionado;
+  const isJuntaComercial = tipoSelecionado === 'Taxa Junta Comercial';
+  const descricaoFinal = isOutro
+    ? descLivre.trim()
+    : (isJuntaComercial && pagoPeloCliente
+        ? 'Taxa Junta Comercial (pago pelo cliente)'
+        : tipoSelecionado);
+
+  const handleTipoChange = (novoTipo: string) => {
+    setTipoSelecionado(novoTipo);
+    setPagoPeloCliente(false);
+    if (novoTipo === OUTRO) {
+      setNewValor('0');
+    } else {
+      const tipo = TIPOS_TAXA.find(t => t.label === novoTipo);
+      setNewValor(tipo ? String(tipo.valorPadrao) : '0');
+    }
+  };
+
+  const handlePagoPeloClienteChange = (checked: boolean) => {
+    setPagoPeloCliente(checked);
+    if (checked) setNewValor('0');
+    else {
+      const tipo = TIPOS_TAXA.find(t => t.label === tipoSelecionado);
+      setNewValor(tipo ? String(tipo.valorPadrao) : '0');
+    }
+  };
 
   const handleAdd = () => {
     const valor = parseFloat(newValor.replace(',', '.')) || 0;
-    if (!descricaoFinal || valor <= 0) {
+    const isPagoCliente = isJuntaComercial && pagoPeloCliente;
+    if (!descricaoFinal || (valor <= 0 && !isPagoCliente)) {
       toast.error('Preencha descrição e valor');
       return;
     }
@@ -87,10 +114,13 @@ export default function ValoresAdicionaisModal({
       { processo_id: processoId, descricao: descricaoFinal, valor },
       {
         onSuccess: () => {
-          toast.success('Taxa adicionada — anexe o comprovante na coluna Comprov.');
+          toast.success(isPagoCliente
+            ? 'Taxa registrada (pago pelo cliente)'
+            : 'Taxa adicionada — anexe o comprovante na coluna Comprov.');
           setDescLivre('');
-          setNewValor('');
-          setTipoSelecionado(TIPOS_TAXA[0]);
+          setPagoPeloCliente(false);
+          setTipoSelecionado(TIPOS_TAXA[0].label);
+          setNewValor(String(TIPOS_TAXA[0].valorPadrao));
         },
       },
     );
