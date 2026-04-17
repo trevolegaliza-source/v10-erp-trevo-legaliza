@@ -814,7 +814,39 @@ function AuditoriaFicha({
         >
           <Check className="h-3 w-3 mr-1" /> {l.auditado ? 'Auditado ✅' : 'Auditar'}
         </Button>
+        {isMaster() && l.processo_id && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-xs h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => setConfirmDeleteOpen(true)}
+            title="Excluir processo"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir processo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Excluir processo <strong>{l.processo_razao_social}</strong>? Esta ação não pode ser desfeita e removerá também o lançamento financeiro vinculado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingProcesso}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleExcluirProcesso(); }}
+              disabled={deletingProcesso}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingProcesso ? 'Excluindo...' : 'Excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
