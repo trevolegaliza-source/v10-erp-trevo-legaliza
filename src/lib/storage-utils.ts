@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { empresaPath } from '@/lib/storage-path';
 import { toast } from 'sonner';
 
 /**
@@ -32,28 +33,29 @@ export async function downloadExtrato(bucket: string, path: string, filename: st
   try {
     toast.info('Baixando extrato...');
 
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .download(path);
-
-    if (error || !data) {
-      console.error('Storage download error:', error);
-      toast.error('Erro ao baixar o extrato. Tente gerar novamente.');
-      return;
+    const candidatePaths = [path];
+    try {
+      const scopedPath = await empresaPath(path);
+      if (scopedPath !== path) candidatePaths.push(scopedPath);
+    } catch {
+      // ignore: fallback para caminhos legados sem empresa_id
     }
 
-    const pdfBlob = new Blob([data], { type: 'application/pdf' });
-    const blobUrl = URL.createObjectURL(pdfBlob);
+    for (const candidatePath of candidatePaths) {
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(candidatePath, 300);
 
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+      if (!error && data?.signedUrl) {
+        window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+        toast.success(`Extrato ${filename} aberto!`);
+        return;
+      }
 
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
-    toast.success('Extrato baixado!');
+      console.error('Storage signed URL error:', { bucket, path: candidatePath, error });
+    }
+
+    toast.error('Erro ao baixar o extrato. Tente gerar novamente.');
   } catch (err) {
     console.error('Download error:', err);
     toast.error('Erro ao baixar o extrato.');
