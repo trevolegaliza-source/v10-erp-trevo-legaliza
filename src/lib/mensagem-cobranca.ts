@@ -1,9 +1,15 @@
+interface TaxaItem {
+  descricao: string;
+  valor: number;
+}
+
 interface ProcessoCobranca {
   tipo: string;
   razao_social: string;
   valor: number;
   honorarios?: number;
   taxasExtras?: number;
+  taxasDetalhadas?: TaxaItem[];
 }
 
 function formatarNegrito(text: string) {
@@ -19,6 +25,28 @@ function formatarData(dataISO: string) {
   return new Date(dataISO + 'T00:00:00').toLocaleDateString('pt-BR');
 }
 
+function tipoUpper(tipo: string) {
+  return (tipo || 'PROCESSO').toUpperCase();
+}
+
+function renderProcessoBlock(p: ProcessoCobranca): string {
+  const linhas: string[] = [];
+  linhas.push(`${formatarNegrito(tipoUpper(p.tipo))} — ${formatarNegrito(p.razao_social)}`);
+  const honorarios = p.honorarios != null ? p.honorarios : p.valor;
+  linhas.push(`Honorários: ${formatarValor(honorarios)}`);
+  const taxas = (p.taxasDetalhadas || []).filter(t => t.valor > 0);
+  for (const t of taxas) {
+    linhas.push(`${t.descricao}: ${formatarValor(t.valor)}`);
+  }
+  return linhas.join('\n');
+}
+
+function temAlgumaTaxa(processos: ProcessoCobranca[]): boolean {
+  return processos.some(p =>
+    (p.taxasDetalhadas || []).some(t => t.valor > 0) || (p.taxasExtras || 0) > 0,
+  );
+}
+
 /**
  * Gera mensagem de PRIMEIRO ENVIO — tom amigável, faturamento disponível.
  * Usar quando o extrato acabou de ser gerado (etapa: cobranca_gerada).
@@ -30,9 +58,11 @@ export function gerarMensagemCobranca(params: {
   data_vencimento: string;
   diasAtraso: number;
   processosAdicionais?: ProcessoCobranca[];
+  /** @deprecated mantido por compatibilidade; não é mais exibido */
   nomeRemetente?: string;
   honorarios?: number;
   taxasExtras?: number;
+  taxasDetalhadas?: TaxaItem[];
   observacao?: string;
 }) {
   const allProcessos: ProcessoCobranca[] = [
@@ -42,80 +72,37 @@ export function gerarMensagemCobranca(params: {
       valor: params.valor,
       honorarios: params.honorarios,
       taxasExtras: params.taxasExtras,
+      taxasDetalhadas: params.taxasDetalhadas,
     },
     ...(params.processosAdicionais || []),
   ];
 
   const valorTotal = allProcessos.reduce((sum, p) => sum + p.valor, 0);
   const dataFmt = formatarData(params.data_vencimento);
-  const remetente = params.nomeRemetente || 'Equipe';
 
-  // Se é recobrança (vencido), usar tom de cobrança
   if (params.diasAtraso > 0) {
-    return gerarMensagemRecobranca(allProcessos, valorTotal, dataFmt, params.diasAtraso, remetente);
+    return gerarMensagemRecobranca(allProcessos, valorTotal, dataFmt, params.diasAtraso);
   }
 
-  // Primeiro envio — tom amigável
-  if (allProcessos.length === 1) {
-    const p = allProcessos[0];
-    const temTaxas = (p.taxasExtras || 0) > 0;
-
-    let valorBlock = '';
-    if (temTaxas && p.honorarios != null) {
-      valorBlock = `${formatarNegrito('Honorários:')} ${formatarValor(p.honorarios)}
-${formatarNegrito('Taxas e reembolsos:')} ${formatarValor(p.taxasExtras!)}
-${formatarNegrito('Total:')} ${formatarValor(p.valor)}`;
-    } else {
-      valorBlock = `${formatarNegrito('Valor:')} ${formatarValor(p.valor)}`;
-    }
-
-    const obsBlock = params.observacao ? `\n📝 _${params.observacao}_\n` : '';
-
-    return `Olá! Aqui é ${remetente}, do departamento financeiro da ${formatarNegrito('Trevo Legaliza')} 🍀
-
-Informamos que o faturamento referente ao processo de ${formatarNegrito(p.tipo)} — ${formatarNegrito(p.razao_social)} já está disponível.
-
-${valorBlock}
-${formatarNegrito('Vencimento:')} ${dataFmt}
-${obsBlock}
-${formatarNegrito('Chave PIX (CNPJ):')} 39.969.412/0001-70
-${formatarNegrito('Banco:')} C6 Bank
-
-Se preferir realizar o pagamento via ${formatarNegrito('boleto bancário')}, é só solicitar por aqui! 📄
-
-Qualquer dúvida, estamos à disposição.
-
-${formatarNegrito('Trevo Legaliza')} 🍀
-Assessoria societária · Atuação nacional
-(11) 93492-7001 · trevolegaliza.com.br`;
-  }
-
-  // Múltiplos processos
-  const linhas = allProcessos
-    .map(p => {
-      const temTaxas = (p.taxasExtras || 0) > 0;
-      if (temTaxas && p.honorarios != null) {
-        return `• ${formatarNegrito(p.tipo)} — ${formatarNegrito(p.razao_social)} (Honorários ${formatarValor(p.honorarios)} + Taxas ${formatarValor(p.taxasExtras!)})`;
-      }
-      return `• ${formatarNegrito(p.tipo)} — ${formatarNegrito(p.razao_social)} (${formatarValor(p.valor)})`;
-    })
-    .join('\n');
-
+  const blocos = allProcessos.map(renderProcessoBlock).join('\n\n');
   const obsBlock = params.observacao ? `\n📝 _${params.observacao}_\n` : '';
+  const comprovantesBlock = temAlgumaTaxa(allProcessos)
+    ? `\nOs comprovantes de pagamento das taxas reembolsáveis estão registrados no processo dentro da nossa plataforma.\n`
+    : '';
 
-  return `Olá! Aqui é ${remetente}, do departamento financeiro da ${formatarNegrito('Trevo Legaliza')} 🍀
+  return `Olá! Aqui é do departamento financeiro da ${formatarNegrito('Trevo Legaliza')} 🍀
 
-Informamos que o faturamento referente aos processos abaixo já está disponível:
+Segue o faturamento referente ao(s) processo(s) do mês:
 
-${linhas}
+${blocos}
 
-${formatarNegrito('Valor Total:')} ${formatarValor(valorTotal)}
-${formatarNegrito('Vencimento:')} ${dataFmt}
-${obsBlock}
+${formatarNegrito('Total: ' + formatarValor(valorTotal))}
+${formatarNegrito('Vencimento: ' + dataFmt)}
+${obsBlock}${comprovantesBlock}
 ${formatarNegrito('Chave PIX (CNPJ):')} 39.969.412/0001-70
 ${formatarNegrito('Banco:')} C6 Bank
 
-Se preferir realizar o pagamento via ${formatarNegrito('boleto bancário')}, é só solicitar por aqui! 📄
+Se preferir pagamento via ${formatarNegrito('boleto bancário')}, é só solicitar por aqui! 📄
 
 Qualquer dúvida, estamos à disposição.
 
@@ -131,27 +118,21 @@ function gerarMensagemRecobranca(
   processos: ProcessoCobranca[],
   valorTotal: number,
   dataVencimento: string,
-  diasAtraso: number,
-  remetente: string,
+  _diasAtraso: number,
 ) {
-  const processoTexto = processos.length === 1
-    ? `referente ao processo de ${formatarNegrito(processos[0].tipo)} — ${formatarNegrito(processos[0].razao_social)}`
-    : `referente a ${formatarNegrito(String(processos.length) + ' processos')}`;
-
-  const listaProcessos = processos.length > 1
-    ? '\n' + processos.map(p => {
-        const temTaxas = (p.taxasExtras || 0) > 0;
-        if (temTaxas && p.honorarios != null) {
-          return `• ${p.tipo} — ${formatarNegrito(p.razao_social)} (Honorários ${formatarValor(p.honorarios)} + Taxas ${formatarValor(p.taxasExtras!)})`;
-        }
-        return `• ${p.tipo} — ${formatarNegrito(p.razao_social)} (${formatarValor(p.valor)})`;
-      }).join('\n') + '\n'
+  const blocos = processos.map(renderProcessoBlock).join('\n\n');
+  const comprovantesBlock = temAlgumaTaxa(processos)
+    ? `\nOs comprovantes de pagamento das taxas reembolsáveis estão registrados no processo dentro da nossa plataforma.\n`
     : '';
 
-  return `Olá! Aqui é ${remetente}, do financeiro da ${formatarNegrito('Trevo Legaliza')} 🍀
+  return `Olá! Aqui é do departamento financeiro da ${formatarNegrito('Trevo Legaliza')} 🍀
 
-Gostaríamos de verificar o pagamento ${processoTexto} no valor de ${formatarNegrito(formatarValor(valorTotal))}, com vencimento em ${formatarNegrito(dataVencimento)}.
-${listaProcessos}
+Gostaríamos de verificar o pagamento referente ao(s) processo(s) abaixo, com vencimento em ${formatarNegrito(dataVencimento)}:
+
+${blocos}
+
+${formatarNegrito('Total: ' + formatarValor(valorTotal))}
+${comprovantesBlock}
 ${formatarNegrito('Chave PIX (CNPJ):')} 39.969.412/0001-70
 ${formatarNegrito('Banco:')} C6 Bank
 
