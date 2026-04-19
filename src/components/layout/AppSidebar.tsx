@@ -24,6 +24,7 @@ const navItems = [
   { path: '/relatorios/fluxo-caixa', label: 'Fluxo de Caixa', icon: ArrowUpCircle, badgeKey: null, modulo: 'fluxo_caixa' },
   { path: '/inteligencia-geografica', label: 'Intel. Geográfica', icon: MapPin, badgeKey: null, modulo: 'intel_geografica' },
   { path: '/catalogo', label: 'Portfólio & Preços', icon: BookOpen, badgeKey: null, modulo: 'catalogo' },
+  { path: '/reconciliacao-trello', label: 'Trello ↔ ERP', icon: GitCompare, badgeKey: null, modulo: 'configuracoes', masterOnly: true },
   { path: '/configuracoes', label: 'Configurações', icon: Settings, badgeKey: null, modulo: 'configuracoes' },
 ];
 
