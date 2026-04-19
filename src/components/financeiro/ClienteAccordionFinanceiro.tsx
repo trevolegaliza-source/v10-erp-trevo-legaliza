@@ -817,8 +817,9 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     const extratoId = getExtratoIdAtual(cliente);
     const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoId).filter(l => l.processo_id);
     const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
+    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, diasAtraso: 0, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
     await navigator.clipboard.writeText(msg);
     toast.success('✅ Mensagem copiada! Cole no WhatsApp.');
   }
@@ -959,8 +960,9 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     const extratoId = getExtratoIdAtual(cliente);
     const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoId).filter(l => l.processo_id);
     const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
+    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, diasAtraso: 0, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
@@ -989,8 +991,9 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       const extratoIdAtual = getExtratoIdAtual(cliente);
       const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoIdAtual).filter(l => l.processo_id);
       const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
+    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
       const nomeRemetente = await getNomeRemetente();
-      const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, diasAtraso: 0, nomeRemetente });
+      const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
       } else {
@@ -1173,7 +1176,7 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
       if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
     }
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
     await navigator.clipboard.writeText(msg);
     toast.success(temVencidos ? '✅ Mensagem de recobrança copiada!' : '✅ Mensagem copiada! Cole no WhatsApp.');
   }
@@ -1205,7 +1208,7 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
       if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
     }
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
@@ -1235,7 +1238,7 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
         if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
       }
       const nomeRemetente = await getNomeRemetente();
-      const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
+      const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
       } else {
@@ -1604,10 +1607,11 @@ export function ModalPosExtrato({
     
     const lancsForMsg = extratoGerado.lancamentos;
     const vaMap = await buildValoresAdicionaisMap(lancsForMsg);
+    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancsForMsg);
     
     if (lancsForMsg.length === 0) { toast.warning('Nenhum lançamento encontrado.'); return; }
     
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, diasAtraso: 0, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
     openWhatsApp(tel, msg);
     handleClose();
   }
@@ -1619,9 +1623,10 @@ export function ModalPosExtrato({
       const nomeRemetente = await getNomeRemetente();
       const lancsForMsg = extratoGerado.lancamentos;
       const vaMap = await buildValoresAdicionaisMap(lancsForMsg);
+    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancsForMsg);
       
       const msg = lancsForMsg.length > 0 
-        ? buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, diasAtraso: 0, nomeRemetente })
+        ? buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente })
         : '';
       
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
