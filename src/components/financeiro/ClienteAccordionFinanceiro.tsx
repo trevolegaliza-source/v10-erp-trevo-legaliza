@@ -146,6 +146,28 @@ async function buildValoresAdicionaisMap(lancamentos: Array<Pick<LancamentoFinan
   return vaMap;
 }
 
+export async function buildValoresAdicionaisDetalhadosMap(
+  lancamentos: Array<Pick<LancamentoFinanceiro, 'processo_id'>>,
+): Promise<Record<string, Array<{ descricao: string; valor: number }>>> {
+  const processoIds = [...new Set(lancamentos.map(l => l.processo_id).filter(Boolean))] as string[];
+  const map: Record<string, Array<{ descricao: string; valor: number }>> = {};
+  if (processoIds.length === 0) return map;
+
+  const { data: vas } = await supabase
+    .from('valores_adicionais')
+    .select('processo_id, descricao, valor')
+    .in('processo_id', processoIds);
+
+  if (vas) {
+    for (const va of vas) {
+      if (!map[va.processo_id]) map[va.processo_id] = [];
+      map[va.processo_id].push({ descricao: va.descricao || 'Taxa', valor: Number(va.valor) || 0 });
+    }
+  }
+
+  return map;
+}
+
 function getExtratoIdAtual(cliente: ClienteFinanceiro) {
   return cliente.extrato_mais_recente?.id || cliente.lancamentos.find(l => l.extrato_id)?.extrato_id || null;
 }
