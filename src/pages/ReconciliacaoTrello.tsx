@@ -78,7 +78,7 @@ export default function ReconciliacaoTrello() {
   const [processos, setProcessos] = useState<ProcessoRow[]>([]);
   const [search, setSearch] = useState("");
 
-  if (!permLoading && !isMaster()) return <Navigate to="/" replace />;
+  const podeAcessar = !permLoading && isMaster();
 
   const carregar = async () => {
     setLoading(true);
@@ -108,9 +108,9 @@ export default function ReconciliacaoTrello() {
   };
 
   useEffect(() => {
-    if (!permLoading && isMaster()) carregar();
+    if (podeAcessar) carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [permLoading]);
+  }, [podeAcessar]);
 
   // Match boards → clientes
   const boardMatches: BoardMatch[] = useMemo(() => {
