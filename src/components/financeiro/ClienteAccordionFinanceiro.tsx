@@ -103,6 +103,7 @@ export async function getNomeRemetente(): Promise<string> {
 interface MsgBuilderParams {
   lancamentos: LancamentoFinanceiro[];
   vaMap: Record<string, number>;
+  vaDetalhadoMap?: Record<string, Array<{ descricao: string; valor: number }>>;
   diasAtraso: number;
   nomeRemetente: string;
   observacao?: string;
@@ -146,6 +147,28 @@ async function buildValoresAdicionaisMap(lancamentos: Array<Pick<LancamentoFinan
   return vaMap;
 }
 
+export async function buildValoresAdicionaisDetalhadosMap(
+  lancamentos: Array<Pick<LancamentoFinanceiro, 'processo_id'>>,
+): Promise<Record<string, Array<{ descricao: string; valor: number }>>> {
+  const processoIds = [...new Set(lancamentos.map(l => l.processo_id).filter(Boolean))] as string[];
+  const map: Record<string, Array<{ descricao: string; valor: number }>> = {};
+  if (processoIds.length === 0) return map;
+
+  const { data: vas } = await supabase
+    .from('valores_adicionais')
+    .select('processo_id, descricao, valor')
+    .in('processo_id', processoIds);
+
+  if (vas) {
+    for (const va of vas) {
+      if (!map[va.processo_id]) map[va.processo_id] = [];
+      map[va.processo_id].push({ descricao: va.descricao || 'Taxa', valor: Number(va.valor) || 0 });
+    }
+  }
+
+  return map;
+}
+
 function getExtratoIdAtual(cliente: ClienteFinanceiro) {
   return cliente.extrato_mais_recente?.id || cliente.lancamentos.find(l => l.extrato_id)?.extrato_id || null;
 }
@@ -156,21 +179,24 @@ function getLancamentosDoExtrato(cliente: ClienteFinanceiro, extratoId?: string 
   return lancamentos.length > 0 ? lancamentos : cliente.lancamentos;
 }
 
-export function buildMensagemFromLancamentos({ lancamentos, vaMap, diasAtraso, nomeRemetente, observacao }: MsgBuilderParams): string {
+export function buildMensagemFromLancamentos({ lancamentos, vaMap, vaDetalhadoMap, diasAtraso, nomeRemetente, observacao }: MsgBuilderParams): string {
   const l = lancamentos[0];
   if (!l) return '';
   const honorarios = l.valor;
   const taxasExtras = l.processo_id ? (vaMap[l.processo_id] || 0) : 0;
+  const taxasDetalhadas = l.processo_id ? (vaDetalhadoMap?.[l.processo_id] || []) : [];
   const valorPrimeiro = honorarios + taxasExtras;
   const adicionais = lancamentos.slice(1).map(item => {
     const h = item.valor;
     const t = item.processo_id ? (vaMap[item.processo_id] || 0) : 0;
+    const td = item.processo_id ? (vaDetalhadoMap?.[item.processo_id] || []) : [];
     return {
       tipo: getTipoProcessoLabel(item.processo_tipo),
       razao_social: item.processo_razao_social,
       valor: h + t,
       honorarios: h,
       taxasExtras: t,
+      taxasDetalhadas: td,
     };
   });
   return gerarMensagemCobranca({
@@ -179,6 +205,7 @@ export function buildMensagemFromLancamentos({ lancamentos, vaMap, diasAtraso, n
     valor: valorPrimeiro,
     honorarios,
     taxasExtras,
+    taxasDetalhadas,
     data_vencimento: l.data_vencimento,
     diasAtraso,
     nomeRemetente,
@@ -790,8 +817,9 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     const extratoId = getExtratoIdAtual(cliente);
     const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoId).filter(l => l.processo_id);
     const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
+    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, diasAtraso: 0, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
     await navigator.clipboard.writeText(msg);
     toast.success('✅ Mensagem copiada! Cole no WhatsApp.');
   }
@@ -932,8 +960,9 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     const extratoId = getExtratoIdAtual(cliente);
     const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoId).filter(l => l.processo_id);
     const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
+    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, diasAtraso: 0, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
@@ -962,8 +991,9 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       const extratoIdAtual = getExtratoIdAtual(cliente);
       const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoIdAtual).filter(l => l.processo_id);
       const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
+    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
       const nomeRemetente = await getNomeRemetente();
-      const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, diasAtraso: 0, nomeRemetente });
+      const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
       } else {
@@ -1141,12 +1171,19 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
     if (lancsParaMsg.length === 0) return;
     const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))];
     let vaMap: Record<string, number> = {};
+    const vaDetalhadoMap: Record<string, Array<{ descricao: string; valor: number }>> = {};
     if (processoIds.length > 0) {
-      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, descricao, valor').in('processo_id', processoIds);
+      if (vas) {
+        for (const va of vas) {
+          vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + Number(va.valor);
+          if (!vaDetalhadoMap[va.processo_id]) vaDetalhadoMap[va.processo_id] = [];
+          vaDetalhadoMap[va.processo_id].push({ descricao: (va as any).descricao || 'Taxa', valor: Number(va.valor) || 0 });
+        }
+      }
     }
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
     await navigator.clipboard.writeText(msg);
     toast.success(temVencidos ? '✅ Mensagem de recobrança copiada!' : '✅ Mensagem copiada! Cole no WhatsApp.');
   }
@@ -1173,12 +1210,19 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
     if (lancsParaMsg.length === 0) return;
     const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))];
     let vaMap: Record<string, number> = {};
+    const vaDetalhadoMap: Record<string, Array<{ descricao: string; valor: number }>> = {};
     if (processoIds.length > 0) {
-      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, descricao, valor').in('processo_id', processoIds);
+      if (vas) {
+        for (const va of vas) {
+          vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + Number(va.valor);
+          if (!vaDetalhadoMap[va.processo_id]) vaDetalhadoMap[va.processo_id] = [];
+          vaDetalhadoMap[va.processo_id].push({ descricao: (va as any).descricao || 'Taxa', valor: Number(va.valor) || 0 });
+        }
+      }
     }
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
@@ -1203,12 +1247,19 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
       const lancsParaMsg = temVencidos ? lancVencidos : cliente.lancamentos;
       const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))] as string[];
       const vaMap: Record<string, number> = {};
+      const vaDetalhadoMap: Record<string, Array<{ descricao: string; valor: number }>> = {};
       if (processoIds.length > 0) {
-        const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-        if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+        const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, descricao, valor').in('processo_id', processoIds);
+        if (vas) {
+          for (const va of vas) {
+            vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + Number(va.valor);
+            if (!vaDetalhadoMap[va.processo_id]) vaDetalhadoMap[va.processo_id] = [];
+            vaDetalhadoMap[va.processo_id].push({ descricao: (va as any).descricao || 'Taxa', valor: Number(va.valor) || 0 });
+          }
+        }
       }
       const nomeRemetente = await getNomeRemetente();
-      const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, diasAtraso: maiorAtraso, nomeRemetente });
+      const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
       } else {
@@ -1577,10 +1628,11 @@ export function ModalPosExtrato({
     
     const lancsForMsg = extratoGerado.lancamentos;
     const vaMap = await buildValoresAdicionaisMap(lancsForMsg);
+    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancsForMsg);
     
     if (lancsForMsg.length === 0) { toast.warning('Nenhum lançamento encontrado.'); return; }
     
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, diasAtraso: 0, nomeRemetente });
+    const msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
     openWhatsApp(tel, msg);
     handleClose();
   }
@@ -1592,9 +1644,10 @@ export function ModalPosExtrato({
       const nomeRemetente = await getNomeRemetente();
       const lancsForMsg = extratoGerado.lancamentos;
       const vaMap = await buildValoresAdicionaisMap(lancsForMsg);
+    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancsForMsg);
       
       const msg = lancsForMsg.length > 0 
-        ? buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, diasAtraso: 0, nomeRemetente })
+        ? buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente })
         : '';
       
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
