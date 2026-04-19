@@ -38,9 +38,7 @@ Deno.serve(async (req) => {
     );
     if (!boardsRes.ok) {
       const text = await boardsRes.text();
-      throw new Error(
-        `Trello boards fetch failed [${boardsRes.status}]: ${text} | apiKey.len=${apiKey.length} token.len=${token.length} apiKey.startsWithATTA=${apiKey.startsWith("ATTA")}`
-      );
+      throw new Error(`Trello boards fetch failed [${boardsRes.status}]: ${text}`);
     }
     const boards: TrelloBoard[] = await boardsRes.json();
     const openBoards = boards.filter((b) => !b.closed);
