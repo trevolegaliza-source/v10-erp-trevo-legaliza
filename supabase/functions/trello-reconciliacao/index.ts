@@ -20,8 +20,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get("TRELLO_API_KEY");
-    const token = Deno.env.get("TRELLO_TOKEN");
+    const apiKey = Deno.env.get("TRELLO_API_KEY")?.trim();
+    const token = Deno.env.get("TRELLO_TOKEN")?.trim();
 
     if (!apiKey || !token) {
       return new Response(
@@ -38,7 +38,9 @@ Deno.serve(async (req) => {
     );
     if (!boardsRes.ok) {
       const text = await boardsRes.text();
-      throw new Error(`Trello boards fetch failed [${boardsRes.status}]: ${text}`);
+      throw new Error(
+        `Trello boards fetch failed [${boardsRes.status}]: ${text} | apiKey.len=${apiKey.length} token.len=${token.length} apiKey.startsWithATTA=${apiKey.startsWith("ATTA")}`
+      );
     }
     const boards: TrelloBoard[] = await boardsRes.json();
     const openBoards = boards.filter((b) => !b.closed);
