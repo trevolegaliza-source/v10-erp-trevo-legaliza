@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Kanban, Users, DollarSign, Settings,
-  PlusCircle, ArrowUpCircle, LogOut, UsersRound, Receipt, MapPin, BookOpen, Upload, BarChart3, X,
+  PlusCircle, ArrowUpCircle, LogOut, UsersRound, Receipt, MapPin, BookOpen, Upload, BarChart3, X, GitCompare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ const navItems = [
   { path: '/relatorios/fluxo-caixa', label: 'Fluxo de Caixa', icon: ArrowUpCircle, badgeKey: null, modulo: 'fluxo_caixa' },
   { path: '/inteligencia-geografica', label: 'Intel. Geográfica', icon: MapPin, badgeKey: null, modulo: 'intel_geografica' },
   { path: '/catalogo', label: 'Portfólio & Preços', icon: BookOpen, badgeKey: null, modulo: 'catalogo' },
+  { path: '/reconciliacao-trello', label: 'Trello ↔ ERP', icon: GitCompare, badgeKey: null, modulo: 'configuracoes', masterOnly: true },
   { path: '/configuracoes', label: 'Configurações', icon: Settings, badgeKey: null, modulo: 'configuracoes' },
 ];
 
@@ -51,9 +52,12 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const location = useLocation();
   const { signOut, user } = useAuth();
   const { data: counts } = useSidebarCounts();
-  const { podeVer, loading: permsLoading } = usePermissions();
+  const { podeVer, loading: permsLoading, isMaster } = usePermissions();
 
-  const visibleItems = navItems.filter(item => podeVer(item.modulo));
+  const visibleItems = navItems.filter(item => {
+    if ((item as any).masterOnly && !isMaster()) return false;
+    return podeVer(item.modulo);
+  });
 
   return (
     <aside
