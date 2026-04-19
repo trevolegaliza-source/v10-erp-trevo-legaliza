@@ -179,21 +179,24 @@ function getLancamentosDoExtrato(cliente: ClienteFinanceiro, extratoId?: string 
   return lancamentos.length > 0 ? lancamentos : cliente.lancamentos;
 }
 
-export function buildMensagemFromLancamentos({ lancamentos, vaMap, diasAtraso, nomeRemetente, observacao }: MsgBuilderParams): string {
+export function buildMensagemFromLancamentos({ lancamentos, vaMap, vaDetalhadoMap, diasAtraso, nomeRemetente, observacao }: MsgBuilderParams): string {
   const l = lancamentos[0];
   if (!l) return '';
   const honorarios = l.valor;
   const taxasExtras = l.processo_id ? (vaMap[l.processo_id] || 0) : 0;
+  const taxasDetalhadas = l.processo_id ? (vaDetalhadoMap?.[l.processo_id] || []) : [];
   const valorPrimeiro = honorarios + taxasExtras;
   const adicionais = lancamentos.slice(1).map(item => {
     const h = item.valor;
     const t = item.processo_id ? (vaMap[item.processo_id] || 0) : 0;
+    const td = item.processo_id ? (vaDetalhadoMap?.[item.processo_id] || []) : [];
     return {
       tipo: getTipoProcessoLabel(item.processo_tipo),
       razao_social: item.processo_razao_social,
       valor: h + t,
       honorarios: h,
       taxasExtras: t,
+      taxasDetalhadas: td,
     };
   });
   return gerarMensagemCobranca({
@@ -202,6 +205,7 @@ export function buildMensagemFromLancamentos({ lancamentos, vaMap, diasAtraso, n
     valor: valorPrimeiro,
     honorarios,
     taxasExtras,
+    taxasDetalhadas,
     data_vencimento: l.data_vencimento,
     diasAtraso,
     nomeRemetente,
