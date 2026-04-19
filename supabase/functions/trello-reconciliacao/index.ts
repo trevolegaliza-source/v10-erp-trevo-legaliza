@@ -20,8 +20,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get("TRELLO_API_KEY");
-    const token = Deno.env.get("TRELLO_TOKEN");
+    const apiKey = Deno.env.get("TRELLO_API_KEY")?.trim();
+    const token = Deno.env.get("TRELLO_TOKEN")?.trim();
 
     if (!apiKey || !token) {
       return new Response(
