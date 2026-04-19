@@ -837,7 +837,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
 
       const { data: extrato } = await supabase
         .from('extratos')
-        .select('cliente_id, filename')
+        .select('cliente_id, filename, pdf_url')
         .eq('id', extratoId)
         .single();
 
@@ -846,7 +846,9 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
         return;
       }
 
-      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
+      const path = (extrato as any).pdf_url?.includes('/object/public/documentos/')
+        ? decodeURIComponent((extrato as any).pdf_url.split('/object/public/documentos/')[1] || `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`)
+        : `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
       await downloadExtrato('documentos', path, (extrato as any).filename);
     } catch (err) {
       console.error('Erro ao baixar extrato:', err);
@@ -1194,9 +1196,11 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
       const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
       const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
       if (!extratoId) { toast.error('Nenhum extrato encontrado para este cliente.'); return; }
-      const { data: extrato } = await supabase.from('extratos').select('cliente_id, filename').eq('id', extratoId).single();
+      const { data: extrato } = await supabase.from('extratos').select('cliente_id, filename, pdf_url').eq('id', extratoId).single();
       if (!extrato) { toast.error('Extrato não encontrado.'); return; }
-      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
+      const path = (extrato as any).pdf_url?.includes('/object/public/documentos/')
+        ? decodeURIComponent((extrato as any).pdf_url.split('/object/public/documentos/')[1] || `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`)
+        : `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
       await downloadExtrato('documentos', path, (extrato as any).filename);
     } catch (err) {
       toast.error('Erro ao baixar extrato.');
