@@ -103,6 +103,7 @@ export async function getNomeRemetente(): Promise<string> {
 interface MsgBuilderParams {
   lancamentos: LancamentoFinanceiro[];
   vaMap: Record<string, number>;
+  vaDetalhadoMap?: Record<string, Array<{ descricao: string; valor: number }>>;
   diasAtraso: number;
   nomeRemetente: string;
   observacao?: string;
