@@ -46,6 +46,7 @@ const INITIAL_VALOR: ValorFormData = {
 export default function CadastroRapido() {
   const { data: clientes } = useClientes();
   const createProcesso = useCreateProcesso();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // State
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -60,6 +61,34 @@ export default function CadastroRapido() {
   const [totalEconomia, setTotalEconomia] = useState(0);
   const [isFirstProcess, setIsFirstProcess] = useState(false);
   const isSubmitting = useRef(false);
+  const prefillApplied = useRef(false);
+
+  // Pré-preencher via query params (vindos da Reconciliação Trello)
+  useEffect(() => {
+    if (prefillApplied.current) return;
+    if (!clientes || clientes.length === 0) return;
+
+    const codigo = searchParams.get('cliente_codigo');
+    const razao = searchParams.get('razao_social');
+    const tipo = searchParams.get('tipo') as TipoProcesso | null;
+
+    if (!codigo && !razao && !tipo) return;
+
+    if (codigo) {
+      const c = clientes.find((c) => c.codigo_identificador === codigo);
+      if (c) setClienteId(c.id);
+    }
+    if (razao || tipo) {
+      setProcessoForm((prev) => ({
+        ...prev,
+        razaoSocial: razao || prev.razaoSocial,
+        tipo: (tipo as any) || prev.tipo,
+      }));
+    }
+    prefillApplied.current = true;
+    // Limpar query params para não re-aplicar
+    setSearchParams({}, { replace: true });
+  }, [clientes, searchParams, setSearchParams]);
 
   const selectedCliente = (clientes || []).find(c => c.id === clienteId) || null;
   const { data: negotiations } = useServiceNegotiations(clienteId || undefined);
