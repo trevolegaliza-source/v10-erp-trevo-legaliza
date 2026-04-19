@@ -31,6 +31,7 @@ const ImportarProcessos = lazy(() => import("./pages/ImportarProcessos"));
 const RelatoriosDRE = lazy(() => import("./pages/RelatoriosDRE"));
 const RelatoriosFluxoCaixa = lazy(() => import("./pages/RelatoriosFluxoCaixa"));
 const PortfolioPublico = lazy(() => import("./pages/PortfolioPublico"));
+const ReconciliacaoTrello = lazy(() => import("./pages/ReconciliacaoTrello"));
 const PropostaPublica = lazy(() => import("./pages/PropostaPublica"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -162,6 +163,7 @@ const App = () => (
                       <RelatoriosFluxoCaixa />
                     </RequirePermission>
                   } />
+                  <Route path="/reconciliacao-trello" element={<ReconciliacaoTrello />} />
                   <Route path="/configuracoes" element={
                     <RequirePermission modulo="configuracoes">
                       <Configuracoes />
