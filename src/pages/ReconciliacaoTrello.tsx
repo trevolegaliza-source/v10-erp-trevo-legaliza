@@ -222,6 +222,9 @@ export default function ReconciliacaoTrello() {
     downloadCSV(rows, `reconciliacao-trello-${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
+  if (permLoading) return <div className="p-6 text-sm text-muted-foreground">Carregando...</div>;
+  if (!isMaster()) return <Navigate to="/" replace />;
+
   return (
     <div className="space-y-6 p-4 md:p-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
