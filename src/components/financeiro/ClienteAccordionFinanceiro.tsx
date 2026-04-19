@@ -1171,9 +1171,16 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
     if (lancsParaMsg.length === 0) return;
     const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))];
     let vaMap: Record<string, number> = {};
+    const vaDetalhadoMap: Record<string, Array<{ descricao: string; valor: number }>> = {};
     if (processoIds.length > 0) {
-      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, descricao, valor').in('processo_id', processoIds);
+      if (vas) {
+        for (const va of vas) {
+          vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + Number(va.valor);
+          if (!vaDetalhadoMap[va.processo_id]) vaDetalhadoMap[va.processo_id] = [];
+          vaDetalhadoMap[va.processo_id].push({ descricao: (va as any).descricao || 'Taxa', valor: Number(va.valor) || 0 });
+        }
+      }
     }
     const nomeRemetente = await getNomeRemetente();
     const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
@@ -1203,9 +1210,16 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
     if (lancsParaMsg.length === 0) return;
     const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))];
     let vaMap: Record<string, number> = {};
+    const vaDetalhadoMap: Record<string, Array<{ descricao: string; valor: number }>> = {};
     if (processoIds.length > 0) {
-      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-      if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+      const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, descricao, valor').in('processo_id', processoIds);
+      if (vas) {
+        for (const va of vas) {
+          vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + Number(va.valor);
+          if (!vaDetalhadoMap[va.processo_id]) vaDetalhadoMap[va.processo_id] = [];
+          vaDetalhadoMap[va.processo_id].push({ descricao: (va as any).descricao || 'Taxa', valor: Number(va.valor) || 0 });
+        }
+      }
     }
     const nomeRemetente = await getNomeRemetente();
     const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
@@ -1233,9 +1247,16 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
       const lancsParaMsg = temVencidos ? lancVencidos : cliente.lancamentos;
       const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))] as string[];
       const vaMap: Record<string, number> = {};
+      const vaDetalhadoMap: Record<string, Array<{ descricao: string; valor: number }>> = {};
       if (processoIds.length > 0) {
-        const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, valor').in('processo_id', processoIds);
-        if (vas) { for (const va of vas) { vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + va.valor; } }
+        const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, descricao, valor').in('processo_id', processoIds);
+        if (vas) {
+          for (const va of vas) {
+            vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + Number(va.valor);
+            if (!vaDetalhadoMap[va.processo_id]) vaDetalhadoMap[va.processo_id] = [];
+            vaDetalhadoMap[va.processo_id].push({ descricao: (va as any).descricao || 'Taxa', valor: Number(va.valor) || 0 });
+          }
+        }
       }
       const nomeRemetente = await getNomeRemetente();
       const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
