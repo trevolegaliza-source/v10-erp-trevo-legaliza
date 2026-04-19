@@ -52,9 +52,12 @@ export function AppSidebar({ open, onClose }: AppSidebarProps) {
   const location = useLocation();
   const { signOut, user } = useAuth();
   const { data: counts } = useSidebarCounts();
-  const { podeVer, loading: permsLoading } = usePermissions();
+  const { podeVer, loading: permsLoading, isMaster } = usePermissions();
 
-  const visibleItems = navItems.filter(item => podeVer(item.modulo));
+  const visibleItems = navItems.filter(item => {
+    if ((item as any).masterOnly && !isMaster()) return false;
+    return podeVer(item.modulo);
+  });
 
   return (
     <aside
