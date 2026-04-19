@@ -56,6 +56,25 @@ function extractCodigo(name: string): string | null {
   return match ? match[1] : null;
 }
 
+// Inferir tipo de processo a partir do nome do card
+function inferirTipo(cardName: string): string {
+  const n = cardName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+  if (/\bABERTURA\b/.test(n)) return "abertura";
+  if (/\bALTERAC/.test(n)) return "alteracao";
+  if (/\bTRANSFORMAC/.test(n)) return "transformacao";
+  if (/\bENCERRAMENTO\b|\bBAIXA\b/.test(n)) return "baixa";
+  if (/\bAVULSO\b/.test(n)) return "avulso";
+  return "abertura";
+}
+
+// Limpa "CODIGO - " do início do nome do card
+function limparNomeCard(name: string): string {
+  return name.replace(/^\s*\d{6}\s*[-–—]\s*/, "").trim();
+}
+
 interface BoardMatch {
   board: BoardWithCards;
   codigoTrello: string | null;
@@ -308,7 +327,12 @@ export default function ReconciliacaoTrello() {
                   </a>
                 </Button>
                 <Button asChild size="sm">
-                  <Link to={`/cadastro-rapido?nome=${encodeURIComponent(b.board.boardName)}`}>
+                  <Link
+                    to={`/cadastro-rapido?${new URLSearchParams({
+                      ...(b.codigoTrello ? { cliente_codigo: b.codigoTrello } : {}),
+                      razao_social: b.board.boardName.replace(/\b\d{6}\b\s*[-–—]?\s*/, "").trim(),
+                    }).toString()}`}
+                  >
                     Cadastrar no ERP
                   </Link>
                 </Button>
@@ -381,7 +405,13 @@ export default function ReconciliacaoTrello() {
                   </a>
                 </Button>
                 <Button asChild size="sm">
-                  <Link to={`/cadastro-rapido?cliente=${cm.cliente!.id}&razao=${encodeURIComponent(cm.card.name)}`}>
+                  <Link
+                    to={`/cadastro-rapido?${new URLSearchParams({
+                      cliente_codigo: cm.cliente!.codigo_identificador,
+                      razao_social: limparNomeCard(cm.card.name),
+                      tipo: inferirTipo(cm.card.name),
+                    }).toString()}`}
+                  >
                     Cadastrar processo
                   </Link>
                 </Button>
