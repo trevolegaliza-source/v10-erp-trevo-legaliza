@@ -873,9 +873,37 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const qc = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
   const [loadingExtrato, setLoadingExtrato] = useState(false);
+  const [whatsappMsgEnviar, setWhatsappMsgEnviar] = useState('');
   const { salvarExtrato } = useExtratos();
 
   const hasExtratoNoSistema = cliente.lancamentos.some(l => l.extrato_id);
+
+  // Pré-computa mensagem de WhatsApp + link da cobrança para o <WhatsappLinkButton />
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const extratoId = getExtratoIdAtual(cliente);
+        const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoId).filter(l => l.processo_id);
+        const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
+        const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
+        const nomeRemetente = await getNomeRemetente();
+        let msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
+        const token = await getCobrancaTokenAtiva(cliente.cliente_id, extratoId || undefined);
+        if (token) msg += `\n\n🔗 Ver cobrança completa: ${getCobrancaPublicUrl(token)}`;
+        if (active) setWhatsappMsgEnviar(msg);
+      } catch {/* noop */}
+    })();
+    return () => { active = false; };
+  }, [cliente]);
+
+  async function handleCopiarLinkCobranca() {
+    const extratoId = getExtratoIdAtual(cliente);
+    const token = await getCobrancaTokenAtiva(cliente.cliente_id, extratoId || undefined);
+    if (!token) { toast.error('Link de cobrança não encontrado.'); return; }
+    await navigator.clipboard.writeText(getCobrancaPublicUrl(token));
+    toast.success('🔗 Link copiado!');
+  }
 
   async function handleCopiarMensagem() {
     const extratoId = getExtratoIdAtual(cliente);
@@ -1169,6 +1197,7 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
   const [contestarAnexo, setContestarAnexo] = useState<File | null>(null);
   const [contestarAnexoPreview, setContestarAnexoPreview] = useState<string | null>(null);
   const [uploadingAnexo, setUploadingAnexo] = useState(false);
+  const [whatsappMsgAguardando, setWhatsappMsgAguardando] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
