@@ -6,15 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, HEAD, OPTIONS",
 };
 
-const ADMINS = new Set([
-  "trevolegaliza",
-  "abnermaliqdossantosjimoh",
-  "amandacristovao1",
-  "arthurlegalizacao",
-  "carolinaguirado7",
-  "leticiatonelli3",
-]);
-const LABEL_CREATOR = "trevolegaliza";
+const MASTER_FALLBACK = "trevolegaliza"; // sempre liberado
+const LABEL_CREATOR = MASTER_FALLBACK;
 
 const TRELLO_KEY = Deno.env.get("TRELLO_API_KEY") ?? Deno.env.get("TRELLO_KEY") ?? "";
 const TRELLO_TOKEN = Deno.env.get("TRELLO_TOKEN") ?? "";
@@ -23,6 +16,31 @@ const TRELLO_SECRET = Deno.env.get("TRELLO_SECRET") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+// In-memory whitelist cache (60s TTL)
+let whitelistCache: { admins: Set<string>; ts: number } | null = null;
+const CACHE_TTL_MS = 60_000;
+
+async function getWhitelist(): Promise<{ admins: Set<string>; labelCreator: string }> {
+  if (whitelistCache && Date.now() - whitelistCache.ts < CACHE_TTL_MS) {
+    return { admins: whitelistCache.admins, labelCreator: LABEL_CREATOR };
+  }
+  const { data, error } = await supabase
+    .from("colaboradores")
+    .select("trello_username")
+    .eq("status", "ativo")
+    .not("trello_username", "is", null);
+
+  if (error) console.error("getWhitelist error:", error.message);
+
+  const admins = new Set<string>([MASTER_FALLBACK]);
+  for (const c of (data || [])) {
+    const u = ((c as any).trello_username || "").trim().toLowerCase();
+    if (u) admins.add(u);
+  }
+  whitelistCache = { admins, ts: Date.now() };
+  return { admins, labelCreator: LABEL_CREATOR };
+}
 
 async function trelloCall(method: string, path: string, params: Record<string, string> = {}) {
   const url = new URL(`https://api.trello.com${path}`);
@@ -77,7 +95,7 @@ async function processAction(payload: any) {
   if (!action) return;
 
   const type: string = action.type;
-  const username: string = action.memberCreator?.username ?? "";
+  const username: string = (action.memberCreator?.username ?? "").toLowerCase();
   const board = action.data?.board ?? {};
   const card = action.data?.card ?? {};
 
@@ -92,8 +110,10 @@ async function processAction(payload: any) {
   };
 
   try {
+    const { admins, labelCreator } = await getWhitelist();
+
     // 1. createCard — somente admins
-    if (type === "createCard" && !ADMINS.has(username)) {
+    if (type === "createCard" && !admins.has(username)) {
       const r = await trelloCall("PUT", `/1/cards/${card.id}/closed`, { value: "true" });
       await commentCard(
         card.id,
@@ -104,7 +124,7 @@ async function processAction(payload: any) {
     }
 
     // 2. updateCard — movimento entre listas
-    if (type === "updateCard" && action.data?.listBefore && action.data?.listAfter && !ADMINS.has(username)) {
+    if (type === "updateCard" && action.data?.listBefore && action.data?.listAfter && !admins.has(username)) {
       const r = await trelloCall("PUT", `/1/cards/${card.id}/idList`, {
         value: action.data.listBefore.id,
       });
@@ -125,7 +145,7 @@ async function processAction(payload: any) {
       type === "updateCard" &&
       action.data?.old?.closed === false &&
       action.data?.card?.closed === true &&
-      !ADMINS.has(username)
+      !admins.has(username)
     ) {
       const r = await trelloCall("PUT", `/1/cards/${card.id}/closed`, { value: "false" });
       await commentCard(card.id, `Somente o admim pode arquivar cartões (@${username})`);
@@ -133,8 +153,8 @@ async function processAction(payload: any) {
       return;
     }
 
-    // 4. createLabel — somente LABEL_CREATOR
-    if (type === "createLabel" && username !== LABEL_CREATOR) {
+    // 4. createLabel — somente labelCreator
+    if (type === "createLabel" && username !== labelCreator) {
       const labelId = action.data?.label?.id;
       if (labelId) {
         const r = await trelloCall("DELETE", `/1/labels/${labelId}`);
@@ -148,7 +168,7 @@ async function processAction(payload: any) {
     }
 
     // 5. deleteAttachmentFromCard — não-admin
-    if (type === "deleteAttachmentFromCard" && !ADMINS.has(username)) {
+    if (type === "deleteAttachmentFromCard" && !admins.has(username)) {
       await commentCard(
         card.id,
         `⚠️ @${username} deletou um anexo sem permissão.`,
@@ -168,12 +188,10 @@ async function processAction(payload: any) {
 }
 
 Deno.serve(async (req) => {
-  // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Trello validates URL via HEAD before registering webhook
   if (req.method === "HEAD" || req.method === "GET") {
     return new Response("ok", { status: 200, headers: corsHeaders });
   }
@@ -191,15 +209,12 @@ Deno.serve(async (req) => {
     return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
-  // Validate HMAC signature (skipped if TRELLO_SECRET not set)
   const valid = await verifySignature(req, rawBody);
   if (!valid) {
     console.warn("Invalid Trello webhook signature");
-    // Still return 200 to avoid Trello disabling the webhook
     return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
-  // Process async — return 200 immediately
   processAction(payload).catch((e) => console.error("async processAction:", e));
 
   return new Response("ok", { status: 200, headers: corsHeaders });
