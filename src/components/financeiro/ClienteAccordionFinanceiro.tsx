@@ -48,7 +48,12 @@ import { downloadExtrato } from '@/lib/storage-utils';
 import { fetchExtratoBlob, triggerBlobDownload } from '@/lib/extrato-download';
 
 // ══════════ WHATSAPP HELPER ══════════
+import { WhatsappLinkButton } from './WhatsappLinkButton';
 import { buildWhatsappUrl } from '@/lib/open-whatsapp';
+import { getCobrancaTokenAtiva } from '@/hooks/useFinanceiroClientes';
+import { getCobrancaPublicUrl } from '@/lib/cobranca-url';
+
+/** Programmatic open via real anchor click (used after WhatsappLinkButton click handlers). */
 function openWhatsApp(phone: string, message: string) {
   navigator.clipboard.writeText(message).catch(() => {});
   const url = buildWhatsappUrl(phone, message);
@@ -868,9 +873,37 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const qc = useQueryClient();
   const [regenerating, setRegenerating] = useState(false);
   const [loadingExtrato, setLoadingExtrato] = useState(false);
+  const [whatsappMsgEnviar, setWhatsappMsgEnviar] = useState('');
   const { salvarExtrato } = useExtratos();
 
   const hasExtratoNoSistema = cliente.lancamentos.some(l => l.extrato_id);
+
+  // Pré-computa mensagem de WhatsApp + link da cobrança para o <WhatsappLinkButton />
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const extratoId = getExtratoIdAtual(cliente);
+        const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoId).filter(l => l.processo_id);
+        const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
+        const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
+        const nomeRemetente = await getNomeRemetente();
+        let msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
+        const token = await getCobrancaTokenAtiva(cliente.cliente_id, extratoId || undefined);
+        if (token) msg += `\n\n🔗 Ver cobrança completa: ${getCobrancaPublicUrl(token)}`;
+        if (active) setWhatsappMsgEnviar(msg);
+      } catch {/* noop */}
+    })();
+    return () => { active = false; };
+  }, [cliente]);
+
+  async function handleCopiarLinkCobranca() {
+    const extratoId = getExtratoIdAtual(cliente);
+    const token = await getCobrancaTokenAtiva(cliente.cliente_id, extratoId || undefined);
+    if (!token) { toast.error('Link de cobrança não encontrado.'); return; }
+    await navigator.clipboard.writeText(getCobrancaPublicUrl(token));
+    toast.success('🔗 Link copiado!');
+  }
 
   async function handleCopiarMensagem() {
     const extratoId = getExtratoIdAtual(cliente);
@@ -1109,10 +1142,15 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
           )}
           {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
           <div className="grid grid-cols-2 sm:flex gap-2 mt-3 sm:flex-wrap">
-            <Button size="sm" variant="outline" onClick={handleEnviarWhatsApp} className={cn("gap-1 h-11 sm:h-9", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
-              <MessageCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">WhatsApp{cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ' (sem tel.)'}</span>
-              <span className="sm:hidden">WhatsApp</span>
+            <WhatsappLinkButton
+              phone={cliente.cliente_telefone || ''}
+              message={whatsappMsgEnviar}
+              label={`WhatsApp${cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ''}`.trim()}
+              variant="outline"
+              onAfterClick={handleMarcarEnviado}
+            />
+            <Button size="sm" variant="outline" onClick={handleCopiarLinkCobranca} className="h-11 sm:h-9">
+              <LinkIcon className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Copiar Link</span><span className="sm:hidden">Link</span>
             </Button>
             <Button size="sm" variant="outline" onClick={handleCompartilhar} className="gap-1 h-11 sm:h-9">
               <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Compartilhar</span><span className="sm:hidden">Enviar</span>
@@ -1159,6 +1197,7 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
   const [contestarAnexo, setContestarAnexo] = useState<File | null>(null);
   const [contestarAnexoPreview, setContestarAnexoPreview] = useState<string | null>(null);
   const [uploadingAnexo, setUploadingAnexo] = useState(false);
+  const [whatsappMsgAguardando, setWhatsappMsgAguardando] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
 
@@ -1174,6 +1213,47 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
         return Math.floor((hoje.getTime() - venc.getTime()) / 86400000);
       }))
     : 0;
+
+  // Pré-computa mensagem de WhatsApp + link da cobrança para o <WhatsappLinkButton />
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const lancsParaMsg = temVencidos ? lancVencidos : cliente.lancamentos;
+        if (lancsParaMsg.length === 0) return;
+        const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))] as string[];
+        const vaMap: Record<string, number> = {};
+        const vaDetalhadoMap: Record<string, Array<{ descricao: string; valor: number }>> = {};
+        if (processoIds.length > 0) {
+          const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, descricao, valor').in('processo_id', processoIds);
+          if (vas) {
+            for (const va of vas) {
+              vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + Number(va.valor);
+              if (!vaDetalhadoMap[va.processo_id]) vaDetalhadoMap[va.processo_id] = [];
+              vaDetalhadoMap[va.processo_id].push({ descricao: (va as any).descricao || 'Taxa', valor: Number(va.valor) || 0 });
+            }
+          }
+        }
+        const nomeRemetente = await getNomeRemetente();
+        let msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
+        const extratoIds = [...new Set(lancsParaMsg.map(l => l.extrato_id).filter(Boolean))] as string[];
+        const extratoId = extratoIds[0];
+        const token = await getCobrancaTokenAtiva(cliente.cliente_id, extratoId || undefined);
+        if (token) msg += `\n\n🔗 Ver cobrança completa: ${getCobrancaPublicUrl(token)}`;
+        if (active) setWhatsappMsgAguardando(msg);
+      } catch {/* noop */}
+    })();
+    return () => { active = false; };
+  }, [cliente, temVencidos, maiorAtraso]);
+
+  async function handleCopiarLinkCobrancaAguardando() {
+    const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
+    const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
+    const token = await getCobrancaTokenAtiva(cliente.cliente_id, extratoId || undefined);
+    if (!token) { toast.error('Link de cobrança não encontrado.'); return; }
+    await navigator.clipboard.writeText(getCobrancaPublicUrl(token));
+    toast.success('🔗 Link copiado!');
+  }
 
   function toggleSelectPagar(lancId: string) {
     setSelectedPagar(prev => {
@@ -1404,10 +1484,14 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
               </span>
             </div>
             <div className="grid grid-cols-2 sm:flex gap-2 mt-3 sm:flex-wrap">
-              <Button size="sm" variant="outline" onClick={handleEnviarWhatsAppRecobranca} className={cn("gap-1 h-11 sm:h-9", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
-                <MessageCircle className="h-4 w-4" />
-                <span className="hidden sm:inline">WhatsApp{cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ' (sem tel.)'}</span>
-                <span className="sm:hidden">WhatsApp</span>
+              <WhatsappLinkButton
+                phone={cliente.cliente_telefone || ''}
+                message={whatsappMsgAguardando}
+                label={`WhatsApp${cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ''}`.trim()}
+                variant="outline"
+              />
+              <Button size="sm" variant="outline" onClick={handleCopiarLinkCobrancaAguardando} className="h-11 sm:h-9">
+                <LinkIcon className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Copiar Link</span><span className="sm:hidden">Link</span>
               </Button>
               <Button size="sm" variant="outline" onClick={handleCompartilharAguardando} className="gap-1 h-11 sm:h-9">
                 <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Compartilhar</span><span className="sm:hidden">Enviar</span>
@@ -1771,8 +1855,13 @@ export function ModalPosExtrato({
   }
 
   return (
-    <Dialog open={true} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="sm:max-w-sm">
+    <Dialog open={true} onOpenChange={() => {}}>
+      <DialogContent
+        className="sm:max-w-sm"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-emerald-500" /> Extrato Gerado!

@@ -733,3 +733,26 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     refetch: query.refetch,
   };
 }
+
+/**
+ * Busca o share_token da cobrança ATIVA mais recente do cliente.
+ * Se extratoId fornecido, restringe a esse extrato.
+ */
+export async function getCobrancaTokenAtiva(
+  clienteId: string,
+  extratoId?: string,
+): Promise<string | null> {
+  let query = supabase
+    .from('cobrancas')
+    .select('share_token')
+    .eq('cliente_id', clienteId)
+    .in('status', ['ativa', 'vencida'])
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (extratoId) query = query.eq('extrato_id', extratoId);
+
+  const { data } = await query.maybeSingle();
+  return (data as any)?.share_token || null;
+}
+
