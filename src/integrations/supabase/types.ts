@@ -14,6 +14,255 @@ export type Database = {
   }
   public: {
     Tables: {
+      backup_extratos_20260420: {
+        Row: {
+          cliente_id: string | null
+          competencia_ano: number | null
+          competencia_mes: number | null
+          created_at: string | null
+          created_by: string | null
+          data_envio: string | null
+          empresa_id: string | null
+          enviado: boolean | null
+          filename: string | null
+          id: string | null
+          observacoes: string | null
+          pdf_url: string | null
+          processo_ids: string[] | null
+          qtd_processos: number | null
+          status: string | null
+          total_geral: number | null
+          total_honorarios: number | null
+          total_taxas: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          competencia_ano?: number | null
+          competencia_mes?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          data_envio?: string | null
+          empresa_id?: string | null
+          enviado?: boolean | null
+          filename?: string | null
+          id?: string | null
+          observacoes?: string | null
+          pdf_url?: string | null
+          processo_ids?: string[] | null
+          qtd_processos?: number | null
+          status?: string | null
+          total_geral?: number | null
+          total_honorarios?: number | null
+          total_taxas?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          competencia_ano?: number | null
+          competencia_mes?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          data_envio?: string | null
+          empresa_id?: string | null
+          enviado?: boolean | null
+          filename?: string | null
+          id?: string | null
+          observacoes?: string | null
+          pdf_url?: string | null
+          processo_ids?: string[] | null
+          qtd_processos?: number | null
+          status?: string | null
+          total_geral?: number | null
+          total_honorarios?: number | null
+          total_taxas?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      backup_lancamentos_20260420: {
+        Row: {
+          auditado: boolean | null
+          auditado_em: string | null
+          auditado_por: string | null
+          boleto_url: string | null
+          categoria: string | null
+          centro_custo: string | null
+          cliente_id: string | null
+          cobranca_encaminhada: boolean | null
+          colaborador_id: string | null
+          competencia_ano: number | null
+          competencia_mes: number | null
+          comprovante_url: string | null
+          confirmado_recebimento: boolean | null
+          conta_id: string | null
+          contestacao_anexo_url: string | null
+          contestacao_data: string | null
+          contestacao_motivo: string | null
+          created_at: string | null
+          data_pagamento: string | null
+          data_retorno_cobranca: string | null
+          data_ultimo_contato: string | null
+          data_vencimento: string | null
+          descricao: string | null
+          despesa_recorrente_id: string | null
+          empresa_id: string | null
+          etapa_financeiro: string | null
+          extrato_id: string | null
+          fornecedor: string | null
+          honorario_extra: number | null
+          id: string | null
+          is_taxa_reembolsavel: boolean | null
+          notas_cobranca: string | null
+          observacoes_financeiro: string | null
+          processo_id: string | null
+          recibo_assinado_url: string | null
+          status: Database["public"]["Enums"]["status_financeiro"] | null
+          subcategoria: string | null
+          tentativas_cobranca: number | null
+          tipo: Database["public"]["Enums"]["tipo_lancamento"] | null
+          updated_at: string | null
+          url_comprovante: string | null
+          url_recibo_taxa: string | null
+          valor: number | null
+          valor_alterado_em: string | null
+          valor_alterado_por: string | null
+          valor_original: number | null
+        }
+        Insert: {
+          auditado?: boolean | null
+          auditado_em?: string | null
+          auditado_por?: string | null
+          boleto_url?: string | null
+          categoria?: string | null
+          centro_custo?: string | null
+          cliente_id?: string | null
+          cobranca_encaminhada?: boolean | null
+          colaborador_id?: string | null
+          competencia_ano?: number | null
+          competencia_mes?: number | null
+          comprovante_url?: string | null
+          confirmado_recebimento?: boolean | null
+          conta_id?: string | null
+          contestacao_anexo_url?: string | null
+          contestacao_data?: string | null
+          contestacao_motivo?: string | null
+          created_at?: string | null
+          data_pagamento?: string | null
+          data_retorno_cobranca?: string | null
+          data_ultimo_contato?: string | null
+          data_vencimento?: string | null
+          descricao?: string | null
+          despesa_recorrente_id?: string | null
+          empresa_id?: string | null
+          etapa_financeiro?: string | null
+          extrato_id?: string | null
+          fornecedor?: string | null
+          honorario_extra?: number | null
+          id?: string | null
+          is_taxa_reembolsavel?: boolean | null
+          notas_cobranca?: string | null
+          observacoes_financeiro?: string | null
+          processo_id?: string | null
+          recibo_assinado_url?: string | null
+          status?: Database["public"]["Enums"]["status_financeiro"] | null
+          subcategoria?: string | null
+          tentativas_cobranca?: number | null
+          tipo?: Database["public"]["Enums"]["tipo_lancamento"] | null
+          updated_at?: string | null
+          url_comprovante?: string | null
+          url_recibo_taxa?: string | null
+          valor?: number | null
+          valor_alterado_em?: string | null
+          valor_alterado_por?: string | null
+          valor_original?: number | null
+        }
+        Update: {
+          auditado?: boolean | null
+          auditado_em?: string | null
+          auditado_por?: string | null
+          boleto_url?: string | null
+          categoria?: string | null
+          centro_custo?: string | null
+          cliente_id?: string | null
+          cobranca_encaminhada?: boolean | null
+          colaborador_id?: string | null
+          competencia_ano?: number | null
+          competencia_mes?: number | null
+          comprovante_url?: string | null
+          confirmado_recebimento?: boolean | null
+          conta_id?: string | null
+          contestacao_anexo_url?: string | null
+          contestacao_data?: string | null
+          contestacao_motivo?: string | null
+          created_at?: string | null
+          data_pagamento?: string | null
+          data_retorno_cobranca?: string | null
+          data_ultimo_contato?: string | null
+          data_vencimento?: string | null
+          descricao?: string | null
+          despesa_recorrente_id?: string | null
+          empresa_id?: string | null
+          etapa_financeiro?: string | null
+          extrato_id?: string | null
+          fornecedor?: string | null
+          honorario_extra?: number | null
+          id?: string | null
+          is_taxa_reembolsavel?: boolean | null
+          notas_cobranca?: string | null
+          observacoes_financeiro?: string | null
+          processo_id?: string | null
+          recibo_assinado_url?: string | null
+          status?: Database["public"]["Enums"]["status_financeiro"] | null
+          subcategoria?: string | null
+          tentativas_cobranca?: number | null
+          tipo?: Database["public"]["Enums"]["tipo_lancamento"] | null
+          updated_at?: string | null
+          url_comprovante?: string | null
+          url_recibo_taxa?: string | null
+          valor?: number | null
+          valor_alterado_em?: string | null
+          valor_alterado_por?: string | null
+          valor_original?: number | null
+        }
+        Relationships: []
+      }
+      backup_valores_adicionais_20260420: {
+        Row: {
+          anexo_url: string | null
+          comprovante_url: string | null
+          created_at: string | null
+          descricao: string | null
+          empresa_id: string | null
+          id: string | null
+          processo_id: string | null
+          updated_at: string | null
+          valor: number | null
+        }
+        Insert: {
+          anexo_url?: string | null
+          comprovante_url?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          empresa_id?: string | null
+          id?: string | null
+          processo_id?: string | null
+          updated_at?: string | null
+          valor?: number | null
+        }
+        Update: {
+          anexo_url?: string | null
+          comprovante_url?: string | null
+          created_at?: string | null
+          descricao?: string | null
+          empresa_id?: string | null
+          id?: string | null
+          processo_id?: string | null
+          updated_at?: string | null
+          valor?: number | null
+        }
+        Relationships: []
+      }
       catalogo_precos_uf: {
         Row: {
           created_at: string | null
