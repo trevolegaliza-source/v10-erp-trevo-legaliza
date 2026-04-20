@@ -74,6 +74,8 @@ export type ExtratoGeradoPayload = {
   total: number;
   /** Lancamentos included in this extrato — used for WhatsApp message */
   lancamentos: LancamentoFinanceiro[];
+  cobrancaUrl?: string;
+  cobrancaId?: string;
   cleanup?: () => void;
 };
 
@@ -646,6 +648,41 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
           .eq('tipo', 'receber');
       }
 
+      // Criar registro de cobrança pública
+      let cobrancaUrl: string | undefined;
+      let cobrancaId: string | undefined;
+      try {
+        const { getCobrancaPublicUrl } = await import('@/lib/cobranca-url');
+        const lancamentoIds = selecionados.map(l => l.id);
+        const datasVenc = selecionados
+          .map(l => l.data_vencimento)
+          .filter(Boolean)
+          .sort();
+        const dataVencimento = datasVenc[0] || null;
+
+        const { data: cobranca, error: cobErr } = await supabase
+          .from('cobrancas')
+          .insert({
+            cliente_id: clienteId,
+            extrato_id: (extrato as any).id,
+            lancamento_ids: lancamentoIds,
+            total_honorarios: result.totalHonorarios,
+            total_taxas: result.totalTaxas,
+            total_geral: result.totalGeral,
+            data_vencimento: dataVencimento,
+            status: 'ativa',
+          } as any)
+          .select('id, share_token')
+          .single();
+
+        if (cobErr) throw cobErr;
+        cobrancaId = (cobranca as any).id;
+        cobrancaUrl = getCobrancaPublicUrl((cobranca as any).share_token);
+      } catch (cobErr: any) {
+        console.error('Falha ao criar cobrança pública:', cobErr);
+        // Não bloquear fluxo do extrato se cobrança falhar
+      }
+
       // invalidateFinanceiro moved to ModalPosExtrato close
 
       toast.success('Extrato gerado com sucesso!');
@@ -658,6 +695,8 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         clienteTelefone: (clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || cliente.cliente_telefone || '',
         total: result.totalGeral,
         lancamentos: selecionados,
+        cobrancaUrl,
+        cobrancaId,
         cleanup: () => {
           setSelected(new Set());
           setGenerating(false);
