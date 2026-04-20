@@ -36,6 +36,7 @@ export interface ColaboradorFormData {
   dia_das: string;
   tipo_transporte: 'vt' | 'auxilio_combustivel';
   auxilio_combustivel_valor: string;
+  trello_username: string;
   fgts_percentual: string;
   inss_patronal_percentual: string;
   provisionar_13: boolean;
@@ -52,6 +53,7 @@ export const EMPTY_FORM: ColaboradorFormData = {
   data_inicio: '', aniversario: '',
   dia_adiantamento: '20', dia_salario: '5', dia_vt_vr: '0', dia_das: '20',
   tipo_transporte: 'vt', auxilio_combustivel_valor: '',
+  trello_username: '',
   fgts_percentual: '8', inss_patronal_percentual: '20',
   provisionar_13: true, provisionar_ferias: true,
   observacoes_pagamento: '',
@@ -130,6 +132,16 @@ export default function ColaboradorForm({ form, setForm, onSubmit, isPending, is
             <Label className="text-xs text-foreground">Chave PIX</Label>
             <Input className="h-8" value={form.pix_chave} onChange={e => setForm(f => ({ ...f, pix_chave: e.target.value }))} />
           </div>
+        </div>
+        <div className="grid gap-2">
+          <Label className="text-xs text-foreground">Usuário Trello (sem @)</Label>
+          <Input
+            className="h-8"
+            value={form.trello_username}
+            onChange={e => setForm(f => ({ ...f, trello_username: e.target.value.trim().toLowerCase() }))}
+            placeholder="ex: joaosilva"
+          />
+          <p className="text-[10px] text-muted-foreground">Concede permissão de admin nos boards Trello protegidos.</p>
         </div>
       </Section>
 

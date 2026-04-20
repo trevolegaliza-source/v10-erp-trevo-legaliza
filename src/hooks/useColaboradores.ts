@@ -34,6 +34,7 @@ export interface Colaborador {
   observacoes_pagamento: string | null;
   tipo_transporte: 'vt' | 'auxilio_combustivel';
   auxilio_combustivel_valor: number;
+  trello_username: string | null;
   created_at: string;
   updated_at: string;
 }
