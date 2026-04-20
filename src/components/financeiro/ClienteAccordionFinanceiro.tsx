@@ -48,23 +48,9 @@ import { downloadExtrato } from '@/lib/storage-utils';
 import { fetchExtratoBlob, triggerBlobDownload } from '@/lib/extrato-download';
 
 // ══════════ WHATSAPP HELPER ══════════
-import { buildWhatsappUrl } from '@/lib/open-whatsapp';
-function openWhatsApp(phone: string, message: string) {
-  navigator.clipboard.writeText(message).catch(() => {});
-  const url = buildWhatsappUrl(phone, message);
-  if (url === '#') {
-    toast.error('Telefone inválido.');
-    return;
-  }
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener noreferrer';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  toast.success('✅ Mensagem copiada! Abrindo WhatsApp...');
-}
+import { WhatsappLinkButton } from './WhatsappLinkButton';
+import { getCobrancaTokenAtiva } from '@/hooks/useFinanceiroClientes';
+import { getCobrancaPublicUrl } from '@/lib/cobranca-url';
 
 // ══════════ EXPORTED TYPE ══════════
 export type ExtratoGeradoPayload = {
