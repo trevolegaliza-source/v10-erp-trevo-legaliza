@@ -40,6 +40,7 @@ import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
+import TrelloProvisionButton from '@/components/clientes/TrelloProvisionButton';
 import ProcessoEditModal from '@/components/financeiro/ProcessoEditModal';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import { Textarea } from '@/components/ui/textarea';
