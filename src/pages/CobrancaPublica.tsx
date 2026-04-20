@@ -157,8 +157,31 @@ export default function CobrancaPublica() {
     window.open(`https://wa.me/${cobranca.empresa_config.whatsapp}?text=${msg}`, '_blank');
   };
 
-  const baixarExtrato = () => {
-    toast.info('Geração de PDF em breve nesta página. Use o WhatsApp para solicitar.');
+  const baixarExtrato = async () => {
+    if (!token) return;
+    try {
+      toast.info('Baixando PDF...');
+      const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cobranca-pdf?token=${encodeURIComponent(token)}`;
+      const resp = await fetch(fnUrl, {
+        headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+      });
+      if (!resp.ok) {
+        toast.error('PDF indisponível. Fale com a gente pelo WhatsApp.');
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cobranca-${cobranca?.cliente_nome || token}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      toast.success('PDF baixado!');
+    } catch {
+      toast.error('Erro ao baixar PDF.');
+    }
   };
 
   if (loading) {
