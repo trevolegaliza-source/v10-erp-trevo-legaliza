@@ -105,6 +105,36 @@ export default function CobrancaPublica() {
   }, []);
 
   useEffect(() => {
+    if (!cobranca) return;
+    const title = `Cobrança — ${cobranca.cliente_apelido || cobranca.cliente_nome} — Trevo Legaliza`;
+    const description = `Cobrança oficial no valor de R$ ${Number(cobranca.total_geral).toFixed(2).replace('.', ',')}. Pague via PIX ou boleto com segurança.`;
+    const image = 'https://trevolegaliza.lovable.app/og-cobranca.png';
+
+    document.title = title;
+
+    const setMeta = (key: 'property' | 'name', value: string, content: string) => {
+      let tag = document.querySelector(`meta[${key}="${value}"]`) as HTMLMetaElement | null;
+      if (!tag) {
+        tag = document.createElement('meta');
+        tag.setAttribute(key, value);
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute('content', content);
+    };
+
+    setMeta('property', 'og:title', title);
+    setMeta('property', 'og:description', description);
+    setMeta('property', 'og:image', image);
+    setMeta('property', 'og:type', 'website');
+    setMeta('property', 'og:site_name', 'Trevo Legaliza');
+    setMeta('name', 'description', description);
+    setMeta('name', 'twitter:card', 'summary_large_image');
+    setMeta('name', 'twitter:title', title);
+    setMeta('name', 'twitter:description', description);
+    setMeta('name', 'twitter:image', image);
+  }, [cobranca]);
+
+  useEffect(() => {
     if (!token) return;
     let cancelled = false;
 

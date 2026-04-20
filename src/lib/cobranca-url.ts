@@ -1,7 +1,5 @@
+const PRODUCTION_BASE = 'https://trevolegaliza.lovable.app';
+
 export function getCobrancaPublicUrl(token: string): string {
-  const base =
-    typeof window !== 'undefined' && window.location.hostname.includes('lovable.app')
-      ? window.location.origin
-      : 'https://trevolegaliza.lovable.app';
-  return `${base}/cobranca/${token}`;
+  return `${PRODUCTION_BASE}/cobranca/${token}`;
 }
