@@ -997,12 +997,8 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       l.etapa_financeiro === 'cobranca_gerada' ||
       (l.etapa_financeiro === 'solicitacao_criada' && l.extrato_id)
     ).map(l => l.id);
-    if (ids.length === 0) return;
-    const { error } = await supabase
-      .from('lancamentos')
-      .update({ etapa_financeiro: 'cobranca_enviada', observacoes_financeiro: `Cobrança enviada em ${new Date().toLocaleDateString('pt-BR')}` } as any)
-      .in('id', ids);
-    if (error) { toast.error(error.message); return; }
+    const ok = await marcarLancamentosComoEnviados(ids);
+    if (!ok) return;
     invalidateFinanceiro(qc);
     toast.success('Cobrança marcada como enviada!');
   }
@@ -1029,10 +1025,13 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     }
     const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
     openWhatsApp(tel, msg);
-    setTimeout(() => {
-      const confirmar = window.confirm('Você conseguiu enviar a mensagem no WhatsApp?\n\nClique OK para marcar como enviado no sistema.');
-      if (confirmar) handleMarcarEnviado();
-    }, 2000);
+    const ids = getLancamentosDoExtrato(cliente, extratoId).filter(l =>
+      l.etapa_financeiro === 'cobranca_gerada' ||
+      (l.etapa_financeiro === 'solicitacao_criada' && l.extrato_id)
+    ).map(l => l.id);
+    const ok = await marcarLancamentosComoEnviados(ids);
+    if (!ok) return;
+    invalidateFinanceiro(qc);
   }
 
   async function handleCompartilhar() {
