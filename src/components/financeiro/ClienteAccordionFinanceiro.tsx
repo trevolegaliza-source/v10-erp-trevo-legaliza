@@ -52,6 +52,9 @@ import { WhatsappLinkButton } from './WhatsappLinkButton';
 import { buildWhatsappUrl } from '@/lib/open-whatsapp';
 import { getCobrancaTokenAtiva } from '@/hooks/useFinanceiroClientes';
 import { getCobrancaPublicUrl } from '@/lib/cobranca-url';
+import GerarAsaasModal from './GerarAsaasModal';
+import { useCobrancaAsaas } from '@/hooks/useAsaas';
+import { FileBadge } from 'lucide-react';
 
 /** Programmatic open via real anchor click (used after WhatsappLinkButton click handlers). */
 function openWhatsApp(phone: string, message: string) {
@@ -1751,6 +1754,8 @@ export function ModalPosExtrato({
   const [whatsappHref, setWhatsappHref] = useState('#');
   const [whatsappMessage, setWhatsappMessage] = useState('');
   const [preparingWhatsapp, setPreparingWhatsapp] = useState(true);
+  const [asaasModalOpen, setAsaasModalOpen] = useState(false);
+  const { data: asaasInfo } = useCobrancaAsaas(extratoGerado.cobrancaId);
 
   useEffect(() => {
     let active = true;
@@ -1880,6 +1885,16 @@ export function ModalPosExtrato({
                 <LinkIcon className="h-4 w-4" /> Copiar Link da Cobrança
               </Button>
             )}
+            {extratoGerado.cobrancaId && (
+              <Button
+                variant={asaasInfo?.payment_id ? 'outline' : 'default'}
+                className="w-full gap-2 h-11"
+                onClick={() => setAsaasModalOpen(true)}
+              >
+                <FileBadge className="h-4 w-4" />
+                {asaasInfo?.payment_id ? 'Boleto/PIX gerado ✓ — Ver detalhes' : 'Gerar Boleto / PIX (Asaas)'}
+              </Button>
+            )}
             <a
               href={whatsappHref}
               target="_blank"
@@ -1924,6 +1939,14 @@ export function ModalPosExtrato({
           </div>
         </div>
       </DialogContent>
+      <GerarAsaasModal
+        open={asaasModalOpen}
+        onOpenChange={setAsaasModalOpen}
+        cobrancaId={extratoGerado.cobrancaId}
+        clienteNome={extratoGerado.clienteNome}
+        total={extratoGerado.total}
+        vencimentoSugerido={asaasInfo?.data_vencimento || undefined}
+      />
     </Dialog>
   );
 }

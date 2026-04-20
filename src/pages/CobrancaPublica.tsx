@@ -49,6 +49,18 @@ interface EmpresaConfig {
   site: string;
 }
 
+interface AsaasInfo {
+  payment_id: string | null;
+  status: string | null;
+  invoice_url: string | null;
+  boleto_url: string | null;
+  boleto_barcode: string | null;
+  pix_qrcode: string | null;
+  pix_payload: string | null;
+  gerado_em: string | null;
+  pago_em: string | null;
+}
+
 interface CobrancaData {
   id: string;
   cliente_nome: string;
@@ -64,6 +76,7 @@ interface CobrancaData {
   empresa_config: EmpresaConfig;
   pago_em?: string | null;
   extrato_id?: string | null;
+  asaas?: AsaasInfo | null;
 }
 
 const fmtBRL = (v: number) =>
@@ -404,18 +417,47 @@ export default function CobrancaPublica() {
               <div className="text-center space-y-1">
                 <h2 className="text-lg font-bold text-emerald-300">Pague agora via PIX</h2>
                 <p className="text-xs text-muted-foreground">
-                  Aponte a câmera ou copie a chave abaixo
+                  Aponte a câmera ou copie o código abaixo
                 </p>
               </div>
 
+              {/* QR Code: prioriza imagem oficial do Asaas, cai pra QR estático com chave PIX */}
               <div className="bg-white p-4 rounded-lg mx-auto w-fit">
-                <QRCodeSVG value={empresa.pix_chave} size={180} level="M" />
+                {cobranca.asaas?.pix_qrcode ? (
+                  <img
+                    src={`data:image/png;base64,${cobranca.asaas.pix_qrcode}`}
+                    alt="QR Code PIX"
+                    className="h-[180px] w-[180px]"
+                  />
+                ) : (
+                  <QRCodeSVG value={empresa.pix_chave} size={180} level="M" />
+                )}
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2 bg-background/60 border border-border rounded-lg p-3">
-                  <code className="flex-1 text-sm font-mono truncate">{empresa.pix_chave}</code>
-                  <Button size="sm" variant="ghost" onClick={copiarPix} className="gap-1">
+                  <code className="flex-1 text-sm font-mono truncate">
+                    {cobranca.asaas?.pix_payload || empresa.pix_chave}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(
+                          cobranca.asaas?.pix_payload || empresa.pix_chave
+                        );
+                        setCopied(true);
+                        toast.success(
+                          cobranca.asaas?.pix_payload ? 'PIX copia-e-cola copiado!' : 'Chave PIX copiada!'
+                        );
+                        setTimeout(() => setCopied(false), 2500);
+                      } catch {
+                        toast.error('Não foi possível copiar.');
+                      }
+                    }}
+                    className="gap-1"
+                  >
                     {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
                     {copied ? 'Copiado' : 'Copiar'}
                   </Button>
@@ -425,14 +467,48 @@ export default function CobrancaPublica() {
                 </p>
               </div>
 
-              <Button
-                disabled
-                variant="outline"
-                className="w-full gap-2"
-                title="Disponível em breve"
-              >
-                <FileText className="h-4 w-4" /> Baixar Boleto (em breve)
-              </Button>
+              {cobranca.asaas?.boleto_url ? (
+                <Button asChild variant="outline" className="w-full gap-2">
+                  <a href={cobranca.asaas.boleto_url} target="_blank" rel="noopener noreferrer">
+                    <FileText className="h-4 w-4" /> Baixar Boleto
+                  </a>
+                </Button>
+              ) : (
+                <Button disabled variant="outline" className="w-full gap-2" title="Cobrança ainda não possui boleto">
+                  <FileText className="h-4 w-4" /> Boleto indisponível
+                </Button>
+              )}
+
+              {cobranca.asaas?.boleto_barcode && (
+                <div className="space-y-1">
+                  <p className="text-[11px] text-muted-foreground text-center">Linha digitável</p>
+                  <div className="flex items-center gap-2 bg-background/60 border border-border rounded-lg p-2">
+                    <code className="flex-1 text-[11px] font-mono truncate">{cobranca.asaas.boleto_barcode}</code>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(cobranca.asaas!.boleto_barcode!);
+                          toast.success('Linha digitável copiada!');
+                        } catch {
+                          toast.error('Não foi possível copiar.');
+                        }
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {cobranca.asaas?.invoice_url && (
+                <Button asChild className="w-full gap-2 bg-primary text-primary-foreground hover:opacity-90">
+                  <a href={cobranca.asaas.invoice_url} target="_blank" rel="noopener noreferrer">
+                    Pagar pela página oficial Asaas
+                  </a>
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
