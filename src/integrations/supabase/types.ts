@@ -1650,6 +1650,39 @@ export type Database = {
         }
         Relationships: []
       }
+      trello_provisioner_logs: {
+        Row: {
+          actions_applied: Json | null
+          board_id: string | null
+          board_name: string | null
+          created_at: string | null
+          errors: Json | null
+          id: string
+          success: boolean | null
+          trigger_type: string | null
+        }
+        Insert: {
+          actions_applied?: Json | null
+          board_id?: string | null
+          board_name?: string | null
+          created_at?: string | null
+          errors?: Json | null
+          id?: string
+          success?: boolean | null
+          trigger_type?: string | null
+        }
+        Update: {
+          actions_applied?: Json | null
+          board_id?: string | null
+          board_name?: string | null
+          created_at?: string | null
+          errors?: Json | null
+          id?: string
+          success?: boolean | null
+          trigger_type?: string | null
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           created_at: string | null
