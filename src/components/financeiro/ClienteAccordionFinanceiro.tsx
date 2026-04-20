@@ -1283,12 +1283,9 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
       const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
       const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
       if (!extratoId) { toast.error('Nenhum extrato encontrado.'); return; }
-      const { data: extrato } = await supabase.from('extratos').select('cliente_id, filename').eq('id', extratoId).single();
-      if (!extrato) { toast.error('Extrato não encontrado.'); return; }
-      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
-      const { data: fileData } = await supabase.storage.from('documentos').download(path);
-      if (!fileData) { toast.error('Erro ao carregar extrato.'); return; }
-      const file = new File([fileData], (extrato as any).filename, { type: 'application/pdf' });
+      const result = await fetchExtratoBlob(extratoId);
+      if (!result) { toast.error('Erro ao carregar extrato.'); return; }
+      const file = new File([result.blob], result.filename, { type: 'application/pdf' });
       const lancsParaMsg = temVencidos ? lancVencidos : cliente.lancamentos;
       const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))] as string[];
       const vaMap: Record<string, number> = {};
@@ -1308,9 +1305,7 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
       } else {
-        const url = URL.createObjectURL(fileData);
-        const a = document.createElement('a'); a.href = url; a.download = (extrato as any).filename; a.click();
-        URL.revokeObjectURL(url);
+        triggerBlobDownload(result.blob, result.filename);
         toast.success('Extrato baixado!');
       }
     } catch (err: any) {
