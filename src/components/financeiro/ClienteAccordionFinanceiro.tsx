@@ -47,21 +47,24 @@ import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { downloadExtrato } from '@/lib/storage-utils';
 
 // ══════════ WHATSAPP HELPER ══════════
+// Uses a real anchor element clicked synchronously — avoids ERR_BLOCKED_BY_RESPONSE / COEP
+// blocks that hit window.open() in some browser contexts.
+import { buildWhatsappUrl } from '@/lib/open-whatsapp';
 function openWhatsApp(phone: string, message: string) {
-  navigator.clipboard.writeText(message).then(() => {
-    toast.success('✅ Mensagem copiada! Cole no WhatsApp.', {
-      duration: 5000,
-      action: {
-        label: 'Abrir WhatsApp',
-        onClick: () => {
-          window.open(`https://wa.me/${phone}`, '_blank');
-        },
-      },
-    });
-  }).catch(() => {
-    // Fallback: try opening directly
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
-  });
+  navigator.clipboard.writeText(message).catch(() => {});
+  const url = buildWhatsappUrl(phone, message);
+  if (url === '#') {
+    toast.error('Telefone inválido.');
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  toast.success('✅ Mensagem copiada! Abrindo WhatsApp...');
 }
 
 // ══════════ EXPORTED TYPE ══════════
