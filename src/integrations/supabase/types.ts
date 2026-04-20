@@ -493,6 +493,88 @@ export type Database = {
         }
         Relationships: []
       }
+      cobrancas: {
+        Row: {
+          cliente_id: string
+          created_at: string | null
+          created_by: string | null
+          data_vencimento: string | null
+          empresa_id: string
+          extrato_id: string | null
+          id: string
+          lancamento_ids: string[]
+          pago_em: string | null
+          share_token: string
+          status: string
+          total_geral: number
+          total_honorarios: number
+          total_taxas: number
+          updated_at: string | null
+          visualizada_em: string | null
+          whatsapp_enviado_em: string | null
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string | null
+          created_by?: string | null
+          data_vencimento?: string | null
+          empresa_id?: string
+          extrato_id?: string | null
+          id?: string
+          lancamento_ids: string[]
+          pago_em?: string | null
+          share_token?: string
+          status?: string
+          total_geral: number
+          total_honorarios?: number
+          total_taxas?: number
+          updated_at?: string | null
+          visualizada_em?: string | null
+          whatsapp_enviado_em?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          data_vencimento?: string | null
+          empresa_id?: string
+          extrato_id?: string | null
+          id?: string
+          lancamento_ids?: string[]
+          pago_em?: string | null
+          share_token?: string
+          status?: string
+          total_geral?: number
+          total_honorarios?: number
+          total_taxas?: number
+          updated_at?: string | null
+          visualizada_em?: string | null
+          whatsapp_enviado_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobrancas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_extrato_id_fkey"
+            columns: ["extrato_id"]
+            isOneToOne: false
+            referencedRelation: "extratos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       colaborador_avaliacoes: {
         Row: {
           ano: number
