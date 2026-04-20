@@ -13,6 +13,7 @@ import { useColaboradores } from '@/hooks/useColaboradores';
 import { usePlanoContas } from '@/hooks/usePlanoContas';
 import { supabase } from '@/integrations/supabase/client';
 import { STORAGE_BUCKETS } from '@/constants/storage';
+import { empresaPath } from '@/lib/storage-path';
 import { toast } from 'sonner';
 import { fetchFeriadosNacionais, proximoDiaUtil } from '@/lib/brasil-api';
 import type { FeriadoNacional } from '@/lib/brasil-api';
@@ -171,7 +172,7 @@ export default function DespesaFormModal({ open, onClose, onSave, editData, defa
     if (file) {
       try {
         const ext = (file.name.split('.').pop() || 'pdf').toLowerCase();
-        const path = `comprovantes/${crypto.randomUUID()}.${ext}`;
+        const path = await empresaPath(`comprovantes/${crypto.randomUUID()}.${ext}`);
         const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(path, file, { upsert: true });
         if (error) throw error;
         comprovanteUrl = path;

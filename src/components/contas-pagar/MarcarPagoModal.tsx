@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { STORAGE_BUCKETS } from '@/constants/storage';
+import { empresaPath } from '@/lib/storage-path';
 import { toast } from 'sonner';
 
 interface Props {
@@ -27,7 +28,7 @@ export default function MarcarPagoModal({ lancamento, open, onClose, onConfirm }
       let url: string | undefined;
       if (file) {
         const ext = (file.name.split('.').pop() || 'pdf').toLowerCase();
-        const path = `comprovantes/${lancamento.id}.${ext}`;
+        const path = await empresaPath(`comprovantes/${lancamento.id}.${ext}`);
         const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(path, file, { upsert: true });
         if (error) throw error;
         url = path;
