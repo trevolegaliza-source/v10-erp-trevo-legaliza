@@ -233,7 +233,7 @@ export default function CobrancaPublica() {
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         {/* Header */}
         <header className="text-center space-y-2">
-          <img src={LOGO_URL} alt="Trevo Legaliza" className="h-14 mx-auto" />
+          <img src={logoTrevo} alt="Trevo Legaliza" className="h-14 mx-auto" />
           <p className="text-xs uppercase tracking-widest text-muted-foreground">Cobrança Oficial</p>
           <p className="text-[11px] text-muted-foreground/70">
             {empresa.nome} · CNPJ {empresa.cnpj}
