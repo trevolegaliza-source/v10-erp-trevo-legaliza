@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      asaas_webhook_events: {
+        Row: {
+          asaas_payment_id: string | null
+          cobranca_id: string | null
+          error: string | null
+          event_id: string | null
+          event_type: string | null
+          id: string
+          payload: Json | null
+          processed: boolean | null
+          received_at: string | null
+        }
+        Insert: {
+          asaas_payment_id?: string | null
+          cobranca_id?: string | null
+          error?: string | null
+          event_id?: string | null
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+          processed?: boolean | null
+          received_at?: string | null
+        }
+        Update: {
+          asaas_payment_id?: string | null
+          cobranca_id?: string | null
+          error?: string | null
+          event_id?: string | null
+          event_type?: string | null
+          id?: string
+          payload?: Json | null
+          processed?: boolean | null
+          received_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asaas_webhook_events_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       backup_extratos_20260420: {
         Row: {
           cliente_id: string | null
@@ -349,6 +393,7 @@ export type Database = {
       clientes: {
         Row: {
           apelido: string | null
+          asaas_customer_id: string | null
           auditado_em: string | null
           auditado_financeiro: boolean | null
           bairro: string | null
@@ -397,6 +442,7 @@ export type Database = {
         }
         Insert: {
           apelido?: string | null
+          asaas_customer_id?: string | null
           auditado_em?: string | null
           auditado_financeiro?: boolean | null
           bairro?: string | null
@@ -445,6 +491,7 @@ export type Database = {
         }
         Update: {
           apelido?: string | null
+          asaas_customer_id?: string | null
           auditado_em?: string | null
           auditado_financeiro?: boolean | null
           bairro?: string | null
@@ -495,6 +542,17 @@ export type Database = {
       }
       cobrancas: {
         Row: {
+          asaas_boleto_barcode: string | null
+          asaas_boleto_url: string | null
+          asaas_gerado_em: string | null
+          asaas_invoice_url: string | null
+          asaas_last_event: Json | null
+          asaas_pago_em: string | null
+          asaas_payment_id: string | null
+          asaas_pix_payload: string | null
+          asaas_pix_qrcode: string | null
+          asaas_status: string | null
+          asaas_webhook_recebido_em: string | null
           cliente_id: string
           created_at: string | null
           created_by: string | null
@@ -514,6 +572,17 @@ export type Database = {
           whatsapp_enviado_em: string | null
         }
         Insert: {
+          asaas_boleto_barcode?: string | null
+          asaas_boleto_url?: string | null
+          asaas_gerado_em?: string | null
+          asaas_invoice_url?: string | null
+          asaas_last_event?: Json | null
+          asaas_pago_em?: string | null
+          asaas_payment_id?: string | null
+          asaas_pix_payload?: string | null
+          asaas_pix_qrcode?: string | null
+          asaas_status?: string | null
+          asaas_webhook_recebido_em?: string | null
           cliente_id: string
           created_at?: string | null
           created_by?: string | null
@@ -533,6 +602,17 @@ export type Database = {
           whatsapp_enviado_em?: string | null
         }
         Update: {
+          asaas_boleto_barcode?: string | null
+          asaas_boleto_url?: string | null
+          asaas_gerado_em?: string | null
+          asaas_invoice_url?: string | null
+          asaas_last_event?: Json | null
+          asaas_pago_em?: string | null
+          asaas_payment_id?: string | null
+          asaas_pix_payload?: string | null
+          asaas_pix_qrcode?: string | null
+          asaas_status?: string | null
+          asaas_webhook_recebido_em?: string | null
           cliente_id?: string
           created_at?: string | null
           created_by?: string | null
@@ -2197,6 +2277,7 @@ export type Database = {
       get_cobranca_por_token: {
         Args: { p_token: string }
         Returns: {
+          asaas: Json
           cliente_apelido: string
           cliente_cnpj: string
           cliente_nome: string
