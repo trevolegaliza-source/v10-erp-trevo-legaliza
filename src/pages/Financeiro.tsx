@@ -380,23 +380,23 @@ export default function Financeiro() {
                 type="multiple"
                 defaultValue={[
                   ...(!isFinanceiro && qtdAguardandoAuditoria > 0 ? ['auditoria'] : []),
-                  ...(clientesCobrar.length > 0 ? ['cobrar'] : []),
-                  ...(mensalistasSemFatura.length > 0 ? ['mensalistas'] : []),
+                  ...(clientesCobrar.length > 0 || mensalistasSemFatura.length > 0 ? ['cobrar'] : []),
                 ]}
-                className="space-y-2"
+                className="space-y-3"
               >
                 {!isFinanceiro && (
-                  <AccordionItem value="auditoria" className="border rounded-lg px-4 bg-card">
-                    <AccordionTrigger className="hover:no-underline py-3">
-                      <div className="flex items-center gap-2 flex-1 pr-2">
+                  <AccordionItem value="auditoria" className="border rounded-lg bg-card">
+                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className="text-lg">🔍</span>
                         <ClipboardCheck className="h-4 w-4 text-amber-500" />
-                        <span className="font-medium text-sm">Aguardando Auditoria</span>
-                        <Badge variant="secondary" className="ml-auto bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px]">
+                        <span className="font-semibold text-sm">Aguardando Auditoria</span>
+                        <Badge variant="secondary" className="ml-auto mr-2 bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px]">
                           {qtdAguardandoAuditoria}
                         </Badge>
                       </div>
                     </AccordionTrigger>
-                    <AccordionContent>
+                    <AccordionContent className="px-4 pb-4">
                       {clientesAguardandoAuditoria.length === 0 ? (
                         <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
                       ) : (
@@ -406,45 +406,23 @@ export default function Financeiro() {
                   </AccordionItem>
                 )}
 
-                <AccordionItem value="cobrar" className="border rounded-lg px-4 bg-card">
-                  <AccordionTrigger className="hover:no-underline py-3">
-                    <div className="flex items-center gap-2 flex-1 pr-2">
+                <AccordionItem value="cobrar" className="border rounded-lg bg-card">
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="text-lg">📄</span>
                       <FileText className="h-4 w-4 text-amber-500" />
-                      <span className="font-medium text-sm">Prontos para Cobrar</span>
-                      <Badge variant="secondary" className="ml-auto bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px]">
-                        {clientesCobrar.length}
+                      <span className="font-semibold text-sm">Prontos para Cobrar</span>
+                      <Badge variant="secondary" className="ml-auto mr-2 bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px]">
+                        {clientesCobrar.length + mensalistasSemFatura.length}
                       </Badge>
                     </div>
                   </AccordionTrigger>
-                  <AccordionContent>
-                    {clientesCobrar.length === 0 && !masterBypassJanela ? (
+                  <AccordionContent className="px-4 pb-4">
+                    {clientesCobrar.length === 0 && mensalistasSemFatura.length === 0 && !masterBypassJanela ? (
                       <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
                     ) : (
                       <ClientesFaturar
                         clientes={masterBypassJanela ? [...clientesCobrar, ...clientesFuturaFatura] : clientesCobrar}
-                        mensalistasSemFatura={[]}
-                        onExtratoGerado={setExtratoGerado}
-                      />
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-
-                <AccordionItem value="mensalistas" className="border rounded-lg px-4 bg-card">
-                  <AccordionTrigger className="hover:no-underline py-3">
-                    <div className="flex items-center gap-2 flex-1 pr-2">
-                      <FileText className="h-4 w-4 text-amber-500" />
-                      <span className="font-medium text-sm">Mensalistas sem fatura</span>
-                      <Badge variant="secondary" className="ml-auto bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px]">
-                        {mensalistasSemFatura.length}
-                      </Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    {mensalistasSemFatura.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
-                    ) : (
-                      <ClientesFaturar
-                        clientes={[]}
                         mensalistasSemFatura={mensalistasSemFatura}
                         onExtratoGerado={setExtratoGerado}
                       />
