@@ -256,7 +256,7 @@ export default function Financeiro() {
             </GlassCard>
 
             {/* Recebido */}
-            <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)" onClick={() => setActiveTab('pagos')} className="cursor-pointer">
+            <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)" onClick={() => setActiveTab('historico')} className="cursor-pointer">
               <div className="rounded-lg bg-emerald-500/10 p-1.5 sm:p-2 w-fit">
                 <CheckCircle className="h-4 w-4 text-emerald-400" />
               </div>
