@@ -872,27 +872,17 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     try {
       const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
       const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
-
       if (!extratoId) {
         toast.error('Nenhum extrato encontrado. Gere novamente pela tab "Gerar Extrato".');
         return;
       }
-
-      const { data: extrato } = await supabase
-        .from('extratos')
-        .select('cliente_id, filename, pdf_url')
-        .eq('id', extratoId)
-        .single();
-
-      if (!extrato) {
-        toast.error('Extrato não encontrado no sistema.');
+      const result = await fetchExtratoBlob(extratoId);
+      if (!result) {
+        toast.error('Erro ao baixar o extrato. Tente regerar.');
         return;
       }
-
-      const path = (extrato as any).pdf_url?.includes('/object/public/documentos/')
-        ? decodeURIComponent((extrato as any).pdf_url.split('/object/public/documentos/')[1] || `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`)
-        : `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
-      await downloadExtrato('documentos', path, (extrato as any).filename);
+      triggerBlobDownload(result.blob, result.filename);
+      toast.success('Extrato baixado!');
     } catch (err) {
       console.error('Erro ao baixar extrato:', err);
       toast.error('Erro ao carregar o extrato.');
