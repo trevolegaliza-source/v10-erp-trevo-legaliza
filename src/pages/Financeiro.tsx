@@ -537,9 +537,8 @@ export default function Financeiro() {
                 type="multiple"
                 defaultValue={[
                   ...(clientesPagos.length > 0 ? ['pagos'] : []),
-                  'todos',
                 ]}
-                className="space-y-2"
+                className="space-y-3"
               >
                 <AccordionItem value="pagos" className="border rounded-lg px-4 bg-card">
                   <AccordionTrigger className="hover:no-underline py-3">
