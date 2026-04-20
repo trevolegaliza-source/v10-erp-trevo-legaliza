@@ -31,16 +31,34 @@ const INTEREST_PERCENT = 1;  // 1% ao mês (0,033%/dia)
 type AsaasResponse = { ok: boolean; status: number; data: any };
 
 async function asaasFetch(path: string, init: RequestInit = {}): Promise<AsaasResponse> {
-  const res = await fetch(`${ASAAS_BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "access_token": ASAAS_API_KEY,
-      "Content-Type": "application/json",
-      "User-Agent": "trevo-legaliza-erp/1.0",
-      ...(init.headers || {}),
-    },
-  });
-  const data = await res.json().catch(() => ({}));
+  const baseUrl = ASAAS_BASE_URL.replace(/\/+$/, ""); // remove trailing slash
+  const fullUrl = `${baseUrl}${path}`;
+  let res: Response;
+  try {
+    res = await fetch(fullUrl, {
+      ...init,
+      headers: {
+        "access_token": ASAAS_API_KEY,
+        "Content-Type": "application/json",
+        "User-Agent": "trevo-legaliza-erp/1.0",
+        ...(init.headers || {}),
+      },
+    });
+  } catch (e) {
+    console.error("[asaasFetch] network error", { url: fullUrl, error: String(e) });
+    throw new Error(`Falha de rede ao chamar Asaas (${fullUrl}): ${String(e)}`);
+  }
+  const text = await res.text();
+  let data: any = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (!res.ok) {
+    console.error("[asaasFetch] error response", {
+      url: fullUrl,
+      method: init.method ?? "GET",
+      status: res.status,
+      body: text?.substring(0, 500),
+    });
+  }
   return { ok: res.ok, status: res.status, data };
 }
 
@@ -83,7 +101,16 @@ async function ensureCustomer(clienteRow: any): Promise<string> {
     method: "POST",
     body: JSON.stringify(payload),
   });
-  if (!created.ok) throw new Error(`Asaas customer ${created.status}: ${JSON.stringify(created.data)}`);
+  if (!created.ok) {
+    const detail = JSON.stringify(created.data);
+    if (created.status === 401) {
+      throw new Error("Asaas: chave de API inválida ou não autorizada. Confirme ASAAS_API_KEY nos secrets.");
+    }
+    if (created.status === 404) {
+      throw new Error(`Asaas: endpoint não encontrado em ${ASAAS_BASE_URL}/customers. Verifique se ASAAS_BASE_URL está correto (produção: https://api.asaas.com/v3, sandbox: https://api-sandbox.asaas.com/v3).`);
+    }
+    throw new Error(`Asaas customer (${created.status}): ${detail || "(sem corpo)"}`);
+  }
 
   const customerId = created.data.id;
   await admin.from("clientes").update({ asaas_customer_id: customerId }).eq("id", clienteRow.id);
