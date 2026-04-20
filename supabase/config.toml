@@ -2,3 +2,6 @@ project_id = "gwyinucaeaayuckvevma"
 
 [functions.trello-guard]
 verify_jwt = false
+
+[functions.trello-provisioner]
+verify_jwt = false
