@@ -45,6 +45,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { downloadExtrato } from '@/lib/storage-utils';
+import { fetchExtratoBlob, triggerBlobDownload } from '@/lib/extrato-download';
 
 // ══════════ WHATSAPP HELPER ══════════
 // Uses a real anchor element clicked synchronously — avoids ERR_BLOCKED_BY_RESPONSE / COEP
