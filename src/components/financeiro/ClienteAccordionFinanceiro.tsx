@@ -1024,24 +1024,19 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
       const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
       const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
       if (!extratoId) { toast.error('Nenhum extrato encontrado. Gere novamente.'); return; }
-      const { data: extrato } = await supabase.from('extratos').select('cliente_id, filename').eq('id', extratoId).single();
-      if (!extrato) { toast.error('Extrato não encontrado.'); return; }
-      const path = `extratos/${(extrato as any).cliente_id}/${(extrato as any).filename}`;
-      const { data: fileData } = await supabase.storage.from('documentos').download(path);
-      if (!fileData) { toast.error('Erro ao carregar extrato.'); return; }
-      const file = new File([fileData], (extrato as any).filename, { type: 'application/pdf' });
+      const result = await fetchExtratoBlob(extratoId);
+      if (!result) { toast.error('Erro ao carregar extrato.'); return; }
+      const file = new File([result.blob], result.filename, { type: 'application/pdf' });
       const extratoIdAtual = getExtratoIdAtual(cliente);
       const lancamentosExtrato = getLancamentosDoExtrato(cliente, extratoIdAtual).filter(l => l.processo_id);
       const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
-    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
+      const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
       const nomeRemetente = await getNomeRemetente();
       const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
       } else {
-        const url = URL.createObjectURL(fileData);
-        const a = document.createElement('a'); a.href = url; a.download = (extrato as any).filename; a.click();
-        URL.revokeObjectURL(url);
+        triggerBlobDownload(result.blob, result.filename);
         toast.success('Extrato baixado!');
       }
     } catch (err: any) {
