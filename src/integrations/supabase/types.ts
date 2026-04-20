@@ -2194,6 +2194,23 @@ export type Database = {
         }
         Returns: string
       }
+      get_cobranca_por_token: {
+        Args: { p_token: string }
+        Returns: {
+          cliente_apelido: string
+          cliente_cnpj: string
+          cliente_nome: string
+          created_at: string
+          data_vencimento: string
+          empresa_config: Json
+          id: string
+          lancamentos: Json
+          status: string
+          total_geral: number
+          total_honorarios: number
+          total_taxas: number
+        }[]
+      }
       get_empresa_id: { Args: never; Returns: string }
       get_proposta_por_token: {
         Args: { p_token: string }
@@ -2255,6 +2272,10 @@ export type Database = {
       }
       get_user_empresa_id: { Args: never; Returns: string }
       get_user_role: { Args: never; Returns: string }
+      mark_cobranca_visualizada: {
+        Args: { p_token: string }
+        Returns: undefined
+      }
       verificar_senha_proposta: {
         Args: { p_senha: string; p_token: string }
         Returns: boolean
