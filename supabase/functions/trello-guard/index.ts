@@ -6,8 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, HEAD, OPTIONS",
 };
 
-const MASTER_FALLBACK = "trevolegaliza"; // sempre liberado
-const LABEL_CREATOR = MASTER_FALLBACK;
+const MASTER_USER = "trevolegaliza"; // único admin total
 
 const TRELLO_KEY = Deno.env.get("TRELLO_API_KEY") ?? Deno.env.get("TRELLO_KEY") ?? "";
 const TRELLO_TOKEN = Deno.env.get("TRELLO_TOKEN") ?? "";
@@ -18,12 +17,12 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // In-memory whitelist cache (60s TTL)
-let whitelistCache: { admins: Set<string>; ts: number } | null = null;
+let whitelistCache: { staff: Set<string>; ts: number } | null = null;
 const CACHE_TTL_MS = 60_000;
 
-async function getWhitelist(): Promise<{ admins: Set<string>; labelCreator: string }> {
+async function getWhitelist(): Promise<{ master: string; staff: Set<string> }> {
   if (whitelistCache && Date.now() - whitelistCache.ts < CACHE_TTL_MS) {
-    return { admins: whitelistCache.admins, labelCreator: LABEL_CREATOR };
+    return { master: MASTER_USER, staff: whitelistCache.staff };
   }
   const { data, error } = await supabase
     .from("colaboradores")
@@ -33,13 +32,15 @@ async function getWhitelist(): Promise<{ admins: Set<string>; labelCreator: stri
 
   if (error) console.error("getWhitelist error:", error.message);
 
-  const admins = new Set<string>([MASTER_FALLBACK]);
+  const staff = new Set<string>();
   for (const c of (data || [])) {
     const u = ((c as any).trello_username || "").trim().toLowerCase();
-    if (u) admins.add(u);
+    if (u) staff.add(u);
   }
-  whitelistCache = { admins, ts: Date.now() };
-  return { admins, labelCreator: LABEL_CREATOR };
+  // Master também pode tudo que staff pode
+  staff.add(MASTER_USER);
+  whitelistCache = { staff, ts: Date.now() };
+  return { master: MASTER_USER, staff };
 }
 
 async function trelloCall(method: string, path: string, params: Record<string, string> = {}) {
@@ -110,27 +111,29 @@ async function processAction(payload: any) {
   };
 
   try {
-    const { admins, labelCreator } = await getWhitelist();
+    const { master, staff } = await getWhitelist();
+    const isMaster = username === master;
+    const isStaff = staff.has(username);
 
-    // 1. createCard — somente admins
-    if (type === "createCard" && !admins.has(username)) {
+    // 1. createCard — staff (e master) podem
+    if (type === "createCard" && !isStaff) {
       const r = await trelloCall("PUT", `/1/cards/${card.id}/closed`, { value: "true" });
       await commentCard(
         card.id,
-        `⚠️ Cartão arquivado — Somente o admin pode criar cartões (@${username})`,
+        `⚠️ Cartão arquivado — usuário (@${username}) não autorizado a criar.`,
       );
       await logAction({ ...baseLog, was_reverted: r.ok, revert_detail: `archived (status ${r.status})` });
       return;
     }
 
-    // 2. updateCard — movimento entre listas
-    if (type === "updateCard" && action.data?.listBefore && action.data?.listAfter && !admins.has(username)) {
+    // 2. updateCard — movimento entre listas (staff e master podem)
+    if (type === "updateCard" && action.data?.listBefore && action.data?.listAfter && !isStaff) {
       const r = await trelloCall("PUT", `/1/cards/${card.id}/idList`, {
         value: action.data.listBefore.id,
       });
       await commentCard(
         card.id,
-        `⚠️ Movimento revertido — Somente o admin pode mover cartões (@${username})`,
+        `⚠️ Movimento revertido — usuário (@${username}) não autorizado.`,
       );
       await logAction({
         ...baseLog,
@@ -140,21 +143,21 @@ async function processAction(payload: any) {
       return;
     }
 
-    // 3. updateCard — arquivamento (closed: false → true)
+    // 3. updateCard — arquivamento (closed: false → true) — APENAS master
     if (
       type === "updateCard" &&
       action.data?.old?.closed === false &&
       action.data?.card?.closed === true &&
-      !admins.has(username)
+      !isMaster
     ) {
       const r = await trelloCall("PUT", `/1/cards/${card.id}/closed`, { value: "false" });
-      await commentCard(card.id, `Somente o admim pode arquivar cartões (@${username})`);
+      await commentCard(card.id, `Somente o admim pode arquivar cartões`);
       await logAction({ ...baseLog, was_reverted: r.ok, revert_detail: `unarchived (status ${r.status})` });
       return;
     }
 
-    // 4. createLabel — somente labelCreator
-    if (type === "createLabel" && username !== labelCreator) {
+    // 4. createLabel — APENAS master
+    if (type === "createLabel" && !isMaster) {
       const labelId = action.data?.label?.id;
       if (labelId) {
         const r = await trelloCall("DELETE", `/1/labels/${labelId}`);
@@ -167,11 +170,11 @@ async function processAction(payload: any) {
       return;
     }
 
-    // 5. deleteAttachmentFromCard — não-admin
-    if (type === "deleteAttachmentFromCard" && !admins.has(username)) {
+    // 5. deleteAttachmentFromCard — staff (e master) podem; outros só comentam
+    if (type === "deleteAttachmentFromCard" && !isStaff) {
       await commentCard(
         card.id,
-        `⚠️ @${username} deletou um anexo sem permissão.`,
+        `⚠️ @${username} deletou anexo sem permissão.`,
       );
       await logAction({
         ...baseLog,
