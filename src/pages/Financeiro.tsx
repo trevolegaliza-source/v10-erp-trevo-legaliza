@@ -485,6 +485,19 @@ export default function Financeiro() {
                 ]}
                 className="space-y-4"
               >
+                <AccordionItem value="enviados" className="border rounded-lg px-4 bg-card data-[state=closed]:bg-muted/30">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <div className="flex items-center gap-2 flex-1 pr-2">
+                      <Send className="h-4 w-4 text-blue-400" />
+                      <span className="font-medium text-sm">Enviados</span>
+                      <Badge variant="outline" className="ml-auto text-[10px]">0</Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
+                  </AccordionContent>
+                </AccordionItem>
+
                 <AccordionItem value="aguardando" className="border rounded-lg px-4 bg-card data-[state=closed]:bg-muted/30">
                   <AccordionTrigger className="hover:no-underline py-3">
                     <div className="flex items-center gap-2 flex-1 pr-2">
