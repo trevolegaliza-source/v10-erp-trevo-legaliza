@@ -72,6 +72,7 @@ export default function Colaboradores() {
       observacoes_pagamento: c.observacoes_pagamento || '',
       tipo_transporte: (c as any).tipo_transporte || 'vt',
       auxilio_combustivel_valor: String((c as any).auxilio_combustivel_valor || ''),
+      trello_username: (c as any).trello_username || '',
     });
     setDialog(true);
   };
@@ -99,6 +100,7 @@ export default function Colaboradores() {
       aniversario: form.aniversario || null,
       tipo_transporte: form.tipo_transporte,
       auxilio_combustivel_valor: Number(form.auxilio_combustivel_valor) || 0,
+      trello_username: form.trello_username?.trim().toLowerCase() || null,
       dia_adiantamento: Number(form.dia_adiantamento) || 20,
       dia_salario: Number(form.dia_salario) || 5,
       dia_vt_vr: Number(form.dia_vt_vr) || 0,
@@ -225,6 +227,7 @@ export default function Colaboradores() {
                     <TableHead className="text-right text-foreground">Salário</TableHead>
                     <TableHead className="text-right text-foreground">Custo Total</TableHead>
                     <TableHead className="text-foreground">Chave PIX</TableHead>
+                    <TableHead className="text-foreground">Trello</TableHead>
                     <TableHead className="text-center text-foreground">Status</TableHead>
                     <TableHead className="text-center text-foreground">Ações</TableHead>
                   </TableRow>
@@ -267,6 +270,13 @@ export default function Colaboradores() {
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </TableCell>
+                        <TableCell>
+                          {(c as any).trello_username ? (
+                            <span className="text-xs text-foreground">@{(c as any).trello_username}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-center">
                           <Badge className={`border-0 text-[10px] ${c.status === 'ativo' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
                             {c.status === 'ativo' ? 'Ativo' : 'Inativo'}
@@ -288,7 +298,7 @@ export default function Colaboradores() {
                   })}
                   {filtered.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhum colaborador</TableCell>
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum colaborador</TableCell>
                     </TableRow>
                   )}
                 </TableBody>
