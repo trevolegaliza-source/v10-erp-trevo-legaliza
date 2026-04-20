@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt, MessageCircle, Share2, Tags, ChevronDown, Upload, X, Image, File as FileIcon, Undo2 } from 'lucide-react';
+import { FileText, Send, Copy, Download, CheckCircle, AlertTriangle, Clock, Calendar, RefreshCw, Loader2, MoreHorizontal, Receipt, MessageCircle, Share2, Tags, ChevronDown, Upload, X, Image, File as FileIcon, Undo2, Link as LinkIcon } from 'lucide-react';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
   AlertDialog,
@@ -74,6 +74,8 @@ export type ExtratoGeradoPayload = {
   total: number;
   /** Lancamentos included in this extrato — used for WhatsApp message */
   lancamentos: LancamentoFinanceiro[];
+  cobrancaUrl?: string;
+  cobrancaId?: string;
   cleanup?: () => void;
 };
 
@@ -646,6 +648,41 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
           .eq('tipo', 'receber');
       }
 
+      // Criar registro de cobrança pública
+      let cobrancaUrl: string | undefined;
+      let cobrancaId: string | undefined;
+      try {
+        const { getCobrancaPublicUrl } = await import('@/lib/cobranca-url');
+        const lancamentoIds = selecionados.map(l => l.id);
+        const datasVenc = selecionados
+          .map(l => l.data_vencimento)
+          .filter(Boolean)
+          .sort();
+        const dataVencimento = datasVenc[0] || null;
+
+        const { data: cobranca, error: cobErr } = await supabase
+          .from('cobrancas')
+          .insert({
+            cliente_id: clienteId,
+            extrato_id: (extrato as any).id,
+            lancamento_ids: lancamentoIds,
+            total_honorarios: result.totalHonorarios,
+            total_taxas: result.totalTaxas,
+            total_geral: result.totalGeral,
+            data_vencimento: dataVencimento,
+            status: 'ativa',
+          } as any)
+          .select('id, share_token')
+          .single();
+
+        if (cobErr) throw cobErr;
+        cobrancaId = (cobranca as any).id;
+        cobrancaUrl = getCobrancaPublicUrl((cobranca as any).share_token);
+      } catch (cobErr: any) {
+        console.error('Falha ao criar cobrança pública:', cobErr);
+        // Não bloquear fluxo do extrato se cobrança falhar
+      }
+
       // invalidateFinanceiro moved to ModalPosExtrato close
 
       toast.success('Extrato gerado com sucesso!');
@@ -658,6 +695,8 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
         clienteTelefone: (clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || cliente.cliente_telefone || '',
         total: result.totalGeral,
         lancamentos: selecionados,
+        cobrancaUrl,
+        cobrancaId,
         cleanup: () => {
           setSelected(new Set());
           setGenerating(false);
@@ -1619,6 +1658,19 @@ export function ModalPosExtrato({
     onClose();
   }
 
+  async function handleCopiarLink() {
+    if (!extratoGerado.cobrancaUrl) {
+      toast.error('Link da cobrança indisponível.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(extratoGerado.cobrancaUrl);
+      toast.success('Link copiado! Cole no WhatsApp.');
+    } catch {
+      toast.error('Erro ao copiar link.');
+    }
+  }
+
   async function handleWhatsApp() {
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', extratoGerado.clienteId).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || extratoGerado.clienteTelefone || '').replace(/\D/g, '');
@@ -1636,7 +1688,10 @@ export function ModalPosExtrato({
     
     if (lancsForMsg.length === 0) { toast.warning('Nenhum lançamento encontrado.'); return; }
     
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
+    let msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
+    if (extratoGerado.cobrancaUrl) {
+      msg += `\n\n🔗 Ver cobrança completa: ${extratoGerado.cobrancaUrl}`;
+    }
     openWhatsApp(tel, msg);
     handleClose();
   }
@@ -1694,6 +1749,11 @@ export function ModalPosExtrato({
           </div>
           <p className="text-sm text-muted-foreground">O que deseja fazer?</p>
           <div className="space-y-2">
+            {extratoGerado.cobrancaUrl && (
+              <Button className="w-full gap-2 h-11" onClick={handleCopiarLink}>
+                <LinkIcon className="h-4 w-4" /> Copiar Link da Cobrança
+              </Button>
+            )}
             <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white h-11" onClick={handleWhatsApp}>
               <MessageCircle className="h-4 w-4" /> Enviar WhatsApp
             </Button>
