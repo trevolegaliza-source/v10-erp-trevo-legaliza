@@ -1214,6 +1214,47 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
       }))
     : 0;
 
+  // Pré-computa mensagem de WhatsApp + link da cobrança para o <WhatsappLinkButton />
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const lancsParaMsg = temVencidos ? lancVencidos : cliente.lancamentos;
+        if (lancsParaMsg.length === 0) return;
+        const processoIds = [...new Set(lancsParaMsg.map(l => l.processo_id).filter(Boolean))] as string[];
+        const vaMap: Record<string, number> = {};
+        const vaDetalhadoMap: Record<string, Array<{ descricao: string; valor: number }>> = {};
+        if (processoIds.length > 0) {
+          const { data: vas } = await supabase.from('valores_adicionais').select('processo_id, descricao, valor').in('processo_id', processoIds);
+          if (vas) {
+            for (const va of vas) {
+              vaMap[va.processo_id] = (vaMap[va.processo_id] || 0) + Number(va.valor);
+              if (!vaDetalhadoMap[va.processo_id]) vaDetalhadoMap[va.processo_id] = [];
+              vaDetalhadoMap[va.processo_id].push({ descricao: (va as any).descricao || 'Taxa', valor: Number(va.valor) || 0 });
+            }
+          }
+        }
+        const nomeRemetente = await getNomeRemetente();
+        let msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
+        const extratoIds = [...new Set(lancsParaMsg.map(l => l.extrato_id).filter(Boolean))] as string[];
+        const extratoId = extratoIds[0];
+        const token = await getCobrancaTokenAtiva(cliente.cliente_id, extratoId || undefined);
+        if (token) msg += `\n\n🔗 Ver cobrança completa: ${getCobrancaPublicUrl(token)}`;
+        if (active) setWhatsappMsgAguardando(msg);
+      } catch {/* noop */}
+    })();
+    return () => { active = false; };
+  }, [cliente, temVencidos, maiorAtraso]);
+
+  async function handleCopiarLinkCobrancaAguardando() {
+    const lancComExtrato = cliente.lancamentos.find(l => l.extrato_id);
+    const extratoId = lancComExtrato?.extrato_id || cliente.extrato_mais_recente?.id;
+    const token = await getCobrancaTokenAtiva(cliente.cliente_id, extratoId || undefined);
+    if (!token) { toast.error('Link de cobrança não encontrado.'); return; }
+    await navigator.clipboard.writeText(getCobrancaPublicUrl(token));
+    toast.success('🔗 Link copiado!');
+  }
+
   function toggleSelectPagar(lancId: string) {
     setSelectedPagar(prev => {
       const next = new Set(prev);
