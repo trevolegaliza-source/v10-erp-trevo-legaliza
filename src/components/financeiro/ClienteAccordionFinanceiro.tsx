@@ -1855,7 +1855,7 @@ export function ModalPosExtrato({
   }
 
   return (
-    <Dialog open={true} onOpenChange={() => {}}>
+    <Dialog open={true} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent
         className="sm:max-w-sm"
         onPointerDownOutside={(e) => e.preventDefault()}
