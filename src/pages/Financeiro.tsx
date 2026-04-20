@@ -61,15 +61,15 @@ export default function Financeiro() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
     const stateTab = (location.state as any)?.tab;
-    if (stateTab) return stateTab;
-    return isFinanceiro ? 'cobrar' : 'auditoria';
+    if (stateTab) return mapLegacyTab(stateTab);
+    return 'a_fazer';
   });
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
   const [extratoGerado, setExtratoGerado] = useState<ExtratoGeradoPayload | null>(null);
   useEffect(() => {
     const stateTab = (location.state as any)?.tab;
-    if (stateTab) setActiveTab(stateTab);
+    if (stateTab) setActiveTab(mapLegacyTab(stateTab));
   }, [location.state]);
 
   const dates = periodo === 'custom'
