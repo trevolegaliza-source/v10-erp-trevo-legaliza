@@ -431,7 +431,7 @@ function ClientesFaturarBase({
       {prontos.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold text-emerald-600 flex items-center gap-1.5">✅ Prontos para cobrar</h3>
-          <Accordion type="multiple" className="space-y-2">
+          <Accordion type="multiple" defaultValue={[]} className="space-y-2">
             {prontos.map(c => <FaturarItem key={c.cliente_id} cliente={c} isDeferimento={false} onExtratoGerado={onExtratoGerado} />)}
           </Accordion>
         </div>
@@ -445,7 +445,7 @@ function ClientesFaturarBase({
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-2">
-            <Accordion type="multiple" className="space-y-2">
+            <Accordion type="multiple" defaultValue={[]} className="space-y-2">
               {aguardandoDef.map(c => <FaturarItem key={c.cliente_id + '_def'} cliente={c} isDeferimento={true} onExtratoGerado={onExtratoGerado} />)}
             </Accordion>
           </CollapsibleContent>
@@ -799,7 +799,7 @@ function FaturarItem({ cliente, isDeferimento = false, onExtratoGerado }: {
 export function ClientesEnviar({ clientes }: { clientes: ClienteFinanceiro[] }) {
   if (clientes.length === 0) return <EmptyState text="Nenhuma cobrança aguardando envio." />;
   return (
-    <Accordion type="multiple" className="space-y-2">
+    <Accordion type="multiple" defaultValue={[]} className="space-y-2">
       {clientes.map(c => <EnviarItem key={c.cliente_id} cliente={c} />)}
     </Accordion>
   );
@@ -1093,7 +1093,7 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
 export function ClientesAguardando({ clientes, contestarLancamento }: { clientes: ClienteFinanceiro[]; contestarLancamento?: any }) {
   if (clientes.length === 0) return <EmptyState text="Nenhum pagamento pendente." />;
   return (
-    <Accordion type="multiple" className="space-y-2">
+    <Accordion type="multiple" defaultValue={[]} className="space-y-2">
       {clientes.map(c => <AguardandoItem key={c.cliente_id} cliente={c} contestarLancamento={contestarLancamento} />)}
     </Accordion>
   );
@@ -1518,7 +1518,7 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
 export function ClientesRecebidos({ clientes }: { clientes: ClienteFinanceiro[] }) {
   if (clientes.length === 0) return <EmptyState text="Nenhum pagamento recebido neste período." />;
   return (
-    <Accordion type="multiple" className="space-y-2">
+    <Accordion type="multiple" defaultValue={[]} className="space-y-2">
       {clientes.map(c => <RecebidoItem key={c.cliente_id} cliente={c} />)}
     </Accordion>
   );
