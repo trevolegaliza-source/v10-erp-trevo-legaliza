@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil, List, Check, Tags, ClipboardCheck, AlertTriangle, Undo2 } from 'lucide-react';
+import { ArrowLeft, Building2, User, Settings, FileText, DollarSign, Download, Trash2, Upload, Edit2, Save, X, Plus, FileBarChart, Receipt, Archive, ArchiveRestore, ExternalLink, Eye, Pencil, List, Check, Tags, ClipboardCheck, AlertTriangle, Undo2, Trello, Loader2 } from 'lucide-react';
 import { EtiquetasDisplay, EtiquetasEdit } from '@/components/EtiquetasBadges';
 import { useAuditarLancamento, useAuditarTodosCliente, useAlterarValorLancamento } from '@/hooks/useFinanceiroClientes';
 import ValoresAdicionaisModal from '@/components/financeiro/ValoresAdicionaisModal';
@@ -40,6 +40,7 @@ import { STORAGE_BUCKETS } from '@/constants/storage';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
+import TrelloProvisionButton from '@/components/clientes/TrelloProvisionButton';
 import ProcessoEditModal from '@/components/financeiro/ProcessoEditModal';
 import { useColaboradores } from '@/hooks/useColaboradores';
 import { Textarea } from '@/components/ui/textarea';
@@ -687,6 +688,7 @@ export default function ClienteDetalhe() {
           <Button variant="outline" size="sm" className="gap-1.5 text-xs text-foreground" onClick={() => { setSelectedCobrancaProcessos(new Set()); setShowCobrancaDialog(true); }}>
             <Receipt className="h-3.5 w-3.5" /> Gerar Cobrança
           </Button>
+          <TrelloProvisionButton cliente={cliente} onProvisioned={() => loadAll(cliente.id)} />
           {isArchived ? (
             <Button variant="outline" size="sm" className="gap-1.5 text-xs text-primary" onClick={() => setShowArchivePassword(true)}>
               <ArchiveRestore className="h-3.5 w-3.5" /> Desarquivar

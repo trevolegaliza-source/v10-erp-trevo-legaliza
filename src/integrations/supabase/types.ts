@@ -138,6 +138,9 @@ export type Database = {
           telefone_financeiro: string | null
           tipo: Database["public"]["Enums"]["tipo_cliente"]
           tipo_desconto: string | null
+          trello_board_id: string | null
+          trello_board_url: string | null
+          trello_provisionado_em: string | null
           updated_at: string | null
           valor_base: number | null
           valor_limite_desconto: number | null
@@ -183,6 +186,9 @@ export type Database = {
           telefone_financeiro?: string | null
           tipo?: Database["public"]["Enums"]["tipo_cliente"]
           tipo_desconto?: string | null
+          trello_board_id?: string | null
+          trello_board_url?: string | null
+          trello_provisionado_em?: string | null
           updated_at?: string | null
           valor_base?: number | null
           valor_limite_desconto?: number | null
@@ -228,6 +234,9 @@ export type Database = {
           telefone_financeiro?: string | null
           tipo?: Database["public"]["Enums"]["tipo_cliente"]
           tipo_desconto?: string | null
+          trello_board_id?: string | null
+          trello_board_url?: string | null
+          trello_provisionado_em?: string | null
           updated_at?: string | null
           valor_base?: number | null
           valor_limite_desconto?: number | null
