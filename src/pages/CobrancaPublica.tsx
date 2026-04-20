@@ -24,9 +24,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-const LOGO_URL =
-  'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png';
+import logoTrevo from '@/assets/logo-trevo.png';
 
 interface Taxa {
   descricao: string;
