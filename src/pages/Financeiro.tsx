@@ -505,7 +505,7 @@ export default function Financeiro() {
                 </AccordionItem>
 
                 {!isFinanceiro && (
-                  <AccordionItem value="contestados" className="border rounded-lg px-4 bg-card">
+                  <AccordionItem value="contestados" className="border rounded-lg px-4 bg-card data-[state=closed]:bg-muted/30">
                     <AccordionTrigger className="hover:no-underline py-3">
                       <div className="flex items-center gap-2 flex-1 pr-2">
                         <AlertTriangle className="h-4 w-4 text-amber-500" />
