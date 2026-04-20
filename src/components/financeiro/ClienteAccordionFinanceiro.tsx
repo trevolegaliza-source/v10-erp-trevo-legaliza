@@ -47,21 +47,24 @@ import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { downloadExtrato } from '@/lib/storage-utils';
 
 // ══════════ WHATSAPP HELPER ══════════
+// Uses a real anchor element clicked synchronously — avoids ERR_BLOCKED_BY_RESPONSE / COEP
+// blocks that hit window.open() in some browser contexts.
+import { buildWhatsappUrl } from '@/lib/open-whatsapp';
 function openWhatsApp(phone: string, message: string) {
-  navigator.clipboard.writeText(message).then(() => {
-    toast.success('✅ Mensagem copiada! Cole no WhatsApp.', {
-      duration: 5000,
-      action: {
-        label: 'Abrir WhatsApp',
-        onClick: () => {
-          window.open(`https://wa.me/${phone}`, '_blank');
-        },
-      },
-    });
-  }).catch(() => {
-    // Fallback: try opening directly
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
-  });
+  navigator.clipboard.writeText(message).catch(() => {});
+  const url = buildWhatsappUrl(phone, message);
+  if (url === '#') {
+    toast.error('Telefone inválido.');
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  toast.success('✅ Mensagem copiada! Abrindo WhatsApp...');
 }
 
 // ══════════ EXPORTED TYPE ══════════
@@ -1003,7 +1006,14 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
     const vaMap = await buildValoresAdicionaisMap(lancamentosExtrato);
     const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancamentosExtrato);
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
+    let msg = buildMensagemFromLancamentos({ lancamentos: lancamentosExtrato, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
+    if (extratoId) {
+      const { data: cob } = await supabase.from('cobrancas').select('share_token').eq('extrato_id', extratoId).eq('status', 'ativa').order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if ((cob as any)?.share_token) {
+        const { getCobrancaPublicUrl } = await import('@/lib/cobranca-url');
+        msg += `\n\n🔗 Ver cobrança completa: ${getCobrancaPublicUrl((cob as any).share_token)}`;
+      }
+    }
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
@@ -1265,7 +1275,15 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
       }
     }
     const nomeRemetente = await getNomeRemetente();
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
+    let msg = buildMensagemFromLancamentos({ lancamentos: lancsParaMsg, vaMap, vaDetalhadoMap, diasAtraso: maiorAtraso, nomeRemetente });
+    const extratoIds = [...new Set(lancsParaMsg.map(l => l.extrato_id).filter(Boolean))];
+    if (extratoIds.length > 0) {
+      const { data: cob } = await supabase.from('cobrancas').select('share_token').in('extrato_id', extratoIds as string[]).eq('status', 'ativa').order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if ((cob as any)?.share_token) {
+        const { getCobrancaPublicUrl } = await import('@/lib/cobranca-url');
+        msg += `\n\n🔗 Ver cobrança completa: ${getCobrancaPublicUrl((cob as any).share_token)}`;
+      }
+    }
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', cliente.cliente_id).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || '').replace(/\D/g, '');
     if (!telefone) {
