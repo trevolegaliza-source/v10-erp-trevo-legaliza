@@ -1,1 +1,4 @@
 project_id = "gwyinucaeaayuckvevma"
+
+[functions.trello-guard]
+verify_jwt = false
