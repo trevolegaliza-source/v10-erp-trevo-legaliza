@@ -246,7 +246,7 @@ export default function Financeiro() {
             </GlassCard>
 
             {/* Cobrado — now goes to aguardando */}
-            <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)" onClick={() => setActiveTab('aguardando')} className="cursor-pointer">
+            <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)" onClick={() => setActiveTab('em_andamento')} className="cursor-pointer">
               <div className="rounded-lg bg-blue-500/10 p-1.5 sm:p-2 w-fit">
                 <Send className="h-4 w-4 text-blue-400" />
               </div>
