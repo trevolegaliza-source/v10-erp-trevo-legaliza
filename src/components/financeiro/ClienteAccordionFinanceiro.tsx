@@ -1,4 +1,4 @@
-import { memo, useState, useMemo, useCallback, useRef } from 'react';
+import { memo, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,8 +48,6 @@ import { downloadExtrato } from '@/lib/storage-utils';
 import { fetchExtratoBlob, triggerBlobDownload } from '@/lib/extrato-download';
 
 // ══════════ WHATSAPP HELPER ══════════
-// Uses a real anchor element clicked synchronously — avoids ERR_BLOCKED_BY_RESPONSE / COEP
-// blocks that hit window.open() in some browser contexts.
 import { buildWhatsappUrl } from '@/lib/open-whatsapp';
 function openWhatsApp(phone: string, message: string) {
   navigator.clipboard.writeText(message).catch(() => {});
@@ -104,6 +102,24 @@ export async function getNomeRemetente(): Promise<string> {
     }
   } catch { /* ignore */ }
   return 'Equipe';
+}
+
+async function marcarLancamentosComoEnviados(lancamentoIds: string[]) {
+  if (lancamentoIds.length === 0) return true;
+  const { error } = await supabase
+    .from('lancamentos')
+    .update({
+      etapa_financeiro: 'cobranca_enviada',
+      observacoes_financeiro: `Cobrança enviada em ${new Date().toLocaleDateString('pt-BR')}`,
+    } as any)
+    .in('id', lancamentoIds);
+
+  if (error) {
+    toast.error(error.message);
+    return false;
+  }
+
+  return true;
 }
 
 interface MsgBuilderParams {
