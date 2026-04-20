@@ -1608,6 +1608,48 @@ export type Database = {
           },
         ]
       }
+      trello_guard_logs: {
+        Row: {
+          action_type: string
+          board_id: string | null
+          board_name: string | null
+          card_id: string | null
+          card_name: string | null
+          created_at: string | null
+          id: string
+          member_username: string | null
+          raw_action: Json | null
+          revert_detail: string | null
+          was_reverted: boolean | null
+        }
+        Insert: {
+          action_type: string
+          board_id?: string | null
+          board_name?: string | null
+          card_id?: string | null
+          card_name?: string | null
+          created_at?: string | null
+          id?: string
+          member_username?: string | null
+          raw_action?: Json | null
+          revert_detail?: string | null
+          was_reverted?: boolean | null
+        }
+        Update: {
+          action_type?: string
+          board_id?: string | null
+          board_name?: string | null
+          card_id?: string | null
+          card_name?: string | null
+          created_at?: string | null
+          id?: string
+          member_username?: string | null
+          raw_action?: Json | null
+          revert_detail?: string | null
+          was_reverted?: boolean | null
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           created_at: string | null
