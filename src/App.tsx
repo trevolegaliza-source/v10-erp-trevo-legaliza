@@ -33,6 +33,7 @@ const RelatoriosFluxoCaixa = lazy(() => import("./pages/RelatoriosFluxoCaixa"));
 const PortfolioPublico = lazy(() => import("./pages/PortfolioPublico"));
 const ReconciliacaoTrello = lazy(() => import("./pages/ReconciliacaoTrello"));
 const PropostaPublica = lazy(() => import("./pages/PropostaPublica"));
+const CobrancaPublica = lazy(() => import("./pages/CobrancaPublica"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -172,6 +173,7 @@ const App = () => (
                 </Route>
                 <Route path="/portfolio/:token" element={<PortfolioPublico />} />
                 <Route path="/proposta/:token" element={<PropostaPublica />} />
+                <Route path="/cobranca/:token" element={<CobrancaPublica />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
