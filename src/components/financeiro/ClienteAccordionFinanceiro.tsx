@@ -49,8 +49,27 @@ import { fetchExtratoBlob, triggerBlobDownload } from '@/lib/extrato-download';
 
 // ══════════ WHATSAPP HELPER ══════════
 import { WhatsappLinkButton } from './WhatsappLinkButton';
+import { buildWhatsappUrl } from '@/lib/open-whatsapp';
 import { getCobrancaTokenAtiva } from '@/hooks/useFinanceiroClientes';
 import { getCobrancaPublicUrl } from '@/lib/cobranca-url';
+
+/** Programmatic open via real anchor click (used after WhatsappLinkButton click handlers). */
+function openWhatsApp(phone: string, message: string) {
+  navigator.clipboard.writeText(message).catch(() => {});
+  const url = buildWhatsappUrl(phone, message);
+  if (url === '#') {
+    toast.error('Telefone inválido.');
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  toast.success('✅ Mensagem copiada! Abrindo WhatsApp...');
+}
 
 // ══════════ EXPORTED TYPE ══════════
 export type ExtratoGeradoPayload = {
@@ -1095,10 +1114,15 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
           )}
           {cliente.lancamentos.map(l => <LancamentoRow key={l.id} lancamento={l} />)}
           <div className="grid grid-cols-2 sm:flex gap-2 mt-3 sm:flex-wrap">
-            <Button size="sm" variant="outline" onClick={handleEnviarWhatsApp} className={cn("gap-1 h-11 sm:h-9", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
-              <MessageCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">WhatsApp{cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ' (sem tel.)'}</span>
-              <span className="sm:hidden">WhatsApp</span>
+            <WhatsappLinkButton
+              phone={cliente.cliente_telefone || ''}
+              message={whatsappMsgEnviar}
+              label={`WhatsApp${cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ''}`.trim()}
+              variant="outline"
+              onAfterClick={handleMarcarEnviado}
+            />
+            <Button size="sm" variant="outline" onClick={handleCopiarLinkCobranca} className="h-11 sm:h-9">
+              <LinkIcon className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Copiar Link</span><span className="sm:hidden">Link</span>
             </Button>
             <Button size="sm" variant="outline" onClick={handleCompartilhar} className="gap-1 h-11 sm:h-9">
               <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Compartilhar</span><span className="sm:hidden">Enviar</span>
@@ -1390,10 +1414,14 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
               </span>
             </div>
             <div className="grid grid-cols-2 sm:flex gap-2 mt-3 sm:flex-wrap">
-              <Button size="sm" variant="outline" onClick={handleEnviarWhatsAppRecobranca} className={cn("gap-1 h-11 sm:h-9", cliente.cliente_telefone ? "text-green-600 border-green-600/30 hover:bg-green-600/10" : "text-amber-600 border-amber-600/30 hover:bg-amber-600/10")}>
-                <MessageCircle className="h-4 w-4" />
-                <span className="hidden sm:inline">WhatsApp{cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ' (sem tel.)'}</span>
-                <span className="sm:hidden">WhatsApp</span>
+              <WhatsappLinkButton
+                phone={cliente.cliente_telefone || ''}
+                message={whatsappMsgAguardando}
+                label={`WhatsApp${cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ''}`.trim()}
+                variant="outline"
+              />
+              <Button size="sm" variant="outline" onClick={handleCopiarLinkCobrancaAguardando} className="h-11 sm:h-9">
+                <LinkIcon className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Copiar Link</span><span className="sm:hidden">Link</span>
               </Button>
               <Button size="sm" variant="outline" onClick={handleCompartilharAguardando} className="gap-1 h-11 sm:h-9">
                 <Share2 className="h-4 w-4" /> <span className="hidden sm:inline">Compartilhar</span><span className="sm:hidden">Enviar</span>
@@ -1757,8 +1785,13 @@ export function ModalPosExtrato({
   }
 
   return (
-    <Dialog open={true} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent className="sm:max-w-sm">
+    <Dialog open={true} onOpenChange={() => {}}>
+      <DialogContent
+        className="sm:max-w-sm"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-emerald-500" /> Extrato Gerado!
