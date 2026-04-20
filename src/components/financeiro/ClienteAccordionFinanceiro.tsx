@@ -1658,6 +1658,19 @@ export function ModalPosExtrato({
     onClose();
   }
 
+  async function handleCopiarLink() {
+    if (!extratoGerado.cobrancaUrl) {
+      toast.error('Link da cobrança indisponível.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(extratoGerado.cobrancaUrl);
+      toast.success('Link copiado! Cole no WhatsApp.');
+    } catch {
+      toast.error('Erro ao copiar link.');
+    }
+  }
+
   async function handleWhatsApp() {
     const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', extratoGerado.clienteId).single();
     const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || extratoGerado.clienteTelefone || '').replace(/\D/g, '');
@@ -1675,7 +1688,10 @@ export function ModalPosExtrato({
     
     if (lancsForMsg.length === 0) { toast.warning('Nenhum lançamento encontrado.'); return; }
     
-    const msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
+    let msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
+    if (extratoGerado.cobrancaUrl) {
+      msg += `\n\n🔗 Ver cobrança completa: ${extratoGerado.cobrancaUrl}`;
+    }
     openWhatsApp(tel, msg);
     handleClose();
   }
@@ -1733,6 +1749,11 @@ export function ModalPosExtrato({
           </div>
           <p className="text-sm text-muted-foreground">O que deseja fazer?</p>
           <div className="space-y-2">
+            {extratoGerado.cobrancaUrl && (
+              <Button className="w-full gap-2 h-11" onClick={handleCopiarLink}>
+                <LinkIcon className="h-4 w-4" /> Copiar Link da Cobrança
+              </Button>
+            )}
             <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white h-11" onClick={handleWhatsApp}>
               <MessageCircle className="h-4 w-4" /> Enviar WhatsApp
             </Button>
