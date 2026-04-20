@@ -6,11 +6,12 @@ import { ptBR } from 'date-fns/locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { GlassCard } from '@/components/ui/glass-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Download, FileText, Send, Clock, CheckCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown, ClipboardCheck } from 'lucide-react';
+import { Download, FileText, Send, Clock, CheckCircle, AlertCircle, AlertTriangle, DollarSign, TrendingUp, Search, ChevronDown, TrendingDown, ClipboardCheck, History } from 'lucide-react';
 import { useFinanceiroClientes, type LancamentoFinanceiro, isLancamentoVencidoReal } from '@/hooks/useFinanceiroClientes';
 import {
   ClientesFaturar,
@@ -29,6 +30,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 
 function toISO(d: Date) { return d.toISOString().split('T')[0]; }
+
+// Map legacy tab keys (auditoria/cobrar/aguardando/contestado/pagos/todos) to new 3-tab structure
+function mapLegacyTab(tab: string): string {
+  if (['auditoria', 'cobrar'].includes(tab)) return 'a_fazer';
+  if (['aguardando', 'contestado', 'enviados'].includes(tab)) return 'em_andamento';
+  if (['pagos', 'todos'].includes(tab)) return 'historico';
+  if (['a_fazer', 'em_andamento', 'historico'].includes(tab)) return tab;
+  return 'a_fazer';
+}
 
 type PeriodoPreset = 'este_mes' | 'mes_anterior' | 'ultimos_3' | 'custom';
 
@@ -60,15 +70,15 @@ export default function Financeiro() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState(() => {
     const stateTab = (location.state as any)?.tab;
-    if (stateTab) return stateTab;
-    return isFinanceiro ? 'cobrar' : 'auditoria';
+    if (stateTab) return mapLegacyTab(stateTab);
+    return 'a_fazer';
   });
   const [searchTodos, setSearchTodos] = useState('');
   const [showFuturas, setShowFuturas] = useState(false);
   const [extratoGerado, setExtratoGerado] = useState<ExtratoGeradoPayload | null>(null);
   useEffect(() => {
     const stateTab = (location.state as any)?.tab;
-    if (stateTab) setActiveTab(stateTab);
+    if (stateTab) setActiveTab(mapLegacyTab(stateTab));
   }, [location.state]);
 
   const dates = periodo === 'custom'
@@ -236,7 +246,7 @@ export default function Financeiro() {
             </GlassCard>
 
             {/* Cobrado — now goes to aguardando */}
-            <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)" onClick={() => setActiveTab('aguardando')} className="cursor-pointer">
+            <GlassCard variant="service" glowColor="rgba(59, 130, 246, 0.12)" onClick={() => setActiveTab('em_andamento')} className="cursor-pointer">
               <div className="rounded-lg bg-blue-500/10 p-1.5 sm:p-2 w-fit">
                 <Send className="h-4 w-4 text-blue-400" />
               </div>
@@ -246,7 +256,7 @@ export default function Financeiro() {
             </GlassCard>
 
             {/* Recebido */}
-            <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)" onClick={() => setActiveTab('pagos')} className="cursor-pointer">
+            <GlassCard variant="service" glowColor="rgba(34, 197, 94, 0.12)" onClick={() => setActiveTab('historico')} className="cursor-pointer">
               <div className="rounded-lg bg-emerald-500/10 p-1.5 sm:p-2 w-fit">
                 <CheckCircle className="h-4 w-4 text-emerald-400" />
               </div>
@@ -262,7 +272,7 @@ export default function Financeiro() {
             <GlassCard
               variant="service"
               glowColor="rgba(239, 68, 68, 0.12)"
-              onClick={() => setActiveTab('aguardando')}
+              onClick={() => setActiveTab('em_andamento')}
               className="cursor-pointer"
             >
               <div className="rounded-lg bg-red-500/10 p-1.5 sm:p-2 w-fit">
@@ -332,122 +342,265 @@ export default function Financeiro() {
             </CardContent>
           </Card>
 
-          {/* Tabs — horizontal scroll on mobile */}
+          {/* Tabs — 3 abas principais com sub-seções colapsáveis */}
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="flex w-full overflow-x-auto overflow-y-hidden no-scrollbar gap-1 h-auto flex-nowrap justify-start">
-              {!isFinanceiro && (
-                <TabsTrigger value="auditoria" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
-                  <ClipboardCheck className="h-3.5 w-3.5" />
-                  Auditoria
-                  {clientesAguardandoAuditoria.length > 0 && (
-                    <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesAguardandoAuditoria.length}</Badge>
-                  )}
-                </TabsTrigger>
-              )}
-              <TabsTrigger value="cobrar" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
-                <FileText className="h-3.5 w-3.5" />
-                Cobrar
-                {clientesCobrar.length > 0 && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesCobrar.length}</Badge>
+              <TabsTrigger value="a_fazer" className="whitespace-nowrap flex-shrink-0 gap-1.5 text-xs px-3 py-2 data-[state=active]:text-amber-500">
+                <AlertCircle className="h-3.5 w-3.5" />
+                A Fazer
+                {(qtdAguardandoAuditoria + clientesCobrar.length) > 0 && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px] bg-amber-500/15 text-amber-500 border-amber-500/30">
+                    {qtdAguardandoAuditoria + clientesCobrar.length}
+                  </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="aguardando" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
+              <TabsTrigger value="em_andamento" className="whitespace-nowrap flex-shrink-0 gap-1.5 text-xs px-3 py-2 data-[state=active]:text-blue-400">
                 <Clock className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Ag. Pagamento</span>
-                <span className="sm:hidden">Ag. Pgto</span>
-                {clientesAguardando.length > 0 && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px]">{clientesAguardando.length}</Badge>
+                Em Andamento
+                {(clientesAguardando.length + clientesContestados.length) > 0 && (
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px] bg-blue-500/15 text-blue-400 border-blue-500/30">
+                    {clientesAguardando.length + clientesContestados.length}
+                  </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="contestado" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Contestado
-                {totalLancamentosContestados > 0 && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 min-w-[18px] bg-amber-500/20 text-amber-600">{totalLancamentosContestados}</Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="pagos" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
+              <TabsTrigger value="historico" className="whitespace-nowrap flex-shrink-0 gap-1.5 text-xs px-3 py-2 data-[state=active]:text-emerald-400">
                 <CheckCircle className="h-3.5 w-3.5" />
-                Pagos
+                Histórico
                 {clientesPagos.length > 0 && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 min-w-[18px] text-emerald-500 border-emerald-500/30">{clientesPagos.length}</Badge>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 min-w-[18px] text-emerald-500 border-emerald-500/30">
+                    {clientesPagos.length}
+                  </Badge>
                 )}
-              </TabsTrigger>
-              <TabsTrigger value="todos" className="whitespace-nowrap flex-shrink-0 gap-1 text-xs px-2.5 py-1.5">
-                <TrendingUp className="h-3.5 w-3.5" />
-                Todos
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="auditoria" className="mt-4">
-              <ClientesAuditoria clientes={clientesAguardandoAuditoria} />
-            </TabsContent>
+            {/* ABA 1 — A FAZER */}
+            <TabsContent value="a_fazer" className="mt-4">
+              <Accordion
+                type="multiple"
+                defaultValue={[
+                  ...(!isFinanceiro && qtdAguardandoAuditoria > 0 ? ['auditoria'] : []),
+                  ...(clientesCobrar.length > 0 ? ['cobrar'] : []),
+                  ...(mensalistasSemFatura.length > 0 ? ['mensalistas'] : []),
+                ]}
+                className="space-y-2"
+              >
+                {!isFinanceiro && (
+                  <AccordionItem value="auditoria" className="border rounded-lg px-4 bg-card">
+                    <AccordionTrigger className="hover:no-underline py-3">
+                      <div className="flex items-center gap-2 flex-1 pr-2">
+                        <ClipboardCheck className="h-4 w-4 text-amber-500" />
+                        <span className="font-medium text-sm">Aguardando Auditoria</span>
+                        <Badge variant="secondary" className="ml-auto bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px]">
+                          {qtdAguardandoAuditoria}
+                        </Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      {clientesAguardandoAuditoria.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
+                      ) : (
+                        <ClientesAuditoria clientes={clientesAguardandoAuditoria} />
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
 
-            <TabsContent value="cobrar" className="mt-4">
-              <ClientesFaturar
-                clientes={masterBypassJanela ? [...clientesCobrar, ...clientesFuturaFatura] : clientesCobrar}
-                mensalistasSemFatura={mensalistasSemFatura}
-                onExtratoGerado={setExtratoGerado}
-              />
-
-              {!masterBypassJanela && clientesFuturaFatura.length > 0 && (
-                <div className="mt-6">
-                  <button
-                    onClick={() => setShowFuturas(!showFuturas)}
-                    className="text-sm text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
-                  >
-                    <Clock className="h-3 w-3" />
-                    Próximas faturas ({clientesFuturaFatura.length})
-                    <ChevronDown className={`h-3 w-3 transition-transform ${showFuturas ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {showFuturas && (
-                    <div className="mt-2 space-y-2 opacity-60">
-                      {clientesFuturaFatura.map(c => {
-                        const diaFatura = c.cliente_dia_vencimento_mensal || 0;
-                        const hoje = new Date().getDate();
-                        const diaInicioJanela = Math.max(1, diaFatura - 5);
-                        const diasAteCobranca = hoje > diaFatura
-                          ? (new Date(new Date().getFullYear(), new Date().getMonth() + 1, diaInicioJanela).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24) | 0
-                          : Math.max(1, diaInicioJanela - hoje);
-                        return (
-                          <div key={c.cliente_id} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-border/60">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium truncate">{c.cliente_apelido || c.cliente_nome}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {c.qtd_sem_extrato} proc. · {formatBRL(c.total_faturado)} · Fatura dia {diaFatura}
-                              </p>
-                            </div>
-                            <Badge variant="outline" className="text-xs shrink-0 ml-2">
-                              Cobrar em {diasAteCobranca} dia{diasAteCobranca > 1 ? 's' : ''}
-                            </Badge>
-                          </div>
-                        );
-                      })}
+                <AccordionItem value="cobrar" className="border rounded-lg px-4 bg-card">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <div className="flex items-center gap-2 flex-1 pr-2">
+                      <FileText className="h-4 w-4 text-amber-500" />
+                      <span className="font-medium text-sm">Prontos para Cobrar</span>
+                      <Badge variant="secondary" className="ml-auto bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px]">
+                        {clientesCobrar.length}
+                      </Badge>
                     </div>
-                  )}
-                </div>
-              )}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {clientesCobrar.length === 0 && !masterBypassJanela ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
+                    ) : (
+                      <ClientesFaturar
+                        clientes={masterBypassJanela ? [...clientesCobrar, ...clientesFuturaFatura] : clientesCobrar}
+                        mensalistasSemFatura={[]}
+                        onExtratoGerado={setExtratoGerado}
+                      />
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="mensalistas" className="border rounded-lg px-4 bg-card">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <div className="flex items-center gap-2 flex-1 pr-2">
+                      <FileText className="h-4 w-4 text-amber-500" />
+                      <span className="font-medium text-sm">Mensalistas sem fatura</span>
+                      <Badge variant="secondary" className="ml-auto bg-amber-500/15 text-amber-500 border-amber-500/30 text-[10px]">
+                        {mensalistasSemFatura.length}
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {mensalistasSemFatura.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
+                    ) : (
+                      <ClientesFaturar
+                        clientes={[]}
+                        mensalistasSemFatura={mensalistasSemFatura}
+                        onExtratoGerado={setExtratoGerado}
+                      />
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+
+                {!masterBypassJanela && (
+                  <AccordionItem value="futuras" className="border rounded-lg px-4 bg-card">
+                    <AccordionTrigger className="hover:no-underline py-3">
+                      <div className="flex items-center gap-2 flex-1 pr-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">Próximas faturas</span>
+                        <Badge variant="outline" className="ml-auto text-[10px]">
+                          {clientesFuturaFatura.length}
+                        </Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      {clientesFuturaFatura.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
+                      ) : (
+                        <div className="space-y-2 opacity-80">
+                          {clientesFuturaFatura.map(c => {
+                            const diaFatura = c.cliente_dia_vencimento_mensal || 0;
+                            const hoje = new Date().getDate();
+                            const diaInicioJanela = Math.max(1, diaFatura - 5);
+                            const diasAteCobranca = hoje > diaFatura
+                              ? (new Date(new Date().getFullYear(), new Date().getMonth() + 1, diaInicioJanela).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24) | 0
+                              : Math.max(1, diaInicioJanela - hoje);
+                            return (
+                              <div key={c.cliente_id} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-border/60">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium truncate">{c.cliente_apelido || c.cliente_nome}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {c.qtd_sem_extrato} proc. · {formatBRL(c.total_faturado)} · Fatura dia {diaFatura}
+                                  </p>
+                                </div>
+                                <Badge variant="outline" className="text-xs shrink-0 ml-2">
+                                  Cobrar em {diasAteCobranca} dia{diasAteCobranca > 1 ? 's' : ''}
+                                </Badge>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
+              </Accordion>
             </TabsContent>
-            <TabsContent value="aguardando" className="mt-4">
-              <ClientesAguardando clientes={clientesAguardando} contestarLancamento={contestarLancamento} />
+
+            {/* ABA 2 — EM ANDAMENTO */}
+            <TabsContent value="em_andamento" className="mt-4">
+              <Accordion
+                type="multiple"
+                defaultValue={[
+                  ...(clientesAguardando.length > 0 ? ['aguardando'] : []),
+                  ...(!isFinanceiro && clientesContestados.length > 0 ? ['contestados'] : []),
+                ]}
+                className="space-y-2"
+              >
+                <AccordionItem value="aguardando" className="border rounded-lg px-4 bg-card">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <div className="flex items-center gap-2 flex-1 pr-2">
+                      <Send className="h-4 w-4 text-blue-400" />
+                      <span className="font-medium text-sm">Aguardando Pagamento</span>
+                      <Badge variant="secondary" className="ml-auto bg-blue-500/15 text-blue-400 border-blue-500/30 text-[10px]">
+                        {clientesAguardando.length}
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {clientesAguardando.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
+                    ) : (
+                      <ClientesAguardando clientes={clientesAguardando} contestarLancamento={contestarLancamento} />
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+
+                {!isFinanceiro && (
+                  <AccordionItem value="contestados" className="border rounded-lg px-4 bg-card">
+                    <AccordionTrigger className="hover:no-underline py-3">
+                      <div className="flex items-center gap-2 flex-1 pr-2">
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                        <span className="font-medium text-sm">Contestados</span>
+                        <Badge variant="secondary" className="ml-auto bg-amber-500/15 text-amber-600 border-amber-500/30 text-[10px]">
+                          {totalLancamentosContestados}
+                        </Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      {clientesContestados.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
+                      ) : (
+                        <ClientesContestados
+                          clientes={clientesContestados}
+                          onResolver={(params) => resolverContestacao.mutate(params)}
+                          userRole={role}
+                        />
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
+              </Accordion>
             </TabsContent>
-            <TabsContent value="contestado" className="mt-4">
-              <ClientesContestados
-                clientes={clientesContestados}
-                onResolver={(params) => resolverContestacao.mutate(params)}
-                userRole={role}
-              />
-            </TabsContent>
-            <TabsContent value="pagos" className="mt-4">
-              <ClientesPagos clientes={clientesPagos} />
-            </TabsContent>
-            <TabsContent value="todos" className="mt-4">
-              <TabTodos
-                lancamentos={todosLancamentos}
-                search={searchTodos}
-                onSearchChange={setSearchTodos}
-              />
+
+            {/* ABA 3 — HISTÓRICO */}
+            <TabsContent value="historico" className="mt-4">
+              <Accordion
+                type="multiple"
+                defaultValue={[
+                  ...(clientesPagos.length > 0 ? ['pagos'] : []),
+                  'todos',
+                ]}
+                className="space-y-2"
+              >
+                <AccordionItem value="pagos" className="border rounded-lg px-4 bg-card">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <div className="flex items-center gap-2 flex-1 pr-2">
+                      <CheckCircle className="h-4 w-4 text-emerald-500" />
+                      <span className="font-medium text-sm">Pagos no período</span>
+                      <Badge variant="outline" className="ml-auto text-emerald-500 border-emerald-500/30 text-[10px]">
+                        {clientesPagos.length}
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {clientesPagos.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">Nada por aqui ✨</p>
+                    ) : (
+                      <ClientesPagos clientes={clientesPagos} />
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="todos" className="border rounded-lg px-4 bg-card">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <div className="flex items-center gap-2 flex-1 pr-2">
+                      <History className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-sm">Buscar todos os lançamentos</span>
+                      <Badge variant="outline" className="ml-auto text-[10px]">
+                        {todosLancamentos.length}
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <TabTodos
+                      lancamentos={todosLancamentos}
+                      search={searchTodos}
+                      onSearchChange={setSearchTodos}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </TabsContent>
           </Tabs>
         </>
