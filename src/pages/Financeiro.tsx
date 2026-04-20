@@ -31,6 +31,15 @@ import { useQuery } from '@tanstack/react-query';
 
 function toISO(d: Date) { return d.toISOString().split('T')[0]; }
 
+// Map legacy tab keys (auditoria/cobrar/aguardando/contestado/pagos/todos) to new 3-tab structure
+function mapLegacyTab(tab: string): string {
+  if (['auditoria', 'cobrar'].includes(tab)) return 'a_fazer';
+  if (['aguardando', 'contestado', 'enviados'].includes(tab)) return 'em_andamento';
+  if (['pagos', 'todos'].includes(tab)) return 'historico';
+  if (['a_fazer', 'em_andamento', 'historico'].includes(tab)) return tab;
+  return 'a_fazer';
+}
+
 type PeriodoPreset = 'este_mes' | 'mes_anterior' | 'ultimos_3' | 'custom';
 
 function getPeriodoDates(preset: PeriodoPreset): { inicio: string; fim: string } {
