@@ -1663,6 +1663,53 @@ export function ModalPosExtrato({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [clienteTelefone, setClienteTelefone] = useState('');
+  const [whatsappHref, setWhatsappHref] = useState('#');
+  const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [preparingWhatsapp, setPreparingWhatsapp] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    const prepararWhatsapp = async () => {
+      setPreparingWhatsapp(true);
+      try {
+        const { data: clienteData } = await supabase
+          .from('clientes')
+          .select('telefone, telefone_financeiro')
+          .eq('id', extratoGerado.clienteId)
+          .single();
+
+        const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || extratoGerado.clienteTelefone || '').replace(/\D/g, '');
+        const nomeRemetente = await getNomeRemetente();
+        const lancsForMsg = extratoGerado.lancamentos;
+        const vaMap = await buildValoresAdicionaisMap(lancsForMsg);
+        const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancsForMsg);
+
+        let msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
+        if (extratoGerado.cobrancaUrl) {
+          msg += `\n\n🔗 Ver cobrança completa: ${extratoGerado.cobrancaUrl}`;
+        }
+
+        if (!active) return;
+        setClienteTelefone(telefone);
+        setWhatsappMessage(msg);
+        setWhatsappHref(telefone ? buildWhatsappUrl(telefone, msg) : '#');
+      } catch {
+        if (!active) return;
+        setClienteTelefone('');
+        setWhatsappMessage('');
+        setWhatsappHref('#');
+      } finally {
+        if (active) setPreparingWhatsapp(false);
+      }
+    };
+
+    prepararWhatsapp();
+    return () => {
+      active = false;
+    };
+  }, [extratoGerado]);
 
   function handleClose() {
     extratoGerado.cleanup?.();
@@ -1683,66 +1730,44 @@ export function ModalPosExtrato({
     }
   }
 
-  async function handleWhatsApp() {
-    const { data: clienteData } = await supabase.from('clientes').select('telefone, telefone_financeiro').eq('id', extratoGerado.clienteId).single();
-    const telefone = ((clienteData as any)?.telefone_financeiro || (clienteData as any)?.telefone || extratoGerado.clienteTelefone || '').replace(/\D/g, '');
-    if (!telefone) {
-      toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
-      return;
-    }
-    const tel = telefone.startsWith('55') ? telefone : '55' + telefone;
-    
-    const nomeRemetente = await getNomeRemetente();
-    
-    const lancsForMsg = extratoGerado.lancamentos;
-    const vaMap = await buildValoresAdicionaisMap(lancsForMsg);
-    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancsForMsg);
-    
-    if (lancsForMsg.length === 0) { toast.warning('Nenhum lançamento encontrado.'); return; }
-    
-    let msg = buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente });
-    if (extratoGerado.cobrancaUrl) {
-      msg += `\n\n🔗 Ver cobrança completa: ${extratoGerado.cobrancaUrl}`;
-    }
-    openWhatsApp(tel, msg);
+  async function handleMarcarEnviado() {
+    const ids = extratoGerado.lancamentos
+      .filter(l => l.etapa_financeiro === 'cobranca_gerada' || (l.etapa_financeiro === 'solicitacao_criada' && l.extrato_id))
+      .map(l => l.id);
+    const ok = await marcarLancamentosComoEnviados(ids);
+    if (!ok) return;
+    invalidateFinanceiro(queryClient);
+    toast.success('Cobrança marcada como enviada!');
     handleClose();
   }
 
   async function handleCompartilhar() {
     try {
       const file = new File([extratoGerado.blob], extratoGerado.filename, { type: 'application/pdf' });
-      
-      const nomeRemetente = await getNomeRemetente();
-      const lancsForMsg = extratoGerado.lancamentos;
-      const vaMap = await buildValoresAdicionaisMap(lancsForMsg);
-    const vaDetalhadoMap = await buildValoresAdicionaisDetalhadosMap(lancsForMsg);
-      
-      const msg = lancsForMsg.length > 0 
-        ? buildMensagemFromLancamentos({ lancamentos: lancsForMsg, vaMap, vaDetalhadoMap, diasAtraso: 0, nomeRemetente })
-        : '';
-      
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title: 'Extrato Trevo Legaliza', text: msg, files: [file] });
-      } else {
-        const url = URL.createObjectURL(extratoGerado.blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = extratoGerado.filename; a.click();
-        URL.revokeObjectURL(url);
-        toast.success('PDF baixado!');
+      const canShareFile = navigator.share && navigator.canShare?.({ files: [file] });
+
+      if (canShareFile) {
+        await navigator.share({ title: 'Extrato Trevo Legaliza', text: whatsappMessage, files: [file] });
+        const ids = extratoGerado.lancamentos
+          .filter(l => l.etapa_financeiro === 'cobranca_gerada' || (l.etapa_financeiro === 'solicitacao_criada' && l.extrato_id))
+          .map(l => l.id);
+        const ok = await marcarLancamentosComoEnviados(ids);
+        if (!ok) return;
+        invalidateFinanceiro(queryClient);
+        handleClose();
+        return;
       }
-      handleClose();
+
+      triggerBlobDownload(extratoGerado.blob, extratoGerado.filename);
+      toast.success('PDF baixado!');
     } catch (err: any) {
       if (err.name !== 'AbortError') toast.error('Erro ao compartilhar: ' + err.message);
     }
   }
 
   function handleBaixar() {
-    const url = URL.createObjectURL(extratoGerado.blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = extratoGerado.filename; a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(extratoGerado.blob, extratoGerado.filename);
     toast.success('PDF baixado!');
-    handleClose();
   }
 
   return (
@@ -1766,14 +1791,43 @@ export function ModalPosExtrato({
                 <LinkIcon className="h-4 w-4" /> Copiar Link da Cobrança
               </Button>
             )}
-            <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white h-11" onClick={handleWhatsApp}>
+            <a
+              href={whatsappHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-disabled={preparingWhatsapp || !clienteTelefone || whatsappHref === '#'}
+              className={cn(
+                'inline-flex w-full items-center justify-center gap-2 rounded-md h-11 px-4 text-sm font-medium transition-colors',
+                preparingWhatsapp || !clienteTelefone || whatsappHref === '#'
+                  ? 'pointer-events-none border border-border bg-muted text-muted-foreground opacity-60'
+                  : 'bg-primary text-primary-foreground hover:opacity-90'
+              )}
+              onClick={async () => {
+                if (preparingWhatsapp || !clienteTelefone || whatsappHref === '#') {
+                  toast.error('Telefone não cadastrado. Cadastre o telefone do cliente antes de enviar.');
+                  return;
+                }
+                navigator.clipboard.writeText(whatsappMessage).catch(() => {});
+                toast.success('Mensagem copiada! Abrindo WhatsApp...');
+                const ids = extratoGerado.lancamentos
+                  .filter(l => l.etapa_financeiro === 'cobranca_gerada' || (l.etapa_financeiro === 'solicitacao_criada' && l.extrato_id))
+                  .map(l => l.id);
+                const ok = await marcarLancamentosComoEnviados(ids);
+                if (!ok) return;
+                invalidateFinanceiro(queryClient);
+                handleClose();
+              }}
+            >
               <MessageCircle className="h-4 w-4" /> Enviar WhatsApp
-            </Button>
+            </a>
             <Button variant="outline" className="w-full gap-2 h-11" onClick={handleCompartilhar}>
               <Share2 className="h-4 w-4" /> Compartilhar PDF
             </Button>
             <Button variant="outline" className="w-full gap-2 h-11" onClick={handleBaixar}>
               <Download className="h-4 w-4" /> Baixar PDF
+            </Button>
+            <Button variant="outline" className="w-full gap-2 h-11" onClick={handleMarcarEnviado}>
+              <Send className="h-4 w-4" /> Marcar como enviado
             </Button>
             <Button variant="ghost" className="w-full text-muted-foreground h-11" onClick={handleClose}>
               Fazer depois
