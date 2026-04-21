@@ -2281,6 +2281,7 @@ export type Database = {
           cliente_apelido: string
           cliente_cnpj: string
           cliente_nome: string
+          cliente_nome_contador: string
           created_at: string
           data_vencimento: string
           empresa_config: Json
