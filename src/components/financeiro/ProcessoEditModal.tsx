@@ -159,7 +159,7 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
       }
       const { error: errProc } = await supabase
         .from('processos')
-        .update(procUpdates)
+        .update(procUpdates as any)
         .eq('id', processo.id);
       if (errProc) throw errProc;
 
@@ -177,7 +177,7 @@ export default function ProcessoEditModal({ open, onOpenChange, processo }: Proc
         }
         const { error: errLanc } = await supabase
           .from('lancamentos')
-          .update(lancUpdates)
+          .update(lancUpdates as any)
           .eq('id', lanc.id);
         if (errLanc) console.warn('Erro ao atualizar lançamento:', errLanc);
       }

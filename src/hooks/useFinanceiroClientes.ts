@@ -703,7 +703,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
       const { error } = await supabase
         .from('lancamentos')
-        .update(updates)
+        .update(updates as any)
         .eq('id', lancamentoId);
       if (error) throw error;
     },

@@ -115,7 +115,7 @@ export function useUpdateCliente() {
         if ((updates as any)[field] !== undefined) payload[field] = (updates as any)[field];
       }
 
-      const { data, error } = await supabase.from('clientes').update(payload).eq('id', id).select('*').single();
+      const { data, error } = await supabase.from('clientes').update(payload as any).eq('id', id).select('*').single();
       if (error) throw error;
       return data as Cliente;
     },
@@ -527,7 +527,7 @@ export function useUpdateLancamento() {
     mutationFn: async ({ id, ...updates }: Partial<Lancamento> & { id: string }) => {
       const { data, error } = await supabase
         .from('lancamentos')
-        .update({ ...updates, updated_at: new Date().toISOString() })
+        .update({ ...updates, updated_at: new Date().toISOString() } as any)
         .eq('id', id)
         .select()
         .single();

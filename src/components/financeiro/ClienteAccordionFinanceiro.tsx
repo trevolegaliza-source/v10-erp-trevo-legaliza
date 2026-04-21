@@ -1979,7 +1979,7 @@ function MoverParaMenu({ cliente }: { cliente: ClienteFinanceiro }) {
 
     const { error } = await supabase
       .from('lancamentos')
-      .update(updates)
+      .update(updates as any)
       .in('id', lancamentoIds);
 
     if (error) {

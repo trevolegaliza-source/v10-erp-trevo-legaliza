@@ -222,7 +222,7 @@ function AuditoriaItem({ cliente }: { cliente: ClienteFinanceiro }) {
         if (!cliente.cliente_telefone) updates.telefone = contactPhone;
       }
       if (Object.keys(updates).length > 0) {
-        await supabase.from('clientes').update(updates).eq('id', cliente.cliente_id);
+        await supabase.from('clientes').update(updates as any).eq('id', cliente.cliente_id);
         qc.invalidateQueries({ queryKey: ['financeiro_clientes'] });
         toast.success('Contato salvo!');
       }
