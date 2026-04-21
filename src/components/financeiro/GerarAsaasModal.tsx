@@ -47,12 +47,15 @@ export default function GerarAsaasModal({
 
   const gerarMut = useGerarAsaasCobranca();
 
+  // Ao abrir o modal, reseta estado. NÃO depender de vencimentoSugerido
+  // aqui — ele muda depois do gerar e zeraria a tela de resultado.
   useEffect(() => {
     if (open) {
-      setVencimento(vencimentoSugerido || addDaysISO(3));
+      setVencimento((prev) => prev || vencimentoSugerido || addDaysISO(3));
       setResultado(null);
     }
-  }, [open, vencimentoSugerido]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleGerar = async () => {
     if (!cobrancaId) { toast.error('Cobrança sem ID. Gere o extrato antes.'); return; }
