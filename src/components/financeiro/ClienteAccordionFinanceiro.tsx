@@ -53,8 +53,9 @@ import { buildWhatsappUrl } from '@/lib/open-whatsapp';
 import { getCobrancaTokenAtiva } from '@/hooks/useFinanceiroClientes';
 import { getCobrancaPublicUrl } from '@/lib/cobranca-url';
 import GerarAsaasModal from './GerarAsaasModal';
+import DetalhesCobrancaModal from './DetalhesCobrancaModal';
 import { useCobrancaAsaas } from '@/hooks/useAsaas';
-import { FileBadge } from 'lucide-react';
+import { FileBadge, Eye } from 'lucide-react';
 
 /** Programmatic open via real anchor click (used after WhatsappLinkButton click handlers). */
 function openWhatsApp(phone: string, message: string) {
@@ -877,7 +878,28 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
   const [regenerating, setRegenerating] = useState(false);
   const [loadingExtrato, setLoadingExtrato] = useState(false);
   const [whatsappMsgEnviar, setWhatsappMsgEnviar] = useState('');
+  const [detalhesOpen, setDetalhesOpen] = useState(false);
+  const [cobrancaIdAtiva, setCobrancaIdAtiva] = useState<string | null>(null);
   const { salvarExtrato } = useExtratos();
+
+  // Busca o ID da cobrança mais recente do cliente pra usar no modal de detalhes.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const extratoId = getExtratoIdAtual(cliente);
+      const { data } = await supabase
+        .from('cobrancas')
+        .select('id')
+        .eq('cliente_id', cliente.cliente_id)
+        .in('status', ['ativa', 'vencida', 'paga'])
+        .match(extratoId ? { extrato_id: extratoId } : {})
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (active) setCobrancaIdAtiva((data as any)?.id ?? null);
+    })();
+    return () => { active = false; };
+  }, [cliente]);
 
   const hasExtratoNoSistema = cliente.lancamentos.some(l => l.extrato_id);
 
@@ -1152,6 +1174,17 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
               variant="outline"
               onAfterClick={handleMarcarEnviado}
             />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDetalhesOpen(true)}
+              disabled={!cobrancaIdAtiva}
+              className="h-11 sm:h-9 text-primary border-primary/40 hover:bg-primary/10"
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Ver cobrança</span>
+              <span className="sm:hidden">Ver</span>
+            </Button>
             <Button size="sm" variant="outline" onClick={handleCopiarLinkCobranca} className="h-11 sm:h-9">
               <LinkIcon className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Copiar Link</span><span className="sm:hidden">Link</span>
             </Button>
@@ -1176,6 +1209,14 @@ function EnviarItem({ cliente }: { cliente: ClienteFinanceiro }) {
           </div>
         </div>
       </AccordionContent>
+      <DetalhesCobrancaModal
+        open={detalhesOpen}
+        onOpenChange={setDetalhesOpen}
+        cobrancaId={cobrancaIdAtiva}
+        clienteNome={cliente.cliente_apelido || cliente.cliente_nome}
+        clienteTelefone={cliente.cliente_telefone}
+        total={cliente.total_faturado}
+      />
     </AccordionItem>
   );
 }
@@ -1195,6 +1236,26 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
   const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split('T')[0]);
   const [loadingExtrato, setLoadingExtrato] = useState(false);
   const [selectedPagar, setSelectedPagar] = useState<Set<string>>(new Set());
+  const [detalhesOpen, setDetalhesOpen] = useState(false);
+  const [cobrancaIdAtiva, setCobrancaIdAtiva] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const extratoId = getExtratoIdAtual(cliente);
+      const { data } = await supabase
+        .from('cobrancas')
+        .select('id')
+        .eq('cliente_id', cliente.cliente_id)
+        .in('status', ['ativa', 'vencida', 'paga'])
+        .match(extratoId ? { extrato_id: extratoId } : {})
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (active) setCobrancaIdAtiva((data as any)?.id ?? null);
+    })();
+    return () => { active = false; };
+  }, [cliente]);
   const [contestarModal, setContestarModal] = useState<string | null>(null);
   const [contestarMotivo, setContestarMotivo] = useState('');
   const [contestarAnexo, setContestarAnexo] = useState<File | null>(null);
@@ -1493,6 +1554,17 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
                 label={`WhatsApp${cliente.cliente_telefone ? ` ${cliente.cliente_telefone}` : ''}`.trim()}
                 variant="outline"
               />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDetalhesOpen(true)}
+                disabled={!cobrancaIdAtiva}
+                className="h-11 sm:h-9 text-primary border-primary/40 hover:bg-primary/10"
+              >
+                <Eye className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Ver cobrança</span>
+                <span className="sm:hidden">Ver</span>
+              </Button>
               <Button size="sm" variant="outline" onClick={handleCopiarLinkCobrancaAguardando} className="h-11 sm:h-9">
                 <LinkIcon className="h-4 w-4 mr-1" /> <span className="hidden sm:inline">Copiar Link</span><span className="sm:hidden">Link</span>
               </Button>
@@ -1648,6 +1720,15 @@ function AguardandoItem({ cliente, contestarLancamento }: { cliente: ClienteFina
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DetalhesCobrancaModal
+        open={detalhesOpen}
+        onOpenChange={setDetalhesOpen}
+        cobrancaId={cobrancaIdAtiva}
+        clienteNome={cliente.cliente_apelido || cliente.cliente_nome}
+        clienteTelefone={cliente.cliente_telefone}
+        total={cliente.total_faturado}
+      />
     </>
   );
 }

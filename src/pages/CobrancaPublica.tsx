@@ -22,8 +22,10 @@ import {
   XCircle,
   FileText,
   Calendar,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import logoTrevo from '@/assets/logo-trevo.png';
 
 interface Taxa {
@@ -287,322 +289,296 @@ export default function CobrancaPublica() {
     : diffDias <= 2 ? 'text-amber-400'
     : 'text-emerald-400';
 
+  const temAsaas = !!cobranca.asaas?.pix_payload;
+  const pixValueToCopy = cobranca.asaas?.pix_payload || empresa.pix_chave;
+
+  const copyPix = async () => {
+    try {
+      await navigator.clipboard.writeText(pixValueToCopy);
+      setCopied(true);
+      toast.success(temAsaas ? 'PIX copia-e-cola copiado!' : 'Chave PIX copiada!');
+      setTimeout(() => setCopied(false), 3000);
+    } catch { toast.error('Não foi possível copiar.'); }
+  };
+
+  const copyBoleto = async () => {
+    try {
+      await navigator.clipboard.writeText(cobranca.asaas!.boleto_barcode!);
+      toast.success('Linha digitável copiada!');
+    } catch { toast.error('Não foi possível copiar.'); }
+  };
+
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
-      {/* Hero com gradiente verde */}
-      <div className="bg-gradient-to-br from-emerald-950/60 via-background to-background border-b border-emerald-500/10">
-        <div className="max-w-2xl mx-auto px-4 pt-8 pb-6 text-center space-y-3">
-          <img src={logoTrevo} alt="Trevo Legaliza" className="h-16 mx-auto" />
-          <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-[0.3em] text-emerald-400/70 font-medium">Cobrança Oficial</p>
-            <p className="text-[11px] text-muted-foreground/70">
-              {empresa.nome} · CNPJ {empresa.cnpj}
+    <div className="dark min-h-screen bg-background text-foreground font-sans">
+      {/* Cabeçalho minimalista */}
+      <header className="border-b border-border/30">
+        <div className="max-w-xl mx-auto px-5 py-4 flex items-center justify-between">
+          <img src={logoTrevo} alt="Trevo Legaliza" className="h-8" />
+          <div className="text-right">
+            <p className="text-[9px] uppercase tracking-[0.25em] text-muted-foreground/70 font-semibold">
+              Cobrança Oficial
             </p>
+            <p className="text-[10px] text-muted-foreground/60">CNPJ {empresa.cnpj}</p>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
-        {/* Card principal — saudação + status + vencimento */}
-        <Card className="bg-card border-border shadow-lg">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1 min-w-0 flex-1">
-                <h1 className="text-2xl sm:text-3xl font-bold truncate">Olá, {saudacao}!</h1>
-                <p className="text-sm text-muted-foreground">
-                  Aqui está o resumo da sua cobrança
-                </p>
+      <main className="max-w-xl mx-auto px-5 py-8 space-y-8">
+        {/* HERO — valor gigante + saudação */}
+        <section className="text-center space-y-3 pt-4">
+          <p className="text-sm text-muted-foreground">
+            Olá, <span className="font-medium text-foreground">{saudacao}</span>
+          </p>
+          <p className="text-[11px] uppercase tracking-widest text-muted-foreground/70 font-semibold">
+            {isPaga ? 'Valor pago' : 'Valor a pagar'}
+          </p>
+          <h1 className="text-6xl sm:text-7xl font-bold tabular-nums tracking-tight text-primary leading-none">
+            {fmtBRL(cobranca.total_geral)}
+          </h1>
+          {!isPaga && vencimentoLabel && (
+            <div className="inline-flex items-center gap-2 mt-2">
+              <div className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold',
+                diffDias != null && diffDias < 0
+                  ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                  : diffDias != null && diffDias <= 2
+                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                  : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+              )}>
+                <Calendar className="h-3 w-3" />
+                {vencimentoLabel}
               </div>
-              <Badge variant="outline" className={`${statusInfo.className} shrink-0`}>
-                {statusInfo.label}
-              </Badge>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/50">
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Emissão</p>
-                <p className="text-sm font-medium mt-1">{fmtData(cobranca.created_at)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Vencimento</p>
-                <p className="text-sm font-medium mt-1">{fmtData(cobranca.data_vencimento)}</p>
-                {vencimentoLabel && !isPaga && (
-                  <p className={`text-xs font-semibold mt-0.5 ${vencimentoCls}`}>
-                    {vencimentoLabel}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {isPaga && (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 flex items-center gap-3">
-                <CheckCircle2 className="h-8 w-8 text-emerald-400 shrink-0" />
-                <div>
-                  <p className="font-semibold text-emerald-300">Pagamento confirmado!</p>
-                  {cobranca.pago_em && (
-                    <p className="text-xs text-emerald-300/80">
-                      Recebido em {fmtData(cobranca.pago_em)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Lista de processos */}
-        <Card className="bg-card border-border">
-          <CardContent className="p-6">
-            <h2 className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
-              Processos cobrados
-            </h2>
-            <Accordion type="multiple" className="space-y-2">
-              {cobranca.lancamentos.map((l) => {
-                const tipoCls = TIPO_BADGE[l.tipo_processo || 'avulso'] ?? TIPO_BADGE.avulso;
-                const temTaxas = l.taxas && l.taxas.length > 0;
-                return (
-                  <AccordionItem
-                    key={l.id}
-                    value={l.id}
-                    className="border border-border/60 rounded-lg px-3"
-                  >
-                    <AccordionTrigger className="hover:no-underline py-3">
-                      <div className="flex items-center justify-between gap-2 w-full pr-2">
-                        <div className="text-left flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {l.razao_social || l.descricao}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            {l.tipo_processo && (
-                              <Badge variant="outline" className={`text-[10px] ${tipoCls}`}>
-                                {l.tipo_processo}
-                              </Badge>
-                            )}
-                            {temTaxas && (
-                              <span className="text-[10px] text-muted-foreground">
-                                +{l.taxas.length} taxa(s)
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <span className="font-semibold tabular-nums shrink-0">
-                          {fmtBRL(l.valor)}
-                        </span>
-                      </div>
-                    </AccordionTrigger>
-                    {temTaxas && (
-                      <AccordionContent className="pb-3">
-                        <div className="space-y-1 pt-2 border-t border-border/40">
-                          {l.taxas.map((t, i) => (
-                            <div key={i} className="flex justify-between text-xs">
-                              <span className="text-muted-foreground">{t.descricao}</span>
-                              <span className="tabular-nums">{fmtBRL(t.valor)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    )}
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
-          </CardContent>
-        </Card>
-
-        {/* Totais */}
-        <Card className="bg-card border-border">
-          <CardContent className="p-6 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Honorários</span>
-              <span className="tabular-nums">{fmtBRL(cobranca.total_honorarios)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Taxas / Reembolsos</span>
-              <span className="tabular-nums">{fmtBRL(cobranca.total_taxas)}</span>
-            </div>
-            <div className="flex justify-between items-center pt-3 border-t border-border">
-              <span className="text-sm uppercase tracking-wide text-muted-foreground">Total</span>
-              <span className="text-3xl font-bold text-primary tabular-nums">
-                {fmtBRL(cobranca.total_geral)}
+              <span className="text-xs text-muted-foreground">
+                · {fmtData(cobranca.data_vencimento)}
               </span>
             </div>
-          </CardContent>
-        </Card>
+          )}
+          {isPaga && (
+            <div className="inline-flex items-center gap-2 mt-2 px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-sm font-semibold">
+              <CheckCircle2 className="h-4 w-4" />
+              Pagamento confirmado{cobranca.pago_em && ` em ${fmtData(cobranca.pago_em)}`}
+            </div>
+          )}
+        </section>
 
-        {/* Pagamento (oculto se paga) */}
-        {!isPaga && (() => {
-          const temAsaas = !!cobranca.asaas?.pix_payload;
-          const pixValueToCopy = cobranca.asaas?.pix_payload || empresa.pix_chave;
-          const pixQrValue = cobranca.asaas?.pix_qrcode
-            ? null // usa imagem base64 direto
-            : (cobranca.asaas?.pix_payload || empresa.pix_chave);
+        {/* Botão principal PIX — dominante, impossível de errar */}
+        {!isPaga && (
+          <section className="space-y-3">
+            <button
+              onClick={copyPix}
+              className={cn(
+                'w-full h-16 rounded-xl font-bold text-base transition-all',
+                'flex items-center justify-center gap-2',
+                'bg-primary text-primary-foreground hover:opacity-95 active:scale-[0.99]',
+                'shadow-[0_0_0_1px_hsl(var(--primary)/0.3),0_8px_24px_-6px_hsl(var(--primary)/0.35)]',
+                copied && 'bg-emerald-600 text-emerald-50'
+              )}
+            >
+              {copied ? (
+                <><Check className="h-5 w-5" /> Código PIX copiado!</>
+              ) : (
+                <><Copy className="h-5 w-5" /> {temAsaas ? 'Copiar PIX copia-e-cola' : 'Copiar chave PIX'}</>
+              )}
+            </button>
+            <p className="text-xs text-center text-muted-foreground">
+              {temAsaas
+                ? 'Cole no app do seu banco · pagamento instantâneo'
+                : 'Após copiar a chave, informe o valor no app do banco'}
+            </p>
+          </section>
+        )}
 
-          return (
-            <>
-              {/* Botão principal: PIX copia-e-cola em DESTAQUE (mobile-first) */}
-              <Card className="bg-gradient-to-br from-emerald-900/30 to-emerald-950/40 border-emerald-500/40 shadow-lg">
-                <CardContent className="p-5 space-y-4">
-                  <div className="text-center space-y-1">
-                    <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-xs font-semibold">
-                      <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" /> PAGAMENTO INSTANTÂNEO
-                    </div>
-                    <h2 className="text-xl font-bold text-emerald-50 mt-2">Pague via PIX</h2>
-                    <p className="text-xs text-emerald-200/60">
-                      {temAsaas
-                        ? 'Copie o código abaixo e cole no app do seu banco'
-                        : 'Aponte a câmera ou copie a chave abaixo'}
-                    </p>
-                  </div>
+        {/* QR Code colapsável — alternativa discreta */}
+        {!isPaga && (
+          <details className="group border-t border-border/30 pt-4">
+            <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-2 select-none">
+              <span>Preferir QR Code?</span>
+              <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+            </summary>
+            <div className="mt-5 flex flex-col items-center gap-3">
+              <div className="bg-white p-4 rounded-2xl shadow-sm">
+                {cobranca.asaas?.pix_qrcode ? (
+                  <img
+                    src={`data:image/png;base64,${cobranca.asaas.pix_qrcode}`}
+                    alt="QR Code PIX"
+                    className="h-[200px] w-[200px]"
+                  />
+                ) : (
+                  <QRCodeSVG value={pixValueToCopy} size={200} level="M" />
+                )}
+              </div>
+              {!temAsaas && (
+                <p className="text-[11px] text-amber-400/90 text-center max-w-xs">
+                  QR estático — você precisará digitar o valor manualmente no app.
+                </p>
+              )}
+            </div>
+          </details>
+        )}
 
-                  {/* Botão principal: PIX copia-e-cola */}
-                  <Button
-                    size="lg"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(pixValueToCopy);
-                        setCopied(true);
-                        toast.success(temAsaas ? 'PIX copia-e-cola copiado!' : 'Chave PIX copiada!');
-                        setTimeout(() => setCopied(false), 3000);
-                      } catch {
-                        toast.error('Não foi possível copiar.');
-                      }
-                    }}
-                    className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 text-emerald-950 font-bold text-base gap-2"
-                  >
-                    {copied ? (
-                      <><Check className="h-5 w-5" /> Código copiado!</>
-                    ) : (
-                      <><Copy className="h-5 w-5" /> {temAsaas ? 'Copiar PIX copia-e-cola' : 'Copiar chave PIX'}</>
-                    )}
-                  </Button>
-
-                  {/* QR Code colapsado (alternativa pra quem lê QR) */}
-                  <details className="group">
-                    <summary className="cursor-pointer text-center text-xs text-emerald-200/70 hover:text-emerald-200 select-none">
-                      Preferir QR Code? <span className="underline">Clique pra expandir</span>
-                    </summary>
-                    <div className="mt-3 flex flex-col items-center gap-2">
-                      <div className="bg-white p-3 rounded-lg">
-                        {cobranca.asaas?.pix_qrcode ? (
-                          <img
-                            src={`data:image/png;base64,${cobranca.asaas.pix_qrcode}`}
-                            alt="QR Code PIX"
-                            className="h-[160px] w-[160px]"
-                          />
-                        ) : (
-                          <QRCodeSVG value={pixQrValue!} size={160} level="M" />
-                        )}
-                      </div>
-                      {!temAsaas && (
-                        <p className="text-[10px] text-amber-300/80 text-center max-w-xs">
-                          ⚠️ QR estático: você precisará digitar o valor manualmente no app do banco.
-                        </p>
+        {/* Processos cobrados — lista limpa, sem accordion */}
+        <section className="border-t border-border/30 pt-6 space-y-3">
+          <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground/70 font-semibold">
+            Processos cobrados
+          </h2>
+          <div className="divide-y divide-border/40 border border-border/40 rounded-xl bg-card/50">
+            {cobranca.lancamentos.map((l) => {
+              const tipoCls = TIPO_BADGE[l.tipo_processo || 'avulso'] ?? TIPO_BADGE.avulso;
+              const temTaxas = l.taxas && l.taxas.length > 0;
+              return (
+                <div key={l.id} className="p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm leading-snug">
+                        {l.razao_social || l.descricao}
+                      </p>
+                      {l.tipo_processo && (
+                        <Badge variant="outline" className={cn('text-[10px] mt-1.5 border', tipoCls)}>
+                          {l.tipo_processo}
+                        </Badge>
                       )}
                     </div>
-                  </details>
-
-                  <p className="text-[10px] text-center text-emerald-200/50">
-                    {empresa.pix_banco} · CNPJ {empresa.cnpj}
-                  </p>
-                </CardContent>
-              </Card>
-
-              {/* Boleto (se Asaas gerou) */}
-              {cobranca.asaas?.boleto_url && (
-                <Card className="bg-card border-border">
-                  <CardContent className="p-5 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <h3 className="text-sm font-semibold">Preferir boleto bancário?</h3>
-                    </div>
-
-                    <Button asChild variant="outline" className="w-full gap-2">
-                      <a href={cobranca.asaas.boleto_url} target="_blank" rel="noopener noreferrer">
-                        <Download className="h-4 w-4" /> Baixar boleto em PDF
-                      </a>
-                    </Button>
-
-                    {cobranca.asaas.boleto_barcode && (
-                      <div className="space-y-1">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-                          Linha digitável
-                        </p>
-                        <div className="flex items-center gap-2 bg-background/60 border border-border rounded-lg p-3">
-                          <code className="flex-1 text-[11px] font-mono break-all leading-relaxed">
-                            {cobranca.asaas.boleto_barcode}
-                          </code>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="shrink-0"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(cobranca.asaas!.boleto_barcode!);
-                                toast.success('Linha digitável copiada!');
-                              } catch {
-                                toast.error('Não foi possível copiar.');
-                              }
-                            }}
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
+                    <span className="font-semibold tabular-nums shrink-0 text-sm">
+                      {fmtBRL(l.valor)}
+                    </span>
+                  </div>
+                  {temTaxas && (
+                    <div className="pt-2 pl-3 space-y-0.5 border-l-2 border-border/40">
+                      {l.taxas.map((t, i) => (
+                        <div key={i} className="flex justify-between text-[11px] text-muted-foreground">
+                          <span>+ {t.descricao}</span>
+                          <span className="tabular-nums">{fmtBRL(t.valor)}</span>
                         </div>
-                      </div>
-                    )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-                    {cobranca.asaas.invoice_url && (
-                      <Button asChild variant="ghost" size="sm" className="w-full text-xs text-muted-foreground">
-                        <a href={cobranca.asaas.invoice_url} target="_blank" rel="noopener noreferrer">
-                          Ver página oficial Asaas →
-                        </a>
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
+          {/* Totais */}
+          <div className="pt-2 space-y-1">
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Honorários</span>
+              <span className="tabular-nums">{fmtBRL(cobranca.total_honorarios)}</span>
+            </div>
+            {cobranca.total_taxas > 0 && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Taxas / Reembolsos</span>
+                <span className="tabular-nums">{fmtBRL(cobranca.total_taxas)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center pt-2 mt-2 border-t border-border/40">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Total</span>
+              <span className="text-xl font-bold tabular-nums">{fmtBRL(cobranca.total_geral)}</span>
+            </div>
+          </div>
+        </section>
 
-              {/* Se não tem Asaas ainda, aviso discreto */}
-              {!temAsaas && (
-                <Card className="bg-muted/30 border-border/50">
-                  <CardContent className="p-4 text-center">
-                    <p className="text-xs text-muted-foreground">
-                      Prefere pagar por <strong>boleto</strong>? Solicite à nossa equipe pelo WhatsApp.
-                    </p>
-                  </CardContent>
-                </Card>
+        {/* Boleto — secundário, só se Asaas gerou */}
+        {!isPaga && cobranca.asaas?.boleto_url && (
+          <section className="border-t border-border/30 pt-6 space-y-3">
+            <h2 className="text-[11px] uppercase tracking-widest text-muted-foreground/70 font-semibold">
+              Preferir boleto bancário?
+            </h2>
+            <div className="space-y-2.5">
+              <a
+                href={cobranca.asaas.boleto_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 h-12 rounded-xl border border-border bg-card hover:bg-accent transition-colors text-sm font-medium"
+              >
+                <Download className="h-4 w-4" /> Baixar boleto em PDF
+              </a>
+              {cobranca.asaas.boleto_barcode && (
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">
+                    Linha digitável
+                  </p>
+                  <div className="flex items-center gap-2 bg-background/50 border border-border/60 rounded-lg p-3">
+                    <code className="flex-1 text-[11px] font-mono break-all leading-relaxed text-muted-foreground">
+                      {cobranca.asaas.boleto_barcode}
+                    </code>
+                    <button
+                      onClick={copyBoleto}
+                      className="shrink-0 h-8 w-8 rounded-md hover:bg-accent flex items-center justify-center"
+                      aria-label="Copiar linha digitável"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
               )}
-            </>
-          );
-        })()}
+              {cobranca.asaas.invoice_url && (
+                <a
+                  href={cobranca.asaas.invoice_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center text-xs text-muted-foreground hover:text-foreground pt-1"
+                >
+                  Ver página oficial Asaas →
+                </a>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Aviso pra quem não tem boleto ainda */}
+        {!isPaga && !cobranca.asaas?.boleto_url && (
+          <section className="border-t border-border/30 pt-6">
+            <p className="text-xs text-muted-foreground text-center">
+              Precisa de <strong className="text-foreground">boleto bancário</strong>? Fale com a gente pelo WhatsApp.
+            </p>
+          </section>
+        )}
 
         {/* Ações secundárias */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Button variant="outline" onClick={baixarExtrato} className="gap-2">
-            <Download className="h-4 w-4" /> Baixar PDF
-          </Button>
-          <Button variant="outline" onClick={abrirWhatsApp} className="gap-2">
+        <section className="border-t border-border/30 pt-6 grid grid-cols-2 gap-3">
+          <button
+            onClick={baixarExtrato}
+            className="flex items-center justify-center gap-2 h-11 rounded-lg border border-border bg-card hover:bg-accent transition-colors text-sm"
+          >
+            <Download className="h-4 w-4" /> Baixar extrato
+          </button>
+          <button
+            onClick={abrirWhatsApp}
+            className="flex items-center justify-center gap-2 h-11 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-sm font-medium"
+          >
             <MessageCircle className="h-4 w-4" /> Tirar dúvida
-          </Button>
-        </div>
+          </button>
+        </section>
+
+        {/* Dados de emissão */}
+        <section className="border-t border-border/30 pt-4 grid grid-cols-2 gap-4 text-xs">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold">Emissão</p>
+            <p className="mt-1">{fmtData(cobranca.created_at)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-semibold">Vencimento</p>
+            <p className="mt-1">{fmtData(cobranca.data_vencimento)}</p>
+          </div>
+        </section>
 
         {/* Footer */}
-        <footer className="text-center pt-6 pb-4 space-y-1">
+      </main>
+
+      <footer className="border-t border-border/30 mt-4">
+        <div className="max-w-xl mx-auto px-5 py-6 text-center space-y-1.5">
           <p className="text-xs text-muted-foreground">
-            Esta cobrança é oficial da {empresa.nome}
+            Esta cobrança é oficial da <strong className="text-foreground">{empresa.nome}</strong>
           </p>
           <a
             href={`https://${empresa.site}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline"
+            className="text-xs text-primary hover:underline inline-block"
           >
             {empresa.site}
           </a>
-          <p className="text-[10px] text-muted-foreground/70">
-            Cobrança gerada em {fmtData(cobranca.created_at)}
-          </p>
-        </footer>
-      </div>
+        </div>
+      </footer>
     </div>
   );
 }
