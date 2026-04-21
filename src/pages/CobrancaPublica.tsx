@@ -68,6 +68,7 @@ interface CobrancaData {
   cliente_nome: string;
   cliente_apelido: string | null;
   cliente_cnpj: string | null;
+  cliente_nome_contador: string | null;
   total_honorarios: number;
   total_taxas: number;
   total_geral: number;
@@ -310,31 +311,44 @@ export default function CobrancaPublica() {
 
   return (
     <div className="dark min-h-screen bg-background text-foreground font-sans relative overflow-hidden">
-      {/* Background ambient — glow verde sutil no topo */}
+      {/* Background ambient — glow verde intenso no topo */}
       <div
         aria-hidden
-        className="absolute inset-x-0 top-0 h-[500px] pointer-events-none"
+        className="absolute inset-x-0 top-0 h-[800px] pointer-events-none"
         style={{
           background:
-            'radial-gradient(ellipse 80% 50% at 50% 0%, hsl(142 71% 45% / 0.10) 0%, transparent 70%)',
+            'radial-gradient(ellipse 90% 60% at 50% 0%, hsl(142 71% 45% / 0.22) 0%, hsl(142 71% 45% / 0.08) 35%, transparent 75%)',
+        }}
+      />
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[400px] pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 40% 30% at 50% 0%, hsl(142 71% 60% / 0.25) 0%, transparent 80%)',
         }}
       />
 
       {/* Hero Header — identidade forte */}
-      <header className="relative border-b border-emerald-500/10 bg-gradient-to-b from-emerald-950/40 to-transparent">
-        <div className="max-w-xl mx-auto px-5 pt-8 pb-6 text-center space-y-3">
-          <img src={logoTrevo} alt="Trevo Legaliza" className="h-20 sm:h-24 mx-auto drop-shadow-[0_4px_20px_rgba(34,197,94,0.25)]" />
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+      <header className="relative border-b border-emerald-500/20 bg-gradient-to-b from-emerald-950/60 to-transparent">
+        <div className="max-w-xl mx-auto px-5 pt-10 pb-8 text-center space-y-4">
+          <img
+            src={logoTrevo}
+            alt="Trevo Legaliza"
+            className="h-28 sm:h-32 mx-auto"
+            style={{ filter: 'drop-shadow(0 0 24px rgba(34,197,94,0.45)) drop-shadow(0 6px 16px rgba(34,197,94,0.25))' }}
+          />
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 shadow-[0_0_20px_rgba(34,197,94,0.25)]">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
               </span>
-              <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300 font-semibold">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-emerald-200 font-semibold">
                 Cobrança Digital Oficial
               </p>
             </div>
-            <p className="text-xs text-muted-foreground/70 pt-1">
+            <p className="text-xs text-muted-foreground/70 pt-0.5">
               {empresa.nome} · CNPJ {empresa.cnpj}
             </p>
           </div>
@@ -351,8 +365,11 @@ export default function CobrancaPublica() {
             {isPaga ? 'Valor pago' : 'Valor a pagar'}
           </p>
           <h1
-            className="text-6xl sm:text-7xl font-bold tabular-nums tracking-tight text-primary leading-none"
-            style={{ textShadow: '0 0 40px hsl(142 71% 45% / 0.35)' }}
+            className="text-5xl sm:text-6xl font-bold tabular-nums tracking-tight text-primary leading-none"
+            style={{
+              textShadow:
+                '0 0 12px hsl(142 71% 55% / 0.6), 0 0 36px hsl(142 71% 45% / 0.4), 0 0 70px hsl(142 71% 40% / 0.3)',
+            }}
           >
             {fmtBRL(cobranca.total_geral)}
           </h1>
@@ -570,16 +587,18 @@ export default function CobrancaPublica() {
           </button>
         </section>
 
-        {/* Seção Dani — IA da Trevo */}
-        <section className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/40 via-background to-emerald-950/20 p-5">
+        {/* Seção Dani — IA da Trevo (primeira pessoa, personalizada) */}
+        <section className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/50 via-background to-emerald-950/30 p-5 shadow-[0_0_40px_rgba(34,197,94,0.15)]">
           <div
             aria-hidden
-            className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"
+            className="absolute -right-24 -top-24 w-72 h-72 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none"
           />
           <div className="relative flex items-start gap-4">
             <div className="shrink-0">
               <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center text-2xl">
+                <div
+                  className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(34,197,94,0.45)]"
+                >
                   🤖
                 </div>
                 <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-emerald-500 rounded-full border-2 border-background flex items-center justify-center">
@@ -587,16 +606,22 @@ export default function CobrancaPublica() {
                 </span>
               </div>
             </div>
-            <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex-1 min-w-0 space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-bold text-emerald-300">Dani</h3>
+                <h3 className="font-bold text-emerald-300 text-base">Dani</h3>
                 <span className="text-[10px] uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">
-                  Atendimento IA · Trevo
+                  IA da Trevo
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Esta cobrança foi gerada e enviada <strong className="text-foreground">automaticamente</strong> pela Dani,
-                nossa inteligência artificial. Ela acompanha processos, envia lembretes e responde comentários 24h por dia.
+              <p className="text-sm text-foreground/90 leading-relaxed">
+                {cobranca.cliente_nome_contador ? (
+                  <>Olá, <strong className="text-emerald-300">{cobranca.cliente_nome_contador}</strong>! </>
+                ) : (
+                  <>Olá! </>
+                )}
+                Sou a <strong className="text-emerald-300">Dani</strong>, inteligência artificial da Trevo Legaliza.
+                Fui eu quem gerou esta cobrança automaticamente e estou acompanhando seu processo 24 horas por dia.
+                Qualquer dúvida, chama a gente no WhatsApp que eu sigo cuidando de tudo por aqui. 🍀
               </p>
               <p className="text-[11px] text-emerald-400/80">
                 Trevo Legaliza · Assessoria societária com tecnologia de ponta
