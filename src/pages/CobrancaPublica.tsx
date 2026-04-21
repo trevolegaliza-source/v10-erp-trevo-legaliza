@@ -309,30 +309,51 @@ export default function CobrancaPublica() {
   };
 
   return (
-    <div className="dark min-h-screen bg-background text-foreground font-sans">
-      {/* Cabeçalho minimalista */}
-      <header className="border-b border-border/30">
-        <div className="max-w-xl mx-auto px-5 py-4 flex items-center justify-between">
-          <img src={logoTrevo} alt="Trevo Legaliza" className="h-8" />
-          <div className="text-right">
-            <p className="text-[9px] uppercase tracking-[0.25em] text-muted-foreground/70 font-semibold">
-              Cobrança Oficial
+    <div className="dark min-h-screen bg-background text-foreground font-sans relative overflow-hidden">
+      {/* Background ambient — glow verde sutil no topo */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[500px] pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 50% at 50% 0%, hsl(142 71% 45% / 0.10) 0%, transparent 70%)',
+        }}
+      />
+
+      {/* Hero Header — identidade forte */}
+      <header className="relative border-b border-emerald-500/10 bg-gradient-to-b from-emerald-950/40 to-transparent">
+        <div className="max-w-xl mx-auto px-5 pt-8 pb-6 text-center space-y-3">
+          <img src={logoTrevo} alt="Trevo Legaliza" className="h-20 sm:h-24 mx-auto drop-shadow-[0_4px_20px_rgba(34,197,94,0.25)]" />
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-300 font-semibold">
+                Cobrança Digital Oficial
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground/70 pt-1">
+              {empresa.nome} · CNPJ {empresa.cnpj}
             </p>
-            <p className="text-[10px] text-muted-foreground/60">CNPJ {empresa.cnpj}</p>
           </div>
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-5 py-8 space-y-8">
+      <main className="relative max-w-xl mx-auto px-5 py-8 space-y-8">
         {/* HERO — valor gigante + saudação */}
-        <section className="text-center space-y-3 pt-4">
+        <section className="text-center space-y-3 pt-2">
           <p className="text-sm text-muted-foreground">
             Olá, <span className="font-medium text-foreground">{saudacao}</span>
           </p>
           <p className="text-[11px] uppercase tracking-widest text-muted-foreground/70 font-semibold">
             {isPaga ? 'Valor pago' : 'Valor a pagar'}
           </p>
-          <h1 className="text-6xl sm:text-7xl font-bold tabular-nums tracking-tight text-primary leading-none">
+          <h1
+            className="text-6xl sm:text-7xl font-bold tabular-nums tracking-tight text-primary leading-none"
+            style={{ textShadow: '0 0 40px hsl(142 71% 45% / 0.35)' }}
+          >
             {fmtBRL(cobranca.total_geral)}
           </h1>
           {!isPaga && vencimentoLabel && (
@@ -549,6 +570,88 @@ export default function CobrancaPublica() {
           </button>
         </section>
 
+        {/* Seção Dani — IA da Trevo */}
+        <section className="relative overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/40 via-background to-emerald-950/20 p-5">
+          <div
+            aria-hidden
+            className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"
+          />
+          <div className="relative flex items-start gap-4">
+            <div className="shrink-0">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-700 flex items-center justify-center text-2xl">
+                  🤖
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-emerald-500 rounded-full border-2 border-background flex items-center justify-center">
+                  <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+                </span>
+              </div>
+            </div>
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-emerald-300">Dani</h3>
+                <span className="text-[10px] uppercase tracking-wider bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">
+                  Atendimento IA · Trevo
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Esta cobrança foi gerada e enviada <strong className="text-foreground">automaticamente</strong> pela Dani,
+                nossa inteligência artificial. Ela acompanha processos, envia lembretes e responde comentários 24h por dia.
+              </p>
+              <p className="text-[11px] text-emerald-400/80">
+                Trevo Legaliza · Assessoria societária com tecnologia de ponta
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Siga a Trevo */}
+        <section className="text-center space-y-3 border-t border-border/30 pt-6">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/70 font-semibold">
+            Siga a Trevo Legaliza
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <a
+              href="https://instagram.com/trevolegaliza"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram Trevo Legaliza"
+              className="w-11 h-11 rounded-full border border-border/50 bg-card hover:bg-accent hover:border-emerald-500/30 transition-colors flex items-center justify-center"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="5" />
+                <circle cx="12" cy="12" r="4" />
+                <circle cx="17.5" cy="6.5" r="1" fill="currentColor" />
+              </svg>
+            </a>
+            <a
+              href="https://wa.me/5511934927001"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="WhatsApp Trevo Legaliza"
+              className="w-11 h-11 rounded-full border border-border/50 bg-card hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-400 transition-colors flex items-center justify-center"
+            >
+              <MessageCircle className="h-5 w-5" />
+            </a>
+            <a
+              href={`https://${empresa.site}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Site Trevo Legaliza"
+              className="w-11 h-11 rounded-full border border-border/50 bg-card hover:bg-accent hover:border-emerald-500/30 transition-colors flex items-center justify-center"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z" />
+              </svg>
+            </a>
+          </div>
+          <p className="text-xs text-muted-foreground/70">
+            <strong className="text-foreground">12 anos</strong> · <strong className="text-foreground">24+ estados</strong> · <strong className="text-foreground">100% digital</strong>
+          </p>
+        </section>
+
         {/* Dados de emissão */}
         <section className="border-t border-border/30 pt-4 grid grid-cols-2 gap-4 text-xs">
           <div>
@@ -560,8 +663,6 @@ export default function CobrancaPublica() {
             <p className="mt-1">{fmtData(cobranca.data_vencimento)}</p>
           </div>
         </section>
-
-        {/* Footer */}
       </main>
 
       <footer className="border-t border-border/30 mt-4">
