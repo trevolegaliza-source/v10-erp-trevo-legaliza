@@ -77,9 +77,16 @@ export default function DetalhesCobrancaModal({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="sm:max-w-md border-zinc-800 text-zinc-100"
-          style={{ backgroundColor: 'hsl(160 10% 8%)' }}
+          className="sm:max-w-md text-zinc-100 max-h-[85vh] overflow-y-auto p-0 border-2"
+          style={{
+            backgroundColor: '#0d1310',
+            borderColor: '#2a3530',
+            isolation: 'isolate',
+            zIndex: 60,
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.04)',
+          }}
         >
+          <div className="p-6 space-y-4" style={{ backgroundColor: '#0d1310' }}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-zinc-50">
               <FileBadge className="h-5 w-5 text-emerald-400" />
@@ -101,8 +108,8 @@ export default function DetalhesCobrancaModal({
                   <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
                 </div>
               ) : publicUrl ? (
-                <div className="flex items-center gap-2 bg-zinc-900/60 border border-zinc-800 rounded-lg p-2">
-                  <code className="flex-1 text-[11px] font-mono truncate text-zinc-300">{publicUrl}</code>
+                <div className="flex items-center gap-2 bg-zinc-900/60 border border-zinc-800 rounded-lg p-2 min-w-0">
+                  <code className="flex-1 min-w-0 text-[11px] font-mono truncate text-zinc-300">{publicUrl}</code>
                   <button
                     onClick={() => copyText(publicUrl, 'Link')}
                     className="p-1.5 rounded hover:bg-zinc-800 text-zinc-300"
@@ -221,6 +228,7 @@ export default function DetalhesCobrancaModal({
                 )}
               </div>
             )}
+          </div>
           </div>
         </DialogContent>
       </Dialog>
