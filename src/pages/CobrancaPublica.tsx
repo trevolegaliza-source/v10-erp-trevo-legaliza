@@ -124,7 +124,7 @@ export default function CobrancaPublica() {
     if (!cobranca) return;
     const title = `Cobrança — ${cobranca.cliente_apelido || cobranca.cliente_nome} — Trevo Legaliza`;
     const description = `Cobrança oficial no valor de R$ ${Number(cobranca.total_geral).toFixed(2).replace('.', ',')}. Pague via PIX ou boleto com segurança.`;
-    const image = 'https://trevolegaliza.lovable.app/og-cobranca.png';
+    const image = 'https://cobranca.trevolegaliza.com/og-cobranca.png';
 
     document.title = title;
 
