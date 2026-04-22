@@ -29,6 +29,7 @@ import ProvisaoBarra from '@/components/contas-pagar/ProvisaoBarra';
 import DespesaFormModal from '@/components/contas-pagar/DespesaFormModal';
 import RecorrenteFormModal from '@/components/contas-pagar/RecorrenteFormModal';
 import MarcarPagoModal from '@/components/contas-pagar/MarcarPagoModal';
+import MarcarPagoBulkModal from '@/components/contas-pagar/MarcarPagoBulkModal';
 import ImportarFolhaModal from '@/components/contas-pagar/ImportarFolhaModal';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 
@@ -44,6 +45,7 @@ import {
   useUpdateRecorrente,
   useToggleRecorrente,
   useDeleteRecorrente,
+  useMarcarPagoBulk,
   gerarLancamentosRecorrentes,
 } from '@/hooks/useContasPagar';
 import { useColaboradores } from '@/hooks/useColaboradores';
@@ -129,6 +131,8 @@ export default function ContasPagar() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showBulkPayModal, setShowBulkPayModal] = useState(false);
+  const marcarPagoBulk = useMarcarPagoBulk();
   const [activeTab, setActiveTab] = useState('urgencia');
   const [diasAlerta, setDiasAlerta] = useState(() => parseInt(localStorage.getItem('trevo_dias_alerta_pagar') || '7'));
   const [kpiFilter, setKpiFilter] = useState<KpiFilter>('total');
@@ -479,9 +483,20 @@ export default function ContasPagar() {
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={exitSelectionMode}>Cancelar</Button>
-              <Button variant="destructive" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
-                Excluir Seleção
-              </Button>
+              {podeAprovar('contas_pagar') && (
+                <Button
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                  onClick={() => setShowBulkPayModal(true)}
+                >
+                  <CheckCircle className="h-3.5 w-3.5" /> Marcar Pagos
+                </Button>
+              )}
+              {podeExcluir('contas_pagar') && (
+                <Button variant="destructive" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
+                  Excluir Seleção
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -523,6 +538,17 @@ export default function ContasPagar() {
         open={showPasswordDialog}
         onOpenChange={setShowPasswordDialog}
         onConfirm={confirmDelete}
+      />
+
+      {/* Bulk payment modal */}
+      <MarcarPagoBulkModal
+        open={showBulkPayModal}
+        onClose={() => setShowBulkPayModal(false)}
+        lancamentos={lancamentos.filter(l => selectedIds.has(l.id))}
+        onConfirm={async (ids, dataPagamento, comprovanteUrl) => {
+          await marcarPagoBulk.mutateAsync({ ids, data_pagamento: dataPagamento, comprovante_url: comprovanteUrl });
+          exitSelectionMode();
+        }}
       />
 
       {/* Bulk delete confirmation */}

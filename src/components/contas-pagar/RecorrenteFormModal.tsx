@@ -118,7 +118,22 @@ export default function RecorrenteFormModal({ open, onClose, onSave, editData }:
             </div>
             <div className="grid gap-2">
               <Label>Dia do Vencimento</Label>
-              <Input type="number" min={1} max={28} value={diaVencimento} onChange={e => setDiaVencimento(e.target.value)} />
+              <Input
+                type="number"
+                min={1}
+                max={31}
+                value={diaVencimento}
+                onChange={e => {
+                  const v = parseInt(e.target.value || '0', 10);
+                  if (Number.isNaN(v)) return setDiaVencimento('');
+                  if (v < 1) return setDiaVencimento('1');
+                  if (v > 31) return setDiaVencimento('31');
+                  setDiaVencimento(String(v));
+                }}
+              />
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Dias 29-31 ajustam automaticamente em fevereiro (vai pro último dia do mês).
+              </p>
             </div>
           </div>
           <div className="grid gap-2">

@@ -124,11 +124,18 @@ export function useDeleteDespesa() {
   });
 }
 
+// Detecta se a subcategoria é VT ou VR (várias grafias possíveis)
+function isVtVrSub(sub: string | null | undefined): boolean {
+  const s = (sub || '').toLowerCase();
+  return s.includes('vt') || s.includes('vr')
+    || s.includes('vale transporte') || s.includes('vale refeição')
+    || s.includes('transporte') || s.includes('refeição');
+}
+
 export function useMarcarPago() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data_pagamento, comprovante_url }: { id: string; data_pagamento: string; comprovante_url?: string }) => {
-      // First, mark the target lancamento
       const { data: target, error: fetchError } = await supabase
         .from('lancamentos')
         .select('id, colaborador_id, competencia_mes, competencia_ano, subcategoria')
@@ -136,26 +143,23 @@ export function useMarcarPago() {
         .single();
       if (fetchError) throw fetchError;
 
-      const sub = (target.subcategoria || '').toLowerCase();
-      const isVtVr = sub.includes('vt') || sub.includes('vr') || sub.includes('vale transporte') || sub.includes('vale refeição') || sub.includes('transporte') || sub.includes('refeição');
+      const isVtVr = isVtVrSub(target.subcategoria);
 
+      // Lógica especial: VT/VR — marca todos VT+VR do mesmo colaborador/mês juntos
+      // (operacionalmente fazem sentido como bloco único)
       if (isVtVr && target.colaborador_id && target.competencia_mes && target.competencia_ano) {
-        // Mark both VT and VR for the same collaborator/month
-        // First get all VT/VR ids for this collaborator/month
         const { data: vtVrItems, error: fetchVtVrError } = await supabase
           .from('lancamentos')
-          .select('id, subcategoria')
+          .select('id, subcategoria, valor, descricao')
           .eq('colaborador_id', target.colaborador_id)
           .eq('competencia_mes', target.competencia_mes)
-          .eq('competencia_ano', target.competencia_ano);
+          .eq('competencia_ano', target.competencia_ano)
+          .eq('tipo', 'pagar')
+          .neq('status', 'pago'); // só pendentes
         if (fetchVtVrError) throw fetchVtVrError;
 
-        const vtVrIds = (vtVrItems || [])
-          .filter((item: any) => {
-            const s = (item.subcategoria || '').toLowerCase();
-            return s.includes('vt') || s.includes('vr') || s.includes('vale transporte') || s.includes('vale refeição') || s.includes('transporte') || s.includes('refeição');
-          })
-          .map((item: any) => item.id);
+        const filtrados = (vtVrItems || []).filter(item => isVtVrSub((item as any).subcategoria));
+        const vtVrIds = filtrados.map((item: any) => item.id);
 
         if (vtVrIds.length > 0) {
           const { error } = await supabase.from('lancamentos').update({
@@ -166,22 +170,98 @@ export function useMarcarPago() {
           }).in('id', vtVrIds);
           if (error) throw error;
         }
+        // Retorna info pra UI mostrar quantos foram marcados
+        return { count: vtVrIds.length, isVtVrCascade: vtVrIds.length > 1, items: filtrados };
+      }
+
+      const { error } = await supabase.from('lancamentos').update({
+        status: 'pago' as any,
+        data_pagamento,
+        comprovante_url: comprovante_url || null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', id);
+      if (error) throw error;
+      return { count: 1, isVtVrCascade: false, items: [] };
+    },
+    onSuccess: (result) => {
+      qc.invalidateQueries({ queryKey: ['lancamentos_pagar'] });
+      qc.invalidateQueries({ queryKey: ['lancamentos_pagar_date'] });
+      qc.invalidateQueries({ queryKey: ['lancamentos_pagos_historico'] });
+      // Toast informativo: avisa explicitamente quando o VT/VR cascateou
+      if (result?.isVtVrCascade && result.count > 1) {
+        toast.success(`✅ ${result.count} lançamentos VT/VR marcados como pagos (mesmo colaborador, mesmo mês)`, { duration: 6000 });
       } else {
-        const { error } = await supabase.from('lancamentos').update({
+        toast.success('Pagamento confirmado!');
+      }
+    },
+    onError: (e: any) => toast.error('Erro: ' + e.message),
+  });
+}
+
+/**
+ * Marca múltiplos lançamentos como pagos de uma vez.
+ * Útil pra "bulk payment" — selecionar várias linhas + 1 clique.
+ * Comprovante é OPCIONAL (e único pro lote — se anexado, é vinculado a TODOS).
+ */
+export function useMarcarPagoBulk() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      ids,
+      data_pagamento,
+      comprovante_url,
+    }: {
+      ids: string[];
+      data_pagamento: string;
+      comprovante_url?: string;
+    }) => {
+      if (ids.length === 0) throw new Error('Nenhum lançamento selecionado.');
+
+      const { error } = await supabase
+        .from('lancamentos')
+        .update({
           status: 'pago' as any,
           data_pagamento,
           comprovante_url: comprovante_url || null,
           updated_at: new Date().toISOString(),
-        }).eq('id', id);
-        if (error) throw error;
-      }
+        })
+        .in('id', ids)
+        .neq('status', 'pago'); // segurança: nunca sobrescreve um pagamento já feito
+      if (error) throw error;
+
+      return { count: ids.length };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ['lancamentos_pagar'] });
       qc.invalidateQueries({ queryKey: ['lancamentos_pagar_date'] });
-      toast.success('Pagamento confirmado!');
+      qc.invalidateQueries({ queryKey: ['lancamentos_pagos_historico'] });
+      toast.success(`✅ ${result.count} pagamento(s) confirmado(s) em lote!`, { duration: 5000 });
     },
-    onError: (e: any) => toast.error('Erro: ' + e.message),
+    onError: (e: any) => toast.error('Erro ao marcar em lote: ' + e.message),
+  });
+}
+
+/**
+ * Histórico de pagamentos: lista todos os lançamentos PAGOS com filtro de data
+ * de pagamento. Usado na nova tab "Histórico". Não filtra por mês de
+ * competência — filtra pelo dia que efetivamente o dinheiro saiu.
+ */
+export function useHistoricoPagamentos(dataInicio: string, dataFim: string) {
+  return useQuery({
+    queryKey: ['lancamentos_pagos_historico', dataInicio, dataFim],
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lancamentos')
+        .select('*')
+        .eq('tipo', 'pagar')
+        .eq('status', 'pago')
+        .gte('data_pagamento', dataInicio)
+        .lte('data_pagamento', dataFim)
+        .order('data_pagamento', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
   });
 }
 
