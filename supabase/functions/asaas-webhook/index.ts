@@ -2,14 +2,23 @@
 // Edge Function: asaas-webhook
 // =============================================
 // Recebe webhooks do Asaas quando pagamentos mudam de estado.
-// Valida origem via header `asaas-access-token` (configurado no painel Asaas).
-// Garante idempotência via tabela asaas_webhook_events.
-// Quando PAYMENT_CONFIRMED / PAYMENT_RECEIVED:
-//   - Marca cobranca.status = 'paga', asaas_pago_em = now()
-//   - Marca todos os lancamentos vinculados: status=pago,
-//     etapa_financeiro=honorario_pago, data_pagamento, confirmado_recebimento=true
-// Quando PAYMENT_OVERDUE → cobranca.status = 'vencida'
-// Quando PAYMENT_REFUNDED / PAYMENT_DELETED → cobranca.status = 'cancelada'
+//
+// Proteções em camadas:
+//  1. FAIL-FAST: se ASAAS_WEBHOOK_TOKEN não estiver configurado, recusa 503
+//  2. TOKEN CHECK com comparação timing-safe
+//  3. IDEMPOTÊNCIA ATÔMICA via INSERT em asaas_webhook_events(event_id)
+//     — conflito em unique index = já processado, retorna 200 duplicate
+//  4. CUSTOMER MATCH: valida que payment.customer bate com
+//     clientes.asaas_customer_id da cobrança antes de mudar estado
+//  5. BODY DE RESPOSTA SANITIZADO: não vaza mensagem de erro crua
+//
+// Fluxo de estados das cobranças:
+//   PAYMENT_CONFIRMED / PAYMENT_RECEIVED → cobranca.status = 'paga',
+//     lançamentos: status=pago, etapa=honorario_pago, confirmado_recebimento=true
+//   PAYMENT_OVERDUE → cobranca.status = 'vencida' (só se ainda ativa)
+//   PAYMENT_DELETED / PAYMENT_RESTORED → cobranca.status = 'cancelada'
+//   PAYMENT_REFUNDED / PAYMENT_REFUND_IN_PROGRESS → cobranca.status = 'cancelada'
+//     + lançamentos voltam para pendente/cobranca_enviada
 // =============================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -35,17 +44,70 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
-async function handlePaidEvent(paymentId: string, event: any) {
-  // Atualiza cobrança
-  const { data: cobrancaRow, error: selErr } = await admin
+// Comparação de strings resistente a timing attacks.
+// Sempre percorre o maior tamanho, evitando early-return por length diff.
+function timingSafeEqual(a: string, b: string): boolean {
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
+type CobrancaWithCliente = {
+  id: string;
+  lancamento_ids: string[] | null;
+  status: string;
+  cliente_id: string;
+  clientes: { asaas_customer_id: string | null } | null;
+};
+
+async function fetchCobrancaByPaymentId(
+  paymentId: string
+): Promise<CobrancaWithCliente | null> {
+  const { data } = await admin
     .from("cobrancas")
-    .select("id, lancamento_ids, status")
+    .select(
+      "id, lancamento_ids, status, cliente_id, clientes(asaas_customer_id)"
+    )
     .eq("asaas_payment_id", paymentId)
     .maybeSingle();
+  return (data as any) ?? null;
+}
 
-  if (selErr || !cobrancaRow) {
+/**
+ * Garante que o customer informado no payload do Asaas corresponde
+ * ao asaas_customer_id registrado no cliente desta cobrança.
+ * Defende contra webhook forjado com payment_id válido mas customer divergente.
+ */
+function assertCustomerMatches(
+  cobranca: CobrancaWithCliente,
+  payload: any
+): void {
+  const payloadCustomer: string | undefined = payload?.payment?.customer;
+  const clienteCustomer = cobranca.clientes?.asaas_customer_id ?? null;
+  if (!payloadCustomer) {
+    throw new Error("payload sem payment.customer");
+  }
+  if (!clienteCustomer) {
+    throw new Error(
+      `cliente ${cobranca.cliente_id} sem asaas_customer_id registrado`
+    );
+  }
+  if (payloadCustomer !== clienteCustomer) {
+    throw new Error(
+      `customer mismatch: payload=${payloadCustomer} cobranca=${clienteCustomer}`
+    );
+  }
+}
+
+async function handlePaidEvent(paymentId: string, event: any) {
+  const cobranca = await fetchCobrancaByPaymentId(paymentId);
+  if (!cobranca) {
     throw new Error(`cobrança não encontrada para payment_id=${paymentId}`);
   }
+  assertCustomerMatches(cobranca, event);
 
   const confirmedAt =
     event?.payment?.confirmedDate ||
@@ -62,10 +124,9 @@ async function handlePaidEvent(paymentId: string, event: any) {
       asaas_last_event: event,
       asaas_webhook_recebido_em: nowISO(),
     })
-    .eq("id", cobrancaRow.id);
+    .eq("id", cobranca.id);
 
-  // Atualiza os lançamentos vinculados
-  const lancamentoIds = (cobrancaRow as any).lancamento_ids as string[] | null;
+  const lancamentoIds = cobranca.lancamento_ids;
   if (Array.isArray(lancamentoIds) && lancamentoIds.length > 0) {
     await admin
       .from("lancamentos")
@@ -73,7 +134,7 @@ async function handlePaidEvent(paymentId: string, event: any) {
         status: "pago",
         etapa_financeiro: "honorario_pago",
         data_pagamento:
-          (confirmedAt && confirmedAt.split("T")[0]) || todayISO(),
+          (confirmedAt && String(confirmedAt).split("T")[0]) || todayISO(),
         confirmado_recebimento: true,
       } as any)
       .in("id", lancamentoIds);
@@ -81,34 +142,27 @@ async function handlePaidEvent(paymentId: string, event: any) {
 }
 
 async function handleOverdueEvent(paymentId: string, event: any) {
-  const { data: cobrancaRow } = await admin
+  const cobranca = await fetchCobrancaByPaymentId(paymentId);
+  if (!cobranca) return;
+  assertCustomerMatches(cobranca, event);
+  if (cobranca.status !== "ativa") return; // já paga/cancelada
+
+  await admin
     .from("cobrancas")
-    .select("id, status")
-    .eq("asaas_payment_id", paymentId)
-    .maybeSingle();
-  if (!cobrancaRow) return;
-  // Só muda se ainda não foi paga/cancelada
-  if ((cobrancaRow as any).status === "ativa") {
-    await admin
-      .from("cobrancas")
-      .update({
-        status: "vencida",
-        asaas_status: event?.payment?.status ?? "OVERDUE",
-        asaas_last_event: event,
-        asaas_webhook_recebido_em: nowISO(),
-      })
-      .eq("id", (cobrancaRow as any).id);
-  }
+    .update({
+      status: "vencida",
+      asaas_status: event?.payment?.status ?? "OVERDUE",
+      asaas_last_event: event,
+      asaas_webhook_recebido_em: nowISO(),
+    })
+    .eq("id", cobranca.id);
 }
 
 async function handleCanceledEvent(paymentId: string, event: any) {
-  const { data: cobrancaRow } = await admin
-    .from("cobrancas")
-    .select("id, lancamento_ids, status")
-    .eq("asaas_payment_id", paymentId)
-    .maybeSingle();
-  if (!cobrancaRow) return;
-  if ((cobrancaRow as any).status === "paga") return; // já paga, não cancela
+  const cobranca = await fetchCobrancaByPaymentId(paymentId);
+  if (!cobranca) return;
+  assertCustomerMatches(cobranca, event);
+  if (cobranca.status === "paga") return; // conservador: não cancela o que já foi pago
 
   await admin
     .from("cobrancas")
@@ -118,21 +172,14 @@ async function handleCanceledEvent(paymentId: string, event: any) {
       asaas_last_event: event,
       asaas_webhook_recebido_em: nowISO(),
     })
-    .eq("id", (cobrancaRow as any).id);
-
-  // Lançamentos vinculados voltam para solicitacao_criada (remove extrato_id?)
-  // Conservador: só marca como cancelados no Asaas, NÃO mexe nos lançamentos
-  // pra não quebrar lógica do Financeiro. Thales pode reagir manualmente.
+    .eq("id", cobranca.id);
+  // Conservador: não mexe em lançamentos aqui; Thales/Carolina reagem manualmente.
 }
 
 async function handleRefundedEvent(paymentId: string, event: any) {
-  // Igual a cancelada, mas reverte lançamentos que estavam pagos
-  const { data: cobrancaRow } = await admin
-    .from("cobrancas")
-    .select("id, lancamento_ids, status")
-    .eq("asaas_payment_id", paymentId)
-    .maybeSingle();
-  if (!cobrancaRow) return;
+  const cobranca = await fetchCobrancaByPaymentId(paymentId);
+  if (!cobranca) return;
+  assertCustomerMatches(cobranca, event);
 
   await admin
     .from("cobrancas")
@@ -143,9 +190,9 @@ async function handleRefundedEvent(paymentId: string, event: any) {
       asaas_last_event: event,
       asaas_webhook_recebido_em: nowISO(),
     })
-    .eq("id", (cobrancaRow as any).id);
+    .eq("id", cobranca.id);
 
-  const lancamentoIds = (cobrancaRow as any).lancamento_ids as string[] | null;
+  const lancamentoIds = cobranca.lancamento_ids;
   if (Array.isArray(lancamentoIds) && lancamentoIds.length > 0) {
     await admin
       .from("lancamentos")
@@ -173,16 +220,31 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Validação de origem via token (configurado no painel Asaas)
-  if (WEBHOOK_TOKEN) {
-    const headerToken = req.headers.get("asaas-access-token") ?? "";
-    if (headerToken !== WEBHOOK_TOKEN) {
-      console.warn("[asaas-webhook] invalid access-token header");
-      return new Response(JSON.stringify({ error: "unauthorized" }), {
-        status: 401,
+  // === FAIL-FAST ===
+  // Sem token configurado, o webhook ficaria completamente aberto.
+  // Retornamos 503 e logamos em CRITICAL — Asaas vai retentar,
+  // dando tempo pro Thales configurar o secret sem perder eventos.
+  if (!WEBHOOK_TOKEN || WEBHOOK_TOKEN.trim().length === 0) {
+    console.error(
+      "[asaas-webhook] CRITICAL: ASAAS_WEBHOOK_TOKEN não configurado; rejeitando todas as chamadas"
+    );
+    return new Response(
+      JSON.stringify({ error: "webhook token not configured" }),
+      {
+        status: 503,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+      }
+    );
+  }
+
+  // Validação de origem — comparação timing-safe
+  const headerToken = req.headers.get("asaas-access-token") ?? "";
+  if (!timingSafeEqual(headerToken, WEBHOOK_TOKEN)) {
+    console.warn("[asaas-webhook] invalid access-token header");
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   let payload: any = null;
@@ -199,52 +261,64 @@ Deno.serve(async (req) => {
   const eventType: string = payload?.event ?? payload?.type ?? "UNKNOWN";
   const paymentId: string | undefined = payload?.payment?.id;
 
-  // Idempotência — se já processamos esse event_id, retorna 200 sem fazer nada
+  // === IDEMPOTÊNCIA ATÔMICA ===
+  // Tentamos INSERT já; o unique index parcial em event_id (WHERE event_id IS NOT NULL)
+  // garante que só um worker consegue inserir. Conflito (23505) = já processado/processando,
+  // respondemos 200 duplicate sem reexecutar efeito.
+  // Eventos sem event_id passam sem dedupe (raro, melhor processar do que perder).
+  let logId: string | null = null;
   if (eventId) {
-    const { data: existing } = await admin
+    const { data: inserted, error: insertErr } = await admin
       .from("asaas_webhook_events")
-      .select("id, processed")
-      .eq("event_id", eventId)
+      .insert({
+        event_id: eventId,
+        event_type: eventType,
+        asaas_payment_id: paymentId ?? null,
+        processed: false,
+        payload,
+      })
+      .select("id")
       .maybeSingle();
-    if (existing && (existing as any).processed) {
-      return new Response(JSON.stringify({ ok: true, duplicate: true }), {
-        status: 200,
+
+    if (insertErr) {
+      if ((insertErr as any).code === "23505") {
+        // unique_violation → já existe esse event_id
+        return new Response(JSON.stringify({ ok: true, duplicate: true }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      console.error("[asaas-webhook] erro ao registrar evento:", insertErr);
+      return new Response(JSON.stringify({ ok: false }), {
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    logId = (inserted as any)?.id ?? null;
+  } else {
+    const { data: inserted } = await admin
+      .from("asaas_webhook_events")
+      .insert({
+        event_id: null,
+        event_type: eventType,
+        asaas_payment_id: paymentId ?? null,
+        processed: false,
+        payload,
+      })
+      .select("id")
+      .maybeSingle();
+    logId = (inserted as any)?.id ?? null;
   }
-
-  // Registra o evento ANTES de processar (garante rastro mesmo se falhar)
-  const { data: inserted } = await admin
-    .from("asaas_webhook_events")
-    .insert({
-      event_id: eventId ?? null,
-      event_type: eventType,
-      asaas_payment_id: paymentId ?? null,
-      processed: false,
-      payload,
-    })
-    .select("id")
-    .single();
-  const logId = (inserted as any)?.id ?? null;
 
   let processError: string | null = null;
   try {
     if (!paymentId) {
-      // Eventos sem payment.id (ex: customer events) — só logamos
       console.log("[asaas-webhook] evento sem payment.id:", eventType);
     } else {
       switch (eventType) {
-        // Pagamento confirmado ou dinheiro caiu na conta
         case "PAYMENT_CONFIRMED":
         case "PAYMENT_RECEIVED":
-        case "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED": // no-op mas registra
-          if (
-            eventType === "PAYMENT_CONFIRMED" ||
-            eventType === "PAYMENT_RECEIVED"
-          ) {
-            await handlePaidEvent(paymentId, payload);
-          }
+          await handlePaidEvent(paymentId, payload);
           break;
         case "PAYMENT_OVERDUE":
           await handleOverdueEvent(paymentId, payload);
@@ -266,7 +340,8 @@ Deno.serve(async (req) => {
         case "PAYMENT_DUNNING_REQUESTED":
         case "PAYMENT_BANK_SLIP_VIEWED":
         case "PAYMENT_CHECKOUT_VIEWED":
-          // Eventos informacionais — só registramos no log, não mudam status
+        case "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED":
+          // informacional — só registramos
           break;
         default:
           console.log("[asaas-webhook] evento não tratado:", eventType);
@@ -287,13 +362,16 @@ Deno.serve(async (req) => {
       .eq("id", logId);
   }
 
-  // Sempre retorna 200 pro Asaas (evita retries desnecessários em erros nossos)
+  // Sempre 200 pro Asaas não retentar; erros ficam registrados no DB.
+  // Body enxuto — mensagem de erro crua fica só no log + asaas_webhook_events.error.
   return new Response(
     JSON.stringify({
       ok: processError === null,
       event_type: eventType,
-      error: processError,
     }),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    }
   );
 });
