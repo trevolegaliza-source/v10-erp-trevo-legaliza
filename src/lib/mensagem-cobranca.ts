@@ -1,3 +1,5 @@
+import { supabase } from '@/integrations/supabase/client';
+
 interface TaxaItem {
   descricao: string;
   valor: number;
@@ -10,6 +12,78 @@ interface ProcessoCobranca {
   honorarios?: number;
   taxasExtras?: number;
   taxasDetalhadas?: TaxaItem[];
+}
+
+/**
+ * Dados da empresa emissora da cobrança. Vêm da tabela empresas_config
+ * via RPC resolve_empresa_config. Fallback pros valores da Trevo
+ * garante que a mensagem sempre fica completa mesmo sem config
+ * populada (compatibilidade pra empresa legacy).
+ */
+export interface EmpresaConfigCobranca {
+  nome: string;      // razão social
+  pix_chave: string;
+  pix_banco: string;
+  whatsapp: string;  // formato internacional, ex: 5511934927001
+  site: string;
+  /** Nome display (ex: "Trevo Legaliza"). Se vazio, usa pedaço do nome. */
+  nome_fantasia?: string;
+}
+
+/** Fallback usado quando a config não tá populada (empresa antiga). */
+const CONFIG_FALLBACK: EmpresaConfigCobranca = {
+  nome: 'TREVO LEGALIZA LTDA',
+  nome_fantasia: 'Trevo Legaliza',
+  pix_chave: '39.969.412/0001-70',
+  pix_banco: 'C6 Bank',
+  whatsapp: '5511934927001',
+  site: 'trevolegaliza.com.br',
+};
+
+function nomeCurto(cfg: EmpresaConfigCobranca): string {
+  return cfg.nome_fantasia && cfg.nome_fantasia.trim().length > 0
+    ? cfg.nome_fantasia.trim()
+    : cfg.nome.replace(/\b(LTDA|S\.?A\.?|ME|EPP)\.?\b/gi, '').trim();
+}
+
+function formatarTelefoneBR(v: string): string {
+  // 5511934927001 → (11) 93492-7001
+  const digits = (v || '').replace(/\D/g, '');
+  const local = digits.startsWith('55') ? digits.slice(2) : digits;
+  if (local.length === 11) {
+    return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
+  }
+  if (local.length === 10) {
+    return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
+  }
+  return v; // não sei formatar, devolve como veio
+}
+
+/**
+ * Busca config da empresa (via RPC que já tem fallback embutido).
+ * Útil pra quem tem empresa_id em mãos e quer construir a mensagem.
+ */
+export async function fetchEmpresaConfigCobranca(
+  empresaId: string,
+): Promise<EmpresaConfigCobranca> {
+  try {
+    const { data, error } = await supabase.rpc(
+      'resolve_empresa_config' as any,
+      { p_empresa_id: empresaId },
+    );
+    if (error || !data) return CONFIG_FALLBACK;
+    const cfg = data as Partial<EmpresaConfigCobranca>;
+    return {
+      nome: cfg.nome || CONFIG_FALLBACK.nome,
+      nome_fantasia: cfg.nome_fantasia,
+      pix_chave: cfg.pix_chave || CONFIG_FALLBACK.pix_chave,
+      pix_banco: cfg.pix_banco || CONFIG_FALLBACK.pix_banco,
+      whatsapp: cfg.whatsapp || CONFIG_FALLBACK.whatsapp,
+      site: cfg.site || CONFIG_FALLBACK.site,
+    };
+  } catch {
+    return CONFIG_FALLBACK;
+  }
 }
 
 function formatarNegrito(text: string) {
@@ -50,6 +124,10 @@ function temAlgumaTaxa(processos: ProcessoCobranca[]): boolean {
 /**
  * Gera mensagem de PRIMEIRO ENVIO — tom amigável, faturamento disponível.
  * Usar quando o extrato acabou de ser gerado (etapa: cobranca_gerada).
+ *
+ * Se `empresaConfig` não for passado, usa o fallback (Trevo). Recomendado
+ * sempre passar via `fetchEmpresaConfigCobranca(empresa_id)` pra suportar
+ * multi-empresa.
  */
 export function gerarMensagemCobranca(params: {
   tipo: string;
@@ -64,7 +142,9 @@ export function gerarMensagemCobranca(params: {
   taxasExtras?: number;
   taxasDetalhadas?: TaxaItem[];
   observacao?: string;
+  empresaConfig?: EmpresaConfigCobranca;
 }) {
+  const cfg = params.empresaConfig ?? CONFIG_FALLBACK;
   const allProcessos: ProcessoCobranca[] = [
     {
       tipo: params.tipo,
@@ -81,7 +161,7 @@ export function gerarMensagemCobranca(params: {
   const dataFmt = formatarData(params.data_vencimento);
 
   if (params.diasAtraso > 0) {
-    return gerarMensagemRecobranca(allProcessos, valorTotal, dataFmt, params.diasAtraso);
+    return gerarMensagemRecobranca(allProcessos, valorTotal, dataFmt, params.diasAtraso, cfg);
   }
 
   const blocos = allProcessos.map(renderProcessoBlock).join('\n\n');
@@ -90,7 +170,10 @@ export function gerarMensagemCobranca(params: {
     ? `\nOs comprovantes de pagamento das taxas reembolsáveis estão registrados no processo dentro da nossa plataforma.\n`
     : '';
 
-  return `Olá! Aqui é do departamento financeiro da ${formatarNegrito('Trevo Legaliza')} 🍀
+  const nome = nomeCurto(cfg);
+  const tel = formatarTelefoneBR(cfg.whatsapp);
+
+  return `Olá! Aqui é do departamento financeiro da ${formatarNegrito(nome)} 🍀
 
 Segue o faturamento referente ao(s) processo(s) do mês:
 
@@ -99,16 +182,16 @@ ${blocos}
 ${formatarNegrito('Total: ' + formatarValor(valorTotal))}
 ${formatarNegrito('Vencimento: ' + dataFmt)}
 ${obsBlock}${comprovantesBlock}
-${formatarNegrito('Chave PIX (CNPJ):')} 39.969.412/0001-70
-${formatarNegrito('Banco:')} C6 Bank
+${formatarNegrito('Chave PIX (CNPJ):')} ${cfg.pix_chave}
+${formatarNegrito('Banco:')} ${cfg.pix_banco}
 
 Se preferir pagamento via ${formatarNegrito('boleto bancário')}, é só solicitar por aqui! 📄
 
 Qualquer dúvida, estamos à disposição.
 
-${formatarNegrito('Trevo Legaliza')} 🍀
+${formatarNegrito(nome)} 🍀
 Assessoria societária · Atuação nacional
-(11) 93492-7001 · trevolegaliza.com.br`;
+${tel} · ${cfg.site}`;
 }
 
 /**
@@ -119,13 +202,17 @@ function gerarMensagemRecobranca(
   valorTotal: number,
   dataVencimento: string,
   _diasAtraso: number,
+  cfg: EmpresaConfigCobranca,
 ) {
   const blocos = processos.map(renderProcessoBlock).join('\n\n');
   const comprovantesBlock = temAlgumaTaxa(processos)
     ? `\nOs comprovantes de pagamento das taxas reembolsáveis estão registrados no processo dentro da nossa plataforma.\n`
     : '';
 
-  return `Olá! Aqui é do departamento financeiro da ${formatarNegrito('Trevo Legaliza')} 🍀
+  const nome = nomeCurto(cfg);
+  const tel = formatarTelefoneBR(cfg.whatsapp);
+
+  return `Olá! Aqui é do departamento financeiro da ${formatarNegrito(nome)} 🍀
 
 Gostaríamos de verificar o pagamento referente ao(s) processo(s) abaixo, com vencimento em ${formatarNegrito(dataVencimento)}:
 
@@ -133,14 +220,14 @@ ${blocos}
 
 ${formatarNegrito('Total: ' + formatarValor(valorTotal))}
 ${comprovantesBlock}
-${formatarNegrito('Chave PIX (CNPJ):')} 39.969.412/0001-70
-${formatarNegrito('Banco:')} C6 Bank
+${formatarNegrito('Chave PIX (CNPJ):')} ${cfg.pix_chave}
+${formatarNegrito('Banco:')} ${cfg.pix_banco}
 
 Se preferir ${formatarNegrito('boleto bancário')}, é só solicitar! 📄
 
 Caso já tenha efetuado o pagamento, por favor desconsidere esta mensagem e nos envie o comprovante.
 
-${formatarNegrito('Trevo Legaliza')} 🍀
+${formatarNegrito(nome)} 🍀
 Assessoria societária · Atuação nacional
-(11) 93492-7001 · trevolegaliza.com.br`;
+${tel} · ${cfg.site}`;
 }
