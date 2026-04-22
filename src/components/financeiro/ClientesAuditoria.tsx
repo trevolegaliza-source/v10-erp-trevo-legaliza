@@ -641,6 +641,11 @@ function AuditoriaFicha({
             </span>
           )}
         </p>
+        {(l as any).etapa_financeiro === 'aguardando_deferimento' && (
+          <div className="mt-1 inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+            🕒 Aguardando deferimento — cobrança bloqueada até marcar deferido
+          </div>
+        )}
       </div>
 
       {/* Etiquetas + Switch Método Trevo */}

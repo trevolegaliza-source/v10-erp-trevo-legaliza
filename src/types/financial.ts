@@ -27,6 +27,7 @@ export interface ProcessoDB {
 }
 
 export type EtapaFinanceiro =
+  | 'aguardando_deferimento' // 0. Cliente no_deferimento — só pode cobrar após processo deferido
   | 'solicitacao_criada'    // 1. Faturar — precisa gerar extrato
   | 'cobranca_gerada'       // 2. Enviar — extrato gerado, enviar ao cliente
   | 'cobranca_enviada'      // 3. Aguardando — cobrança enviada, aguardar pagamento
@@ -34,6 +35,7 @@ export type EtapaFinanceiro =
   | 'honorario_vencido';    // Vencido — recobrança
 
 export const ETAPA_FINANCEIRO_LABELS: Record<EtapaFinanceiro, string> = {
+  aguardando_deferimento: 'Aguardando deferimento',
   solicitacao_criada: 'Faturar',
   cobranca_gerada: 'Enviar',
   cobranca_enviada: 'Aguardando',
@@ -42,6 +44,7 @@ export const ETAPA_FINANCEIRO_LABELS: Record<EtapaFinanceiro, string> = {
 };
 
 export const ETAPA_FINANCEIRO_COLORS: Record<EtapaFinanceiro, string> = {
+  aguardando_deferimento: 'border-amber-500/40',
   solicitacao_criada: 'border-warning',
   cobranca_gerada: 'border-info',
   cobranca_enviada: 'border-muted-foreground/40',
@@ -50,6 +53,7 @@ export const ETAPA_FINANCEIRO_COLORS: Record<EtapaFinanceiro, string> = {
 };
 
 export const ETAPA_FINANCEIRO_ORDER: EtapaFinanceiro[] = [
+  'aguardando_deferimento',
   'solicitacao_criada',
   'cobranca_gerada',
   'cobranca_enviada',

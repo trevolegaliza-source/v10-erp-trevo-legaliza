@@ -70,6 +70,7 @@ export const ETAPAS_PRE_DEFERIMENTO = [
 ];
 
 const ETAPA_ORDER: Record<string, number> = {
+  aguardando_deferimento: -1, // antes de tudo — bloqueado até processo deferir
   solicitacao_criada: 0,
   cobranca_gerada: 1,
   cobranca_enviada: 2,
@@ -371,7 +372,8 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
         c.total_faturado += l.valor;
         c.total_pendente += l.status !== 'pago' ? l.valor : 0;
         c.qtd_processos++;
-        if (!l.extrato_id && l.etapa_financeiro === 'solicitacao_criada') c.qtd_sem_extrato++;
+        // Inclui etapa nova aguardando_deferimento pra cliente aparecer em "A Fazer"
+        if (!l.extrato_id && (l.etapa_financeiro === 'solicitacao_criada' || l.etapa_financeiro === 'aguardando_deferimento')) c.qtd_sem_extrato++;
 
         // Audit counts (only pending)
         if (l.status !== 'pago') {
@@ -379,7 +381,12 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           else c.qtd_nao_auditados++;
         }
 
-        if (cliente?.momento_faturamento === 'no_deferimento' && processo) {
+        // Conta processos aguardando deferimento via DUAS fontes:
+        //  (a) lançamento já criado com etapa='aguardando_deferimento' (fluxo novo da Migration 25)
+        //  (b) cliente no_deferimento + processo em pré-deferimento sem lançamento (legado)
+        if (l.etapa_financeiro === 'aguardando_deferimento') {
+          c.qtd_aguardando_deferimento++;
+        } else if (cliente?.momento_faturamento === 'no_deferimento' && processo) {
           if (ETAPAS_PRE_DEFERIMENTO.includes(processo.etapa || '')) {
             c.qtd_aguardando_deferimento++;
           }
@@ -542,7 +549,7 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
         total_faturado: filteredLancs.reduce((s, l) => s + l.valor, 0),
         total_pendente: filteredLancs.filter(l => l.status !== 'pago').reduce((s, l) => s + l.valor, 0),
         qtd_processos: filteredLancs.length,
-        qtd_sem_extrato: filteredLancs.filter(l => !l.extrato_id && l.etapa_financeiro === 'solicitacao_criada').length,
+        qtd_sem_extrato: filteredLancs.filter(l => !l.extrato_id && (l.etapa_financeiro === 'solicitacao_criada' || l.etapa_financeiro === 'aguardando_deferimento')).length,
         qtd_auditados: filteredLancs.filter(l => l.status !== 'pago' && l.auditado).length,
         qtd_nao_auditados: filteredLancs.filter(l => l.status !== 'pago' && !l.auditado).length,
       };
@@ -609,7 +616,13 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
     // "Aguardando Auditoria" tab
     const clientesAguardandoAuditoriaMap = new Map<string, LancamentoFinanceiro[]>();
     for (const c of clientesCobrarRaw) {
-      const naoAuditados = c.lancamentos.filter(l => !l.auditado && l.status !== 'pago' && l.etapa_financeiro === 'solicitacao_criada');
+      // Inclui aguardando_deferimento — eles ficam visíveis aqui com badge especial,
+      // mas o trigger no DB recusa avançar pra cobrança até o processo ser deferido.
+      const naoAuditados = c.lancamentos.filter(l =>
+        !l.auditado
+        && l.status !== 'pago'
+        && (l.etapa_financeiro === 'solicitacao_criada' || l.etapa_financeiro === 'aguardando_deferimento')
+      );
       if (naoAuditados.length > 0) {
         clientesAguardandoAuditoriaMap.set(c.cliente_id, naoAuditados);
       }
