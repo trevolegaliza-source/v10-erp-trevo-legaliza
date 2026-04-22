@@ -1176,6 +1176,51 @@ export type Database = {
           },
         ]
       }
+      financeiro_auditoria: {
+        Row: {
+          ator_id: string | null
+          ator_role: string | null
+          ator_tipo: string
+          campo: string
+          criado_em: string
+          empresa_id: string | null
+          entidade: string
+          entidade_id: string
+          id: number
+          motivo: string | null
+          valor_antigo: Json | null
+          valor_novo: Json | null
+        }
+        Insert: {
+          ator_id?: string | null
+          ator_role?: string | null
+          ator_tipo: string
+          campo: string
+          criado_em?: string
+          empresa_id?: string | null
+          entidade: string
+          entidade_id: string
+          id?: number
+          motivo?: string | null
+          valor_antigo?: Json | null
+          valor_novo?: Json | null
+        }
+        Update: {
+          ator_id?: string | null
+          ator_role?: string | null
+          ator_tipo?: string
+          campo?: string
+          criado_em?: string
+          empresa_id?: string | null
+          entidade?: string
+          entidade_id?: string
+          id?: number
+          motivo?: string | null
+          valor_antigo?: Json | null
+          valor_novo?: Json | null
+        }
+        Relationships: []
+      }
       lancamentos: {
         Row: {
           auditado: boolean | null
@@ -2281,6 +2326,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _auditoria_gravar: {
+        Args: {
+          p_campo: string
+          p_empresa_id: string
+          p_entidade: string
+          p_entidade_id: string
+          p_valor_antigo: Json
+          p_valor_novo: Json
+        }
+        Returns: undefined
+      }
       asaas_tentar_lock_cobranca: {
         Args: { p_cobranca_id: string }
         Returns: Json
@@ -2350,6 +2406,19 @@ export type Database = {
         }[]
       }
       get_empresa_id: { Args: never; Returns: string }
+      get_historico_financeiro: {
+        Args: { p_entidade: string; p_entidade_id: string; p_limit?: number }
+        Returns: {
+          ator_nome: string
+          ator_role: string
+          ator_tipo: string
+          campo: string
+          criado_em: string
+          id: number
+          valor_antigo: Json
+          valor_novo: Json
+        }[]
+      }
       get_proposta_por_token: {
         Args: { p_token: string }
         Returns: {
