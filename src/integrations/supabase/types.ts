@@ -2484,6 +2484,10 @@ export type Database = {
         Args: { p_token: string }
         Returns: undefined
       }
+      promover_lancamento_ao_deferir: {
+        Args: { p_processo_id: string }
+        Returns: Json
+      }
       resolve_empresa_config: { Args: { p_empresa_id: string }; Returns: Json }
       rotacionar_cobranca_token: {
         Args: { p_cobranca_id: string }
