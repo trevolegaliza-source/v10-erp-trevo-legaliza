@@ -46,6 +46,7 @@ import { TIPO_PROCESSO_LABELS } from '@/types/financial';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import { downloadExtrato } from '@/lib/storage-utils';
 import { fetchExtratoBlob, triggerBlobDownload } from '@/lib/extrato-download';
+import { consolidarObservacoes } from '@/lib/observacao-processo';
 
 // ══════════ WHATSAPP HELPER ══════════
 import { WhatsappLinkButton } from './WhatsappLinkButton';
@@ -230,6 +231,14 @@ export function buildMensagemFromLancamentos({ lancamentos, vaMap, vaDetalhadoMa
       taxasDetalhadas: td,
     };
   });
+  // Consolida observações do processo + financeiro filtrando metadados auto-gerados.
+  const obsConsolidada =
+    observacao ??
+    consolidarObservacoes(
+      (l as any).processo_notas ?? null,
+      l.observacoes_financeiro ?? null,
+    ) ??
+    undefined;
   return gerarMensagemCobranca({
     tipo: getTipoProcessoLabel(l.processo_tipo),
     razao_social: l.processo_razao_social,
@@ -240,7 +249,7 @@ export function buildMensagemFromLancamentos({ lancamentos, vaMap, vaDetalhadoMa
     data_vencimento: l.data_vencimento,
     diasAtraso,
     nomeRemetente,
-    observacao: observacao || l.observacoes_financeiro || undefined,
+    observacao: obsConsolidada,
     processosAdicionais: adicionais.length > 0 ? adicionais : undefined,
   });
 }

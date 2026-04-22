@@ -3,6 +3,7 @@ import html2canvas from 'html2canvas';
 import type { ProcessoFinanceiro } from '@/hooks/useProcessosFinanceiro';
 import type { ValorAdicional } from '@/hooks/useValoresAdicionais';
 import { supabase } from '@/integrations/supabase/client';
+import { consolidarObservacoes } from './observacao-processo';
 
 const BRAND = {
   nome: 'TREVO LEGALIZA LTDA',
@@ -872,11 +873,12 @@ function buildDetailPageHTML(
       </div>
     ` : '';
 
-    const obsRaw = (((processo as any).lancamento?.observacoes_financeiro) || '').trim();
-    // Filtra metadata legada auto-gerada que não é observação real do operador.
-    const isAutoMeta = /^extrato emitido em\b/i.test(obsRaw);
-    const obsHtml = obsRaw && !isAutoMeta
-      ? `<div class="obs-financeiro"><strong>Obs:</strong>${escapeHtml(obsRaw)}</div>`
+    const obsConsolidada = consolidarObservacoes(
+      (processo as any).notas,
+      ((processo as any).lancamento?.observacoes_financeiro),
+    );
+    const obsHtml = obsConsolidada
+      ? `<div class="obs-financeiro"><strong>Obs:</strong>${escapeHtml(obsConsolidada).replace(/\n/g, '<br/>')}</div>`
       : '';
 
     return `
