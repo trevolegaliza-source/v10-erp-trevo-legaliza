@@ -555,6 +555,9 @@ function AuditoriaFicha({
     if (!l.processo_id) return;
     setSavingTrevo(true);
     try {
+      const timestamp = new Date().toISOString();
+
+      // 1. Busca etiquetas atuais e remove metodo_trevo
       const { data: procData, error: procFetchErr } = await supabase
         .from('processos')
         .select('etiquetas')
@@ -564,13 +567,47 @@ function AuditoriaFicha({
       const etiquetasAtuais: string[] = (procData?.etiquetas as string[]) || [];
       const novasEtiquetas = etiquetasAtuais.filter(e => e !== 'metodo_trevo');
 
-      const { error } = await supabase
-        .from('processos')
-        .update({ etiquetas: novasEtiquetas } as any)
-        .eq('id', l.processo_id);
-      if (error) throw error;
+      // 2. Calcula valor a restaurar.
+      //    Prioridade: valor_original do lançamento (se existir) → valor base do cliente
+      //    Se nenhum dos dois for válido, não mexe no valor (evita zerar por engano).
+      const valorRestaurado: number | null =
+        (l.valor_original != null && Number(l.valor_original) > 0)
+          ? Number(l.valor_original)
+          : (valorBase > 0 ? valorBase : null);
 
-      toast.success('Método Trevo removido');
+      // 3. Update processo: tira etiqueta + reverte valor (se temos valor válido)
+      const processoUpdate: Record<string, any> = {
+        etiquetas: novasEtiquetas,
+        updated_at: timestamp,
+      };
+      if (valorRestaurado !== null) processoUpdate.valor = valorRestaurado;
+
+      const { error: procErr } = await supabase
+        .from('processos')
+        .update(processoUpdate as any)
+        .eq('id', l.processo_id);
+      if (procErr) throw procErr;
+
+      // 4. Update lancamento (só se pendente E tivermos valor pra restaurar)
+      if (valorRestaurado !== null && l.status !== 'pago') {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { error: lancErr } = await supabase
+          .from('lancamentos')
+          .update({
+            valor: valorRestaurado,
+            valor_alterado_por: user?.id,
+            valor_alterado_em: timestamp,
+            updated_at: timestamp,
+          } as any)
+          .eq('id', l.id);
+        if (lancErr) throw lancErr;
+      }
+
+      toast.success(
+        valorRestaurado !== null
+          ? `Método Trevo removido · valor voltou para ${fmt(valorRestaurado)}`
+          : 'Método Trevo removido'
+      );
       setTrevoOpen(false);
       invalidateFinanceiro(qc);
       qc.invalidateQueries({ queryKey: ['processos'] });
@@ -635,9 +672,32 @@ function AuditoriaFicha({
               {l.tem_etiqueta_metodo_trevo ? (
                 <>
                   <p className="text-sm font-semibold">Remover Método Trevo?</p>
-                  <p className="text-xs text-muted-foreground">
-                    O valor não será recalculado. Use "Editar Valor" para ajustar manualmente se quiser.
-                  </p>
+                  {(() => {
+                    const valorRestauro =
+                      (l.valor_original != null && Number(l.valor_original) > 0)
+                        ? Number(l.valor_original)
+                        : (valorBase > 0 ? valorBase : null);
+                    return (
+                      <div className="text-xs space-y-1">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Valor atual:</span>
+                          <span className="font-mono">{fmt(l.valor)}</span>
+                        </div>
+                        {valorRestauro !== null ? (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Voltará para:</span>
+                            <span className="font-mono font-bold text-emerald-500">
+                              {fmt(valorRestauro)}
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-amber-600">
+                            ⚠ Sem valor base cadastrado — valor atual será mantido.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div className="flex gap-2 pt-1">
                     <Button size="sm" variant="ghost" className="flex-1" onClick={() => setTrevoOpen(false)}>Cancelar</Button>
                     <Button size="sm" variant="destructive" className="flex-1" onClick={handleDesativarTrevo} disabled={savingTrevo}>

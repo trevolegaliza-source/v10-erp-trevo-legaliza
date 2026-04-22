@@ -69,6 +69,7 @@ export default function FinanceiroList({ processos }: FinanceiroListProps) {
           status: 'pendente' as const,
           etapa_financeiro: 'solicitacao_criada',
           data_pagamento: null,
+          confirmado_recebimento: false,
         })
         .eq('processo_id', undoProcesso.id)
         .eq('status', 'pago');
