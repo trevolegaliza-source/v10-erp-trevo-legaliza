@@ -270,8 +270,15 @@ export default function NovoClienteInline({ onClose, onCreated }: Props) {
                 <SelectItem value="AVULSO_4D">Avulso</SelectItem>
                 <SelectItem value="MENSALISTA">Mensalista</SelectItem>
                 <SelectItem value="PRE_PAGO">Pré-Pago</SelectItem>
+                <SelectItem value="PRECO_POR_TIPO">Preço por Tipo</SelectItem>
               </SelectContent>
             </Select>
+            {form.tipo === 'PRECO_POR_TIPO' && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Cliente paga valor fixo por tipo de processo (abertura/alteração/etc).
+                Configure os preços depois de salvar, em <strong>Editar Cliente → Preços por Tipo</strong>.
+              </p>
+            )}
           </div>
 
           {/* ═══ AVULSO fields ═══ */}

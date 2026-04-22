@@ -268,9 +268,23 @@ export function useCreateProcesso() {
       const cliente = clienteData as any;
       const isPrePago = cliente.tipo === 'PRE_PAGO';
       const isMensalista = cliente.tipo === 'MENSALISTA';
+      const isPrecoPorTipo = cliente.tipo === 'PRECO_POR_TIPO';
       const valorBaseCliente = Number(cliente.valor_base ?? 0);
       const descontoPercent = Number(cliente.desconto_progressivo ?? 0);
       const valorLimite = cliente.valor_limite_desconto != null ? Number(cliente.valor_limite_desconto) : null;
+
+      // Se cliente é PRECO_POR_TIPO, tenta resolver preço fixo do tipo do processo
+      let precoPorTipoFixo: number | null = null;
+      if (isPrecoPorTipo && !isAvulso && !isManualPrice) {
+        const { data: precoRpc, error: precoErr } = await supabase.rpc(
+          'get_preco_por_tipo' as any,
+          { p_cliente_id: input.cliente_id, p_tipo: input.tipo }
+        );
+        if (precoErr) {
+          console.warn('[useCreateProcesso] erro ao buscar preco_por_tipo:', precoErr);
+        }
+        if (precoRpc != null) precoPorTipoFixo = Number(precoRpc);
+      }
 
       // Count same-month processes for this client based on data_entrada (or today)
       const refDate = input.data_entrada ? new Date(input.data_entrada + 'T12:00:00') : new Date();
@@ -295,6 +309,21 @@ export function useCreateProcesso() {
         valorFinal = isManualPrice ? Number(input.valor_manual) : 0;
       } else if (isManualPrice) {
         valorFinal = Number(input.valor_manual);
+      } else if (isPrecoPorTipo) {
+        // Preço fixo por tipo de processo, sem desconto progressivo/franquia.
+        // Urgência ainda se aplica (+50%). Mudança UF duplica (2 processos).
+        if (precoPorTipoFixo == null) {
+          throw new Error(
+            `Cliente "${input.razao_social}" é do tipo "Preço por Tipo" mas não tem preço configurado pro tipo "${input.tipo}". Configure em Clientes → Editar → Preços por Tipo antes de cadastrar o processo.`
+          );
+        }
+        let base = precoPorTipoFixo;
+        if (isUrgente) base = base * 1.5;
+        if (slots === 2) base = base * 2;
+        valorFinal = Math.round(base * 100) / 100;
+        discountInfo = `Preço fixo por tipo (${input.tipo}): R$ ${precoPorTipoFixo.toFixed(2)}`
+          + (isUrgente ? ' × 1.5 Urgência' : '')
+          + (slots === 2 ? ' × 2 (Mudança UF)' : '');
       } else if (isPrePago) {
         valorFinal = isManualPrice ? Number(input.valor_manual) : 0;
       } else if (isMensalista) {
