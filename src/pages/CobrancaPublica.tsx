@@ -496,6 +496,20 @@ export default function CobrancaPublica() {
                       ))}
                     </div>
                   )}
+                  {(() => {
+                    const obs = consolidarObservacoes(l.observacoes_processo, l.observacoes_financeiro);
+                    if (!obs) return null;
+                    return (
+                      <div className="mt-2 pl-3 border-l-2 border-primary/40 bg-primary/5 rounded-r px-2 py-1.5">
+                        <p className="text-[10px] uppercase tracking-wider text-primary/80 font-semibold mb-0.5">
+                          📝 Observações
+                        </p>
+                        <p className="text-[11px] text-foreground/85 whitespace-pre-line leading-snug">
+                          {obs}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
