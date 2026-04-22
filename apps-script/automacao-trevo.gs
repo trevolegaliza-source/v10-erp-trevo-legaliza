@@ -1,0 +1,1469 @@
+// =============================================
+// AUTOMAÇÃO TREVO LEGALIZA 🍀
+// Google Forms → Drive → Trello + Secretária Dani
+// v6.0 - Fixes críticos + lembretes automáticos + métricas
+// =============================================
+
+function getProps() { return PropertiesService.getScriptProperties(); }
+function prop(key) {
+  const v = getProps().getProperty(key);
+  if (!v) throw new Error("Property '" + key + "' não configurada. Rode setupProperties() uma vez.");
+  return v;
+}
+
+// ===== CONSTANTES =====
+const TRELLO_LIST_ID_PADRAO = "69e107569c0cbec9277ffc46";
+const PASTA_CLIENTES_ATIVOS_ID = "1jD3F_eTZMNlI_e2aS2DJYKI0EkUdr91_";
+const EMAIL_ALERTA_ERRO = "thales.burger@trevolegaliza.com.br";
+const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+const ASSINATURA_DANI = "\n\n---\n🍀 *Dani — Secretária Virtual da Trevo Legaliza*\n_Mensagem gerada por inteligência artificial._";
+
+// URLs de imagens hospedadas (Trevo usa subdomínio próprio)
+const LOGO_TREVO_URL = "https://cobranca.trevolegaliza.com/logo-trevo.png";
+const LOGO_DANI_URL = "https://cobranca.trevolegaliza.com/logo-dani.png";
+
+// Etiquetas que disparam lembrete automático
+const ETIQUETAS_LEMBRETE = ["DOCUMENTO PENDENTE", "RESPOSTA DE COMENTÁRIO PENDENTE"];
+
+const EQUIPE_INTERNA = [
+  "trevo legaliza", "trevolegaliza", "abner maliq",
+  "amanda cristovao", "arthur-trevo", "arthur trevo", "leticia tonelli"
+];
+
+const CAMPOS_JA_USADOS = new Set([
+  "Carimbo de data/hora", "Endereço de e-mail", "  Código do cliente", "Código do cliente",
+  "Nome do solicitante", "Nome da Contabilidade", "Pergunta sem título",
+  "Informe o estado que seu processo será realizado:",
+  "Onde deseja protocolar o processo para análise?",
+  "Qual a urgência para a preparação e protocolo do processo? ",
+  "Qual a urgência para a preparação e protocolo do processo?",
+  "Velocidade de Preparação (SLA Trevo) 🍀",
+  "🕰️ Local de Protocolo e Análise (SLA do Órgão Público)"
+]);
+
+// =============================================
+// SETUP INICIAL
+// =============================================
+function setupProperties() {
+  const ui = SpreadsheetApp.getUi();
+  const keys = ["TRELLO_KEY", "TRELLO_TOKEN", "CLAUDE_API_KEY"];
+  const props = getProps();
+  keys.forEach(k => {
+    const atual = props.getProperty(k) ? "(já configurado — deixe em branco pra manter)" : "(vazio)";
+    const resp = ui.prompt("Configurar " + k, atual, ui.ButtonSet.OK_CANCEL);
+    if (resp.getSelectedButton() !== ui.Button.OK) return;
+    const valor = resp.getResponseText().trim();
+    if (valor) props.setProperty(k, valor);
+  });
+  ui.alert("✅ Configuração salva.");
+}
+
+// =============================================
+// HELPERS DE REDE
+// =============================================
+function fetchRetry(url, options, tentativas) {
+  tentativas = tentativas || 3;
+  for (let i = 1; i <= tentativas; i++) {
+    try {
+      const opts = Object.assign({ muteHttpExceptions: true }, options || {});
+      const r = UrlFetchApp.fetch(url, opts);
+      const code = r.getResponseCode();
+      if (code >= 200 && code < 300) return r;
+      if (code === 429 || code >= 500) { Utilities.sleep(1500 * i); continue; }
+      return r;
+    } catch (e) {
+      if (i === tentativas) throw e;
+      Utilities.sleep(1500 * i);
+    }
+  }
+}
+function trelloGet(path, params) {
+  const u = new URL("https://api.trello.com" + path);
+  const p = Object.assign({ key: prop("TRELLO_KEY"), token: prop("TRELLO_TOKEN") }, params || {});
+  Object.keys(p).forEach(k => u.searchParams.set(k, p[k]));
+  return fetchRetry(u.toString(), { method: "get" });
+}
+function trelloPost(path, payload) {
+  const u = "https://api.trello.com" + path + "?key=" + prop("TRELLO_KEY") + "&token=" + prop("TRELLO_TOKEN");
+  return fetchRetry(u, { method: "post", contentType: "application/json", payload: JSON.stringify(payload) });
+}
+function trelloPut(path, payload) {
+  const u = "https://api.trello.com" + path + "?key=" + prop("TRELLO_KEY") + "&token=" + prop("TRELLO_TOKEN");
+  return fetchRetry(u, { method: "put", contentType: "application/json", payload: JSON.stringify(payload) });
+}
+
+// =============================================
+// HELPER UNIVERSAL — busca valor por nome com fallback tolerante
+// =============================================
+function campo(respostas, nomes) {
+  // 1) Match exato primeiro (rápido, 95% dos casos)
+  for (let i = 0; i < nomes.length; i++) {
+    const val = respostas[nomes[i]];
+    if (val && val[0] && String(val[0]).trim() !== "") return String(val[0]).trim();
+  }
+  // 2) Fallback tolerante: lowercase + remove emojis/pontuação + normaliza espaços
+  const norm = (s) => String(s || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .trim();
+  const alvos = nomes.map(norm);
+  for (const chave in respostas) {
+    if (alvos.indexOf(norm(chave)) !== -1) {
+      const val = respostas[chave];
+      if (val && val[0] && String(val[0]).trim() !== "") return String(val[0]).trim();
+    }
+  }
+  return "";
+}
+
+function extrairIdDrive(url) {
+  const m = url.match(/[-\w]{25,}/);
+  return m ? m[0] : null;
+}
+
+function validarEmail(e) {
+  return !!(e && String(e).match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/));
+}
+
+function notificarErro(origem, erro) {
+  try {
+    MailApp.sendEmail(EMAIL_ALERTA_ERRO, "🚨 Erro Trevo — " + origem,
+      "Origem: " + origem + "\n\nErro: " + erro.toString() + "\n\nStack:\n" + (erro.stack || "(sem stack)"));
+  } catch (e) { Logger.log("Falha notificar: " + e.message); }
+  incMetrica("erros");
+}
+
+// =============================================
+// VALIDAÇÃO DO CLIENTE — com cache 1h
+// =============================================
+function validarCodigoCliente(codCliente) {
+  if (!codCliente || String(codCliente).trim() === "") return { valido: false };
+  const cod = String(codCliente).trim();
+  const cache = CacheService.getScriptCache();
+  const key = "cliente_v2_" + cod;
+  const cached = cache.get(key);
+  if (cached) return JSON.parse(cached);
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const aba = ss.getSheetByName("CLIENTES");
+    if (!aba) return { valido: false };
+    const dados = aba.getDataRange().getValues();
+    const headers = dados[0].map(h => String(h).trim().toUpperCase());
+    const idxCodigo = headers.indexOf("CÓDIGO CLIENTE");
+    const idxLista = headers.indexOf("ID DA LISTA");
+    const idxBoard = headers.indexOf("ID DO QUADRO");
+    const idxEmailLembretes = headers.indexOf("EMAIL_LEMBRETES");
+    const idxEmailBloqueado = headers.indexOf("EMAIL_BLOQUEADO");
+
+    for (let i = 1; i < dados.length; i++) {
+      if (String(dados[i][idxCodigo]).trim() === cod) {
+        const resultado = {
+          valido: true,
+          listaId: String(dados[i][idxLista] || "").trim() || TRELLO_LIST_ID_PADRAO,
+          boardId: String(dados[i][idxBoard] || "").trim(),
+          emailsLembretes: idxEmailLembretes >= 0 ? String(dados[i][idxEmailLembretes] || "").trim() : "",
+          emailBloqueado: idxEmailBloqueado >= 0 ? String(dados[i][idxEmailBloqueado] || "").trim() : "",
+        };
+        cache.put(key, JSON.stringify(resultado), 3600);
+        return resultado;
+      }
+    }
+    return { valido: false };
+  } catch (e) {
+    Logger.log("⚠️ Erro validarCodigoCliente: " + e.message);
+    return { valido: false };
+  }
+}
+
+function limparCacheClientes() {
+  // Chamar manualmente após editar aba CLIENTES
+  CacheService.getScriptCache().removeAll([]);
+  Logger.log("Cache de clientes limpo.");
+}
+
+function avisarClienteCodigoErrado(emailSolicitante, nomeSolicitante, codigoErrado) {
+  if (!validarEmail(emailSolicitante)) return;
+  const assunto = "⚠️ Código de cliente inválido — Trevo Legaliza";
+  const corpo =
+    "Olá " + (nomeSolicitante || "") + ",\n\n" +
+    "Recebemos sua solicitação, porém o código de cliente informado (" + codigoErrado + ") não foi encontrado.\n\n" +
+    "Por favor, verifique com o responsável na Trevo Legaliza e reenvie.\n\n" +
+    "🍀 Equipe Trevo Legaliza";
+  try { MailApp.sendEmail(emailSolicitante, assunto, corpo, { cc: EMAIL_ALERTA_ERRO }); }
+  catch (e) { Logger.log("Falha ao avisar cliente: " + e.message); }
+}
+
+// =============================================
+// MÉTRICAS — contadores simples em aba dedicada
+// =============================================
+function incMetrica(chave, n) {
+  n = n || 1;
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let aba = ss.getSheetByName("MÉTRICAS");
+    if (!aba) {
+      aba = ss.insertSheet("MÉTRICAS");
+      aba.getRange(1, 1, 1, 3).setValues([["DATA", "CHAVE", "VALOR"]]);
+      aba.getRange(1, 1, 1, 3).setFontWeight("bold");
+      aba.setFrozenRows(1);
+    }
+    const hoje = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+    const dados = aba.getDataRange().getValues();
+    for (let i = 1; i < dados.length; i++) {
+      if (String(dados[i][0]) === hoje && String(dados[i][1]) === chave) {
+        aba.getRange(i + 1, 3).setValue(Number(dados[i][2] || 0) + n);
+        return;
+      }
+    }
+    aba.appendRow([hoje, chave, n]);
+  } catch (e) { Logger.log("Falha incMetrica " + chave + ": " + e.message); }
+}
+
+// =============================================
+// DEDUP por FORM ID (evita cartão duplicado em resubmit)
+// =============================================
+function jaProcessado(chaveDedup) {
+  const cache = CacheService.getScriptCache();
+  if (cache.get(chaveDedup)) return true;
+  cache.put(chaveDedup, "1", 21600); // 6h
+  return false;
+}
+
+// =============================================
+// TRIGGER: onFormSubmit
+// =============================================
+function aoEnviarFormulario(e) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(60000)) {
+    notificarErro("aoEnviarFormulario", new Error("Timeout aguardando lock — form duplicado ou travado"));
+    return;
+  }
+
+  try {
+    const r = e.namedValues;
+    const codCliente = campo(r, ["  Código do cliente", "Código do cliente"]);
+    const emailSolicitante = campo(r, ["Endereço de e-mail"]);
+    const solicitante = campo(r, ["Nome do solicitante"]);
+    const carimbo = campo(r, ["Carimbo de data/hora"]) || new Date().toISOString();
+
+    // Dedup por carimbo + codigo + email
+    const dedupKey = "form_" + carimbo + "_" + codCliente + "_" + emailSolicitante;
+    if (jaProcessado(dedupKey)) {
+      Logger.log("⚠️ Form duplicado ignorado: " + dedupKey);
+      return;
+    }
+
+    // Validação código
+    const validacao = validarCodigoCliente(codCliente);
+    if (!validacao.valido) {
+      avisarClienteCodigoErrado(emailSolicitante, solicitante, codCliente);
+      incMetrica("form_codigo_invalido");
+      return;
+    }
+
+    const tipoProcesso = campo(r, ["Pergunta sem título"]);
+    const estado = campo(r, ["Informe o estado que seu processo será realizado:"]);
+    const protocolo = campo(r, ["Onde deseja protocolar o processo para análise?"]);
+    const urgencia = campo(r, ["Qual a urgência para a preparação e protocolo do processo? ","Qual a urgência para a preparação e protocolo do processo?"]);
+    const contabilidade = campo(r, ["Nome da Contabilidade"]);
+    const slaTrevo = campo(r, ["Velocidade de Preparação (SLA Trevo) 🍀"]);
+    const localProtocolo = campo(r, ["🕰️ Local de Protocolo e Análise (SLA do Órgão Público)"]);
+
+    const listaDestino = validacao.listaId;
+    const boardId = validacao.boardId;
+    const nomeEmpresa = definirNomeEmpresa(r, tipoProcesso);
+    const nomeCartao = definirNomeCartao(r, codCliente, tipoProcesso);
+    const linkPastaDrive = criarPastasDrive(r, codCliente, nomeEmpresa, emailSolicitante);
+
+    const spec = buildSpecPorTipo(r, tipoProcesso);
+    const isPrioridadeMaxima = slaTrevo.toLowerCase().includes("prioridade máxima");
+    const isMetodoTrevo = localProtocolo.includes("🍀") || localProtocolo.toLowerCase().includes("método trevo");
+    const destaquePrioridade = isPrioridadeMaxima ? "\n\n⚡ **PRIORIDADE MÁXIMA TREVO (+50% de acréscimo)** ⚡\n" : "";
+
+    const cabecalhoComum =
+      "🏢 **" + codCliente + " — " + contabilidade + "**\n" +
+      destaquePrioridade + "\n" +
+      "📂 **LINK DA PASTA:** " + linkPastaDrive + "\n\n" +
+      "📋 SOLICITANTE: " + solicitante + "\n" +
+      "🏢 CONTABILIDADE: " + contabilidade + "\n" +
+      "📧 E-MAIL: " + emailSolicitante + "\n" +
+      "🗺️ ESTADO: " + estado + "\n" +
+      "📬 PROTOCOLO: " + protocolo + "\n" +
+      "⏰ URGÊNCIA: " + urgencia + "\n" +
+      "🍀 SLA TREVO: " + slaTrevo + "\n" +
+      "🕰️ LOCAL PROTOCOLO: " + localProtocolo + "\n" +
+      "📝 FORM ID: " + new Date().toISOString() + "\n" +
+      "───────────────────────────\n\n";
+
+    const descricaoFinal = cabecalhoComum + spec.descricao + montarCamposNaoMapeados(r);
+    const dueDate = calcularDueDate(urgencia, isPrioridadeMaxima);
+
+    const cardData = criarCardTrello(nomeCartao, descricaoFinal, listaDestino, dueDate);
+    if (!cardData) {
+      notificarErro("aoEnviarFormulario", new Error("Falha ao criar card Trello para " + nomeCartao));
+      avisarFalhaCriacao(emailSolicitante, solicitante, nomeEmpresa);
+      return;
+    }
+
+    const cardId = cardData.id;
+    criarChecklistTrello(cardId, spec.nomeChecklist, spec.itensChecklist);
+    definirCapaCartao(cardId, spec.cor);
+
+    const etiquetasParaAplicar = [];
+    if (isPrioridadeMaxima) etiquetasParaAplicar.push("PRIORIDADE");
+    if (isMetodoTrevo) etiquetasParaAplicar.push("MÉTODO TREVO 🍀");
+    if (etiquetasParaAplicar.length > 0) aplicarEtiquetasNoCartao(cardId, boardId, etiquetasParaAplicar);
+
+    adicionarMembrosDoBoardAoCartao(cardId, boardId);
+    enviarEmailConfirmacaoCliente(emailSolicitante, solicitante, nomeEmpresa, tipoProcesso, cardData.shortUrl || cardData.url);
+
+    incMetrica("form_cartao_criado");
+    Logger.log("✅ Cartão criado: " + nomeCartao);
+  } catch (erro) {
+    Logger.log("❌ ERRO: " + erro.toString());
+    Logger.log("Stack: " + erro.stack);
+    notificarErro("aoEnviarFormulario", erro);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function avisarFalhaCriacao(emailSolicitante, nomeSolicitante, nomeEmpresa) {
+  if (!validarEmail(emailSolicitante)) return;
+  const corpo =
+    "Olá " + (nomeSolicitante || "") + ",\n\n" +
+    "Recebemos sua solicitação para " + (nomeEmpresa || "a empresa") + ", porém tivemos uma falha técnica ao registrá-la no nosso sistema.\n\n" +
+    "Nossa equipe já foi notificada e vai processar manualmente. Você será contatado em breve.\n\n" +
+    "🍀 Equipe Trevo Legaliza";
+  try { MailApp.sendEmail(emailSolicitante, "⚠️ Solicitação recebida — processando manualmente", corpo, { cc: EMAIL_ALERTA_ERRO }); }
+  catch (e) { Logger.log(e.message); }
+}
+
+// =============================================
+// CAMPOS NÃO MAPEADOS
+// =============================================
+function montarCamposNaoMapeados(r) {
+  let out = "\n\n═══════════════════════════\n📋 **CAMPOS ADICIONAIS DO FORMULÁRIO**\n═══════════════════════════\n\n";
+  let teveAlgo = false;
+  const chavesMapeadas = coletarChavesMapeadas();
+  for (const chave in r) {
+    if (CAMPOS_JA_USADOS.has(chave)) continue;
+    if (chavesMapeadas.has(chave.trim())) continue;
+    const valor = (r[chave] || [""])[0];
+    if (!valor || String(valor).trim() === "") continue;
+    if (String(valor).includes("drive.google.com")) continue;
+    out += "**" + chave.trim() + ":**\n" + String(valor).trim() + "\n\n";
+    teveAlgo = true;
+  }
+  return teveAlgo ? out : "";
+}
+
+function coletarChavesMapeadas() {
+  return new Set([
+    "Razão Social desejada","Razão Social opção 2","Nome fantasia",
+    "  Selecione o porte/enquadramento da empresa.  ","Selecione o porte/enquadramento da empresa.",
+    "Natureza Jurídica:","A empresa será estabelecida?","Qula a forma de atuação?",
+    "CNAE Principal","CNAE Secundário(s)","Descrição do objeto social",
+    "Capital Social em R$","Capital Social em Quotas",
+    "Endereço da Pessoa Jurídica completo com CEP.:","Outras informações que achar pertinente",
+    "Quantidade de sócios:","Informe a Quantidade de Sócios:",
+    "  👤 SÓCIO 01","👤 SÓCIO 01","Responsável pela RFB?",
+    "⚖️ Administração da Sociedade ","⚖️ Administração da Sociedade",
+    "💰💳 Forma de Integralização no Capital Social ","💰💳 Forma de Integralização no Capital Social",
+    "Integralização total no ato ","Integralização total no ato",
+    "  📝  INFORMAÇÕES COMPLETAS DOS SÓCIOS ","📝  INFORMAÇÕES COMPLETAS DOS SÓCIOS",
+    "💰💳 INTEGRALIZAÇÃO DO CAPITAL SOCIAL E FORMA DE INTEGRALIZAÇÃO ","💰💳 INTEGRALIZAÇÃO DO CAPITAL SOCIAL E FORMA DE INTEGRALIZAÇÃO",
+    "📄 RESPONSÁVEL PELA RFB ","📄 RESPONSÁVEL PELA RFB",
+    "⚖️ ADMINISTRAÇÃO DA SOCIEDADE  ","⚖️ ADMINISTRAÇÃO DA SOCIEDADE",
+    "Inscrição CNPJ:","  Razão Social atual","Razão Social atual",
+    "🔄 Informe se deseja alterar a razão social ou o nome fantasia da empresa.  ","🔄 Informe se deseja alterar a razão social ou o nome fantasia da empresa.",
+    "Nova Razão Social  — 1ª opção  ","Nova Razão Social — 1ª opção",
+    "Nova Razão Social — 2ª opção  ","Nova Razão Social — 2ª opção",
+    "Nome Fantasia (opcional)  ","Nome Fantasia (opcional)",
+    "Deseja alterar o enquadramento da empresa?  ","Deseja alterar o enquadramento da empresa?",
+    " Novo Enquadramento  ","Novo Enquadramento","Observações gerais",
+    "Alteração de Objeto Social / CNAE?  ","Alteração de Objeto Social / CNAE?",
+    "CNAE(s) principal e secundário(s)  ","CNAE(s) principal e secundário(s)",
+    "Descrição do objeto social 2","Com a alteração, precisamos saber se a atividade será:",
+    "Está se mudando?","Será troca de UF?","Endereço completo com CEP:",
+    "A atividade nesse novo endereço será estabelecida?","É local de residência do sócio?","Mátricula do imóvel IPTU:",
+    "Mudança no QSA","  👥 Informações completas dos sócios  ","👥 Informações completas dos sócios",
+    "💰 Integralização do Capital Social e Forma de Integralização  ","💰 Integralização do Capital Social e Forma de Integralização",
+    "⚖️ Administração da Sociedade  ","🦁 Responsável pela Receita Federal",
+    "Precisa alterar dados simples na Receita Federal, como e-mail, telefone, contabilista responsável e afins?",
+    "Telefone principal (opcional) ","Telefone principal (opcional)",
+    "E-mail principal (opcional)  ","E-mail principal (opcional)",
+    "Endereço para correspondência (opcional)  ","Endereço para correspondência (opcional)",
+    "Endereço completo e dados de contato do novo contabilista","Informar novo contabilista","Descreva:",
+    "CNPJ da empresa a ser transformada  ","CNPJ da empresa a ser transformada",
+    "Natureza Jurídica atual  ","Natureza Jurídica atual",
+    "Nova natureza jurídica pretendida  ","Nova natureza jurídica pretendida",
+    "🔁 Razão Social e Nome Fantasia após transformação  - 1ª opção","🔁 Razão Social e Nome Fantasia após transformação - 1ª opção",
+    "🔁  2ª Opção de Razão Social  ","🔁 2ª Opção de Razão Social",
+    "📃 Nome Fantasia (opcional)   ","📃 Nome Fantasia (opcional)",
+    "Novo Enquadramento após transformação ","Novo Enquadramento após transformação","Observações gerais 2",
+    "Informações completas dos sócios:  ","Informações completas dos sócios:",
+    "Administração caberá a quem?","Responsável pela RFB  ","Responsável pela RFB",
+    "❓As atividades (CNAEs) e objeto socialvão mudar?  ","❓As atividades (CNAEs) e objeto socialvão mudar?",
+    "Dreva as atividades novas respeitando o modelo abaixo.",
+    "Haverá alteração de endereço da empresa após a transformação? ","Haverá alteração de endereço da empresa após a transformação?",
+    "Será troca de UF? 2","Novo endereço completo com CEP:",
+    "É local de residência do sócio? 2","A atividade nesse endereço será estabelecida?",
+    "Qual a forma de atuação da empresa?","😊 Algo a mais que queira informar?",
+    "❓  CNPJ da empresa a ser encerrada  ","CNPJ da empresa a ser encerrada",
+    "📃 Razão Social da empresa  ","📃 Razão Social da empresa","Razão Social da empresa",
+    "🤔 Motivo do encerramento",
+    "⚠️ Quem será o responsável perante a Receita Federal no encerramento?  ","⚠️ Quem será o responsável perante a Receita Federal no encerramento?",
+    "⚠️ Quem será o responsável perante a Receita Federal no encerramento?   2",
+    "📝 Observações finais (opcional)  ","📝 Observações finais (opcional)",
+    "🤔 Qual o tipo de processo avulso que você deseja solicitar?  ","🤔 Qual o tipo de processo avulso que você deseja solicitar?",
+    "Descreva detalhadamente o que precisa ser feito ","Descreva detalhadamente o que precisa ser feito",
+    "CNPJ da empresa  ","CNPJ da empresa","Razão Social da empresa ",
+    "  📝 Observações sobre os documentos (opcional)  ","📝 Observações sobre os documentos (opcional)"
+  ].map(s => s.trim()));
+}
+
+// =============================================
+// DUE DATE + ETIQUETAS + MEMBROS
+// =============================================
+function calcularDueDate(urgencia, isPrioridadeMaxima) {
+  const agora = new Date();
+  let dias = 7;
+  if (isPrioridadeMaxima) dias = 1;
+  else {
+    const u = (urgencia || "").toLowerCase();
+    if (u.includes("urgente")) dias = 3;
+    else if (u.includes("normal")) dias = 7;
+  }
+  agora.setDate(agora.getDate() + dias);
+  return agora.toISOString();
+}
+
+function aplicarEtiquetasNoCartao(cardId, boardId, nomesEtiquetas) {
+  try {
+    const r = trelloGet("/1/boards/" + boardId + "/labels", { fields: "name,color,id", limit: "1000" });
+    if (r.getResponseCode() !== 200) return;
+    const labels = JSON.parse(r.getContentText());
+    for (const nomeBuscado of nomesEtiquetas) {
+      const label = labels.find(l => (l.name || "").trim() === nomeBuscado.trim());
+      if (label) trelloPost("/1/cards/" + cardId + "/idLabels", { value: label.id });
+      else Logger.log("⚠️ Etiqueta '" + nomeBuscado + "' não encontrada no board " + boardId);
+    }
+  } catch (e) { Logger.log("⚠️ Erro etiquetas: " + e.message); }
+}
+
+function adicionarMembrosDoBoardAoCartao(cardId, boardId) {
+  try {
+    const r = trelloGet("/1/boards/" + boardId + "/members", { fields: "id,username" });
+    if (r.getResponseCode() !== 200) return;
+    const members = JSON.parse(r.getContentText());
+    for (const m of members) {
+      try { trelloPost("/1/cards/" + cardId + "/idMembers", { value: m.id }); }
+      catch (e) { Logger.log("⚠️ Não adicionou @" + m.username + ": " + e.message); }
+    }
+  } catch (e) { Logger.log("⚠️ Erro membros: " + e.message); }
+}
+
+// =============================================
+// DEFINIR NOME EMPRESA / CARTÃO (idêntico v5.1)
+// =============================================
+function buildSpecPorTipo(r, tipoProcesso) {
+  switch (tipoProcesso) {
+    case "Abertura de empresa":
+      return { cor: "green", nomeChecklist: "CHECKLIST - ABERTURA 🍀",
+        itensChecklist: ["FORMULÁRIO PREENCHIDO","DOCUMENTO DOS SÓCIOS","COMPROVANTE DE ENDEREÇO DOS SÓCIOS","INSCRIÇÃO IMOBILIÁRIA (IPTU)","CONTRATO SOCIAL","VIABILIDADE","DBE","VRE","AGUARDANDO PAGAMENTO TAXAS","PROCESSO EM ANALISE","PROCESSO DEFERIDO","INSCRIÇÃO MUNICIPAL","INSCRIÇÃO ESTADUAL","ENQUADRAMENTO SIMPLES NACIONAL (SE OPTANTE)","CONSELHO DE CLASSE (SE HOUVER)","HONORÁRIO PAGO"],
+        descricao: montarDescricaoAbertura(r) };
+    case "Alteração de Empresa": {
+      const trocaUF = campo(r, ["Será troca de UF?"]);
+      const isUF = trocaUF.toLowerCase() === "sim";
+      return { cor: "purple", nomeChecklist: isUF ? "CHECKLIST - ALTERAÇÃO DE U.F.🍀" : "CHECKLIST - ALTERAÇÃO 🍀",
+        itensChecklist: isUF
+          ? ["* INFORMAÇÕES NOVO ENDEREÇO: VERIFICAR SE HAVERÁ ESPAÇO FÍSICO","VIABILIDADE DE ALTERAÇÃO ( SEDE ANTIGA )","VIABILIDADE DE ALTERAÇÃO * SEDE NOVA","DBE","VRE ( SEDE ANTIGA )","DAE ENCAMINHADA ( SEDE ANTIGA )","PROCESSO EM ANALISE ( SEDE ANTIGA )","PROCESSO REGISTRADO ( SEDE ANTIGA )","SOLICITAR BAIXA INSCRIÇÃO MUNICIPAL (SEDE ANTIGA)","INSCRIÇÃO MUNCIPAL BAIXADA ( SEDE ANTIGA )","VRE ***SEDE NOVA","DAE ENCAMINHADA ***SEDE NOVA","PROCESSO EM ANALISE ***SEDE NOVA","PROCESSO REGISTRADO ***SEDE NOVA","PEDIDO DE INSCRIÇÃO MUNICIPAL ***SEDE NOVA","HONORÁRIO PAGO"]
+          : ["FORMULÁRIO PREENCHIDO","DOCUMENTO DOS SÓCIOS (FOTO SIMPLES)","INSCRIÇÃO IMOBILIÁRIA","MINUTA - ALTERAÇÃO CONTRATUAL","VIABILIDADE","DBE","VRE","AGUARDANDO PAGAMENTO TAXAS","PROCESSO EM ANALISE","PROCESSO DEFERIDO","ATUALIZAÇÃO PREFEITURA","CONSELHO DE CLASSE","EMISSÃO DE LICENÇAS","HONORÁRIO PAGO"],
+        descricao: montarDescricaoAlteracao(r, trocaUF) };
+    }
+    case "Transformação de Empresa":
+      return { cor: "orange", nomeChecklist: "CHECKLIST - TRANSFORMAÇÃO🍀",
+        itensChecklist: ["FORMULÁRIO PREENCHIDO","CHECAGEM DE DOCUMENTOS","DESENQUADRAMENTO - MEI","INFORMAR DÉBITOS - MEI (NOS COMENTÁRIOS)","VIABILIDADE - TRANSFORMAÇÃO","DBE","VRE","MINUTA - TRANSFORMAÇÃO CONTRATUAL","AGUARDANDO PAGAMENTO TAXAS","PROCESSO EM ANALISE","PROCESSO DEFERIDO","ATUALIZAÇÃO PREFEITURA","CONSELHO DE CLASSE","EMISSÃO DE LICENÇAS","HONORÁRIO PAGO"],
+        descricao: montarDescricaoTransformacao(r) };
+    case "Encerramento de Empresa":
+      return { cor: "red", nomeChecklist: "Documentação Pendente",
+        itensChecklist: ["CNPJ","Contrato Social registrado","eCPF","HONORÁRIO PAGO"],
+        descricao: montarDescricaoEncerramento(r) };
+    case "Processos Avulsos":
+      return { cor: "black", nomeChecklist: "DOCUMENTOS NECESSÁRIOS",
+        itensChecklist: ["CONTRATO SOCIAL / ESTATUTO","COMPROVANTE DE ENDEREÇO COMERCIAL","INSCRIÇÃO IMOBILIÁRIA (IPTU)","HONORÁRIO PAGO"],
+        descricao: montarDescricaoAvulso(r) };
+    default:
+      return { cor: "blue", nomeChecklist: "CHECKLIST GERAL",
+        itensChecklist: ["FORMULÁRIO PREENCHIDO","HONORÁRIO PAGO"],
+        descricao: "Tipo de processo não identificado.\n\nVerifique o formulário." };
+  }
+}
+
+function definirNomeCartao(r, codCliente, tipoProcesso) {
+  let razao = "";
+  switch (tipoProcesso) {
+    case "Abertura de empresa": razao = campo(r, ["Razão Social desejada"]); break;
+    case "Alteração de Empresa": razao = campo(r, ["  Razão Social atual","Razão Social atual"]); break;
+    case "Transformação de Empresa": razao = campo(r, ["🔁 Razão Social e Nome Fantasia após transformação  - 1ª opção","🔁 Razão Social e Nome Fantasia após transformação - 1ª opção"]); break;
+    case "Encerramento de Empresa": razao = campo(r, ["📃 Razão Social da empresa  ","📃 Razão Social da empresa","Razão Social da empresa"]); break;
+    case "Processos Avulsos": razao = campo(r, ["Razão Social da empresa ","Razão Social da empresa"]); break;
+  }
+  if (!razao || razao.trim() === "") razao = (tipoProcesso || "PROCESSO").toUpperCase();
+  return (codCliente + " - " + razao.trim()).toUpperCase();
+}
+
+function definirNomeEmpresa(r, tipo) {
+  let nome = "";
+  switch (tipo) {
+    case "Abertura de empresa": nome = campo(r, ["Razão Social desejada"]); break;
+    case "Alteração de Empresa": {
+      const alteraRazao = campo(r, ["🔄 Informe se deseja alterar a razão social ou o nome fantasia da empresa.  "]);
+      const novaRazao = campo(r, ["Nova Razão Social  — 1ª opção  ","Nova Razão Social — 1ª opção"]);
+      const razaoAtual = campo(r, ["  Razão Social atual","Razão Social atual"]);
+      nome = (alteraRazao.toLowerCase().includes("sim") && novaRazao) ? novaRazao : razaoAtual; break;
+    }
+    case "Transformação de Empresa": nome = campo(r, ["🔁 Razão Social e Nome Fantasia após transformação  - 1ª opção","🔁 Razão Social e Nome Fantasia após transformação - 1ª opção"]); break;
+    case "Encerramento de Empresa": nome = campo(r, ["📃 Razão Social da empresa  ","📃 Razão Social da empresa","Razão Social da empresa"]); break;
+    case "Processos Avulsos": nome = campo(r, ["Razão Social da empresa ","Razão Social da empresa"]); break;
+  }
+  if (!nome || nome.trim() === "") nome = "PROCESSO - " + campo(r, ["  Código do cliente","Código do cliente"]);
+  return nome.trim();
+}
+
+// =============================================
+// DESCRIÇÕES POR TIPO
+// =============================================
+function montarDescricaoAbertura(r) {
+  const q = campo(r, ["Quantidade de sócios:"]);
+  let d = "**DADOS PARA ABERTURA DE EMPRESA ____________**\n\n";
+  d += "RAZÃO SOCIAL: " + campo(r, ["Razão Social desejada"]) + "\n\n";
+  d += "2ª OPÇÃO: " + campo(r, ["Razão Social opção 2"]) + "\n\n";
+  d += "FANTASIA: " + campo(r, ["Nome fantasia"]) + "\n\n";
+  d += "PORTE: " + campo(r, ["  Selecione o porte/enquadramento da empresa.  ","Selecione o porte/enquadramento da empresa."]) + "\n\n";
+  d += "NATUREZA: " + campo(r, ["Natureza Jurídica:"]) + "\n\n";
+  d += "ESTABELECIDA: " + campo(r, ["A empresa será estabelecida?"]) + "\n\n";
+  d += "ATUAÇÃO: " + campo(r, ["Qula a forma de atuação?"]) + "\n\n";
+  d += "CNAE PRINCIPAL: " + campo(r, ["CNAE Principal"]) + "\n\n";
+  d += "CNAE SECUNDÁRIO: " + campo(r, ["CNAE Secundário(s)"]) + "\n\n";
+  d += "**OBJETO SOCIAL**\n" + campo(r, ["Descrição do objeto social"]) + "\n\n";
+  d += "CAPITAL SOCIAL R$: " + campo(r, ["Capital Social em R$"]) + "\n\n";
+  d += "CAPITAL EM QUOTAS: " + campo(r, ["Capital Social em Quotas"]) + "\n\n";
+  d += "ENDEREÇO PJ: " + campo(r, ["Endereço da Pessoa Jurídica completo com CEP.:"]) + "\n\n";
+  const outras = campo(r, ["Outras informações que achar pertinente"]);
+  if (outras) d += "OUTRAS INFORMAÇÕES: " + outras + "\n\n";
+  d += "───────────────────────────\n\n";
+  if (q === "Somente um sócio") {
+    d += "**A) DADOS EMPRESA**\n\nSERÁ ESTABELECIDA: " + campo(r, ["A empresa será estabelecida?"]) + "\n\n";
+    d += "ENDEREÇO SEDE: " + campo(r, ["Endereço da Pessoa Jurídica completo com CEP.:"]) + "\n\n";
+    d += "**B) DADOS SÓCIOS**\n\nQUANTIDADE DE SÓCIOS: " + q + "\n\n";
+    d += "👤 SÓCIO 01: " + campo(r, ["  👤 SÓCIO 01","👤 SÓCIO 01"]) + "\n\n";
+    d += "RESPONSÁVEL NA RECEITA: " + campo(r, ["Responsável pela RFB?"]) + "\n\n";
+    d += "ADMINISTRAÇÃO: " + campo(r, ["⚖️ Administração da Sociedade ","⚖️ Administração da Sociedade"]) + "\n\n";
+    d += "INTEGRALIZAÇÃO: " + campo(r, ["💰💳 Forma de Integralização no Capital Social ","💰💳 Forma de Integralização no Capital Social"]) + "\n\n";
+    d += "TOTAL NO ATO: " + campo(r, ["Integralização total no ato ","Integralização total no ato"]) + "\n\n";
+  } else {
+    d += "**A) DADOS EMPRESA**\n\nSERÁ ESTABELECIDA: " + campo(r, ["A empresa será estabelecida?"]) + "\n\n";
+    d += "ENDEREÇO SEDE: " + campo(r, ["Endereço da Pessoa Jurídica completo com CEP.:"]) + "\n\n";
+    d += "**B) DADOS SÓCIOS**\n\nQTD SÓCIOS: " + campo(r, ["Informe a Quantidade de Sócios:"]) + "\n\n";
+    d += "📝 INFORMAÇÕES COMPLETAS:\n" + campo(r, ["  📝  INFORMAÇÕES COMPLETAS DOS SÓCIOS ","📝  INFORMAÇÕES COMPLETAS DOS SÓCIOS"]) + "\n\n";
+    d += "💰 INTEGRALIZAÇÃO:\n" + campo(r, ["💰💳 INTEGRALIZAÇÃO DO CAPITAL SOCIAL E FORMA DE INTEGRALIZAÇÃO ","💰💳 INTEGRALIZAÇÃO DO CAPITAL SOCIAL E FORMA DE INTEGRALIZAÇÃO"]) + "\n\n";
+    d += "RESPONSÁVEL RFB: " + campo(r, ["📄 RESPONSÁVEL PELA RFB ","📄 RESPONSÁVEL PELA RFB"]) + "\n\n";
+    d += "ADMINISTRAÇÃO: " + campo(r, ["⚖️ ADMINISTRAÇÃO DA SOCIEDADE  ","⚖️ ADMINISTRAÇÃO DA SOCIEDADE"]) + "\n\n";
+  }
+  return d;
+}
+
+function montarDescricaoAlteracao(r, trocaUF) {
+  let d = "**DADOS PARA ALTERAÇÃO____________**\n\n";
+  d += "CNPJ: " + campo(r, ["Inscrição CNPJ:"]) + "\n\n";
+  d += "RAZÃO SOCIAL ATUAL: " + campo(r, ["  Razão Social atual","Razão Social atual"]) + "\n\n";
+  const alteraRazao = campo(r, ["🔄 Informe se deseja alterar a razão social ou o nome fantasia da empresa.  ","🔄 Informe se deseja alterar a razão social ou o nome fantasia da empresa."]);
+  d += "ALTERA RAZÃO? " + alteraRazao + "\n\n";
+  if (alteraRazao.toLowerCase().includes("sim")) {
+    d += "NOVA 1ª: " + campo(r, ["Nova Razão Social  — 1ª opção  ","Nova Razão Social — 1ª opção"]) + "\n\n";
+    d += "NOVA 2ª: " + campo(r, ["Nova Razão Social — 2ª opção  ","Nova Razão Social — 2ª opção"]) + "\n\n";
+    d += "FANTASIA: " + campo(r, ["Nome Fantasia (opcional)  ","Nome Fantasia (opcional)"]) + "\n\n";
+  }
+  const alteraEnq = campo(r, ["Deseja alterar o enquadramento da empresa?  ","Deseja alterar o enquadramento da empresa?"]);
+  d += "ALTERA ENQUADRAMENTO? " + alteraEnq + "\n\n";
+  if (alteraEnq.toLowerCase().includes("sim")) d += "NOVO: " + campo(r, [" Novo Enquadramento  ","Novo Enquadramento"]) + "\n\n";
+  const obs = campo(r, ["Observações gerais"]);
+  if (obs) d += "OBSERVAÇÕES: " + obs + "\n\n";
+  const alteraCnae = campo(r, ["Alteração de Objeto Social / CNAE?  ","Alteração de Objeto Social / CNAE?"]);
+  d += "ALTERA CNAE? " + alteraCnae + "\n\n";
+  if (alteraCnae.toLowerCase().includes("sim")) {
+    d += "CNAE(s): " + campo(r, ["CNAE(s) principal e secundário(s)  ","CNAE(s) principal e secundário(s)"]) + "\n\n";
+    d += "**OBJETO SOCIAL:**\n" + campo(r, ["Descrição do objeto social 2"]) + "\n\n";
+    d += "ATIVIDADE SERÁ: " + campo(r, ["Com a alteração, precisamos saber se a atividade será:"]) + "\n\n";
+  }
+  const mudando = campo(r, ["Está se mudando?"]);
+  d += "───────────────────────────\n\nESTÁ SE MUDANDO? " + mudando + "\n\n";
+  if (mudando.toUpperCase() === "SIM") {
+    d += "TROCA DE UF? " + trocaUF + "\n\n";
+    d += "NOVO END: " + campo(r, ["Endereço completo com CEP:"]) + "\n\n";
+    d += "ESTABELECIDA NOVO END? " + campo(r, ["A atividade nesse novo endereço será estabelecida?"]) + "\n\n";
+    d += "RESIDÊNCIA SÓCIO? " + campo(r, ["É local de residência do sócio?"]) + "\n\n";
+    d += "IPTU: " + campo(r, ["Mátricula do imóvel IPTU:"]) + "\n\n";
+  }
+  const mudaQSA = campo(r, ["Mudança no QSA"]);
+  d += "───────────────────────────\n\nMUDANÇA NO QSA? " + mudaQSA + "\n\n";
+  if (mudaQSA.toLowerCase().includes("sim")) {
+    d += "👥 SÓCIOS:\n" + campo(r, ["  👥 Informações completas dos sócios  ","👥 Informações completas dos sócios"]) + "\n\n";
+    d += "💰 INTEGRALIZAÇÃO:\n" + campo(r, ["💰 Integralização do Capital Social e Forma de Integralização  ","💰 Integralização do Capital Social e Forma de Integralização"]) + "\n\n";
+    d += "ADMINISTRAÇÃO: " + campo(r, ["⚖️ Administração da Sociedade  "]) + "\n\n";
+    d += "RESPONSÁVEL RFB: " + campo(r, ["🦁 Responsável pela Receita Federal"]) + "\n\n";
+  }
+  const dadosSimples = campo(r, ["Precisa alterar dados simples na Receita Federal, como e-mail, telefone, contabilista responsável e afins?"]);
+  d += "ALTERA DADOS SIMPLES RFB? " + dadosSimples + "\n\n";
+  if (dadosSimples.toLowerCase().includes("sim")) {
+    d += "TELEFONE: " + campo(r, ["Telefone principal (opcional) ","Telefone principal (opcional)"]) + "\n\n";
+    d += "E-MAIL: " + campo(r, ["E-mail principal (opcional)  ","E-mail principal (opcional)"]) + "\n\n";
+    d += "CORRESPONDÊNCIA: " + campo(r, ["Endereço para correspondência (opcional)  ","Endereço para correspondência (opcional)"]) + "\n\n";
+    d += "NOVO CONTABILISTA: " + campo(r, ["Endereço completo e dados de contato do novo contabilista"]) + "\n\n";
+    d += "INFORMAR: " + campo(r, ["Informar novo contabilista"]) + "\n\n";
+  }
+  const descExtra = campo(r, ["Descreva:"]);
+  if (descExtra) d += "DESCRIÇÃO EXTRA: " + descExtra + "\n\n";
+  d += "\n*OBS: HAVENDO ALTERAÇÃO DE RESPONSÁVEL NA RECEITA, SERÁ NECESSÁRIO EMITIR NOVO CERTIFICADO DIGITAL (E-CNPJ).*";
+  return d;
+}
+
+function montarDescricaoTransformacao(r) {
+  let d = "**INFORMAÇÕES PARA TRANSFORMAÇÃO______________**\n\n";
+  d += "CNPJ: " + campo(r, ["CNPJ da empresa a ser transformada  ","CNPJ da empresa a ser transformada"]) + "\n\n";
+  d += "NATUREZA ATUAL: " + campo(r, ["Natureza Jurídica atual  ","Natureza Jurídica atual"]) + "\n\n";
+  d += "NOVA NATUREZA: " + campo(r, ["Nova natureza jurídica pretendida  ","Nova natureza jurídica pretendida"]) + "\n\n";
+  d += "1ª OPÇÃO: " + campo(r, ["🔁 Razão Social e Nome Fantasia após transformação  - 1ª opção","🔁 Razão Social e Nome Fantasia após transformação - 1ª opção"]) + "\n\n";
+  d += "2ª OPÇÃO: " + campo(r, ["🔁  2ª Opção de Razão Social  ","🔁 2ª Opção de Razão Social"]) + "\n\n";
+  d += "FANTASIA: " + campo(r, ["📃 Nome Fantasia (opcional)   ","📃 Nome Fantasia (opcional)"]) + "\n\n";
+  d += "NOVO ENQUADRAMENTO: " + campo(r, ["Novo Enquadramento após transformação ","Novo Enquadramento após transformação"]) + "\n\n";
+  const obs = campo(r, ["Observações gerais 2"]);
+  if (obs) d += "OBSERVAÇÕES: " + obs + "\n\n";
+  d += "───────────────────────────\n\n*VERIFICAR SE HAVERÁ ALTERAÇÃO DE:*\n1. CAPITAL SOCIAL\n2. RAZÃO SOCIAL\n3. QTD SÓCIOS\n4. ESTADO CIVIL\n5. ADMINISTRAÇÃO\n6. RESPONSÁVEL RFB\n\n";
+  d += "👥 SÓCIOS:\n" + campo(r, ["Informações completas dos sócios:  ","Informações completas dos sócios:"]) + "\n\n";
+  d += "ADMINISTRAÇÃO: " + campo(r, ["Administração caberá a quem?"]) + "\n\n";
+  d += "RESPONSÁVEL RFB: " + campo(r, ["Responsável pela RFB  ","Responsável pela RFB"]) + "\n\n";
+  const alteraCnae = campo(r, ["❓As atividades (CNAEs) e objeto socialvão mudar?  ","❓As atividades (CNAEs) e objeto socialvão mudar?"]);
+  d += "───────────────────────────\n\nALTERA CNAE? " + alteraCnae + "\n\n";
+  if (alteraCnae.toLowerCase().includes("sim")) d += "NOVAS ATIVIDADES:\n" + campo(r, ["Dreva as atividades novas respeitando o modelo abaixo."]) + "\n\n";
+  const alteraEnd = campo(r, ["Haverá alteração de endereço da empresa após a transformação? ","Haverá alteração de endereço da empresa após a transformação?"]);
+  d += "ALTERA END? " + alteraEnd + "\n\n";
+  if (alteraEnd.toLowerCase().includes("sim")) {
+    d += "TROCA UF? " + campo(r, ["Será troca de UF? 2"]) + "\n\n";
+    d += "NOVO END: " + campo(r, ["Novo endereço completo com CEP:"]) + "\n\n";
+  }
+  d += "RESIDÊNCIA SÓCIO? " + campo(r, ["É local de residência do sócio? 2"]) + "\n\n";
+  d += "ESTABELECIDA? " + campo(r, ["A atividade nesse endereço será estabelecida?"]) + "\n\n";
+  d += "ATUAÇÃO: " + campo(r, ["Qual a forma de atuação da empresa?"]) + "\n\n";
+  const algoMais = campo(r, ["😊 Algo a mais que queira informar?"]);
+  if (algoMais) d += "ALGO MAIS: " + algoMais + "\n\n";
+  d += "\n*OBS: RECOMENDAMOS EMISSÃO DE NOVO CERTIFICADO DIGITAL AO FINAL.*";
+  return d;
+}
+
+function montarDescricaoEncerramento(r) {
+  let d = "**DADOS PARA ENCERRAMENTO____________**\n\n";
+  d += "CNPJ: " + campo(r, ["❓  CNPJ da empresa a ser encerrada  ","CNPJ da empresa a ser encerrada"]) + "\n\n";
+  d += "RAZÃO SOCIAL: " + campo(r, ["📃 Razão Social da empresa  ","📃 Razão Social da empresa","Razão Social da empresa"]) + "\n\n";
+  d += "MOTIVO: " + campo(r, ["🤔 Motivo do encerramento"]) + "\n\n";
+  const resp = campo(r, ["⚠️ Quem será o responsável perante a Receita Federal no encerramento?  ","⚠️ Quem será o responsável perante a Receita Federal no encerramento?","⚠️ Quem será o responsável perante a Receita Federal no encerramento?   2"]);
+  if (resp) d += "RESPONSÁVEL RF: " + resp + "\n\n";
+  const obs = campo(r, ["📝 Observações finais (opcional)  ","📝 Observações finais (opcional)"]);
+  if (obs) d += "*OBSERVAÇÕES:* " + obs + "\n\n";
+  return d;
+}
+
+function montarDescricaoAvulso(r) {
+  let d = "**PROCESSO A SER EFETUADO____________**\n\n";
+  d += "TIPO: " + campo(r, ["🤔 Qual o tipo de processo avulso que você deseja solicitar?  ","🤔 Qual o tipo de processo avulso que você deseja solicitar?"]) + "\n\n";
+  d += "**INFORMAÇÕES:**\n" + campo(r, ["Descreva detalhadamente o que precisa ser feito ","Descreva detalhadamente o que precisa ser feito"]) + "\n\n";
+  d += "CNPJ: " + campo(r, ["CNPJ da empresa  ","CNPJ da empresa"]) + "\n\n";
+  d += "RAZÃO SOCIAL: " + campo(r, ["Razão Social da empresa ","Razão Social da empresa"]) + "\n\n";
+  const obsDocs = campo(r, ["  📝 Observações sobre os documentos (opcional)  ","📝 Observações sobre os documentos (opcional)"]);
+  if (obsDocs) d += "OBSERVAÇÕES DOCS: " + obsDocs + "\n\n";
+  return d;
+}
+
+// =============================================
+// DRIVE — PASTAS + ANEXOS + COMPARTILHAR LEITOR
+// =============================================
+function criarPastasDrive(r, codCliente, nomeEmpresa, emailSolicitante) {
+  const raiz = DriveApp.getFolderById(PASTA_CLIENTES_ATIVOS_ID);
+  let pastaCliente;
+  const bc = raiz.searchFolders("title contains '" + codCliente + "'");
+  if (bc.hasNext()) pastaCliente = bc.next();
+  else pastaCliente = raiz.createFolder("CLIENTE NOVO - " + codCliente);
+
+  let pastaProcessos;
+  const bp = pastaCliente.searchFolders("title = 'PROCESSOS' OR title = 'processos'");
+  if (bp.hasNext()) pastaProcessos = bp.next();
+  else pastaProcessos = pastaCliente.createFolder("PROCESSOS");
+
+  const pastaEmpresa = buscarOuCriarPastaEmpresa(pastaProcessos, nomeEmpresa);
+
+  // Move arquivos
+  for (const chave in r) {
+    const valor = (r[chave] || [""])[0];
+    if (!valor || !String(valor).includes("drive.google.com")) continue;
+    moverArquivosDoCampo(r, chave, pastaEmpresa);
+  }
+
+  // Compartilha como leitor com o solicitante (e com equipe se desejar)
+  compartilharComoLeitor(pastaEmpresa, emailSolicitante);
+
+  return pastaEmpresa.getUrl();
+}
+
+function compartilharComoLeitor(pasta, email) {
+  if (!validarEmail(email)) return;
+  try {
+    pasta.addViewer(email);
+    Logger.log("✅ Pasta compartilhada com " + email);
+  } catch (e) {
+    Logger.log("⚠️ Falha ao compartilhar com " + email + ": " + e.message);
+  }
+}
+
+function buscarOuCriarPastaEmpresa(pastaProcessos, nomeEmpresa) {
+  const lim = Date.now() - 10 * 60 * 1000;
+  const iter = pastaProcessos.searchFolders("title = '" + nomeEmpresa.replace(/'/g, "\\'") + "'");
+  while (iter.hasNext()) {
+    const p = iter.next();
+    if (p.getDateCreated().getTime() > lim) return p;
+  }
+  return pastaProcessos.createFolder(nomeEmpresa);
+}
+
+function moverArquivosDoCampo(r, nomeCampo, pastaDestino) {
+  const valor = (r[nomeCampo] || [""])[0];
+  if (!valor || !valor.includes("drive.google.com")) return;
+  const urls = valor.split(",");
+  urls.forEach(url => {
+    const id = extrairIdDrive(url.trim());
+    if (id) {
+      try { DriveApp.getFileById(id).moveTo(pastaDestino); }
+      catch (e) {
+        Logger.log("⚠️ Não moveu " + id + ": " + e.message);
+        notificarErro("moverArquivos", new Error("id=" + id + " erro=" + e.message));
+      }
+    }
+  });
+}
+
+// =============================================
+// TRELLO — CARD / CAPA / CHECKLIST
+// =============================================
+function criarCardTrello(nome, descricao, listId, dueDate) {
+  const payload = { name: nome, desc: descricao, idList: listId };
+  if (dueDate) payload.due = dueDate;
+  const r = trelloPost("/1/cards", payload);
+  if (r.getResponseCode() === 200) {
+    const c = JSON.parse(r.getContentText());
+    Logger.log("✅ Card criado: " + c.id + " — " + nome);
+    return c;
+  }
+  Logger.log("❌ Erro criar card: " + r.getContentText());
+  return null;
+}
+
+function definirCapaCartao(cardId, cor) {
+  const r = trelloPut("/1/cards/" + cardId, { cover: { color: cor, brightness: "dark", size: "normal" } });
+  if (r.getResponseCode() !== 200) Logger.log("⚠️ Erro capa: " + r.getContentText());
+}
+
+function criarChecklistTrello(cardId, nomeChecklist, itens) {
+  const rc = trelloPost("/1/checklists", { idCard: cardId, name: nomeChecklist });
+  if (rc.getResponseCode() !== 200) { Logger.log("❌ Erro checklist: " + rc.getContentText()); return; }
+  const checklistId = JSON.parse(rc.getContentText()).id;
+  itens.forEach(item => trelloPost("/1/checklists/" + checklistId + "/checkItems", { name: item }));
+}
+
+// Busca email de comentário do card (pra resposta automática virar comentário)
+function getEmailDoCard(cardId) {
+  try {
+    const r = trelloGet("/1/cards/" + cardId, { fields: "email" });
+    if (r.getResponseCode() !== 200) return null;
+    const data = JSON.parse(r.getContentText());
+    return data.email || null;
+  } catch (e) { return null; }
+}
+
+// =============================================
+// MapearClientes — EXECUÇÃO MANUAL
+// =============================================
+function MapearClientes() {
+  const IGNORAR = ["AUTOMAÇÃO DE NOVOS PROCESSOS","AUTOMACAO","CENTRAL DE PROCESSO","CONTROLE DE COBRANÇA","CONTROLE DE COBRANCA","PROCESOS DR","PROCESSOS DR","INTERNO","MODELO","GRAVAÇÃO","GRAVACAO","SUA ÁREA DE TRABALHO"];
+  const rb = trelloGet("/1/members/me/boards", { fields: "name,id,closed" });
+  if (rb.getResponseCode() !== 200) { Logger.log("❌ Erro: " + rb.getContentText()); return; }
+  const quadros = JSON.parse(rb.getContentText());
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let aba = ss.getSheetByName("CLIENTES");
+  if (!aba) {
+    aba = ss.insertSheet("CLIENTES");
+  }
+
+  // Preserva colunas extras se já existem (EMAIL_LEMBRETES, EMAIL_BLOQUEADO)
+  const dadosExistentes = aba.getDataRange().getValues();
+  const mapaExtras = {};
+  if (dadosExistentes.length > 1) {
+    const headers = dadosExistentes[0].map(h => String(h).trim().toUpperCase());
+    const idxCodigo = headers.indexOf("CÓDIGO CLIENTE");
+    const idxEmailLembretes = headers.indexOf("EMAIL_LEMBRETES");
+    const idxEmailBloqueado = headers.indexOf("EMAIL_BLOQUEADO");
+    if (idxCodigo >= 0) {
+      for (let i = 1; i < dadosExistentes.length; i++) {
+        const cod = String(dadosExistentes[i][idxCodigo]).trim();
+        if (!cod) continue;
+        mapaExtras[cod] = {
+          emailLembretes: idxEmailLembretes >= 0 ? dadosExistentes[i][idxEmailLembretes] : "",
+          emailBloqueado: idxEmailBloqueado >= 0 ? dadosExistentes[i][idxEmailBloqueado] : "",
+        };
+      }
+    }
+  }
+
+  aba.clear();
+  aba.getRange(1, 1, 1, 6).setValues([["CÓDIGO CLIENTE","NOME DO QUADRO","ID DA LISTA","ID DO QUADRO","EMAIL_LEMBRETES","EMAIL_BLOQUEADO"]]);
+  aba.getRange(1, 1, 1, 6).setFontWeight("bold");
+
+  let linha = 2, mapeados = 0, ignorados = 0;
+  for (const q of quadros) {
+    if (q.closed) continue;
+    const up = q.name.toUpperCase();
+    if (IGNORAR.some(ig => up.includes(ig.toUpperCase()))) { ignorados++; continue; }
+    let codigo = "";
+    let m = q.name.match(/(\d{3,})\s*$/);
+    if (m) codigo = m[1];
+    else { m = q.name.match(/COD(?:\s+CLIENTE)?\s*[:\-]?\s*(\d{3,})/i); if (m) codigo = m[1]; else { m = q.name.match(/(\d{5,})/); if (m) codigo = m[1]; } }
+    if (!codigo) continue;
+    const rl = trelloGet("/1/boards/" + q.id + "/lists", { fields: "name,id" });
+    if (rl.getResponseCode() !== 200) continue;
+    const listas = JSON.parse(rl.getContentText());
+    const primeira = listas.find(l => /RECÉM CHEGADOS|RECEM CHEGADOS/i.test(l.name));
+    if (!primeira) continue;
+    const extras = mapaExtras[codigo] || { emailLembretes: "", emailBloqueado: "" };
+    aba.getRange(linha, 1, 1, 6).setValues([[codigo, q.name, primeira.id, q.id, extras.emailLembretes, extras.emailBloqueado]]);
+    linha++; mapeados++;
+  }
+  aba.autoResizeColumns(1, 6);
+  limparCacheClientes();
+  Logger.log("✅ " + mapeados + " mapeados | " + ignorados + " ignorados");
+}
+
+// =============================================
+// TestedoCartao — EXECUÇÃO MANUAL (único)
+// =============================================
+function TestedoCartao() {
+  const planilha = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const lastCol = planilha.getLastColumn();
+  const lastRow = planilha.getLastRow();
+  if (lastRow < 2) { Logger.log("❌ Planilha precisa ter pelo menos 2 linhas."); return; }
+
+  const cabecalhos = planilha.getRange(1, 1, 1, lastCol).getValues()[0];
+  const valores = planilha.getRange(2, 1, 1, lastCol).getValues()[0];
+  const namedValues = {};
+  for (let i = 0; i < cabecalhos.length; i++) {
+    namedValues[String(cabecalhos[i])] = [valores[i] != null ? String(valores[i]) : ""];
+  }
+
+  Logger.log("🧪 TESTE — Código: " + (namedValues["  Código do cliente"] || namedValues["Código do cliente"] || [""])[0]);
+  Logger.log("🧪 Tipo: " + (namedValues["Pergunta sem título"] || [""])[0]);
+
+  try {
+    aoEnviarFormulario({ namedValues: namedValues });
+    Logger.log("✅ TESTE CONCLUÍDO");
+  } catch (e) {
+    Logger.log("❌ ERRO: " + e.toString());
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LEMBRETES DE PENDÊNCIAS — cron diário 9h + disparo imediato
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Trigger diário 9h. Varre TODOS os cards com etiquetas de pendência
+ * e manda email pra quem precisa, respeitando escalonamento 1-5/6-10/11+.
+ */
+function LembretesPendencias() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(120000)) { Logger.log("⚠️ LembretesPendencias: lock ocupado"); return; }
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const abaClientes = ss.getSheetByName("CLIENTES");
+    if (!abaClientes) { Logger.log("Sem aba CLIENTES"); return; }
+    const dados = abaClientes.getDataRange().getValues();
+    const headers = dados[0].map(h => String(h).trim().toUpperCase());
+    const idxCodigo = headers.indexOf("CÓDIGO CLIENTE");
+    const idxBoard = headers.indexOf("ID DO QUADRO");
+    const idxEmailLembretes = headers.indexOf("EMAIL_LEMBRETES");
+    const idxEmailBloqueado = headers.indexOf("EMAIL_BLOQUEADO");
+
+    let processados = 0;
+    let enviados = 0;
+
+    for (let i = 1; i < dados.length; i++) {
+      const boardId = String(dados[i][idxBoard] || "").trim();
+      if (!boardId) continue;
+      const codigo = String(dados[i][idxCodigo] || "").trim();
+      const emailsLembretes = idxEmailLembretes >= 0 ? String(dados[i][idxEmailLembretes] || "").trim() : "";
+      const emailBloqueado = idxEmailBloqueado >= 0 ? String(dados[i][idxEmailBloqueado] || "").trim() : "";
+
+      try {
+        const cards = buscarCardsComEtiquetaLembrete(boardId);
+        for (const card of cards) {
+          processados++;
+          const enviou = processarLembreteCard(card, codigo, emailsLembretes, emailBloqueado);
+          if (enviou) enviados++;
+        }
+      } catch (e) {
+        Logger.log("⚠️ Erro board " + boardId + ": " + e.message);
+      }
+    }
+
+    incMetrica("lembretes_processados", processados);
+    incMetrica("lembretes_enviados", enviados);
+    Logger.log("✅ Lembretes: " + enviados + " enviados de " + processados + " cards verificados");
+  } catch (e) {
+    notificarErro("LembretesPendencias", e);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Web App entrypoint. Edge function Supabase chama aqui ao receber
+ * evento addLabelToCard do Trello pra disparo IMEDIATO.
+ */
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents || "{}");
+    const cardId = payload.card_id;
+    const labelName = payload.label_name;
+    if (!cardId) return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "card_id obrigatório" })).setMimeType(ContentService.MimeType.JSON);
+
+    // Busca dados do card
+    const r = trelloGet("/1/cards/" + cardId, { fields: "name,idBoard,shortUrl,desc,labels", labels: "true" });
+    if (r.getResponseCode() !== 200) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "card não encontrado" })).setMimeType(ContentService.MimeType.JSON);
+    }
+    const card = JSON.parse(r.getContentText());
+
+    // Filtrar só etiquetas que disparam lembrete
+    const labelsLembrete = (card.labels || []).filter(l => ETIQUETAS_LEMBRETE.indexOf((l.name || "").trim()) !== -1);
+    if (labelsLembrete.length === 0) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: true, skipped: "sem etiqueta de lembrete" })).setMimeType(ContentService.MimeType.JSON);
+    }
+    card.labels = labelsLembrete;
+
+    // Descobrir código do cliente pelo board
+    const { codigo, emailsLembretes, emailBloqueado } = resolverClientePorBoard(card.idBoard);
+    if (!codigo) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "cliente não mapeado pra board " + card.idBoard })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const enviou = processarLembreteCard(card, codigo, emailsLembretes, emailBloqueado, /* forcarPrimeiro */ true);
+    incMetrica("lembretes_imediatos");
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, enviou: enviou })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    notificarErro("doPost", err);
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function resolverClientePorBoard(boardId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const aba = ss.getSheetByName("CLIENTES");
+  if (!aba) return {};
+  const dados = aba.getDataRange().getValues();
+  const headers = dados[0].map(h => String(h).trim().toUpperCase());
+  const idxCodigo = headers.indexOf("CÓDIGO CLIENTE");
+  const idxBoard = headers.indexOf("ID DO QUADRO");
+  const idxEmailLembretes = headers.indexOf("EMAIL_LEMBRETES");
+  const idxEmailBloqueado = headers.indexOf("EMAIL_BLOQUEADO");
+  for (let i = 1; i < dados.length; i++) {
+    if (String(dados[i][idxBoard] || "").trim() === String(boardId).trim()) {
+      return {
+        codigo: String(dados[i][idxCodigo] || "").trim(),
+        emailsLembretes: idxEmailLembretes >= 0 ? String(dados[i][idxEmailLembretes] || "").trim() : "",
+        emailBloqueado: idxEmailBloqueado >= 0 ? String(dados[i][idxEmailBloqueado] || "").trim() : "",
+      };
+    }
+  }
+  return {};
+}
+
+function buscarCardsComEtiquetaLembrete(boardId) {
+  const r = trelloGet("/1/boards/" + boardId + "/cards", { fields: "name,shortUrl,desc,labels,idBoard", labels: "true", limit: "1000" });
+  if (r.getResponseCode() !== 200) return [];
+  const all = JSON.parse(r.getContentText());
+  return all.filter(c => {
+    const nomes = (c.labels || []).map(l => (l.name || "").trim());
+    return nomes.some(n => ETIQUETAS_LEMBRETE.indexOf(n) !== -1);
+  });
+}
+
+/**
+ * Decide se manda email hoje para este card.
+ * Regras:
+ *   Dias 1-5: diário
+ *   Dias 6-10: dia sim, dia não
+ *   Dia 11+: avisa Thales uma vez e para
+ * Conta dia a partir do primeiro envio registrado.
+ * Reset se etiqueta sair (o histórico morre por expiração de Property).
+ */
+function processarLembreteCard(card, codigoCliente, emailsLembretes, emailBloqueado, forcarPrimeiro) {
+  const props = PropertiesService.getScriptProperties();
+  const chaveCard = "lembrete_" + card.id;
+  const estadoRaw = props.getProperty(chaveCard);
+  const estado = estadoRaw ? JSON.parse(estadoRaw) : { primeiroEnvio: null, ultimoEnvio: null, tentativas: 0, abandonado: false };
+
+  if (estado.abandonado) return false;
+
+  const hoje = new Date();
+  const hojeISO = Utilities.formatDate(hoje, Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+  // Calcula dia número (1 = primeiro envio)
+  let diaNumero = 1;
+  if (estado.primeiroEnvio) {
+    const primeiro = new Date(estado.primeiroEnvio + "T00:00:00");
+    const diffMs = hoje.getTime() - primeiro.getTime();
+    diaNumero = Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 1;
+  }
+
+  // Regras de escalonamento
+  let deveMandarHoje = false;
+  let abandonarAgora = false;
+  if (!estado.primeiroEnvio || forcarPrimeiro) {
+    deveMandarHoje = true;
+    diaNumero = 1;
+  } else if (diaNumero <= 5) {
+    deveMandarHoje = estado.ultimoEnvio !== hojeISO;
+  } else if (diaNumero <= 10) {
+    // dia sim, dia não a partir do dia 6 (par sim, ímpar não, relativo ao primeiro)
+    const dpar = (diaNumero - 5) % 2 === 1;
+    deveMandarHoje = dpar && estado.ultimoEnvio !== hojeISO;
+  } else {
+    // dia 11+: Thales é avisado, Dani para
+    abandonarAgora = true;
+  }
+
+  if (abandonarAgora) {
+    avisarThalesAbandono(card, codigoCliente, estado.tentativas);
+    estado.abandonado = true;
+    props.setProperty(chaveCard, JSON.stringify(estado));
+    return false;
+  }
+
+  if (!deveMandarHoje) return false;
+
+  // Descobre destinatários
+  const destinatarios = [];
+  if (emailsLembretes) {
+    String(emailsLembretes).split(/[,;]/).map(s => s.trim()).filter(validarEmail).forEach(e => {
+      if (String(emailBloqueado || "").split(/[,;]/).map(s => s.trim().toLowerCase()).indexOf(e.toLowerCase()) === -1) {
+        destinatarios.push(e);
+      }
+    });
+  }
+
+  // Fallback: extrai email do corpo do card se não há EMAIL_LEMBRETES
+  if (destinatarios.length === 0) {
+    const emailCard = extrairEmailDoCardDesc(card.desc || "");
+    if (emailCard && String(emailBloqueado).toLowerCase() !== emailCard.toLowerCase()) destinatarios.push(emailCard);
+  }
+
+  if (destinatarios.length === 0) {
+    Logger.log("⚠️ Nenhum destinatário pra card " + card.id);
+    return false;
+  }
+
+  // Busca email de comentário do card (pra CC — resposta vira comentário automático)
+  const emailCardTrello = getEmailDoCard(card.id);
+
+  // Monta e envia email
+  const etiquetas = (card.labels || []).map(l => l.name).filter(Boolean);
+  const enviou = enviarEmailLembrete({
+    destinatarios: destinatarios,
+    emailCardTrello: emailCardTrello,
+    cardNome: card.name,
+    cardUrl: card.shortUrl,
+    etiquetas: etiquetas,
+    codigoCliente: codigoCliente,
+    diaNumero: diaNumero,
+  });
+
+  if (enviou) {
+    if (!estado.primeiroEnvio) estado.primeiroEnvio = hojeISO;
+    estado.ultimoEnvio = hojeISO;
+    estado.tentativas = (estado.tentativas || 0) + 1;
+    props.setProperty(chaveCard, JSON.stringify(estado));
+    registrarLembrete({ cardId: card.id, cardNome: card.name, cardUrl: card.shortUrl, codigo: codigoCliente, destinatarios: destinatarios.join(", "), tentativa: estado.tentativas, etiquetas: etiquetas.join(", ") });
+  }
+  return enviou;
+}
+
+function extrairEmailDoCardDesc(desc) {
+  const m = String(desc || "").match(/📧\s*E-MAIL:\s*([^\s\n]+)/i);
+  return m && validarEmail(m[1]) ? m[1] : null;
+}
+
+function avisarThalesAbandono(card, codigo, tentativas) {
+  const corpo =
+    "Cliente " + codigo + " não respondeu após " + tentativas + " tentativas de lembrete.\n\n" +
+    "Card: " + card.name + "\n" +
+    "Link: " + card.shortUrl + "\n\n" +
+    "Dani parou de enviar lembretes automáticos. Avaliar ação manual.";
+  try { MailApp.sendEmail(EMAIL_ALERTA_ERRO, "🚨 Cliente abandonou — " + codigo, corpo); }
+  catch (e) { Logger.log(e.message); }
+}
+
+function registrarLembrete(d) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let aba = ss.getSheetByName("LEMBRETES");
+  if (!aba) {
+    aba = ss.insertSheet("LEMBRETES");
+    aba.getRange(1, 1, 1, 7).setValues([["DATA/HORA","CÓDIGO","CARD","LINK","DESTINATÁRIOS","TENTATIVA","ETIQUETAS"]]);
+    aba.getRange(1, 1, 1, 7).setFontWeight("bold");
+    aba.setFrozenRows(1);
+  }
+  aba.insertRowAfter(1);
+  aba.getRange(2, 1, 1, 7).setValues([[new Date(), d.codigo, d.cardNome, d.cardUrl, d.destinatarios, d.tentativa, d.etiquetas]]);
+}
+
+// =============================================
+// EMAIL DE LEMBRETE — HTML bonito com logo
+// =============================================
+function enviarEmailLembrete(opts) {
+  const etiquetaTxt = opts.etiquetas.join(" · ");
+  const diaTxt = opts.diaNumero === 1 ? "Novo lembrete" : "Lembrete — dia " + opts.diaNumero;
+  const assunto = "🍀 " + diaTxt + " — Pendência no processo " + opts.cardNome;
+
+  const html =
+    '<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;background:#0d1310;color:#f2f2f2;">' +
+      '<div style="background:linear-gradient(135deg,#0d1310 0%,#1a3d26 100%);padding:32px 28px;text-align:center;">' +
+        '<img src="' + LOGO_TREVO_URL + '" alt="Trevo Legaliza" style="height:56px;margin-bottom:12px;" />' +
+        '<h1 style="color:#fff;margin:0;font-size:20px;letter-spacing:0.3px;">Pendência no seu processo 🍀</h1>' +
+      '</div>' +
+      '<div style="background:#fff;color:#2d2d2d;padding:32px 28px;">' +
+        '<p style="font-size:16px;margin:0 0 16px;">Olá! Aqui é a <strong>Dani</strong>, IA da Trevo Legaliza.</p>' +
+        '<p style="font-size:15px;line-height:1.6;margin:0 0 20px;">' +
+          'Identifiquei que o processo abaixo está com uma ou mais <strong>pendências</strong> esperando ação. ' +
+          'Enquanto a etiqueta não for resolvida, vou lembrar você por aqui.' +
+        '</p>' +
+        '<div style="background:#fff7ed;border-left:4px solid #f59e0b;padding:16px 20px;margin:20px 0;border-radius:4px;">' +
+          '<p style="margin:0 0 6px;color:#92400e;font-size:12px;text-transform:uppercase;font-weight:700;">Pendência(s)</p>' +
+          '<p style="margin:0;color:#1a1a1a;font-size:14px;font-weight:600;">' + etiquetaTxt + '</p>' +
+        '</div>' +
+        '<div style="background:#f0f7f2;border-left:4px solid #2d5a3d;padding:16px 20px;margin:20px 0;border-radius:4px;">' +
+          '<p style="margin:0 0 6px;color:#1a1a1a;font-size:12px;text-transform:uppercase;font-weight:700;">Processo</p>' +
+          '<p style="margin:0;color:#1a1a1a;font-size:14px;font-weight:600;">' + opts.cardNome + '</p>' +
+        '</div>' +
+        '<div style="text-align:center;margin:28px 0;">' +
+          '<a href="' + opts.cardUrl + '" style="display:inline-block;background:#2d5a3d;color:#fff;padding:14px 32px;text-decoration:none;border-radius:6px;font-size:15px;font-weight:600;">🔗 Acessar o processo</a>' +
+        '</div>' +
+        '<p style="font-size:14px;color:#4a4a4a;line-height:1.6;margin:20px 0;">' +
+          '<strong>Como responder:</strong><br/>' +
+          '• Você pode <strong>responder este email direto</strong> — sua resposta entra como comentário no processo automaticamente.<br/>' +
+          '• Ou clique no botão acima pra ver o processo completo.' +
+        '</p>' +
+        '<div style="background:#faf8f3;border:1px solid #e8e3d5;border-radius:6px;padding:18px;margin:24px 0;">' +
+          '<p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#1a1a1a;">🤖 Por que estou escrevendo</p>' +
+          '<p style="margin:0;font-size:12px;line-height:1.5;color:#4a4a4a;">' +
+            'Sou a inteligência artificial da Trevo. Acompanho os processos em tempo real e aciono o time humano quando necessário. ' +
+            'Assim que a pendência for resolvida, eu paro automaticamente.' +
+          '</p>' +
+        '</div>' +
+      '</div>' +
+      '<div style="background:#0d1310;padding:20px 28px;text-align:center;">' +
+        '<img src="' + LOGO_DANI_URL + '" alt="Dani by Trevo" style="height:40px;margin-bottom:8px;" />' +
+        '<p style="color:#a8d5b8;font-size:12px;margin:6px 0 0;font-weight:600;">Dani · IA da Trevo Legaliza</p>' +
+        '<p style="color:#888;font-size:11px;margin:6px 0 0;">Trevo Legaliza LTDA · 12 anos · 24+ estados · 100% digital</p>' +
+      '</div>' +
+    '</div>';
+
+  const texto =
+    "Olá!\n\nAqui é a Dani, IA da Trevo Legaliza.\n\n" +
+    "Identifiquei pendência(s) no seu processo:\n\n" +
+    "Pendência: " + etiquetaTxt + "\n" +
+    "Processo: " + opts.cardNome + "\n\n" +
+    "Acessar: " + opts.cardUrl + "\n\n" +
+    "Você pode responder este email direto — sua resposta entra no processo automaticamente.\n\n" +
+    "🍀 Dani — Trevo Legaliza";
+
+  try {
+    const opcoes = {
+      htmlBody: html,
+      body: texto,
+      name: "Dani 🍀 Trevo Legaliza",
+      replyTo: opts.emailCardTrello || EMAIL_ALERTA_ERRO,
+    };
+    if (opts.emailCardTrello) opcoes.cc = opts.emailCardTrello;
+
+    MailApp.sendEmail({
+      to: opts.destinatarios.join(","),
+      subject: assunto,
+      ...opcoes,
+    });
+    return true;
+  } catch (e) {
+    Logger.log("⚠️ Falha email lembrete: " + e.message);
+    notificarErro("enviarEmailLembrete", e);
+    return false;
+  }
+}
+
+// =============================================
+// EMAIL DE CONFIRMAÇÃO AO CLIENTE (após criar card)
+// =============================================
+function enviarEmailConfirmacaoCliente(emailCliente, nomeSolicitante, nomeEmpresa, tipoProcesso, cardUrl) {
+  if (!validarEmail(emailCliente)) return;
+
+  const html =
+    '<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;background:#0d1310;color:#f2f2f2;">' +
+      '<div style="background:linear-gradient(135deg,#0d1310 0%,#1a3d26 100%);padding:32px 28px;text-align:center;">' +
+        '<img src="' + LOGO_TREVO_URL + '" alt="Trevo Legaliza" style="height:56px;margin-bottom:12px;" />' +
+        '<h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:0.3px;">Processo cadastrado 🍀</h1>' +
+      '</div>' +
+      '<div style="background:#fff;color:#2d2d2d;padding:32px 28px;">' +
+        '<p style="font-size:16px;margin:0 0 16px;">Olá, <strong>' + (nomeSolicitante || "") + '</strong>!</p>' +
+        '<p style="font-size:15px;line-height:1.6;margin:0 0 18px;">' +
+          'Aqui é a <strong>Dani</strong>, IA da Trevo Legaliza. Acabei de registrar sua solicitação ' +
+          'e posicionei tudo no quadro de controle do seu cliente.' +
+        '</p>' +
+        '<div style="background:#f0f7f2;border-left:4px solid #2d5a3d;padding:16px 20px;margin:20px 0;border-radius:4px;">' +
+          '<p style="margin:0 0 8px;color:#1a1a1a;font-size:12px;text-transform:uppercase;font-weight:700;">Resumo</p>' +
+          '<p style="margin:4px 0;font-size:14px;"><strong>Tipo:</strong> ' + (tipoProcesso || "N/A") + '</p>' +
+          '<p style="margin:4px 0;font-size:14px;"><strong>Empresa:</strong> ' + (nomeEmpresa || "N/A") + '</p>' +
+        '</div>' +
+        (cardUrl ?
+          '<p style="font-size:14px;line-height:1.6;margin:16px 0;">Acompanhe o andamento em tempo real:</p>' +
+          '<div style="text-align:center;margin:24px 0;">' +
+            '<a href="' + cardUrl + '" style="display:inline-block;background:#2d5a3d;color:#fff;padding:14px 32px;text-decoration:none;border-radius:6px;font-size:15px;font-weight:600;">🔗 Acompanhar Processo</a>' +
+          '</div>'
+          : '') +
+        '<div style="background:#faf8f3;border:1px solid #e8e3d5;border-radius:6px;padding:18px;margin:24px 0;">' +
+          '<p style="margin:0 0 6px;font-size:13px;font-weight:700;">🤖 Tecnologia de ponta</p>' +
+          '<p style="margin:0;font-size:12px;line-height:1.5;color:#4a4a4a;">' +
+            'Uso IA pra triagem, acompanhamento de protocolos e resposta a comentários 24h. ' +
+            'A Trevo é o próximo nível da assessoria societária B2B.' +
+          '</p>' +
+        '</div>' +
+      '</div>' +
+      '<div style="background:#0d1310;padding:20px 28px;text-align:center;">' +
+        '<img src="' + LOGO_DANI_URL + '" alt="Dani by Trevo" style="height:40px;margin-bottom:8px;" />' +
+        '<p style="color:#a8d5b8;font-size:12px;margin:6px 0 0;font-weight:600;">Dani · IA da Trevo Legaliza</p>' +
+        '<p style="color:#888;font-size:11px;margin:6px 0 0;">12 anos · 24+ estados · 100% digital</p>' +
+      '</div>' +
+    '</div>';
+
+  const texto =
+    "Olá " + (nomeSolicitante || "") + "!\n\n" +
+    "Aqui é a Dani, IA da Trevo Legaliza. Sua solicitação foi registrada.\n\n" +
+    "Tipo: " + (tipoProcesso || "N/A") + "\n" +
+    "Empresa: " + (nomeEmpresa || "N/A") + "\n" +
+    (cardUrl ? "Acompanhe em: " + cardUrl + "\n" : "") +
+    "\n🍀 Dani — Trevo Legaliza";
+
+  try {
+    MailApp.sendEmail({
+      to: emailCliente,
+      subject: "🍀 Processo cadastrado — Trevo Legaliza",
+      htmlBody: html,
+      body: texto,
+      name: "Dani 🍀 Trevo Legaliza",
+    });
+  } catch (e) { Logger.log("⚠️ Falha email confirmação: " + e.message); }
+}
+
+// ╔══════════════════════════════════════╗
+// ║        SECRETÁRIA DANI — GMAIL       ║
+// ╚══════════════════════════════════════╝
+
+function VarrerEmails() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) { Logger.log("⚠️ Varredura em andamento"); return; }
+  try {
+    varrerComentariosTrello();
+    varrerEmailsOrgaos();
+  } catch (e) { notificarErro("VarrerEmails", e); throw e; }
+  finally { lock.releaseLock(); }
+}
+
+function varrerComentariosTrello() {
+  const threads = GmailApp.search('from:(trello.com) is:unread subject:("mencionou você" OR "comentou")', 0, 20);
+  if (threads.length === 0) return;
+  for (const thread of threads) {
+    for (const msg of thread.getMessages()) {
+      if (!msg.isUnread()) continue;
+      try {
+        const corpo = msg.getPlainBody();
+        const dados = parsearEmailTrello(corpo);
+        if (!dados) { msg.markRead(); continue; }
+        if (ehEquipeInterna(dados.remetente)) { msg.markRead(); continue; }
+        const cls = classificarComentario(dados.comentario, dados.card, dados.quadro);
+        Utilities.sleep(2000);
+        let status = "PENDENTE";
+        let respostaDani = "";
+        if (cls.autoResponder && cls.resposta && dados.cardUrl) {
+          const cardId = extrairCardIdDaUrl(dados.cardUrl);
+          if (cardId) {
+            const textoFinal = cls.resposta + ASSINATURA_DANI;
+            if (postarComentarioNoCard(cardId, textoFinal)) {
+              status = "✅ DANI RESPONDEU";
+              respostaDani = textoFinal;
+              incMetrica("dani_comentou_cliente");
+            }
+          }
+        }
+        registrarPendencia({
+          dataHora: msg.getDate(), tipo: "COMENTÁRIO CLIENTE",
+          cliente: dados.remetente, quadro: dados.quadro, card: dados.card, cardUrl: dados.cardUrl,
+          conteudo: dados.comentario, respostaDani: respostaDani,
+          classificacao: cls.nivel, acaoSugerida: cls.acao, status
+        });
+        msg.markRead();
+      } catch (e) { Logger.log("⚠️ Erro (mantido não lido): " + e.message); }
+    }
+  }
+}
+
+function varrerEmailsOrgaos() {
+  const nomes = ["🏛️ TRIAGEM DE ÓRGÃOS","TRIAGEM DE ÓRGÃOS","TRIAGEM DE ORGAOS"];
+  let label = null;
+  for (const n of nomes) { try { label = GmailApp.getUserLabelByName(n); if (label) break; } catch (e) {} }
+  if (!label) return;
+  const threads = label.getThreads(0, 20).filter(t => t.isUnread());
+  for (const thread of threads) {
+    for (const msg of thread.getMessages()) {
+      if (!msg.isUnread()) continue;
+      try {
+        const interp = interpretarEmailOrgao(msg.getPlainBody(), msg.getSubject(), msg.getFrom());
+        Utilities.sleep(2000);
+        let card = null;
+        if (interp.protocolo) card = buscarCardPorProtocoloViaSearch(interp.protocolo);
+        let respostaDani = "";
+        let cardUrl = "";
+        if (card && card.cardId) {
+          cardUrl = "https://trello.com/c/" + card.cardId;
+          const t = "📧 **Atualização do Órgão Público**\n\n🏛️ **Órgão:** " + (interp.orgao || "N/I") +
+            "\n📋 **Protocolo:** " + (interp.protocolo || "N/A") + "\n\n📝 **Resumo:** " + interp.resumo +
+            "\n\n⚡ **Ação necessária:** " + interp.acao + ASSINATURA_DANI;
+          if (postarComentarioNoCard(card.cardId, t)) {
+            respostaDani = t;
+            incMetrica("dani_comentou_orgao");
+          }
+        }
+        registrarPendencia({
+          dataHora: msg.getDate(), tipo: "E-MAIL ÓRGÃO",
+          cliente: interp.orgao || msg.getFrom(),
+          quadro: card ? card.quadro : "NÃO IDENTIFICADO",
+          card: card ? card.card : "PROTOCOLO: " + (interp.protocolo || "N/A"),
+          cardUrl: cardUrl,
+          conteudo: interp.resumo, respostaDani: respostaDani,
+          classificacao: interp.nivel, acaoSugerida: interp.acao,
+          status: card ? "✅ DANI POSTOU NO CARD" : "PENDENTE"
+        });
+        msg.markRead();
+      } catch (e) { Logger.log("⚠️ Erro órgão (mantido): " + e.message); }
+    }
+  }
+}
+
+function parsearEmailTrello(corpo) {
+  const mUrl = corpo.match(/(https:\/\/trello\.com\/c\/[a-zA-Z0-9]+[^\s\)]*)/);
+  const cardUrl = mUrl ? mUrl[1] : "";
+  const mN = corpo.match(/^(.+?)\s+(?:mencionou voc|comentou)/i);
+  const remetente = mN ? mN[1].trim() : "";
+  const mC = corpo.match(/no cart[aã]o\s+(.+?)\s+de\s+/i);
+  const card = mC ? mC[1].replace(/[_*]/g, "").trim() : "";
+  const mQ = corpo.match(/no cart[aã]o\s+.+?\s+de\s+(.+?)[\n\r]/i);
+  const quadro = mQ ? mQ[1].replace(/[_*]/g, "").trim() : "";
+  const mCom = corpo.match(/de\s+.+?[\n\r]+([\s\S]+?)(?:Responder por email|Reply by email|$)/i);
+  const comentario = mCom ? mCom[1].replace(/@\w+/g, "").replace(/\s+/g, " ").trim() : "";
+  if (!card || !comentario) return null;
+  return { remetente, card, quadro, comentario, cardUrl };
+}
+
+function extrairCardIdDaUrl(cardUrl) { const m = cardUrl.match(/trello\.com\/c\/([a-zA-Z0-9]+)/); return m ? m[1] : null; }
+function ehEquipeInterna(nome) { const n = (nome || "").toLowerCase().trim(); return EQUIPE_INTERNA.some(i => n.includes(i)); }
+
+function chamarClaude(p) {
+  const payload = { model: CLAUDE_MODEL, max_tokens: 500, messages: [{ role: "user", content: p }] };
+  const opts = { method: "post", headers: { "x-api-key": prop("CLAUDE_API_KEY"), "anthropic-version": "2023-06-01", "content-type": "application/json" }, payload: JSON.stringify(payload), muteHttpExceptions: true };
+  for (let t = 1; t <= 3; t++) {
+    const r = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", opts);
+    const c = r.getResponseCode();
+    if (c === 200) {
+      const data = JSON.parse(r.getContentText());
+      let tx = data.content[0].text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+      return tx.replace(/[\n\r\t]/g, " ").replace(/[\x00-\x1F]/g, " ");
+    }
+    if (c === 529 || c === 429 || c === 503) { Utilities.sleep(5000 * t); continue; }
+    throw new Error("IA " + c + ": " + r.getContentText());
+  }
+  throw new Error("IA indisponível");
+}
+
+function classificarComentario(com, card, quadro) {
+  const p = 'Você é a Dani, secretária virtual da Trevo Legaliza.\n\nCOMENTÁRIO de cliente:\nQUADRO: ' + quadro + '\nCARD: ' + card + '\nCOMENTÁRIO: "' + com + '"\n\nClassifique em UMA: 🔴 DÚVIDA | 🟡 DOCUMENTO | 🟢 CONFIRMAÇÃO | 🔵 SOLICITAÇÃO\nPode responder sozinha? Só se: documento, confirmação, pagamento. Na dúvida NÃO.\n\nJSON: {"nivel":"🟡 DOCUMENTO","acao":"ação","autoResponder":true,"resposta":"texto ou null"}';
+  try { const j = JSON.parse(chamarClaude(p)); return { nivel: j.nivel || "🔴 DÚVIDA", acao: j.acao || "Verificar manualmente", autoResponder: j.autoResponder === true, resposta: j.resposta || null }; }
+  catch (e) { return { nivel: "🔴 DÚVIDA", acao: "Verificar manualmente.", autoResponder: false, resposta: null }; }
+}
+
+function interpretarEmailOrgao(corpo, assunto, remetente) {
+  const p = 'Você é a Dani, secretária virtual da Trevo Legaliza.\n\nE-MAIL de órgão:\nREMETENTE: ' + remetente + '\nASSUNTO: ' + assunto + '\nCORPO:\n' + corpo.substring(0, 3000) + '\n\nJSON: {"protocolo":"num ou null","resumo":"1-2 frases","nivel":"🟡 IMPORTANTE | 🟢 INFORMATIVO | 🔴 URGENTE","acao":"ação","orgao":"nome"}';
+  try { const j = JSON.parse(chamarClaude(p)); return { protocolo: j.protocolo || null, resumo: j.resumo || "N/A", nivel: j.nivel || "🟡 IMPORTANTE", acao: j.acao || "Verificar.", orgao: j.orgao || remetente }; }
+  catch (e) { return { protocolo: null, resumo: assunto, nivel: "🟡 IMPORTANTE", acao: "Verificar manualmente.", orgao: remetente }; }
+}
+
+function buscarCardPorProtocoloViaSearch(protocolo) {
+  const p = String(protocolo).replace(/[^0-9]/g, "");
+  if (p.length < 5) return null;
+  const r = trelloGet("/1/search", { query: p, modelTypes: "cards", cards_limit: "10", card_fields: "name,idBoard,shortLink", board_fields: "name" });
+  if (r.getResponseCode() !== 200) return null;
+  const data = JSON.parse(r.getContentText());
+  if (!data.cards || data.cards.length === 0) return null;
+  const c = data.cards[0];
+  const bn = (data.boards || []).find(b => b.id === c.idBoard)?.name || "?";
+  return { cardId: c.id, card: c.name, quadro: bn };
+}
+
+function postarComentarioNoCard(cardId, texto) {
+  const r = trelloPost("/1/cards/" + cardId + "/actions/comments", { text: texto });
+  return r.getResponseCode() === 200;
+}
+
+// =============================================
+// PENDÊNCIAS — 12 colunas (inclui texto Dani + link + revisão Thales)
+// =============================================
+function registrarPendencia(d) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let aba = ss.getSheetByName("PENDÊNCIAS");
+  if (!aba) {
+    aba = ss.insertSheet("PENDÊNCIAS");
+    aba.getRange(1, 1, 1, 12).setValues([[
+      "DATA/HORA","TIPO","CLIENTE/REMETENTE","QUADRO","CARD","LINK CARD",
+      "CONTEÚDO ORIGINAL","RESPOSTA DA DANI","CLASSIFICAÇÃO","AÇÃO SUGERIDA","STATUS","REVISADO POR THALES"
+    ]]);
+    aba.getRange(1, 1, 1, 12).setFontWeight("bold");
+    aba.setFrozenRows(1);
+  }
+  aba.insertRowAfter(1);
+  aba.getRange(2, 1, 1, 12).setValues([[
+    d.dataHora, d.tipo, d.cliente, d.quadro, d.card, d.cardUrl || "",
+    d.conteudo, d.respostaDani || "", d.classificacao, d.acaoSugerida, d.status, ""
+  ]]);
+  const r = aba.getRange(2, 1, 1, 12);
+  if (d.classificacao.includes("🔴")) r.setBackground("#FCEBEB");
+  else if (d.classificacao.includes("🟡")) r.setBackground("#FAEEDA");
+  else if (d.classificacao.includes("🔵")) r.setBackground("#E6F1FB");
+  else r.setBackground("#EAF3DE");
+}
+
+function TestarVarredura() { VarrerEmails(); }
