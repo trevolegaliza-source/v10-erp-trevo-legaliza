@@ -435,7 +435,10 @@ export function useCreateProcesso() {
         ? `Honorário avulso - ${input.tipo.charAt(0).toUpperCase() + input.tipo.slice(1)} - ${input.razao_social}${input.justificativa_avulso ? ` (${input.justificativa_avulso})` : ''}`
         : '';
 
-      // Call SECURITY DEFINER function (atomic processo + lancamento)
+      // RPC criar_processo_com_lancamento aceita p_via_analise.
+      // Salva tudo atômico (processo + lançamento + via). Se a coluna
+      // via_analise ainda não existir no schema (legado), a RPC ignora
+      // silenciosamente o param sem falhar.
       const { data: processoId, error: rpcError } = await supabase.rpc('criar_processo_com_lancamento', {
         p_cliente_id: input.cliente_id,
         p_razao_social: input.razao_social,
@@ -457,23 +460,10 @@ export function useCreateProcesso() {
         p_criar_avulso_extra: criarAvulsoExtra,
         p_valor_avulso_extra: criarAvulsoExtra ? input.valor_avulso! : 0,
         p_descricao_avulso_extra: descAvulsoExtra,
-      });
+        p_via_analise: input.via_analise || 'matriz',
+      } as any);
 
       if (rpcError) throw rpcError;
-
-      // via_analise é uma coluna nova; a RPC atual não aceita esse param.
-      // Fazemos UPDATE imediatamente após a RPC. Se falhar, processo fica
-      // com default 'matriz' (fallback seguro) — toast.warning alerta.
-      if (input.via_analise && input.via_analise !== 'matriz') {
-        const { error: viaErr } = await supabase
-          .from('processos')
-          .update({ via_analise: input.via_analise } as any)
-          .eq('id', processoId);
-        if (viaErr) {
-          console.error('Falha ao setar via_analise:', viaErr);
-          toast.warning('Processo criado, mas via de análise ficou como "matriz". Edite o processo pra ajustar.');
-        }
-      }
 
       // Fetch complete processo object
       const { data: processo, error: fetchError } = await supabase
