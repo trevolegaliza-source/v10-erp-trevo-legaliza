@@ -306,6 +306,12 @@ export default function CadastroRapido() {
   };
 
   // Save processes
+  // Fluxo tolerante a falhas: cada item roda no seu try/catch.
+  // Sucessos vão pra `saved`, falhas pra `failed`. No final:
+  //   - Tudo OK → feedback sucesso + limpa estado
+  //   - Tudo falhou → toast de erro + mantém fila pra retry
+  //   - Parcial → toast explícito (X salvos, Y falharam, lista quais)
+  //              + mantém SÓ os que falharam na fila (retry só do que falta)
   const saveProcessos = async (items: ProcessoNaFila[]) => {
     // Double-click guard
     if (isSubmitting.current) return;
@@ -322,6 +328,7 @@ export default function CadastroRapido() {
       }
 
       const saved: ProcessoSalvo[] = [];
+      const failed: Array<{ item: ProcessoNaFila; error: string }> = [];
       let economia = 0;
 
       for (const item of items) {
@@ -342,44 +349,78 @@ export default function CadastroRapido() {
           notas = `Valor fixo conforme negociação: ${neg.service_name}.${notas ? '\n' + notas : ''}`;
         }
 
-        await createProcesso.mutateAsync({
-          cliente_id: clienteId!,
-          razao_social: item.razaoSocial,
-          tipo: tipoFinal as TipoProcesso,
-          prioridade: item.prioridade,
-          responsavel: item.responsavel || undefined,
-          valor_manual: valorFinal,
-          notas: notas || undefined,
-          ja_pago: item.jaPago,
-          descricao_avulso: item.tipo === 'avulso' ? item.descricaoAvulso : undefined,
-          desconto_boas_vindas: item.boasVindas ? Number(item.boasVindasPct) : undefined,
-          mudanca_uf: item.mudancaUF,
-          data_entrada: item.dataEntrada,
-          dentro_do_plano: selectedCliente?.tipo === 'MENSALISTA' ? item.dentroDoPlano : undefined,
-          valor_avulso: !item.dentroDoPlano ? item.valorAvulso : 0,
-          justificativa_avulso: !item.dentroDoPlano ? item.justificativaAvulso : undefined,
-          etiquetas: item.etiquetas || [],
-          via_analise: item.viaAnalise,
-        });
+        try {
+          await createProcesso.mutateAsync({
+            cliente_id: clienteId!,
+            razao_social: item.razaoSocial,
+            tipo: tipoFinal as TipoProcesso,
+            prioridade: item.prioridade,
+            responsavel: item.responsavel || undefined,
+            valor_manual: valorFinal,
+            notas: notas || undefined,
+            ja_pago: item.jaPago,
+            descricao_avulso: item.tipo === 'avulso' ? item.descricaoAvulso : undefined,
+            desconto_boas_vindas: item.boasVindas ? Number(item.boasVindasPct) : undefined,
+            mudanca_uf: item.mudancaUF,
+            data_entrada: item.dataEntrada,
+            dentro_do_plano: selectedCliente?.tipo === 'MENSALISTA' ? item.dentroDoPlano : undefined,
+            valor_avulso: !item.dentroDoPlano ? item.valorAvulso : 0,
+            justificativa_avulso: !item.dentroDoPlano ? item.justificativaAvulso : undefined,
+            etiquetas: item.etiquetas || [],
+            via_analise: item.viaAnalise,
+          });
 
-        saved.push({
-          razaoSocial: item.razaoSocial,
-          tipo: tipoFinal,
-          valorFinal: item.valorFinal,
-        });
-        economia += item.descontoAplicado;
+          saved.push({
+            razaoSocial: item.razaoSocial,
+            tipo: tipoFinal,
+            valorFinal: item.valorFinal,
+          });
+          economia += item.descontoAplicado;
+        } catch (err: any) {
+          const msg = err?.message || 'Erro desconhecido';
+          console.error(`[saveProcessos] Falha em "${item.razaoSocial}":`, err);
+          failed.push({ item, error: msg });
+        }
       }
 
-      setSavedProcessos(saved);
-      setTotalEconomia(economia);
-      setFeedbackOpen(true);
-      setFila([]);
-      setProcessoForm(INITIAL_PROCESSO);
-      setValorForm(INITIAL_VALOR);
-      setStep(1);
-      setCompletedSteps([]);
-      setClienteId(null);
+      // Decide desfecho
+      if (failed.length === 0) {
+        // Tudo salvou
+        setSavedProcessos(saved);
+        setTotalEconomia(economia);
+        setFeedbackOpen(true);
+        setFila([]);
+        setProcessoForm(INITIAL_PROCESSO);
+        setValorForm(INITIAL_VALOR);
+        setStep(1);
+        setCompletedSteps([]);
+        setClienteId(null);
+      } else if (saved.length === 0) {
+        // Nada salvou — mantém fila pra retry
+        const primeirosErros = failed.slice(0, 3).map(f => `• "${f.item.razaoSocial}": ${f.error}`).join('\n');
+        toast.error(
+          `Nenhum processo salvo (${failed.length} falharam). Fila mantida pra retry.\n${primeirosErros}${failed.length > 3 ? `\n… e mais ${failed.length - 3}` : ''}`,
+          { duration: 10000 }
+        );
+        // Fila permanece intacta — Thales/Carolina clica "Salvar Todos" de novo
+      } else {
+        // Salvou alguns, falhou outros — mantém só os que falharam
+        const nomesSalvos = saved.map(s => `"${s.razaoSocial}"`).join(', ');
+        const nomesFalharam = failed.map(f => `"${f.item.razaoSocial}"`).join(', ');
+        toast.warning(
+          `${saved.length} salvo(s) com sucesso: ${nomesSalvos}.\n${failed.length} falhou(aram): ${nomesFalharam}. Fila mantida só com os que falharam.`,
+          { duration: 10000 }
+        );
+        // Fila fica só com os que falharam — user corrige e reenvia
+        setFila(failed.map(f => f.item));
+        // Mostra feedback dos que salvaram
+        setSavedProcessos(saved);
+        setTotalEconomia(economia);
+        setFeedbackOpen(true);
+        // Não limpa cliente/step — ele pode querer continuar corrigindo
+      }
     } catch (err: any) {
+      // Erro fora do loop (check_duplicate, etc) — falha geral
       toast.error('Erro ao salvar: ' + err.message);
     } finally {
       setIsSaving(false);
