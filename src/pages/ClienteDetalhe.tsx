@@ -336,9 +336,9 @@ export default function ClienteDetalhe() {
       },
       {
         onSuccess: async () => {
-          if (aplicarBoasVindas || processoForm.boas_vindas) {
-            await supabase.from('clientes').update({ desconto_boas_vindas_aplicado: true }).eq('id', cliente.id);
-          }
+          // Marcação de boas-vindas agora é atômica dentro do hook
+          // useCreateProcesso (via RPC tentar_aplicar_boas_vindas +
+          // SELECT FOR UPDATE). Não precisa mais fazer UPDATE aqui.
           setShowNovoProcesso(false);
           setIsFirstProcessNovo(false);
           setProcessoForm({ ...defaultProcessoForm });

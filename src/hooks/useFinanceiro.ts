@@ -340,13 +340,36 @@ export function useCreateProcesso() {
         valorFinal = isUrgente ? valorBaseCliente * 1.5 : valorBaseCliente;
       }
 
-      // Apply welcome discount
+      // Apply welcome discount ATOMICAMENTE
+      // RPC tentar_aplicar_boas_vindas faz SELECT FOR UPDATE + UPDATE na
+      // mesma transação. Se 2 workers pedem ao mesmo tempo, só 1 ganha o
+      // aplicado=true; o outro ignora o desconto sem drama.
+      // Se a criação do processo falhar depois, um catch externo chama
+      // reverter_boas_vindas pra desfazer a marcação.
       let welcomeDiscountInfo = '';
+      let welcomeLockAcquired = false;
       if (input.desconto_boas_vindas && input.desconto_boas_vindas > 0) {
-        const discountAmt = valorFinal * (input.desconto_boas_vindas / 100);
-        valorFinal = Math.round((valorFinal - discountAmt) * 100) / 100;
-        welcomeDiscountInfo = `Desconto de Boas-vindas aplicado: ${input.desconto_boas_vindas}% (-R$ ${discountAmt.toFixed(2)})`;
+        const { data: lockResult, error: lockErr } = await supabase.rpc(
+          'tentar_aplicar_boas_vindas' as any,
+          { p_cliente_id: input.cliente_id }
+        );
+        if (lockErr) throw new Error(`Falha ao reservar boas-vindas: ${lockErr.message}`);
+        const applied = (lockResult as any)?.aplicado === true;
+        if (applied) {
+          welcomeLockAcquired = true;
+          const discountAmt = valorFinal * (input.desconto_boas_vindas / 100);
+          valorFinal = Math.round((valorFinal - discountAmt) * 100) / 100;
+          welcomeDiscountInfo = `Desconto de Boas-vindas aplicado: ${input.desconto_boas_vindas}% (-R$ ${discountAmt.toFixed(2)})`;
+        } else {
+          // Cliente já recebeu boas-vindas (outra aba/outro worker ganhou a corrida).
+          // Não aplica desconto; loga pra telemetria.
+          console.warn('[useCreateProcesso] Boas-vindas ignoradas — já aplicadas pra este cliente');
+        }
       }
+
+      // A partir daqui: se lockou boas-vindas e quebrar alguma coisa abaixo,
+      // precisa reverter pra não "queimar" o direito do cliente.
+      try {
 
       // Append discount info to notas
       let notasFinal = input.notas || '';
@@ -452,15 +475,24 @@ export function useCreateProcesso() {
           } as any);
       }
 
-      // Mark boas-vindas as applied
-      if (input.desconto_boas_vindas && input.desconto_boas_vindas > 0) {
-        await supabase
-          .from('clientes')
-          .update({ desconto_boas_vindas_aplicado: true, updated_at: new Date().toISOString() } as any)
-          .eq('id', input.cliente_id);
-      }
+      // NOTA: marcação de boas-vindas já aconteceu atomicamente via RPC
+      // tentar_aplicar_boas_vindas (dentro do SELECT FOR UPDATE). Não
+      // precisamos mais do UPDATE redundante que existia aqui.
 
       return processo as ProcessoDB;
+
+      } catch (err) {
+        // Se a criação do processo falhou depois de ganhar o lock de
+        // boas-vindas, revertemos pra que o cliente NÃO perca o direito.
+        if (welcomeLockAcquired) {
+          try {
+            await supabase.rpc('reverter_boas_vindas' as any, { p_cliente_id: input.cliente_id });
+          } catch (revertErr) {
+            console.error('[useCreateProcesso] Falha ao reverter boas-vindas:', revertErr);
+          }
+        }
+        throw err;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['processos_db'] });
