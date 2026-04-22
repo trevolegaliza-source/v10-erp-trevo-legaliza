@@ -22,14 +22,19 @@ function fmtDate(d: string | null | undefined) {
 
 function AnexoButton({ storagePath }: { storagePath: string }) {
   const [loading, setLoading] = useState(false);
+  // Signed URL (não blob) — blob URL em iframe → ERR_BLOCKED_BY_CLIENT
   async function handleOpen() {
     setLoading(true);
     try {
-      const { data, error } = await supabase.storage.from('contestacoes').download(storagePath);
-      if (error || !data) { toast.error('Erro ao abrir anexo.'); return; }
-      const blobUrl = URL.createObjectURL(data);
-      window.open(blobUrl, '_blank');
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      const { data, error } = await supabase.storage
+        .from('contestacoes')
+        .createSignedUrl(storagePath, 3600);
+      if (error || !data?.signedUrl) { toast.error('Erro ao abrir anexo.'); return; }
+      const win = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        await navigator.clipboard.writeText(data.signedUrl).catch(() => {});
+        toast.info('Pop-up bloqueado. Link copiado pra área de transferência.', { duration: 8000 });
+      }
     } catch { toast.error('Erro ao abrir anexo.'); } finally { setLoading(false); }
   }
   return (

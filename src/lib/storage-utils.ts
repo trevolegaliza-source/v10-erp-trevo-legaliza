@@ -63,24 +63,33 @@ export async function downloadExtrato(bucket: string, path: string, filename: st
 }
 
 /**
- * Abre um arquivo do Supabase Storage via Blob URL,
- * evitando bloqueio do Chrome (ERR_BLOCKED_BY_CLIENT).
+ * Abre um arquivo do Supabase Storage em nova aba via Signed URL.
+ *
+ * IMPORTANTE: NÃO usar URL.createObjectURL + window.open(blobUrl).
+ * O ERP roda dentro do iframe do preview Lovable. Chrome bloqueia
+ * blob URLs criadas em iframe quando abertas em nova janela
+ * (ERR_BLOCKED_BY_CLIENT). Em modo anônimo o Lovable não vai pra
+ * iframe, por isso parecia bug do navegador.
+ *
+ * Solução: signed URL (URL https real, válida 1h).
  */
 export async function abrirArquivoStorage(bucket: string, path: string): Promise<void> {
   try {
     const { data, error } = await supabase.storage
       .from(bucket)
-      .download(path);
+      .createSignedUrl(path, 3600);
 
-    if (error || !data) {
-      console.error('Erro download storage:', error);
+    if (error || !data?.signedUrl) {
+      console.error('Erro signed URL:', error);
       toast.error('Erro ao abrir o arquivo.');
       return;
     }
 
-    const blobUrl = URL.createObjectURL(data);
-    window.open(blobUrl, '_blank');
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    const win = window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    if (!win) {
+      await navigator.clipboard.writeText(data.signedUrl).catch(() => {});
+      toast.info('Pop-up bloqueado. Link copiado pra área de transferência — cola no navegador.', { duration: 8000 });
+    }
   } catch (err) {
     console.error('Erro storage:', err);
     toast.error('Erro ao abrir o arquivo.');

@@ -15,8 +15,6 @@ import {
   useValoresAdicionais, useAddValorAdicional, useUpdateValorAdicional, useDeleteValorAdicional,
 } from '@/hooks/useValoresAdicionais';
 import { uploadFile, getSignedUrl } from '@/hooks/useStorageUpload';
-import { supabase } from '@/integrations/supabase/client';
-import { STORAGE_BUCKETS } from '@/constants/storage';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { toast } from 'sonner';
 
@@ -182,20 +180,27 @@ export default function ValoresAdicionaisModal({
     toast.success('Arquivo removido');
   };
 
+  // CRÍTICO: NÃO usar URL.createObjectURL + window.open(blobUrl) aqui.
+  // ERP roda dentro do iframe do preview Lovable. Chrome bloqueia
+  // blob URLs criadas em iframe quando abertas em nova janela
+  // (ERR_BLOCKED_BY_CLIENT). Em janela anônima Lovable não vai pra
+  // iframe, por isso parecia bug do navegador.
+  // Solução: signed URL direto (URL https real, válida 1h).
+
   const handleDownload = async (storagePath: string) => {
     try {
       const url = await getSignedUrl(storagePath);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = storagePath.split('/').pop() || 'arquivo';
-      a.target = '_blank';
-      a.click();
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        await navigator.clipboard.writeText(url).catch(() => {});
+        toast.info('Pop-up bloqueado. Link copiado pra área de transferência — cola e abre manualmente.', { duration: 8000 });
+      }
     } catch {
       toast.error('Comprovante não encontrado');
     }
   };
 
-  /** FIX 8: Eye click → image preview modal OR PDF in new tab + error toast */
+  /** Eye click → imagem fica em preview modal interno; PDF/outros abrem em nova aba */
   const handleView = async (storagePath: string) => {
     if (!storagePath) {
       toast.error('Comprovante não encontrado');
@@ -203,20 +208,18 @@ export default function ValoresAdicionaisModal({
     }
     const ext = getExt(storagePath);
     try {
-      const { data, error } = await supabase.storage
-        .from(STORAGE_BUCKETS.CONTRACTS)
-        .download(storagePath);
-      if (error || !data) {
-        toast.error('Comprovante não encontrado');
+      if (IMG_EXTS.includes(ext)) {
+        // Pra preview interno (modal), usa signed URL também — sem blob
+        const url = await getSignedUrl(storagePath);
+        setPreviewImage(url);
         return;
       }
-      const blobUrl = URL.createObjectURL(data);
-      if (IMG_EXTS.includes(ext)) {
-        setPreviewImage(blobUrl);
-      } else {
-        // PDF and others → new tab
-        window.open(blobUrl, '_blank');
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      // PDF e outros: signed URL em nova aba (não blob → não bloqueia)
+      const url = await getSignedUrl(storagePath);
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        await navigator.clipboard.writeText(url).catch(() => {});
+        toast.info('Pop-up bloqueado. Link copiado pra área de transferência — cola e abre manualmente.', { duration: 8000 });
       }
     } catch {
       toast.error('Comprovante não encontrado');
