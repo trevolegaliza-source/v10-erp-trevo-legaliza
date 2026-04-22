@@ -25,6 +25,7 @@ export interface ProcessoNaFila {
   valorAvulso: number;
   justificativaAvulso: string;
   etiquetas: string[];
+  viaAnalise: 'matriz' | 'regional' | 'metodo_trevo';
   // calculated
   valorFinal: number;
   slotNumero: number;

@@ -252,6 +252,7 @@ export function useCreateProcesso() {
       valor_avulso?: number;
       justificativa_avulso?: string;
       etiquetas?: string[];
+      via_analise?: 'matriz' | 'regional' | 'metodo_trevo';
     }) => {
       const isAvulso = input.tipo === 'avulso';
       const isManualPrice = !!input.valor_manual && input.valor_manual > 0;
@@ -407,6 +408,20 @@ export function useCreateProcesso() {
       });
 
       if (rpcError) throw rpcError;
+
+      // via_analise é uma coluna nova; a RPC atual não aceita esse param.
+      // Fazemos UPDATE imediatamente após a RPC. Se falhar, processo fica
+      // com default 'matriz' (fallback seguro) — toast.warning alerta.
+      if (input.via_analise && input.via_analise !== 'matriz') {
+        const { error: viaErr } = await supabase
+          .from('processos')
+          .update({ via_analise: input.via_analise } as any)
+          .eq('id', processoId);
+        if (viaErr) {
+          console.error('Falha ao setar via_analise:', viaErr);
+          toast.warning('Processo criado, mas via de análise ficou como "matriz". Edite o processo pra ajustar.');
+        }
+      }
 
       // Fetch complete processo object
       const { data: processo, error: fetchError } = await supabase

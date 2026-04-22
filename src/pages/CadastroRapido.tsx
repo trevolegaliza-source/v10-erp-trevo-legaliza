@@ -30,6 +30,7 @@ const INITIAL_PROCESSO: ProcessoFormData = {
   valorAvulso: 0,
   justificativaAvulso: '',
   etiquetas: [],
+  viaAnalise: 'matriz',
 };
 
 const INITIAL_VALOR: ValorFormData = {
@@ -232,6 +233,7 @@ export default function CadastroRapido() {
     valorAvulso: processoForm.valorAvulso,
     justificativaAvulso: processoForm.justificativaAvulso,
     etiquetas: processoForm.etiquetas || [],
+    viaAnalise: processoForm.viaAnalise,
     valorFinal: preview.valorFinal,
     slotNumero: preview.slotNumero,
     descontoAplicado: preview.descontoAplicado,
@@ -357,6 +359,7 @@ export default function CadastroRapido() {
           valor_avulso: !item.dentroDoPlano ? item.valorAvulso : 0,
           justificativa_avulso: !item.dentroDoPlano ? item.justificativaAvulso : undefined,
           etiquetas: item.etiquetas || [],
+          via_analise: item.viaAnalise,
         });
 
         saved.push({

@@ -9,6 +9,8 @@ import { TIPO_PROCESSO_LABELS, type TipoProcesso } from '@/types/financial';
 import { EtiquetasCheckboxes } from '@/components/EtiquetasBadges';
 import type { ServiceNegotiation } from '@/hooks/useServiceNegotiations';
 
+export type ViaAnalise = 'matriz' | 'regional' | 'metodo_trevo';
+
 export interface ProcessoFormData {
   razaoSocial: string;
   tipo: string;
@@ -21,6 +23,7 @@ export interface ProcessoFormData {
   valorAvulso: number;
   justificativaAvulso: string;
   etiquetas: string[];
+  viaAnalise: ViaAnalise;
 }
 
 interface Props {
@@ -129,6 +132,47 @@ export default function StepProcesso({ form, onChange, negotiations, colaborador
             <Label htmlFor="prio-urgente" className="font-normal cursor-pointer text-warning">Urgente (+50%)</Label>
           </div>
         </RadioGroup>
+      </div>
+
+      {/* Via de Análise (Matriz / Regional / Método Trevo) */}
+      <div className="space-y-2 rounded-lg border bg-muted/20 p-4">
+        <Label className="text-sm font-medium">Via de análise na Junta Comercial *</Label>
+        <p className="text-[11px] text-muted-foreground mb-2">
+          Escolhida pelo cliente no formulário. Regional e Método Trevo bloqueiam cobrança até
+          registrar a Taxa de Balcão paga em Valores Adicionais.
+        </p>
+        <RadioGroup
+          value={form.viaAnalise}
+          onValueChange={v => update('viaAnalise', v as ViaAnalise)}
+          className="space-y-2"
+        >
+          <label className="flex items-start gap-3 cursor-pointer rounded-md p-2 hover:bg-muted/40">
+            <RadioGroupItem value="matriz" id="via-matriz" className="mt-1" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">⚪ Matriz (padrão)</p>
+              <p className="text-[11px] text-muted-foreground">Apenas DARE / Taxa da Junta Comercial. Prazo indefinido.</p>
+            </div>
+          </label>
+          <label className="flex items-start gap-3 cursor-pointer rounded-md p-2 hover:bg-muted/40">
+            <RadioGroupItem value="regional" id="via-regional" className="mt-1" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-600">🟡 Escritório Regional</p>
+              <p className="text-[11px] text-muted-foreground">Análise até 72h úteis. <strong>Exige Taxa de Balcão (R$ 189-231) paga e cobrada de volta do cliente.</strong></p>
+            </div>
+          </label>
+          <label className="flex items-start gap-3 cursor-pointer rounded-md p-2 hover:bg-muted/40">
+            <RadioGroupItem value="metodo_trevo" id="via-trevo" className="mt-1" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-emerald-600">🟢🚀 Método Trevo / Concierge</p>
+              <p className="text-[11px] text-muted-foreground">Regional + acompanhamento especialista Trevo. Exige Taxa de Balcão + Honorário Método Trevo em Valores Adicionais.</p>
+            </div>
+          </label>
+        </RadioGroup>
+        {form.viaAnalise !== 'matriz' && (
+          <div className="mt-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-700 dark:text-amber-400">
+            ⚠ Depois de cadastrar o processo, lembra de entrar em <strong>Valores Adicionais</strong> e registrar a taxa paga + comprovante. Sem isso, o sistema vai <strong>bloquear</strong> o envio pra cobrança.
+          </div>
+        )}
       </div>
 
       {(form.tipo === 'alteracao' || isNeg) && !isAvulso && (
