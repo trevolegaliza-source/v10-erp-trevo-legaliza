@@ -78,10 +78,12 @@ function fetchRetry(url, options, tentativas) {
   }
 }
 function trelloGet(path, params) {
-  const u = new URL("https://api.trello.com" + path);
   const p = Object.assign({ key: prop("TRELLO_KEY"), token: prop("TRELLO_TOKEN") }, params || {});
-  Object.keys(p).forEach(k => u.searchParams.set(k, p[k]));
-  return fetchRetry(u.toString(), { method: "get" });
+  const qs = Object.keys(p)
+    .map(k => encodeURIComponent(k) + "=" + encodeURIComponent(p[k]))
+    .join("&");
+  const url = "https://api.trello.com" + path + "?" + qs;
+  return fetchRetry(url, { method: "get" });
 }
 function trelloPost(path, payload) {
   const u = "https://api.trello.com" + path + "?key=" + prop("TRELLO_KEY") + "&token=" + prop("TRELLO_TOKEN");
