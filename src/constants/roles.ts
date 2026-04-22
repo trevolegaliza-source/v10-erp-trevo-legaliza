@@ -43,7 +43,6 @@ export const MODULOS_DISPONIVEIS = [
   { value: 'cadastro_rapido', label: 'Cadastro Rápido', grupo: 'Operação' },
   { value: 'processos', label: 'Processos', grupo: 'Operação' },
   { value: 'clientes', label: 'Clientes', grupo: 'Operação' },
-  { value: 'importar', label: 'Importar Planilha', grupo: 'Operação' },
   { value: 'orcamentos', label: 'Orçamentos', grupo: 'Comercial' },
   { value: 'catalogo', label: 'Portfólio & Preços', grupo: 'Comercial' },
   { value: 'financeiro', label: 'Financeiro (Cobranças)', grupo: 'Financeiro' },
