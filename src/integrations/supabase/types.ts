@@ -545,6 +545,7 @@ export type Database = {
           asaas_boleto_barcode: string | null
           asaas_boleto_url: string | null
           asaas_gerado_em: string | null
+          asaas_gerando_lock_ate: string | null
           asaas_invoice_url: string | null
           asaas_last_event: Json | null
           asaas_pago_em: string | null
@@ -556,6 +557,7 @@ export type Database = {
           cliente_id: string
           created_at: string | null
           created_by: string | null
+          data_expiracao: string | null
           data_vencimento: string | null
           empresa_id: string
           extrato_id: string | null
@@ -575,6 +577,7 @@ export type Database = {
           asaas_boleto_barcode?: string | null
           asaas_boleto_url?: string | null
           asaas_gerado_em?: string | null
+          asaas_gerando_lock_ate?: string | null
           asaas_invoice_url?: string | null
           asaas_last_event?: Json | null
           asaas_pago_em?: string | null
@@ -586,6 +589,7 @@ export type Database = {
           cliente_id: string
           created_at?: string | null
           created_by?: string | null
+          data_expiracao?: string | null
           data_vencimento?: string | null
           empresa_id?: string
           extrato_id?: string | null
@@ -605,6 +609,7 @@ export type Database = {
           asaas_boleto_barcode?: string | null
           asaas_boleto_url?: string | null
           asaas_gerado_em?: string | null
+          asaas_gerando_lock_ate?: string | null
           asaas_invoice_url?: string | null
           asaas_last_event?: Json | null
           asaas_pago_em?: string | null
@@ -616,6 +621,7 @@ export type Database = {
           cliente_id?: string
           created_at?: string | null
           created_by?: string | null
+          data_expiracao?: string | null
           data_vencimento?: string | null
           empresa_id?: string
           extrato_id?: string | null
@@ -2229,6 +2235,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      asaas_tentar_lock_cobranca: {
+        Args: { p_cobranca_id: string }
+        Returns: Json
+      }
       atualizar_proposta_por_token: {
         Args: { p_motivo?: string; p_status: string; p_token: string }
         Returns: undefined
@@ -2357,6 +2367,10 @@ export type Database = {
       mark_cobranca_visualizada: {
         Args: { p_token: string }
         Returns: undefined
+      }
+      rotacionar_cobranca_token: {
+        Args: { p_cobranca_id: string }
+        Returns: string
       }
       verificar_senha_proposta: {
         Args: { p_senha: string; p_token: string }
