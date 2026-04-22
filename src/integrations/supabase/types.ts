@@ -1056,6 +1056,45 @@ export type Database = {
           },
         ]
       }
+      empresas_config: {
+        Row: {
+          cnpj: string | null
+          created_at: string
+          empresa_id: string
+          nome_fantasia: string | null
+          pix_banco: string | null
+          pix_chave: string | null
+          razao_social: string | null
+          site: string | null
+          updated_at: string
+          whatsapp: string | null
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string
+          empresa_id: string
+          nome_fantasia?: string | null
+          pix_banco?: string | null
+          pix_chave?: string | null
+          razao_social?: string | null
+          site?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string
+          empresa_id?: string
+          nome_fantasia?: string | null
+          pix_banco?: string | null
+          pix_chave?: string | null
+          razao_social?: string | null
+          site?: string | null
+          updated_at?: string
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
       extratos: {
         Row: {
           cliente_id: string
@@ -2375,6 +2414,7 @@ export type Database = {
         Args: { p_token: string }
         Returns: undefined
       }
+      resolve_empresa_config: { Args: { p_empresa_id: string }; Returns: Json }
       rotacionar_cobranca_token: {
         Args: { p_cobranca_id: string }
         Returns: string
