@@ -25,6 +25,7 @@ import ContasPagarKPIs, { type KpiFilter } from '@/components/contas-pagar/Conta
 import CategoriaAccordion from '@/components/contas-pagar/CategoriaAccordion';
 import ContasPagarLista from '@/components/contas-pagar/ContasPagarLista';
 import RecorrentesTab from '@/components/contas-pagar/RecorrentesTab';
+import HistoricoPagamentos from '@/components/contas-pagar/HistoricoPagamentos';
 import ProvisaoBarra from '@/components/contas-pagar/ProvisaoBarra';
 import DespesaFormModal from '@/components/contas-pagar/DespesaFormModal';
 import RecorrenteFormModal from '@/components/contas-pagar/RecorrenteFormModal';
@@ -359,6 +360,7 @@ export default function ContasPagar() {
           <TabsTrigger value="categoria">Categoria</TabsTrigger>
           <TabsTrigger value="lista">Lista</TabsTrigger>
           <TabsTrigger value="recorrentes">Recorrentes</TabsTrigger>
+          <TabsTrigger value="historico">Histórico</TabsTrigger>
         </TabsList>
 
         <TabsContent value="urgencia">
@@ -461,6 +463,10 @@ export default function ContasPagar() {
             onToggle={r => toggleRecorrente.mutate({ id: r.id, ativo: !r.ativo })}
             onDelete={r => deleteRecorrente.mutate(r.id)}
           />
+        </TabsContent>
+
+        <TabsContent value="historico">
+          <HistoricoPagamentos />
         </TabsContent>
       </Tabs>
 
