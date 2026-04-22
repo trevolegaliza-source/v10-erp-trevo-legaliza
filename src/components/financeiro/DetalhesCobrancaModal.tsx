@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
-  Link as LinkIcon,
   Copy,
   FileBadge,
   MessageCircle,
@@ -160,23 +159,22 @@ export default function DetalhesCobrancaModal({
                 </div>
               ) : publicUrl ? (
                 <>
-                  <div className="flex items-center gap-2 bg-zinc-900/60 border border-zinc-800 rounded-lg p-2 min-w-0">
-                    <code className="flex-1 min-w-0 text-[11px] font-mono truncate text-zinc-300">{publicUrl}</code>
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => copyText(publicUrl, 'Link')}
-                      className="p-1.5 rounded hover:bg-zinc-800 text-zinc-300"
-                      aria-label="Copiar"
+                      className="flex-1 h-10 rounded-md border border-zinc-700 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-100 text-sm font-medium inline-flex items-center justify-center gap-2"
                     >
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="h-4 w-4" /> Copiar link
                     </button>
                     <a
                       href={publicUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="Abrir link"
-                      className="p-1.5 rounded hover:bg-zinc-800 text-zinc-300"
+                      title="Abrir em nova aba"
+                      className="h-10 w-10 shrink-0 rounded-md border border-zinc-700 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-300 inline-flex items-center justify-center"
                     >
-                      <ExternalLink className="h-3.5 w-3.5" />
+                      <ExternalLink className="h-4 w-4" />
                     </a>
                   </div>
                   <div className="flex items-center justify-between text-[11px] px-1">
@@ -278,29 +276,21 @@ export default function DetalhesCobrancaModal({
             </div>
 
             {/* WhatsApp */}
-            {publicUrl && (
+            {publicUrl && clienteTelefone && (
               <div className="space-y-1.5 pt-3 border-t border-zinc-800">
                 <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold">
                   Enviar ao cliente
                 </p>
-                <button
-                  onClick={() => copyText(publicUrl, 'Link')}
-                  className="w-full h-11 rounded-md border border-zinc-700 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-100 text-sm font-medium inline-flex items-center justify-center gap-2"
+                <a
+                  href={`https://wa.me/${(clienteTelefone || '').replace(/\D/g, '').replace(/^/, '55').replace(/^5555/, '55')}?text=${encodeURIComponent(
+                    `Olá! Segue o link da cobrança: ${publicUrl}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-11 rounded-md bg-emerald-500 hover:bg-emerald-600 text-emerald-950 text-sm font-semibold inline-flex items-center justify-center gap-2"
                 >
-                  <LinkIcon className="h-4 w-4" /> Copiar link
-                </button>
-                {clienteTelefone && (
-                  <a
-                    href={`https://wa.me/${(clienteTelefone || '').replace(/\D/g, '').replace(/^/, '55').replace(/^5555/, '55')}?text=${encodeURIComponent(
-                      `Olá! Segue o link da cobrança: ${publicUrl}`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full h-11 rounded-md bg-emerald-500 hover:bg-emerald-600 text-emerald-950 text-sm font-semibold inline-flex items-center justify-center gap-2"
-                  >
-                    <MessageCircle className="h-4 w-4" /> Abrir WhatsApp
-                  </a>
-                )}
+                  <MessageCircle className="h-4 w-4" /> Abrir WhatsApp
+                </a>
               </div>
             )}
           </div>
