@@ -27,10 +27,13 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import logoTrevo from '@/assets/logo-trevo.png';
+import { consolidarObservacoes } from '@/lib/observacao-processo';
 
 interface Taxa {
   descricao: string;
   valor: number;
+  categoria?: string | null;
+  comprovante_url?: string | null;
 }
 
 interface LancamentoCobranca {
@@ -40,6 +43,9 @@ interface LancamentoCobranca {
   razao_social: string | null;
   tipo_processo: string | null;
   taxas: Taxa[];
+  comprovante_url?: string | null;
+  observacoes_processo?: string | null;
+  observacoes_financeiro?: string | null;
 }
 
 interface EmpresaConfig {
