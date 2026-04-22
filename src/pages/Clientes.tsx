@@ -496,7 +496,7 @@ export default function Clientes() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label className="text-muted-foreground">Tipo</Label>
-                <Select value={editForm.tipo} onValueChange={(v) => setEditForm(f => ({ ...f, tipo: v as TipoCliente }))}>
+                <Select value={editForm.tipo} onValueChange={(v) => setEditForm(f => ({ ...f, tipo: v as any }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="MENSALISTA">Mensalista</SelectItem>
