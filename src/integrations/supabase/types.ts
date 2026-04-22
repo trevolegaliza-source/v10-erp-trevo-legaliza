@@ -2383,6 +2383,7 @@ export type Database = {
           p_valor?: number
           p_valor_avulso?: number
           p_valor_avulso_extra?: number
+          p_via_analise?: string
         }
         Returns: string
       }
