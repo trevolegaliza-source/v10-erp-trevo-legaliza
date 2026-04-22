@@ -15,6 +15,7 @@ import {
   Download,
   ExternalLink,
   Loader2,
+  RotateCcw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,28 +40,44 @@ export default function DetalhesCobrancaModal({
   open, onOpenChange, cobrancaId, clienteNome, clienteTelefone, total,
 }: Props) {
   const [shareToken, setShareToken] = useState<string | null>(null);
+  const [dataExpiracao, setDataExpiracao] = useState<string | null>(null);
   const [loadingToken, setLoadingToken] = useState(false);
+  const [rotatingToken, setRotatingToken] = useState(false);
   const [asaasModalOpen, setAsaasModalOpen] = useState(false);
   const { data: asaasInfo, isLoading: loadingAsaas } = useCobrancaAsaas(cobrancaId);
 
   useEffect(() => {
-    if (!open || !cobrancaId) { setShareToken(null); return; }
+    if (!open || !cobrancaId) {
+      setShareToken(null);
+      setDataExpiracao(null);
+      return;
+    }
     let cancel = false;
     setLoadingToken(true);
     supabase
       .from('cobrancas')
-      .select('share_token')
+      .select('share_token, data_expiracao')
       .eq('id', cobrancaId)
       .single()
       .then(({ data }) => {
         if (cancel) return;
         setShareToken((data as any)?.share_token ?? null);
+        setDataExpiracao((data as any)?.data_expiracao ?? null);
         setLoadingToken(false);
       });
     return () => { cancel = true; };
   }, [open, cobrancaId]);
 
   const publicUrl = shareToken ? getCobrancaPublicUrl(shareToken) : null;
+  const expiracaoFmt = dataExpiracao
+    ? new Date(dataExpiracao).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      })
+    : null;
+  const expirado =
+    dataExpiracao !== null && new Date(dataExpiracao).getTime() < Date.now();
 
   const copyText = async (text: string, label: string) => {
     try {
@@ -68,6 +85,40 @@ export default function DetalhesCobrancaModal({
       toast.success(`${label} copiado!`);
     } catch {
       toast.error('Não foi possível copiar.');
+    }
+  };
+
+  const rotacionarToken = async () => {
+    if (!cobrancaId) return;
+    const confirm = window.confirm(
+      'Isso vai invalidar o link atual e gerar um novo.\n\n' +
+      'Qualquer pessoa que tenha o link antigo perderá acesso.\n' +
+      'Deseja continuar?'
+    );
+    if (!confirm) return;
+
+    setRotatingToken(true);
+    try {
+      const { data, error } = await supabase.rpc(
+        'rotacionar_cobranca_token' as any,
+        { p_cobranca_id: cobrancaId }
+      );
+      if (error) throw error;
+      const novoToken = typeof data === 'string' ? data : (data as any);
+      if (!novoToken) throw new Error('RPC não retornou token');
+      setShareToken(novoToken);
+      // Rebusca data_expiracao (trigger recalculou)
+      const { data: refreshed } = await supabase
+        .from('cobrancas')
+        .select('data_expiracao')
+        .eq('id', cobrancaId)
+        .single();
+      setDataExpiracao((refreshed as any)?.data_expiracao ?? null);
+      toast.success('Link antigo invalidado. Novo link gerado.');
+    } catch (e: any) {
+      toast.error(e?.message || 'Falha ao invalidar link.');
+    } finally {
+      setRotatingToken(false);
     }
   };
 
@@ -108,25 +159,49 @@ export default function DetalhesCobrancaModal({
                   <Loader2 className="h-4 w-4 animate-spin" /> Carregando...
                 </div>
               ) : publicUrl ? (
-                <div className="flex items-center gap-2 bg-zinc-900/60 border border-zinc-800 rounded-lg p-2 min-w-0">
-                  <code className="flex-1 min-w-0 text-[11px] font-mono truncate text-zinc-300">{publicUrl}</code>
-                  <button
-                    onClick={() => copyText(publicUrl, 'Link')}
-                    className="p-1.5 rounded hover:bg-zinc-800 text-zinc-300"
-                    aria-label="Copiar"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                  </button>
-                  <a
-                    href={publicUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Abrir link"
-                    className="p-1.5 rounded hover:bg-zinc-800 text-zinc-300"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                </div>
+                <>
+                  <div className="flex items-center gap-2 bg-zinc-900/60 border border-zinc-800 rounded-lg p-2 min-w-0">
+                    <code className="flex-1 min-w-0 text-[11px] font-mono truncate text-zinc-300">{publicUrl}</code>
+                    <button
+                      onClick={() => copyText(publicUrl, 'Link')}
+                      className="p-1.5 rounded hover:bg-zinc-800 text-zinc-300"
+                      aria-label="Copiar"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <a
+                      href={publicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Abrir link"
+                      className="p-1.5 rounded hover:bg-zinc-800 text-zinc-300"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] px-1">
+                    {expiracaoFmt ? (
+                      <span className={expirado ? 'text-rose-400' : 'text-zinc-500'}>
+                        {expirado ? 'Link expirado em' : 'Expira em'} {expiracaoFmt}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-500">Sem expiração definida</span>
+                    )}
+                    <button
+                      onClick={rotacionarToken}
+                      disabled={rotatingToken}
+                      className="inline-flex items-center gap-1 text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+                      title="Invalidar link atual e gerar um novo"
+                    >
+                      {rotatingToken ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RotateCcw className="h-3 w-3" />
+                      )}
+                      Invalidar e gerar novo
+                    </button>
+                  </div>
+                </>
               ) : (
                 <p className="text-xs text-zinc-500">Link indisponível.</p>
               )}
