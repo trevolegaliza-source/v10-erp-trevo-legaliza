@@ -226,7 +226,12 @@ Deno.serve(async (req) => {
     });
   }
 
+  // lockAcquired vira true quando este worker ganha o lock — precisa
+  // liberar manualmente em caso de erro (o UPDATE final libera no sucesso).
+  let lockAcquired = false;
+
   try {
+    // 1) SELECT leve só pra validar isolamento por empresa antes do lock.
     const { data: cobranca, error: cobErr } = await admin
       .from("cobrancas")
       .select("id, cliente_id, empresa_id, total_geral, data_vencimento, share_token, asaas_payment_id, status")
@@ -240,20 +245,50 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (cobranca.status === "paga" || cobranca.status === "cancelada") {
-      return new Response(JSON.stringify({ error: `Cobrança ${cobranca.status} não pode ser reenviada` }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    // 2) Tenta adquirir o lock atomicamente (CAS em asaas_gerando_lock_ate).
+    //    A RPC também valida status e payment_id existente — fonte de verdade
+    //    blindada contra race condition entre SELECT acima e UPDATE lá embaixo.
+    const { data: lockResultRaw, error: lockErr } = await admin.rpc(
+      "asaas_tentar_lock_cobranca",
+      { p_cobranca_id: cobrancaId },
+    );
+    if (lockErr) throw new Error(`Falha ao adquirir lock: ${lockErr.message}`);
+    const lockResult = (lockResultRaw ?? {}) as any;
+
+    if (!lockResult.acquired) {
+      switch (lockResult.reason) {
+        case "not_found":
+          return new Response(JSON.stringify({ error: "Cobrança não encontrada" }), {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        case "wrong_status":
+          return new Response(JSON.stringify({
+            error: `Cobrança ${lockResult.status} não pode ser reenviada`,
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        case "already_generated":
+          return new Response(JSON.stringify({
+            ok: true,
+            reused: true,
+            asaas_payment_id: lockResult.asaas_payment_id,
+            message: "Cobrança Asaas já existe para este registro.",
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        case "in_progress":
+          return new Response(JSON.stringify({
+            error: "Outra geração de cobrança Asaas já está em andamento para este registro. Aguarde alguns segundos e tente novamente.",
+          }), {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        default:
+          throw new Error(`Lock não adquirido por motivo desconhecido: ${JSON.stringify(lockResult)}`);
+      }
     }
-    if (cobranca.asaas_payment_id) {
-      return new Response(JSON.stringify({
-        ok: true,
-        reused: true,
-        asaas_payment_id: cobranca.asaas_payment_id,
-        message: "Cobrança Asaas já existe para este registro.",
-      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    lockAcquired = true;
 
     const { data: cliente, error: clErr } = await admin
       .from("clientes")
@@ -290,9 +325,11 @@ Deno.serve(async (req) => {
       asaas_pix_qrcode: pix?.encodedImage ?? null,
       asaas_pix_payload: pix?.payload ?? null,
       asaas_gerado_em: new Date().toISOString(),
+      asaas_gerando_lock_ate: null, // libera o lock junto com o write final
       data_vencimento: dueDate,
     };
     await admin.from("cobrancas").update(update).eq("id", cobranca.id);
+    lockAcquired = false; // já liberado pelo UPDATE acima
 
     return new Response(JSON.stringify({
       ok: true,
@@ -307,6 +344,20 @@ Deno.serve(async (req) => {
 
   } catch (err: any) {
     console.error("asaas-gerar-cobranca error:", err);
+
+    // Se adquirimos o lock mas falhamos antes do UPDATE final,
+    // liberamos manualmente pra não segurar a cobrança por 60s.
+    if (lockAcquired) {
+      try {
+        await admin
+          .from("cobrancas")
+          .update({ asaas_gerando_lock_ate: null })
+          .eq("id", cobrancaId);
+      } catch (releaseErr) {
+        console.error("asaas-gerar-cobranca: falha ao liberar lock:", releaseErr);
+      }
+    }
+
     return new Response(JSON.stringify({ error: String(err?.message ?? err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
