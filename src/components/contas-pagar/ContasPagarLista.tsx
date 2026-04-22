@@ -5,7 +5,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Pencil, CheckCircle, Trash2 } from 'lucide-react';
+import { Search, Pencil, CheckCircle, Trash2, Paperclip } from 'lucide-react';
+import { abrirArquivoStorage } from '@/lib/storage-utils';
+import { STORAGE_BUCKETS } from '@/constants/storage';
 import { CATEGORIAS_DESPESAS, type CategoriaKey } from '@/constants/categorias-despesas';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import * as LucideIcons from 'lucide-react';
@@ -151,18 +153,40 @@ export default function ContasPagarLista({ lancamentos, onEdit, onMarcarPago, on
                   <TableCell>{getStatusBadge(l)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      {l.comprovante_url && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => abrirArquivoStorage(STORAGE_BUCKETS.CONTRACTS, l.comprovante_url)}
+                              >
+                                <Paperclip className="h-3.5 w-3.5 text-emerald-500" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Ver comprovante</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                       {!hideApprove && l.status === 'pendente' && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)} title="Marcar pago">
                           <CheckCircle className="h-3.5 w-3.5 text-primary" />
                         </Button>
                       )}
+                      {!hideApprove && isPago && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onMarcarPago(l)} title="Editar pagamento / comprovante">
+                          <CheckCircle className="h-3.5 w-3.5 text-emerald-500/60" />
+                        </Button>
+                      )}
                       {!hideEdit && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(l)} title="Editar despesa">
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       )}
-                      {!hideDelete && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(l)}>
+                      {!hideDelete && !isPago && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(l)} title="Excluir">
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
                         </Button>
                       )}
