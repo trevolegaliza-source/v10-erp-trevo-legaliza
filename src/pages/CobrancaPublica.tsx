@@ -123,7 +123,17 @@ export default function CobrancaPublica() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    // Página pública é dark-only (lookup com cliente B2B). Mas se usuário
+    // navega de volta pra app autenticado, dark mode forçado polui o estado.
+    // Cleanup: remove a classe quando o componente desmonta.
+    const wasAlreadyDark = document.documentElement.classList.contains('dark');
     document.documentElement.classList.add('dark');
+    return () => {
+      // Só remove se NÃO era dark antes (preserva preferência do app autenticado)
+      if (!wasAlreadyDark) {
+        document.documentElement.classList.remove('dark');
+      }
+    };
   }, []);
 
   useEffect(() => {
