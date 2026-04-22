@@ -281,12 +281,14 @@ function aoEnviarFormulario(e) {
 
     const spec = buildSpecPorTipo(r, tipoProcesso);
     const isPrioridadeMaxima = slaTrevo.toLowerCase().includes("prioridade máxima");
-    const isMetodoTrevo = localProtocolo.includes("🍀") || localProtocolo.toLowerCase().includes("método trevo");
+    const viaAnalise = detectarViaAnalise(localProtocolo);
+    const infoVia = viaAnaliseInfo(viaAnalise);
     const destaquePrioridade = isPrioridadeMaxima ? "\n\n⚡ **PRIORIDADE MÁXIMA TREVO (+50% de acréscimo)** ⚡\n" : "";
+    const destaqueVia = "\n\n" + infoVia.destaque + "\n";
 
     const cabecalhoComum =
       "🏢 **" + codCliente + " — " + contabilidade + "**\n" +
-      destaquePrioridade + "\n" +
+      destaquePrioridade + destaqueVia + "\n" +
       "📂 **LINK DA PASTA:** " + linkPastaDrive + "\n\n" +
       "📋 SOLICITANTE: " + solicitante + "\n" +
       "🏢 CONTABILIDADE: " + contabilidade + "\n" +
@@ -295,7 +297,7 @@ function aoEnviarFormulario(e) {
       "📬 PROTOCOLO: " + protocolo + "\n" +
       "⏰ URGÊNCIA: " + urgencia + "\n" +
       "🍀 SLA TREVO: " + slaTrevo + "\n" +
-      "🕰️ LOCAL PROTOCOLO: " + localProtocolo + "\n" +
+      "🕰️ VIA DE ANÁLISE: " + infoVia.label + "\n" +
       "📝 FORM ID: " + new Date().toISOString() + "\n" +
       "───────────────────────────\n\n";
 
@@ -315,7 +317,8 @@ function aoEnviarFormulario(e) {
 
     const etiquetasParaAplicar = [];
     if (isPrioridadeMaxima) etiquetasParaAplicar.push("PRIORIDADE");
-    if (isMetodoTrevo) etiquetasParaAplicar.push("MÉTODO TREVO 🍀");
+    // Etiqueta da via (sempre aplica — facilita triagem visual no Trello)
+    if (infoVia.etiqueta) etiquetasParaAplicar.push(infoVia.etiqueta);
     if (etiquetasParaAplicar.length > 0) aplicarEtiquetasNoCartao(cardId, boardId, etiquetasParaAplicar);
 
     adicionarMembrosDoBoardAoCartao(cardId, boardId);
@@ -425,6 +428,51 @@ function coletarChavesMapeadas() {
     "CNPJ da empresa  ","CNPJ da empresa","Razão Social da empresa ",
     "  📝 Observações sobre os documentos (opcional)  ","📝 Observações sobre os documentos (opcional)"
   ].map(s => s.trim()));
+}
+
+// =============================================
+// VIA DE ANÁLISE — Matriz / Regional / Método Trevo
+// =============================================
+// Detecta a via escolhida pelo cliente no form, baseado no texto
+// do campo "🕰️ Local de Protocolo e Análise".
+// Retorna: 'matriz' | 'regional' | 'metodo_trevo'
+function detectarViaAnalise(localProtocolo) {
+  const t = String(localProtocolo || "").toLowerCase();
+  // Método Trevo tem preferência (string contém 🍀 ou "método trevo" ou "concierge")
+  if (t.includes("🍀") || t.includes("método trevo") || t.includes("metodo trevo") || t.includes("concierge")) {
+    return "metodo_trevo";
+  }
+  // Regional
+  if (t.includes("regional") || t.includes("escritório regional") || t.includes("escritorio regional") || t.includes("agilidade")) {
+    return "regional";
+  }
+  // Default é matriz (padrão, sem custo adicional)
+  return "matriz";
+}
+
+// Info visual da via: label pro cabeçalho, destaque em bloco, etiqueta no Trello.
+function viaAnaliseInfo(via) {
+  switch (via) {
+    case "metodo_trevo":
+      return {
+        label: "🟢🚀 Método Trevo / Concierge",
+        destaque: "🟢🚀 **MÉTODO TREVO / CONCIERGE** — DARE + Taxa de Balcão + Honorário Trevo",
+        etiqueta: "MÉTODO TREVO 🍀",
+      };
+    case "regional":
+      return {
+        label: "🟡 Escritório Regional",
+        destaque: "🟡 **ESCRITÓRIO REGIONAL** — DARE + Taxa de Balcão (R$ 189-231). Análise até 72h úteis.",
+        etiqueta: "REGIONAL",
+      };
+    case "matriz":
+    default:
+      return {
+        label: "⚪ Junta Comercial Matriz",
+        destaque: "⚪ **JUNTA COMERCIAL MATRIZ** — somente DARE. Prazo indefinido.",
+        etiqueta: "MATRIZ",
+      };
+  }
 }
 
 // =============================================
