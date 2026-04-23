@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   Plus, FileText, Send, CheckCircle, TrendingUp, MoreHorizontal,
-  Copy, Download, Trash2, Pencil, Link as LinkIcon, ArrowLeft, FileCheck, Eye,
+  Copy, Download, Trash2, Pencil, Link as LinkIcon, ArrowLeft, FileCheck, Eye, MessageCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -236,6 +236,23 @@ export default function Orcamentos() {
     }
   }
 
+  function handleWhatsApp(orc: Orcamento) {
+    const orcAny = orc as any;
+    if (orcAny.destinatario === 'cliente_via_contador') {
+      toast.error('Orçamentos white-label não possuem link público. Use o PDF.');
+      return;
+    }
+    const url = `https://app.trevolegaliza.com/proposta/${orc.share_token}`;
+    const valor = fmt(orc.valor_final);
+    const validade = orc.validade_dias ?? 15;
+    const num = String(orc.numero).padStart(3, '0');
+    let msg = `Olá${orc.prospect_nome ? `, ${orc.prospect_nome}` : ''}! 🍀\n\nSegue sua proposta de honorários da *Trevo Legaliza*.\n\n📋 Proposta #${num}\n💰 Valor: *${valor}*\n⏱️ Válida por ${validade} dias\n\nAcesse e aprove online:\n${url}`;
+    if (orcAny.destinatario === 'contador' && orcAny.senha_link) {
+      msg += `\n\n🔒 Senha de acesso: *${orcAny.senha_link}*`;
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  }
+
   function handleCopyLink(orc: Orcamento) {
     const orcAny = orc as any;
     // Modo cliente_via_contador NÃO tem link público
@@ -243,7 +260,7 @@ export default function Orcamentos() {
       toast.error('Orçamentos white-label não possuem link público. Use o PDF.');
       return;
     }
-    const baseUrl = 'https://trevolegaliza.lovable.app';
+    const baseUrl = 'https://app.trevolegaliza.com';
     const url = `${baseUrl}/proposta/${orc.share_token}`;
     navigator.clipboard.writeText(url);
     
@@ -292,6 +309,9 @@ export default function Orcamentos() {
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handleCopyLink(orc)}>
             <LinkIcon className="h-3.5 w-3.5 mr-2" />Copiar Link
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleWhatsApp(orc)}>
+            <MessageCircle className="h-3.5 w-3.5 mr-2" />Enviar por WhatsApp
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handleDownloadPDF(orc)}>
             <Download className="h-3.5 w-3.5 mr-2" />Baixar PDF
