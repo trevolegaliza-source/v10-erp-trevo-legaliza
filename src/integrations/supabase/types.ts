@@ -2503,6 +2503,10 @@ export type Database = {
         Args: { p_cobranca_id: string }
         Returns: string
       }
+      salvar_selecao_proposta: {
+        Args: { p_itens_selecionados: Json; p_token: string }
+        Returns: boolean
+      }
       verificar_senha_proposta: {
         Args: { p_senha: string; p_token: string }
         Returns: boolean
