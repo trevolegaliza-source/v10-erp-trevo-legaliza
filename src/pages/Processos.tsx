@@ -29,6 +29,23 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 type ViewMode = 'kanban' | 'list';
 type GroupBy = 'none' | 'cliente' | 'mes' | 'etapa';
+type FilterPagamento = 'all' | 'pago' | 'pendente' | 'vencido';
+
+// Classifica status de pagamento a partir de um lançamento
+function classificarPagamento(lanc: any): 'pago' | 'pendente' | 'vencido' | 'sem-lancamento' {
+  if (!lanc) return 'sem-lancamento';
+  if (lanc.status === 'pago') return 'pago';
+  if (lanc.status === 'cancelado') return 'sem-lancamento';
+  // pendente → verifica se vencido
+  if (lanc.data_vencimento) {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const venc = new Date(lanc.data_vencimento);
+    venc.setHours(0, 0, 0, 0);
+    if (venc < hoje) return 'vencido';
+  }
+  return 'pendente';
+}
 
 function QuickActionsMenu({
   process,
@@ -160,6 +177,7 @@ export default function Processos() {
   const deleteProcesso = useDeleteProcesso();
   const [filterType, setFilterType] = useState<string>('all');
   const [filterEtiquetas, setFilterEtiquetas] = useState<Set<EtiquetaProcesso>>(new Set());
+  const [filterPagamento, setFilterPagamento] = useState<FilterPagamento>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [groupBy, setGroupBy] = useState<GroupBy>('cliente');
   const [filterMonth, setFilterMonth] = useState<string>('all');
@@ -181,11 +199,20 @@ export default function Processos() {
     }
   }, [deleteConfirmId, deleteProcesso]);
 
+  // Map processo_id → status de pagamento derivado do lançamento
+  const pagamentoStatusMap = useMemo(() => {
+    const m = new Map<string, 'pago' | 'pendente' | 'vencido' | 'sem-lancamento'>();
+    (processosFinanceiro || []).forEach((pf: ProcessoFinanceiro) => {
+      m.set(pf.id, classificarPagamento((pf as any).lancamento));
+    });
+    return m;
+  }, [processosFinanceiro]);
+
   const filtered = useMemo(() => {
     let result = filterType === 'all'
       ? (processos || [])
       : (processos || []).filter((p) => p.tipo === filterType);
-    
+
     if (filterMonth !== 'all') {
       const [fYear, fMonth] = filterMonth.split('-').map(Number);
       result = result.filter(p => {
@@ -201,8 +228,12 @@ export default function Processos() {
       });
     }
 
+    if (filterPagamento !== 'all') {
+      result = result.filter(p => pagamentoStatusMap.get(p.id) === filterPagamento);
+    }
+
     return result;
-  }, [processos, filterType, filterMonth, filterEtiquetas]);
+  }, [processos, filterType, filterMonth, filterEtiquetas, filterPagamento, pagamentoStatusMap]);
 
   const monthOptions = useMemo(() => {
     const months = new Set<string>();
@@ -256,7 +287,7 @@ export default function Processos() {
     } else {
       setCollapsedGroups(new Set());
     }
-  }, [groupBy, filterMonth, filterType]);
+  }, [groupBy, filterMonth, filterType, filterPagamento]);
 
   const selectedFinanceiroProcess = useMemo<ProcessoFinanceiro | null>(() => {
     if (!selectedProcessId) return null;
@@ -334,6 +365,30 @@ export default function Processos() {
                 <SelectItem value="orcamento">Orçamento</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Filtro por status de pagamento (A10) */}
+            <div className="flex items-center gap-1">
+              {([
+                { k: 'all',      label: 'Todos',    cls: '' },
+                { k: 'pago',     label: '✓ Pagos',   cls: 'bg-green-600 hover:bg-green-700' },
+                { k: 'pendente', label: '⏳ Pendentes', cls: 'bg-amber-500 hover:bg-amber-600' },
+                { k: 'vencido',  label: '⚠ Vencidos', cls: 'bg-red-600 hover:bg-red-700' },
+              ] as const).map(opt => {
+                const active = filterPagamento === opt.k;
+                return (
+                  <Button
+                    key={opt.k}
+                    size="sm"
+                    variant={active ? 'default' : 'outline'}
+                    className={cn('h-9 px-2.5 text-xs', active && opt.cls)}
+                    onClick={() => setFilterPagamento(opt.k)}
+                    title={`Filtrar por status financeiro: ${opt.label}`}
+                  >
+                    {opt.label}
+                  </Button>
+                );
+              })}
+            </div>
 
             <div className="flex items-center gap-1">
               {ETIQUETAS_PROCESSO.map(etiq => {

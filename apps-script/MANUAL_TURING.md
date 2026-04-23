@@ -229,6 +229,193 @@ Se precisar mexer em uma dessas, **avise um desenvolvedor antes**.
 
 ---
 
-**Última atualização:** 2026-04-22  
-**Versão:** 6.0  
+**Última atualização:** 2026-04-23 (auditoria completa v6.1)
+**Versão:** 6.0
 **Perguntas?** Mande uma mensagem pro desenvolvedor ou abra um card no Trevo com tag "SUPORTE-SCRIPT"
+
+---
+
+# 📎 ANEXO — Auditoria técnica completa (23/04/2026)
+
+> Isso aqui é pro desenvolvedor / TURING / sessão futura. Thales pode pular esta parte.
+
+## A1. Mapa completo de funções (1519 linhas, 60+ funções)
+
+### Infraestrutura (linhas 1-240)
+| Função | O que faz |
+|---|---|
+| `getProps()`, `prop(k)` | Acesso ao PropertiesService |
+| `setupProperties()` | Salva TRELLO_KEY, TRELLO_TOKEN, CLAUDE_API_KEY |
+| `fetchRetry(url, opts, n)` | Retry exponencial em HTTP calls |
+| `trelloGet/Post/Put(path, params)` | Wrappers autenticados da API Trello |
+| `campo(r, nomes[])` | Busca fuzzy de campos do formulário |
+| `validarEmail(e)` | Regex de email |
+| `validarCodigoCliente(cod)` | Lookup na planilha CLIENTES com cache |
+| `incMetrica(k)` | Incrementa contador diário na aba MÉTRICAS |
+| `jaProcessado(dedup)` | Cache de idempotência (evita duplicatas) |
+| `notificarErro(origem, e)` | Envia email pro EMAIL_ALERTA_ERRO |
+
+### Trigger principal do formulário (linhas 239-352)
+| Função | O que faz |
+|---|---|
+| `aoEnviarFormulario(e)` | Entrypoint do Google Form. Valida código → cria pasta Drive → cria card Trello → envia email cliente. Atomicidade via LockService. |
+| `avisarClienteCodigoErrado(...)` | Email quando código não existe |
+| `avisarFalhaCriacao(...)` | Email quando a criação falha |
+
+### Construção de dados do processo (linhas 368-744)
+| Função | O que faz |
+|---|---|
+| `coletarChavesMapeadas()` | Lista todos os campos conhecidos do form |
+| `detectarViaAnalise(local)` | Matriz vs Regional vs Método Trevo (v6.0+) |
+| `viaAnaliseInfo(via)` | Metadata de exibição da via |
+| `calcularDueDate(urg, prio)` | Prazo do card baseado em urgência |
+| `buildSpecPorTipo(r, tipo)` | Mapeia tipo de processo → campos a capturar |
+| `definirNomeCartao/Empresa(r, ...)` | Formatação de nomes |
+| `montarDescricaoAbertura/Alteracao/Transformacao/Encerramento/Avulso(r)` | Templates de descrição por tipo |
+
+### Drive (linhas 744-810)
+| Função | O que faz |
+|---|---|
+| `criarPastasDrive(r, cod, nome, email)` | Pasta cliente + subpasta processo |
+| `compartilharComoLeitor(pasta, email)` | ACL do cliente |
+| `buscarOuCriarPastaEmpresa(mae, nome)` | Idempotente |
+| `moverArquivosDoCampo(r, nome, dest)` | Move anexos do form |
+
+### Trello (linhas 810-847)
+| Função | O que faz |
+|---|---|
+| `criarCardTrello(nome, desc, list, due)` | Cria card |
+| `definirCapaCartao(id, cor)` | Cor da capa |
+| `criarChecklistTrello(id, nome, itens)` | Adiciona checklist |
+| `aplicarEtiquetasNoCartao(id, board, labels)` | Aplica/cria etiquetas |
+| `adicionarMembrosDoBoardAoCartao(id, board)` | Adiciona membros da equipe |
+| `getEmailDoCard(id)` | Lê email armazenado em custom field |
+
+### Gestão de clientes (linha 848)
+| Função | O que faz |
+|---|---|
+| `MapearClientes()` | Rebuild da aba CLIENTES a partir do Trello (lenta, rodar manual) |
+
+### Lembretes (linhas 942-1176)
+| Função | O que faz |
+|---|---|
+| `LembretesPendencias()` | Trigger diário 9h — varre cards com etiqueta de lembrete |
+| `doPost(e)` | Webhook HTTP — ERP chama pra forçar lembrete imediato |
+| `resolverClientePorBoard(boardId)` | Lookup inverso (board → cliente) |
+| `buscarCardsComEtiquetaLembrete(board)` | Filtra cards com ETIQUETAS_LEMBRETE |
+| `processarLembreteCard(card, cod, emails, bloq, forcar)` | Decide nível (1ª, 2ª, abandono) e dispara email |
+| `extrairEmailDoCardDesc(desc)` | Parse do email do cliente da descrição |
+| `avisarThalesAbandono(card, cod, n)` | Email crítico pro Thales |
+| `registrarLembrete(d)` | Persiste na aba LEMBRETES |
+
+### Emails (linhas 1192-1338)
+| Função | O que faz |
+|---|---|
+| `enviarEmailLembrete(opts)` | Template de lembrete escalonado |
+| `enviarEmailConfirmacaoCliente(...)` | Email de recebimento |
+
+### Dani (IA) (linhas 1338-1519)
+| Função | O que faz |
+|---|---|
+| `VarrerEmails()` | Orquestrador — chama os 2 varredores abaixo |
+| `varrerComentariosTrello()` | Gmail → filtra notificações do Trello → Claude classifica → posta resposta se autoResponder=true |
+| `varrerEmailsOrgaos()` | Label "🏛️ TRIAGEM DE ÓRGÃOS" → Claude interpreta → busca card por protocolo → posta comentário |
+| `chamarClaude(p)` | Chamada HTTP pra Anthropic Messages API (max_tokens=500, retry 3x) |
+| `classificarComentario(com, card, quadro)` | Prompt estruturado → JSON {nivel, acao, autoResponder, resposta} |
+| `interpretarEmailOrgao(corpo, assunto, rem)` | Prompt estruturado → JSON {protocolo, resumo, nivel, acao, orgao} |
+| `buscarCardPorProtocoloViaSearch(p)` | Trello /1/search por número de protocolo |
+| `postarComentarioNoCard(id, txt)` | POST comentário |
+| `parsearEmailTrello(corpo)` | Parse do email de notificação do Trello (extrai card, comentário, remetente) |
+| `ehEquipeInterna(nome)` | Filtra comentários da equipe Trevo (não processa) |
+| `registrarPendencia(d)` | Persiste na aba PENDÊNCIAS com cor por nível |
+
+### Teste (linhas 910, 1519)
+| Função | O que faz |
+|---|---|
+| `TestedoCartao()` | Pega linha 2 da planilha RESPOSTAS e simula form |
+| `TestarVarredura()` | Roda VarrerEmails manualmente |
+
+---
+
+## A2. Triggers agendados (confirmar no painel Apps Script)
+
+| Trigger | Frequência | Função |
+|---|---|---|
+| onFormSubmit (spreadsheet) | Ao enviar form | `aoEnviarFormulario(e)` |
+| Time-based 9h | Diário | `LembretesPendencias()` |
+| Time-based X min | Recorrente (deve existir?) | `VarrerEmails()` — **CONFIRMAR NO PAINEL** |
+| HTTP Webhook | Sob demanda | `doPost(e)` (URL publicada) |
+
+**⚠️ Ação recomendada pro Thales:** abrir o painel Apps Script > Triggers e tirar screenshot. Se `VarrerEmails` não tem trigger agendado, a Dani só roda quando chamada manualmente.
+
+---
+
+## A3. Integrações externas (fluxo completo)
+
+```
+┌───────────────┐   form     ┌───────────────────┐
+│ Google Forms  │ ─────────▶ │ aoEnviarFormulario│
+└───────────────┘            └────────┬──────────┘
+                                      ├─▶ Drive API (pastas)
+                                      ├─▶ Trello API (card)
+                                      ├─▶ Gmail (email confirm)
+                                      └─▶ Sheets (MÉTRICAS)
+
+┌───────────────┐  trigger   ┌───────────────────┐
+│ Cron 9h       │ ─────────▶ │ LembretesPendencia│
+└───────────────┘            └────────┬──────────┘
+                                      ├─▶ Trello API (listar cards)
+                                      └─▶ Gmail (email lembrete)
+
+┌───────────────┐  trigger   ┌───────────────────┐
+│ Cron X min?   │ ─────────▶ │   VarrerEmails    │
+└───────────────┘            └────────┬──────────┘
+                                      ├─▶ Gmail (ler emails)
+                                      ├─▶ Claude API (classificar)
+                                      └─▶ Trello API (postar comentário)
+
+┌───────────────┐  webhook   ┌───────────────────┐
+│ ERP Supabase  │ ─────────▶ │      doPost       │
+└───────────────┘            └────────┬──────────┘
+                                      └─▶ processarLembreteCard (imediato)
+```
+
+---
+
+## A4. Dívida técnica / pontos de atenção
+
+1. **`doPost` sem autenticação** — aceita qualquer POST com `card_id`. Impacto baixo (só dispara lembretes), mas um atacante que descobrir a URL pode floodear emails. Sugestão: adicionar token no body e validar.
+
+2. **`chamarClaude` com `max_tokens: 500`** — suficiente pra JSON curto, mas se a IA precisar resumir um processo inteiro (futuro), esse limite trava. Parametrizar.
+
+3. **`classificarComentario` só retorna 4 níveis** (DÚVIDA, DOCUMENTO, CONFIRMAÇÃO, SOLICITAÇÃO) — quando formalizarmos o fluxo Dani, provavelmente precisará mais granularidade (ex.: ATUALIZAÇÃO DE STATUS, INFORMAÇÃO PRO CLIENTE).
+
+4. **`ehEquipeInterna`** — lista hardcoded de nomes. Quando equipe mudar, tem que editar o `.gs`. Migrar pra planilha.
+
+5. **`MapearClientes()` é lento** — varre todos os boards. Em 90 boards, pode demorar minutos e estourar timeout do Apps Script (6 min). Se crescer, migrar pra Trello webhooks.
+
+6. **Sem tracking de versão da Dani** — quando mudar o prompt da Claude, não há histórico. Sugestão: gravar versão do prompt em `registrarPendencia`.
+
+7. **`LembretesPendencias` não tem rollback** — se enviar email e falhar ao registrar, o cliente recebe email mas nada fica na planilha. Baixa frequência, mas possível.
+
+---
+
+## A5. Arquivos relacionados neste repositório
+
+| Arquivo | Função |
+|---|---|
+| `apps-script/automacao-trevo.gs` | Código principal (1519 linhas) |
+| `apps-script/MANUAL_TURING.md` | Este manual |
+| `apps-script/INSTRUCOES_SETUP.md` | Passo-a-passo de setup inicial |
+
+---
+
+## A6. Próximas ondas (quando Thales terminar o documento de etiquetas/listas)
+
+1. Expandir `classificarComentario` com tipos detalhados (SOLICITAÇÃO_DOCUMENTO, SOLICITAÇÃO_RESPOSTA, ATUALIZAÇÃO_STATUS etc.)
+2. Adicionar `aplicarEtiquetaAutomatica` que recebe JSON da classificação e aplica/remove etiquetas
+3. Adicionar `enviarEmailClienteContextual` com template dinâmico por tipo
+4. Adicionar timer de follow-up: se cliente não responder em X horas, Dani comenta + envia email
+5. Integrar `possivel_duplicata_processo` (migration 20260423180000) no fluxo de criação do card
+
+— TURING, 23/04/2026
