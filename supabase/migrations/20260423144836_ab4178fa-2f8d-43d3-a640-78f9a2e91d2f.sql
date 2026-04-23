@@ -1,3 +1,17 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- ⚠️  DUPLICATA PARCIAL de 20260423100000_rpc_salvar_selecao_proposta.sql
+-- ────────────────────────────────────────────────────────────────────────────
+-- Gerada pelo Lovable no mesmo dia. CREATE OR REPLACE garante idempotência, mas
+-- a execução dupla é sujeira técnica. Esta migration difere da anterior APENAS
+-- em:
+--   (a) COMMENT ON FUNCTION (linha final)
+--   (b) CREATE INDEX IF NOT EXISTS idx_orcamentos_share_token (linha final)
+--
+-- Não deletar (quebraria `supabase db reset` em devs com estado parcial).
+-- Canônica = 20260423100000. Diffs vão pra cá.
+-- Identificado na auditoria 23/04 (commit e1d1593).
+-- ════════════════════════════════════════════════════════════════════════════
+
 CREATE OR REPLACE FUNCTION public.salvar_selecao_proposta(
   p_token TEXT,
   p_itens_selecionados JSONB
