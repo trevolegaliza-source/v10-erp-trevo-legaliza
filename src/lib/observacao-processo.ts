@@ -13,20 +13,23 @@
  * observações reais (sem prefixos/keywords automáticas).
  */
 
+// Patterns de metadata auto-gerada pelo sistema.
+// IMPORTANTE: keywords ambíguas (Urgência, Boas-vindas, Cortesia, Método Trevo,
+// Valor Manual, Mudança de UF) foram consolidadas numa única regex que exige
+// final de linha, valor percentual ou pipe — evitando filtrar observações
+// legítimas do operador que começam com essas palavras
+// (ex.: "Urgência extrema solicitada pelo cliente" NÃO deve ser filtrado).
 const AUTO_META_PATTERNS: RegExp[] = [
+  // Audit trail / timestamps — nunca aparecem em texto livre do operador
   /^extrato emitido em\b/i,
   /^cobran[çc]a enviada em\b/i,
   /^cobran[çc]a gerada em\b/i,
-  /^valor alterado manualmente\b/i,
   /^processo n[ºo°]\s*\d+\s+do m[êe]s\b/i,
-  /^valor manual\b/i,
-  /^boas[- ]?vindas\b/i,
-  /^cortesia\b/i,
-  /^mudan[çc]a de uf\b/i,
-  /^urg[êe]ncia\b/i,
-  /^m[ée]todo trevo\b/i,
-  /^is_manual\b/i,
+  /^valor alterado manualmente\b/i,
   /^base:\s*r\$/i,
+  /^is_manual\b/i,
+  // Flags ambíguas — só filtra se for standalone, flag com valor (%), ou dentro de pipe
+  /^(valor manual|boas[- ]?vindas|cortesia|mudan[çc]a de uf|urg[êe]ncia|m[ée]todo trevo)(\s*\d+\s*%?)?\s*(\||$)/i,
 ];
 
 const INLINE_META_TOKENS: RegExp[] = [
