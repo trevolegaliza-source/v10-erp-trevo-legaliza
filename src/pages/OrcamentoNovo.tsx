@@ -1214,10 +1214,29 @@ export default function OrcamentoNovo() {
                         )}
                       </div>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => window.open(pdf.url, '_blank')}>
+                        <Button variant="ghost" size="sm" onClick={async () => {
+                          const { data, error } = await supabase.storage
+                            .from('documentos')
+                            .createSignedUrl(pdf.storage_path, 3600);
+                          if (error || !data?.signedUrl) {
+                            toast.error('Erro ao abrir PDF');
+                            return;
+                          }
+                          window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+                        }}>
                           <ExternalLink className="h-3 w-3" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(pdf.url); toast.success('Link copiado!'); }}>
+                        <Button variant="ghost" size="sm" onClick={async () => {
+                          const { data, error } = await supabase.storage
+                            .from('documentos')
+                            .createSignedUrl(pdf.storage_path, 3600);
+                          if (error || !data?.signedUrl) {
+                            toast.error('Erro ao gerar link');
+                            return;
+                          }
+                          await navigator.clipboard.writeText(data.signedUrl);
+                          toast.success('Link copiado! (válido por 1h)');
+                        }}>
                           <Copy className="h-3 w-3" />
                         </Button>
                       </div>
