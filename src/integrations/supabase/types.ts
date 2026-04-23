@@ -1885,6 +1885,7 @@ export type Database = {
           updated_at: string | null
           valor: number | null
           valor_avulso: number | null
+          via_analise: Database["public"]["Enums"]["via_analise"]
         }
         Insert: {
           auditado_em?: string | null
@@ -1908,6 +1909,7 @@ export type Database = {
           updated_at?: string | null
           valor?: number | null
           valor_avulso?: number | null
+          via_analise?: Database["public"]["Enums"]["via_analise"]
         }
         Update: {
           auditado_em?: string | null
@@ -1931,6 +1933,7 @@ export type Database = {
           updated_at?: string | null
           valor?: number | null
           valor_avulso?: number | null
+          via_analise?: Database["public"]["Enums"]["via_analise"]
         }
         Relationships: [
           {
@@ -2253,34 +2256,40 @@ export type Database = {
       valores_adicionais: {
         Row: {
           anexo_url: string | null
+          categoria: string | null
           comprovante_url: string | null
           created_at: string | null
           descricao: string
           empresa_id: string | null
           id: string
           processo_id: string
+          reembolsavel: boolean
           updated_at: string | null
           valor: number
         }
         Insert: {
           anexo_url?: string | null
+          categoria?: string | null
           comprovante_url?: string | null
           created_at?: string | null
           descricao: string
           empresa_id?: string | null
           id?: string
           processo_id: string
+          reembolsavel?: boolean
           updated_at?: string | null
           valor?: number
         }
         Update: {
           anexo_url?: string | null
+          categoria?: string | null
           comprovante_url?: string | null
           created_at?: string | null
           descricao?: string
           empresa_id?: string | null
           id?: string
           processo_id?: string
+          reembolsavel?: boolean
           updated_at?: string | null
           valor?: number
         }
@@ -2484,6 +2493,7 @@ export type Database = {
         Args: { p_token: string }
         Returns: undefined
       }
+      pode_avancar_cobranca: { Args: { p_processo_id: string }; Returns: Json }
       promover_lancamento_ao_deferir: {
         Args: { p_processo_id: string }
         Returns: Json
@@ -2509,6 +2519,7 @@ export type Database = {
         | "baixa"
         | "avulso"
         | "orcamento"
+      via_analise: "matriz" | "regional" | "metodo_trevo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2647,6 +2658,7 @@ export const Constants = {
         "avulso",
         "orcamento",
       ],
+      via_analise: ["matriz", "regional", "metodo_trevo"],
     },
   },
 } as const
