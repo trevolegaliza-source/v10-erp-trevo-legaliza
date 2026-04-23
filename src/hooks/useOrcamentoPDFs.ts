@@ -76,12 +76,13 @@ export function useOrcamentoPDFs(orcamentoId: string | null | undefined) {
 
       if (uploadError) throw uploadError;
 
-      // 4. Get public URL
-      const { data: urlData } = supabase.storage
+      // 4. Generate signed URL (1h TTL) — bucket may not be public
+      const { data: signed, error: signedErr } = await supabase.storage
         .from('documentos')
-        .getPublicUrl(storagePath);
+        .createSignedUrl(storagePath, 3600);
+      if (signedErr) throw signedErr;
 
-      // 5. Save record
+      // 5. Save record (url = signed URL no momento da geração; storage_path é a fonte da verdade)
       const { error: insertError } = await supabase
         .from('orcamento_pdfs' as any)
         .insert({
@@ -89,14 +90,14 @@ export function useOrcamentoPDFs(orcamentoId: string | null | undefined) {
           modo,
           versao,
           status: 'ativo',
-          url: urlData.publicUrl,
+          url: signed.signedUrl,
           storage_path: storagePath,
           filename,
         });
 
       if (insertError) throw insertError;
 
-      return { url: urlData.publicUrl, versao };
+      return { url: signed.signedUrl, versao };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orcamento_pdfs', orcamentoId] });
