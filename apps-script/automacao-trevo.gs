@@ -1,7 +1,11 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
-// v6.0 - Fixes críticos + lembretes automáticos + métricas
+// v6.2 — 23/04/2026 — ZERO PERDA DE DADOS
+//   • Fix bug: objeto social sumindo quando chave tem variação
+//   • Fix bug: arquivos falhando mover silenciosamente
+//   • Cabeçalho agora mostra contagem de arquivos movidos
+//   • Campos adicionais capturam TUDO que não apareceu na descrição
 // =============================================
 
 function getProps() { return PropertiesService.getScriptProperties(); }
@@ -277,7 +281,14 @@ function aoEnviarFormulario(e) {
     const boardId = validacao.boardId;
     const nomeEmpresa = definirNomeEmpresa(r, tipoProcesso);
     const nomeCartao = definirNomeCartao(r, codCliente, tipoProcesso);
-    const linkPastaDrive = criarPastasDrive(r, codCliente, nomeEmpresa, emailSolicitante);
+    const pastaInfo = criarPastasDrive(r, codCliente, nomeEmpresa, emailSolicitante);
+    const linkPastaDrive = pastaInfo.url;
+    const avisoArquivos = pastaInfo.totalArquivos > 0
+      ? "📎 **" + pastaInfo.totalArquivos + " arquivo(s) anexado(s) na pasta**"
+      : "📎 **Nenhum arquivo anexado** (cliente pode não ter feito upload)";
+    const avisoFalhaArquivos = pastaInfo.falhas > 0
+      ? "\n⚠️ **ATENÇÃO: " + pastaInfo.falhas + " arquivo(s) com erro ao mover — verificar logs!**"
+      : "";
 
     const spec = buildSpecPorTipo(r, tipoProcesso);
     const isPrioridadeMaxima = slaTrevo.toLowerCase().includes("prioridade máxima");
@@ -289,7 +300,8 @@ function aoEnviarFormulario(e) {
     const cabecalhoComum =
       "🏢 **" + codCliente + " — " + contabilidade + "**\n" +
       destaquePrioridade + destaqueVia + "\n" +
-      "📂 **LINK DA PASTA:** " + linkPastaDrive + "\n\n" +
+      "📂 **LINK DA PASTA:** " + linkPastaDrive + "\n" +
+      avisoArquivos + avisoFalhaArquivos + "\n\n" +
       "📋 SOLICITANTE: " + solicitante + "\n" +
       "🏢 CONTABILIDADE: " + contabilidade + "\n" +
       "📧 E-MAIL: " + emailSolicitante + "\n" +
@@ -301,7 +313,7 @@ function aoEnviarFormulario(e) {
       "📝 FORM ID: " + new Date().toISOString() + "\n" +
       "───────────────────────────\n\n";
 
-    const descricaoFinal = cabecalhoComum + spec.descricao + montarCamposNaoMapeados(r);
+    const descricaoFinal = cabecalhoComum + spec.descricao + montarCamposNaoMapeados(r, spec.descricao);
     const dueDate = calcularDueDate(urgencia, isPrioridadeMaxima);
 
     const cardData = criarCardTrello(nomeCartao, descricaoFinal, listaDestino, dueDate);
@@ -347,19 +359,37 @@ function avisarFalhaCriacao(emailSolicitante, nomeSolicitante, nomeEmpresa) {
 }
 
 // =============================================
-// CAMPOS NÃO MAPEADOS
+// CAMPOS NÃO MAPEADOS — v6.2 (23/04/2026)
+// Agora NADA se perde: se um campo preenchido não apareceu na descrição
+// principal, ele entra como "CAMPO ADICIONAL" automaticamente.
+//
+// Antes: usava blacklist de chaves mapeadas → se a função do tipo não
+// renderizasse (if que não entrou, chave com variação no Google Forms),
+// o dado sumia. Ex.: Digochat Alteração com "Descrição do objeto social 2"
+// preenchido mas não aparecendo no card.
+//
+// Agora: olha o VALOR — se o texto já está na descrição, pula;
+// caso contrário, adiciona em "Campos adicionais". Sem blacklist.
 // =============================================
-function montarCamposNaoMapeados(r) {
+function montarCamposNaoMapeados(r, descricaoAtual) {
   let out = "\n\n═══════════════════════════\n📋 **CAMPOS ADICIONAIS DO FORMULÁRIO**\n═══════════════════════════\n\n";
   let teveAlgo = false;
-  const chavesMapeadas = coletarChavesMapeadas();
+  const descLower = String(descricaoAtual || "").toLowerCase();
+
   for (const chave in r) {
     if (CAMPOS_JA_USADOS.has(chave)) continue;
-    if (chavesMapeadas.has(chave.trim())) continue;
     const valor = (r[chave] || [""])[0];
     if (!valor || String(valor).trim() === "") continue;
     if (String(valor).includes("drive.google.com")) continue;
-    out += "**" + chave.trim() + ":**\n" + String(valor).trim() + "\n\n";
+
+    const valorLimpo = String(valor).trim();
+    // 🔑 Só pula se o VALOR já apareceu na descrição (amostra dos primeiros 60 chars).
+    // Evita duplicação quando a função do tipo renderizou o campo.
+    // Se amostra curta (<15), não confia no match — inclui pra garantir.
+    const amostra = valorLimpo.substring(0, 60).toLowerCase();
+    if (amostra.length >= 15 && descLower.includes(amostra)) continue;
+
+    out += "**" + chave.trim() + ":**\n" + valorLimpo + "\n\n";
     teveAlgo = true;
   }
   return teveAlgo ? out : "";
@@ -740,6 +770,8 @@ function montarDescricaoAvulso(r) {
 
 // =============================================
 // DRIVE — PASTAS + ANEXOS + COMPARTILHAR LEITOR
+// v6.2: retorna objeto com contagem de arquivos (pra cabeçalho mostrar)
+//       + alerta pro Thales se algum mover falhar.
 // =============================================
 function criarPastasDrive(r, codCliente, nomeEmpresa, emailSolicitante) {
   const raiz = DriveApp.getFolderById(PASTA_CLIENTES_ATIVOS_ID);
@@ -755,17 +787,43 @@ function criarPastasDrive(r, codCliente, nomeEmpresa, emailSolicitante) {
 
   const pastaEmpresa = buscarOuCriarPastaEmpresa(pastaProcessos, nomeEmpresa);
 
-  // Move arquivos
+  // Move arquivos com tracking — qualquer falha é escalada pro Thales
+  let totalTentativas = 0;
+  let totalSucesso = 0;
+  const falhas = [];
+
   for (const chave in r) {
     const valor = (r[chave] || [""])[0];
     if (!valor || !String(valor).includes("drive.google.com")) continue;
-    moverArquivosDoCampo(r, chave, pastaEmpresa);
+    const urls = String(valor).split(",");
+    urls.forEach(url => {
+      const id = extrairIdDrive(url.trim());
+      if (!id) return;
+      totalTentativas++;
+      try {
+        DriveApp.getFileById(id).moveTo(pastaEmpresa);
+        totalSucesso++;
+      } catch (e) {
+        falhas.push({ campo: chave, id: id, erro: e.message });
+        Logger.log("⚠️ Não moveu " + id + " (campo '" + chave + "'): " + e.message);
+      }
+    });
   }
 
-  // Compartilha como leitor com o solicitante (e com equipe se desejar)
+  if (falhas.length > 0) {
+    notificarErro("criarPastasDrive",
+      new Error(totalSucesso + "/" + totalTentativas + " arquivos movidos. Falhas:\n" +
+        falhas.map(f => "  • [" + f.campo + "] " + f.id + " → " + f.erro).join("\n")));
+  }
+
   compartilharComoLeitor(pastaEmpresa, emailSolicitante);
 
-  return pastaEmpresa.getUrl();
+  return {
+    url: pastaEmpresa.getUrl(),
+    totalArquivos: totalSucesso,
+    totalTentativas: totalTentativas,
+    falhas: falhas.length,
+  };
 }
 
 function compartilharComoLeitor(pasta, email) {
