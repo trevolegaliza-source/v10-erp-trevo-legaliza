@@ -1628,7 +1628,14 @@ function garantirWebhooksTodosBoards() {
     Logger.log("❌ Rode setupDaniProperties() primeiro");
     return;
   }
-  const callbackURL = url + (url.indexOf("?") === -1 ? "?" : "&") + "token=" + encodeURIComponent(token);
+  // Se for Edge Function do Supabase, NÃO adiciona token na URL pública
+  // (o proxy adiciona internamente). Apenas Apps Script direto recebe token na URL.
+  const isEdgeFunction = url.indexOf("supabase.co/functions/") !== -1;
+  const callbackURL = isEdgeFunction
+    ? url
+    : url + (url.indexOf("?") === -1 ? "?" : "&") + "token=" + encodeURIComponent(token);
+  Logger.log("🔗 Callback URL pros webhooks: " + callbackURL);
+  Logger.log("    (modo " + (isEdgeFunction ? "Edge Function proxy" : "Apps Script direto") + ")");
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const aba = ss.getSheetByName("CLIENTES");
