@@ -1,11 +1,14 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
-// v6.2 — 23/04/2026 — ZERO PERDA DE DADOS
-//   • Fix bug: objeto social sumindo quando chave tem variação
-//   • Fix bug: arquivos falhando mover silenciosamente
-//   • Cabeçalho agora mostra contagem de arquivos movidos
-//   • Campos adicionais capturam TUDO que não apareceu na descrição
+// v6.3 — 24/04/2026 — ZERO PERDA + ZERO DUPLICAÇÃO
+//   • v6.2: fix objeto social sumindo + contador de arquivos
+//   • v6.3: tracking de chaves consumidas (Set global) → sem duplicação
+//           de "Não/SIM/MENSAL" nos campos adicionais
+//   • v6.3: fallback com/sem " 2" (Google Forms mantém título original
+//           mas planilha renomeia com " 2" quando duplica pergunta)
+//   • v6.3: campos críticos como "Troca de UF" e "Residência sócio"
+//           agora com fallback "Não informado" se chegarem vazios
 // =============================================
 
 function getProps() { return PropertiesService.getScriptProperties(); }
@@ -100,14 +103,23 @@ function trelloPut(path, payload) {
 
 // =============================================
 // HELPER UNIVERSAL — busca valor por nome com fallback tolerante
+// v6.3 (24/04/2026): registra chave efetivamente usada em __chavesUsadasDescricao
+// pra montarCamposNaoMapeados pular sem precisar checar o valor.
+// Resolve duplicação de valores curtos ("Não"/"SIM") nos campos adicionais.
 // =============================================
+var __chavesUsadasDescricao = null;  // inicializado em aoEnviarFormulario
+
 function campo(respostas, nomes) {
-  // 1) Match exato primeiro (rápido, 95% dos casos)
+  // 1) Match exato primeiro
   for (let i = 0; i < nomes.length; i++) {
-    const val = respostas[nomes[i]];
-    if (val && val[0] && String(val[0]).trim() !== "") return String(val[0]).trim();
+    const chaveTentativa = nomes[i];
+    const val = respostas[chaveTentativa];
+    if (val && val[0] && String(val[0]).trim() !== "") {
+      if (__chavesUsadasDescricao) __chavesUsadasDescricao.add(chaveTentativa);
+      return String(val[0]).trim();
+    }
   }
-  // 2) Fallback tolerante: lowercase + remove emojis/pontuação + normaliza espaços
+  // 2) Fallback tolerante: normaliza nome antes de comparar
   const norm = (s) => String(s || '')
     .toLowerCase()
     .replace(/\s+/g, ' ')
@@ -117,7 +129,10 @@ function campo(respostas, nomes) {
   for (const chave in respostas) {
     if (alvos.indexOf(norm(chave)) !== -1) {
       const val = respostas[chave];
-      if (val && val[0] && String(val[0]).trim() !== "") return String(val[0]).trim();
+      if (val && val[0] && String(val[0]).trim() !== "") {
+        if (__chavesUsadasDescricao) __chavesUsadasDescricao.add(chave);
+        return String(val[0]).trim();
+      }
     }
   }
   return "";
@@ -249,6 +264,8 @@ function aoEnviarFormulario(e) {
 
   try {
     const r = e.namedValues;
+    // v6.3: reseta o tracking de chaves consumidas pra esta execução
+    __chavesUsadasDescricao = new Set();
     const codCliente = campo(r, ["  Código do cliente", "Código do cliente"]);
     const emailSolicitante = campo(r, ["Endereço de e-mail"]);
     const solicitante = campo(r, ["Nome do solicitante"]);
@@ -378,14 +395,18 @@ function montarCamposNaoMapeados(r, descricaoAtual) {
 
   for (const chave in r) {
     if (CAMPOS_JA_USADOS.has(chave)) continue;
+    // 🔑 v6.3: pula chaves que já foram consumidas por alguma chamada campo(...)
+    // durante a montagem da descrição do tipo (Abertura/Alteração/etc).
+    if (__chavesUsadasDescricao && __chavesUsadasDescricao.has(chave)) continue;
+
     const valor = (r[chave] || [""])[0];
     if (!valor || String(valor).trim() === "") continue;
     if (String(valor).includes("drive.google.com")) continue;
 
     const valorLimpo = String(valor).trim();
-    // 🔑 Só pula se o VALOR já apareceu na descrição (amostra dos primeiros 60 chars).
-    // Evita duplicação quando a função do tipo renderizou o campo.
-    // Se amostra curta (<15), não confia no match — inclui pra garantir.
+    // Check secundário por valor (amostra 60 chars) — redundância de segurança
+    // pra pegar casos onde o mapeamento da chave falhou mas o valor foi pra descrição
+    // por outra via.
     const amostra = valorLimpo.substring(0, 60).toLowerCase();
     if (amostra.length >= 15 && descLower.includes(amostra)) continue;
 
@@ -677,17 +698,23 @@ function montarDescricaoAlteracao(r, trocaUF) {
   d += "ALTERA CNAE? " + alteraCnae + "\n\n";
   if (alteraCnae.toLowerCase().includes("sim")) {
     d += "CNAE(s): " + campo(r, ["CNAE(s) principal e secundário(s)  ","CNAE(s) principal e secundário(s)"]) + "\n\n";
-    d += "**OBJETO SOCIAL:**\n" + campo(r, ["Descrição do objeto social 2"]) + "\n\n";
+    // v6.3: Google Forms namedValues mantém o título original da pergunta,
+    // mas a planilha renomeia com " 2" quando há duplicata. Então tentamos
+    // COM e SEM o "2" — funciona em ambos os casos.
+    d += "**OBJETO SOCIAL:**\n" + campo(r, ["Descrição do objeto social 2", "Descrição do objeto social"]) + "\n\n";
     d += "ATIVIDADE SERÁ: " + campo(r, ["Com a alteração, precisamos saber se a atividade será:"]) + "\n\n";
   }
   const mudando = campo(r, ["Está se mudando?"]);
   d += "───────────────────────────\n\nESTÁ SE MUDANDO? " + mudando + "\n\n";
   if (mudando.toUpperCase() === "SIM") {
-    d += "TROCA DE UF? " + trocaUF + "\n\n";
-    d += "NOVO END: " + campo(r, ["Endereço completo com CEP:"]) + "\n\n";
+    // v6.3: trocaUF pode vir vazio se Google Forms mudou a chave.
+    // Tenta re-buscar com fallbacks antes de exibir.
+    const trocaUFEfetiva = trocaUF || campo(r, ["Será troca de UF?  ", "Será troca de UF?", "Troca de UF?", "Mudança de UF?"]) || "Não informado";
+    d += "TROCA DE UF? " + trocaUFEfetiva + "\n\n";
+    d += "NOVO END: " + campo(r, ["Endereço completo com CEP:","Endereço completo com CEP"]) + "\n\n";
     d += "ESTABELECIDA NOVO END? " + campo(r, ["A atividade nesse novo endereço será estabelecida?"]) + "\n\n";
-    d += "RESIDÊNCIA SÓCIO? " + campo(r, ["É local de residência do sócio?"]) + "\n\n";
-    d += "IPTU: " + campo(r, ["Mátricula do imóvel IPTU:"]) + "\n\n";
+    d += "RESIDÊNCIA SÓCIO? " + (campo(r, ["É local de residência do sócio?", "É local de residência do sócio? ", "E local de residencia do socio?"]) || "Não informado") + "\n\n";
+    d += "IPTU: " + campo(r, ["Mátricula do imóvel IPTU:", "Matricula do imovel IPTU:", "Matrícula do imóvel IPTU:"]) + "\n\n";
   }
   const mudaQSA = campo(r, ["Mudança no QSA"]);
   d += "───────────────────────────\n\nMUDANÇA NO QSA? " + mudaQSA + "\n\n";
@@ -733,10 +760,11 @@ function montarDescricaoTransformacao(r) {
   const alteraEnd = campo(r, ["Haverá alteração de endereço da empresa após a transformação? ","Haverá alteração de endereço da empresa após a transformação?"]);
   d += "ALTERA END? " + alteraEnd + "\n\n";
   if (alteraEnd.toLowerCase().includes("sim")) {
-    d += "TROCA UF? " + campo(r, ["Será troca de UF? 2"]) + "\n\n";
+    // v6.3: fallback com e sem " 2" (Google Forms vs planilha)
+    d += "TROCA UF? " + (campo(r, ["Será troca de UF? 2", "Será troca de UF?"]) || "Não informado") + "\n\n";
     d += "NOVO END: " + campo(r, ["Novo endereço completo com CEP:"]) + "\n\n";
   }
-  d += "RESIDÊNCIA SÓCIO? " + campo(r, ["É local de residência do sócio? 2"]) + "\n\n";
+  d += "RESIDÊNCIA SÓCIO? " + (campo(r, ["É local de residência do sócio? 2", "É local de residência do sócio?"]) || "Não informado") + "\n\n";
   d += "ESTABELECIDA? " + campo(r, ["A atividade nesse endereço será estabelecida?"]) + "\n\n";
   d += "ATUAÇÃO: " + campo(r, ["Qual a forma de atuação da empresa?"]) + "\n\n";
   const algoMais = campo(r, ["😊 Algo a mais que queira informar?"]);
