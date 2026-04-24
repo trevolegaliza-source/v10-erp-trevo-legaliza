@@ -2499,6 +2499,10 @@ export type Database = {
         Returns: Json
       }
       resolve_empresa_config: { Args: { p_empresa_id: string }; Returns: Json }
+      reverter_boas_vindas: {
+        Args: { p_cliente_id: string }
+        Returns: undefined
+      }
       rotacionar_cobranca_token: {
         Args: { p_cobranca_id: string }
         Returns: string
@@ -2506,6 +2510,10 @@ export type Database = {
       salvar_selecao_proposta: {
         Args: { p_itens_selecionados: Json; p_token: string }
         Returns: boolean
+      }
+      tentar_aplicar_boas_vindas: {
+        Args: { p_cliente_id: string }
+        Returns: Json
       }
       verificar_senha_proposta: {
         Args: { p_senha: string; p_token: string }
