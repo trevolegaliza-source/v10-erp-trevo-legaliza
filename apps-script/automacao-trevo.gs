@@ -1,6 +1,13 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.1 — 24/04/2026 — DANI ONDA 0 + AUTOMAÇÃO DE GROWTH
+//   • v7.1: aba EQUIPE — fonte da verdade pros funcionários internos
+//           (adicionar/remover via planilha, sem editar código)
+//   • v7.1: MapearEquipeInterna() popula aba inicial
+//   • v7.1: setupTriggersDani() — trigger diário 8h que sincroniza
+//           boards novos + cria webhooks automaticamente
+//   • v7.1: sincronizarBoardsETrevoDani() — handler do trigger
 // v7.0 — 24/04/2026 — DANI ARQUITETURA v1.0 — ONDA 0 (INFRAESTRUTURA)
 //   • v6.3: zero duplicação + fallback Google Forms naming (mantido)
 //   • v7.0: doPost expandido pra aceitar webhook nativo Trello
@@ -36,6 +43,9 @@ const LOGO_DANI_URL = "https://cobranca.trevolegaliza.com/logo-dani.png";
 // Etiquetas que disparam lembrete automático
 const ETIQUETAS_LEMBRETE = ["DOCUMENTO PENDENTE", "RESPOSTA DE COMENTÁRIO PENDENTE"];
 
+// Lista DEFAULT de equipe interna. Usada como fallback se aba EQUIPE não existir.
+// Pra adicionar/remover funcionário sem mexer no código, edite a aba EQUIPE
+// (rode MapearEquipeInterna() pra criar a aba populada).
 const EQUIPE_INTERNA = [
   "trevo legaliza", "trevolegaliza", "abner maliq",
   "amanda cristovao", "arthur-trevo", "arthur trevo", "leticia tonelli"
@@ -1718,6 +1728,57 @@ function listarWebhooks() {
 }
 
 /**
+ * Cria/atualiza triggers agendados da Dani.
+ * Idempotente: remove triggers existentes desses handlers antes de criar.
+ *
+ * Triggers criados:
+ *   • sincronizarBoardsETrevoDani — diário 8h
+ *     Roda MapearClientes() + garantirWebhooksTodosBoards() pra capturar
+ *     boards novos automaticamente (sem intervenção manual).
+ *   • LembretesPendencias — diário 9h (já existia, mantém)
+ *   • VarrerEmails — a cada 15min (já existia, mantém)
+ *
+ * Roda 1 vez no editor após colar v7.0.x. Idempotente.
+ */
+function setupTriggersDani() {
+  // Remove triggers existentes pros handlers nossos (evita duplicar)
+  const handlers = ["sincronizarBoardsETrevoDani"];
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (handlers.indexOf(t.getHandlerFunction()) !== -1) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  // Cria trigger diário 8h
+  ScriptApp.newTrigger("sincronizarBoardsETrevoDani")
+    .timeBased()
+    .everyDays(1)
+    .atHour(8)
+    .create();
+
+  Logger.log("✅ Trigger sincronizarBoardsETrevoDani criado (diário 8h).");
+  Logger.log("ℹ️ Triggers existentes (LembretesPendencias 9h, VarrerEmails 15min) mantidos.");
+}
+
+/**
+ * Handler do trigger diário. Mapeia boards novos + cria webhooks pra eles.
+ * Tolerante a falhas: se uma etapa falhar, a outra ainda roda.
+ */
+function sincronizarBoardsETrevoDani() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(300000)) { Logger.log("⚠️ sincronizarBoardsETrevoDani: lock ocupado"); return; }
+  try {
+    Logger.log("🔄 Sincronização diária Dani iniciada");
+    try { MapearClientes(); } catch (e) { notificarErro("MapearClientes (diário)", e); }
+    try { garantirWebhooksTodosBoards(); } catch (e) { notificarErro("garantirWebhooks (diário)", e); }
+    Logger.log("✅ Sincronização diária Dani concluída");
+    incMetrica("sync_diario");
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
  * Remove TODOS os webhooks ativos. Use apenas em rollback / migração.
  */
 function removerTodosWebhooks() {
@@ -1845,7 +1906,74 @@ function parsearEmailTrello(corpo) {
 }
 
 function extrairCardIdDaUrl(cardUrl) { const m = cardUrl.match(/trello\.com\/c\/([a-zA-Z0-9]+)/); return m ? m[1] : null; }
-function ehEquipeInterna(nome) { const n = (nome || "").toLowerCase().trim(); return EQUIPE_INTERNA.some(i => n.includes(i)); }
+/**
+ * Detecta se um nome é de funcionário interno da Trevo.
+ * Lê da aba EQUIPE (se existir, fonte da verdade) ou usa EQUIPE_INTERNA constante.
+ * Cache por execução pra não reler a aba toda vez.
+ */
+var __equipeInternaCache = null;
+function getEquipeInterna() {
+  if (__equipeInternaCache !== null) return __equipeInternaCache;
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const aba = ss.getSheetByName("EQUIPE");
+    if (aba) {
+      const dados = aba.getDataRange().getValues();
+      const headers = dados[0].map(h => String(h).trim().toUpperCase());
+      const idxNome = headers.indexOf("NOME");
+      const idxAtivo = headers.indexOf("ATIVO");
+      const lista = [];
+      for (let i = 1; i < dados.length; i++) {
+        const nome = String(dados[i][idxNome] || "").toLowerCase().trim();
+        const ativo = idxAtivo >= 0 ? String(dados[i][idxAtivo] || "true").toLowerCase().trim() : "true";
+        if (nome && (ativo === "true" || ativo === "sim" || ativo === "1" || ativo === "")) {
+          lista.push(nome);
+        }
+      }
+      if (lista.length > 0) {
+        __equipeInternaCache = lista;
+        return lista;
+      }
+    }
+  } catch (e) { Logger.log("⚠️ getEquipeInterna fallback pra constante: " + e.message); }
+  __equipeInternaCache = EQUIPE_INTERNA.slice();
+  return __equipeInternaCache;
+}
+
+function ehEquipeInterna(nome) {
+  const n = (nome || "").toLowerCase().trim();
+  return getEquipeInterna().some(i => n.includes(i));
+}
+
+/**
+ * Cria a aba EQUIPE populada com os funcionários atuais (constante EQUIPE_INTERNA)
+ * + colunas extras pra Thales preencher. Idempotente: se aba existir, não sobrescreve.
+ */
+function MapearEquipeInterna() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let aba = ss.getSheetByName("EQUIPE");
+  if (aba) {
+    Logger.log("ℹ️ Aba EQUIPE já existe — não sobrescrevo. Edite manualmente.");
+    return;
+  }
+  aba = ss.insertSheet("EQUIPE");
+  aba.getRange(1, 1, 1, 4).setValues([["NOME", "USUARIO_TRELLO", "EMAIL", "ATIVO"]]);
+  aba.getRange(1, 1, 1, 4).setFontWeight("bold");
+  aba.setFrozenRows(1);
+
+  const linhas = [
+    ["Trevo Legaliza",  "@trevolegaliza",         "trevolegaliza@gmail.com",                   "true"],
+    ["Letícia Tonelli", "@leticiatonelli3",       "leticia.tonelli@trevolegaliza.com.br",      "true"],
+    ["Arthur Shiguemi", "@arthurlegalizacao",     "",                                          "true"],
+    ["Abner Maliq",     "@abnermaliqdossantosjimoh", "",                                       "true"],
+    ["Amanda Cristovão","@amandacristovao1",      "",                                          "true"],
+    ["Carolina Guirado","@carolinaguirado7",      "",                                          "true"],
+  ];
+  aba.getRange(2, 1, linhas.length, 4).setValues(linhas);
+  aba.autoResizeColumns(1, 4);
+  __equipeInternaCache = null;
+  Logger.log("✅ Aba EQUIPE criada com " + linhas.length + " funcionários. Edite a coluna ATIVO=false pra desativar alguém.");
+}
 
 function chamarClaude(p) {
   const payload = { model: CLAUDE_MODEL, max_tokens: 500, messages: [{ role: "user", content: p }] };
