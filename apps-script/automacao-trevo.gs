@@ -1,14 +1,18 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
-// v6.3 — 24/04/2026 — ZERO PERDA + ZERO DUPLICAÇÃO
-//   • v6.2: fix objeto social sumindo + contador de arquivos
-//   • v6.3: tracking de chaves consumidas (Set global) → sem duplicação
-//           de "Não/SIM/MENSAL" nos campos adicionais
-//   • v6.3: fallback com/sem " 2" (Google Forms mantém título original
-//           mas planilha renomeia com " 2" quando duplica pergunta)
-//   • v6.3: campos críticos como "Troca de UF" e "Residência sócio"
-//           agora com fallback "Não informado" se chegarem vazios
+// v7.0 — 24/04/2026 — DANI ARQUITETURA v1.0 — ONDA 0 (INFRAESTRUTURA)
+//   • v6.3: zero duplicação + fallback Google Forms naming (mantido)
+//   • v7.0: doPost expandido pra aceitar webhook nativo Trello
+//           (commentCard, addLabelToCard, removeLabelToCard, updateCard,
+//            addAttachmentToCard) — em tempo real, sem polling
+//   • v7.0: doGet 200 OK pra HEAD/GET do Trello (verificação de URL)
+//   • v7.0: token de auth obrigatório em todos os webhooks
+//   • v7.0: skip hard de board "🍀 CENTRAL DE PROCESSO" (Placker)
+//   • v7.0: setupDaniProperties() — wizard de config inicial
+//   • v7.0: garantirWebhooksTodosBoards() — cria webhooks em massa
+//   • v7.0: listarWebhooks() / removerTodosWebhooks() — debug/rollback
+//   • Onda 0: handlers stub (logam apenas). Onda 1+ implementa ações.
 // =============================================
 
 function getProps() { return PropertiesService.getScriptProperties(); }
@@ -1072,44 +1076,181 @@ function LembretesPendencias() {
   }
 }
 
-/**
- * Web App entrypoint. Edge function Supabase chama aqui ao receber
- * evento addLabelToCard do Trello pra disparo IMEDIATO.
- */
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 DANI v1.0 — INFRAESTRUTURA WEBHOOK (Onda 0 — 24/04/2026)
+// ────────────────────────────────────────────────────────────────────────────
+// Aceita 2 tipos de payload:
+//   (a) PAYLOAD INTERNO — { card_id, label_name } (legado, ERP/Edge Function
+//       chamava pra forçar lembrete imediato).
+//   (b) WEBHOOK NATIVO TRELLO — { action: { type, data, memberCreator } }
+//       Disparado em tempo real pelo Trello quando algo acontece num board
+//       monitorado.
+//
+// SEGURANÇA:
+//   Toda chamada precisa de ?token=XXX na query string OU campo "token" no
+//   body. Token armazenado em property WEBHOOK_TOKEN. Sem token = 401.
+//
+// ROTEAMENTO POR TIPO DE EVENTO:
+//   commentCard         → handlerComentario(action) — funcionário ou cliente comenta
+//   addLabelToCard      → handlerEtiquetaAdd(action)
+//   removeLabelToCard   → handlerEtiquetaRemove(action)
+//   updateCard:idList   → handlerCardMovido(action)
+//   addAttachmentToCard → handlerAnexo(action)
+//
+// Onda 0: handlers fazem só LOG + dispatch. Onda 1+ implementa as ações.
+// ════════════════════════════════════════════════════════════════════════════
+
+function doGet(e) {
+  // Trello faz HEAD inicial pra verificar URL ao criar webhook.
+  // Apps Script Web App responde HEAD via doGet. Retornar 200 OK basta.
+  return ContentService.createTextOutput("Dani webhook online")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
 function doPost(e) {
   try {
+    // ── 1. Auth: token obrigatório (param OU body) ───────────────────────
+    const tokenEsperado = getProps().getProperty("WEBHOOK_TOKEN");
+    if (tokenEsperado) {
+      const tokenRecebido =
+        (e.parameter && e.parameter.token) ||
+        (e.postData && e.postData.contents && (() => {
+          try { return JSON.parse(e.postData.contents).token; } catch (_) { return null; }
+        })());
+      if (tokenRecebido !== tokenEsperado) {
+        Logger.log("⚠️ doPost auth fail — token recebido: " + (tokenRecebido ? "[set]" : "[vazio]"));
+        return _respJson({ ok: false, error: "auth_fail" }, 401);
+      }
+    }
+
+    // ── 2. Parse do body ─────────────────────────────────────────────────
     const payload = JSON.parse(e.postData.contents || "{}");
-    const cardId = payload.card_id;
-    const labelName = payload.label_name;
-    if (!cardId) return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "card_id obrigatório" })).setMimeType(ContentService.MimeType.JSON);
 
-    // Busca dados do card
-    const r = trelloGet("/1/cards/" + cardId, { fields: "name,idBoard,shortUrl,desc,labels", labels: "true" });
-    if (r.getResponseCode() !== 200) {
-      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "card não encontrado" })).setMimeType(ContentService.MimeType.JSON);
-    }
-    const card = JSON.parse(r.getContentText());
+    // ── 3. Roteamento (a) payload interno legado ─────────────────────────
+    if (payload.card_id) return _doPostLegadoLembrete(payload);
 
-    // Filtrar só etiquetas que disparam lembrete
-    const labelsLembrete = (card.labels || []).filter(l => ETIQUETAS_LEMBRETE.indexOf((l.name || "").trim()) !== -1);
-    if (labelsLembrete.length === 0) {
-      return ContentService.createTextOutput(JSON.stringify({ ok: true, skipped: "sem etiqueta de lembrete" })).setMimeType(ContentService.MimeType.JSON);
-    }
-    card.labels = labelsLembrete;
-
-    // Descobrir código do cliente pelo board
-    const { codigo, emailsLembretes, emailBloqueado } = resolverClientePorBoard(card.idBoard);
-    if (!codigo) {
-      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "cliente não mapeado pra board " + card.idBoard })).setMimeType(ContentService.MimeType.JSON);
+    // ── 4. Roteamento (b) webhook nativo Trello ──────────────────────────
+    if (payload.action && payload.action.type) {
+      return _doPostWebhookTrello(payload.action);
     }
 
-    const enviou = processarLembreteCard(card, codigo, emailsLembretes, emailBloqueado, /* forcarPrimeiro */ true);
-    incMetrica("lembretes_imediatos");
-    return ContentService.createTextOutput(JSON.stringify({ ok: true, enviou: enviou })).setMimeType(ContentService.MimeType.JSON);
+    return _respJson({ ok: false, error: "payload_desconhecido" }, 400);
   } catch (err) {
     notificarErro("doPost", err);
-    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+    return _respJson({ ok: false, error: String(err) }, 500);
   }
+}
+
+// Helper de resposta JSON
+function _respJson(obj, status) {
+  // Apps Script não permite setar status code customizado em ContentService.
+  // O status é informativo no body (clientes podem ler). Status HTTP sempre 200.
+  obj.__status = status || 200;
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// ─── Payload interno legado (mantém compat com Edge Function existente) ────
+function _doPostLegadoLembrete(payload) {
+  const cardId = payload.card_id;
+  if (!cardId) return _respJson({ ok: false, error: "card_id obrigatório" }, 400);
+
+  const r = trelloGet("/1/cards/" + cardId, { fields: "name,idBoard,shortUrl,desc,labels", labels: "true" });
+  if (r.getResponseCode() !== 200) {
+    return _respJson({ ok: false, error: "card não encontrado" }, 404);
+  }
+  const card = JSON.parse(r.getContentText());
+  const labelsLembrete = (card.labels || []).filter(l => ETIQUETAS_LEMBRETE.indexOf((l.name || "").trim()) !== -1);
+  if (labelsLembrete.length === 0) {
+    return _respJson({ ok: true, skipped: "sem etiqueta de lembrete" });
+  }
+  card.labels = labelsLembrete;
+
+  const { codigo, emailsLembretes, emailBloqueado } = resolverClientePorBoard(card.idBoard);
+  if (!codigo) {
+    return _respJson({ ok: false, error: "cliente não mapeado pra board " + card.idBoard }, 404);
+  }
+
+  const enviou = processarLembreteCard(card, codigo, emailsLembretes, emailBloqueado, /* forcarPrimeiro */ true);
+  incMetrica("lembretes_imediatos");
+  return _respJson({ ok: true, enviou: enviou });
+}
+
+// ─── Roteador de webhook nativo Trello ─────────────────────────────────────
+function _doPostWebhookTrello(action) {
+  const tipo = action.type;
+  const idBoard = (action.data && action.data.board && action.data.board.id) || "";
+  const idCard  = (action.data && action.data.card  && action.data.card.id)  || "";
+  const autor   = (action.memberCreator && action.memberCreator.fullName) || "?";
+
+  // 🛡️ Hard skip: nunca agir no board CENTRAL DE PROCESSO (espelhamento Placker)
+  if (idBoard) {
+    const bn = (action.data.board.name || "").toUpperCase();
+    if (bn.indexOf("CENTRAL DE PROCESSO") !== -1 || bn.indexOf("CENTRAL DE PORCESSO") !== -1) {
+      return _respJson({ ok: true, skipped: "board excluído (CENTRAL DE PROCESSO)" });
+    }
+  }
+
+  // Cliente do board precisa estar mapeado em CLIENTES — caso contrário ignora.
+  // (Boards internos da Trevo não têm código de cliente e devem ser ignorados.)
+  const cli = resolverClientePorBoard(idBoard);
+  if (!cli || !cli.codigo) {
+    return _respJson({ ok: true, skipped: "board não mapeado em CLIENTES: " + idBoard });
+  }
+
+  Logger.log("📥 Webhook recebido: " + tipo + " | board=" + idBoard + " | card=" + idCard + " | autor=" + autor);
+  incMetrica("webhook_" + tipo);
+
+  // Dispatch — Onda 1+ implementa cada handler. Por enquanto só loga.
+  switch (tipo) {
+    case "commentCard":         return handlerComentario(action, cli);
+    case "addLabelToCard":      return handlerEtiquetaAdd(action, cli);
+    case "removeLabelToCard":   return handlerEtiquetaRemove(action, cli);
+    case "updateCard":          return handlerCardAtualizado(action, cli);
+    case "addAttachmentToCard": return handlerAnexo(action, cli);
+    default:
+      return _respJson({ ok: true, ignored: tipo });
+  }
+}
+
+// ─── Handlers (stubs de Onda 0 — logam e retornam) ─────────────────────────
+// Onda 1 implementa as ações de cada um.
+function handlerComentario(action, cli) {
+  const texto = (action.data && action.data.text) || "";
+  const autor = (action.memberCreator && action.memberCreator.fullName) || "?";
+  const tipoAutor = ehEquipeInterna(autor) ? "trevo" : "cliente";
+  Logger.log("  💬 comentário " + tipoAutor + " (" + autor + "): " + texto.substring(0, 100));
+  return _respJson({ ok: true, handler: "comentario", autor: tipoAutor, _todo: "Onda 1" });
+}
+
+function handlerEtiquetaAdd(action, cli) {
+  const label = (action.data && action.data.label && action.data.label.name) || "";
+  Logger.log("  🏷️  etiqueta adicionada: " + label);
+  return _respJson({ ok: true, handler: "etiqueta_add", label: label, _todo: "Onda 1+" });
+}
+
+function handlerEtiquetaRemove(action, cli) {
+  const label = (action.data && action.data.label && action.data.label.name) || "";
+  Logger.log("  🚫 etiqueta removida: " + label);
+  return _respJson({ ok: true, handler: "etiqueta_remove", label: label, _todo: "Onda 1+" });
+}
+
+function handlerCardAtualizado(action, cli) {
+  // Trello envia updateCard pra muita coisa (idList, name, desc, due, closed...)
+  // Nos importamos só com mudança de lista.
+  const before = action.data.listBefore;
+  const after  = action.data.listAfter;
+  if (before && after) {
+    Logger.log("  ↔️  card movido: '" + before.name + "' → '" + after.name + "'");
+    return _respJson({ ok: true, handler: "card_movido", from: before.name, to: after.name, _todo: "Onda 3" });
+  }
+  return _respJson({ ok: true, ignored: "updateCard sem mudança de lista" });
+}
+
+function handlerAnexo(action, cli) {
+  const attachment = action.data && action.data.attachment;
+  Logger.log("  📎 anexo adicionado: " + (attachment ? attachment.name : "?"));
+  return _respJson({ ok: true, handler: "anexo", _todo: "Onda 1" });
 }
 
 function resolverClientePorBoard(boardId) {
@@ -1415,6 +1556,176 @@ function enviarEmailConfirmacaoCliente(emailCliente, nomeSolicitante, nomeEmpres
       name: "Dani 🍀 Trevo Legaliza",
     });
   } catch (e) { Logger.log("⚠️ Falha email confirmação: " + e.message); }
+}
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║   🤖 DANI — WEBHOOK TRELLO (Onda 0)                                      ║
+// ║   Gestão de webhooks + setup de Properties                               ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
+/**
+ * Setup das Properties da Dani.
+ * Roda 1x antes de criar webhooks. Pede ao usuário:
+ *   • WEBAPP_URL  — URL do deploy do Apps Script (Web App)
+ *   • WEBHOOK_TOKEN — gera token aleatório se vazio (32 chars)
+ *   • INDEFERIDO_NOTIFY_EMAILS — destinatários do alerta interno
+ *
+ * Idempotente: se já configurado, mostra valor atual e permite manter.
+ */
+function setupDaniProperties() {
+  const ui = SpreadsheetApp.getUi();
+  const props = getProps();
+
+  // WEBAPP_URL
+  const urlAtual = props.getProperty("WEBAPP_URL") || "";
+  const respUrl = ui.prompt(
+    "🤖 Dani — Setup 1/3: WEBAPP_URL",
+    "URL do deploy do Apps Script como Web App (ex.: https://script.google.com/macros/s/.../exec)\n\nAtual: " + (urlAtual || "(vazio)") + "\n\nDeixe em branco pra manter o atual.",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (respUrl.getSelectedButton() !== ui.Button.OK) return;
+  const url = respUrl.getResponseText().trim();
+  if (url) props.setProperty("WEBAPP_URL", url);
+
+  // WEBHOOK_TOKEN — gera aleatório se vazio
+  let token = props.getProperty("WEBHOOK_TOKEN") || "";
+  if (!token) {
+    token = Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, "").substring(0, 16);
+    props.setProperty("WEBHOOK_TOKEN", token);
+    ui.alert("🔑 WEBHOOK_TOKEN gerado automaticamente:\n\n" + token + "\n\n(salve em local seguro — usado pra autenticar callbacks)");
+  } else {
+    ui.alert("🔑 WEBHOOK_TOKEN já configurado.\nSe precisar recriar, apague a property manualmente em Project Settings > Script Properties.");
+  }
+
+  // INDEFERIDO_NOTIFY_EMAILS
+  const defaultEmails = "trevolegaliza@gmail.com,leticia.tonelli@trevolegaliza.com.br";
+  const emailsAtuais = props.getProperty("INDEFERIDO_NOTIFY_EMAILS") || defaultEmails;
+  const respEmails = ui.prompt(
+    "🤖 Dani — Setup 3/3: Emails de alerta interno (INDEFERIMENTO)",
+    "Lista separada por vírgulas. Recebe alerta SEMPRE que Dani detectar email de indeferimento de órgão.\n\nAtual: " + emailsAtuais + "\n\nDeixe em branco pra manter.",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (respEmails.getSelectedButton() !== ui.Button.OK) return;
+  const emails = respEmails.getResponseText().trim();
+  if (emails) props.setProperty("INDEFERIDO_NOTIFY_EMAILS", emails);
+  else if (!props.getProperty("INDEFERIDO_NOTIFY_EMAILS")) props.setProperty("INDEFERIDO_NOTIFY_EMAILS", defaultEmails);
+
+  ui.alert("✅ Setup Dani concluído.\n\nPróximo passo: rode garantirWebhooksTodosBoards()");
+}
+
+/**
+ * Cria webhook do Trello em TODOS os boards mapeados em CLIENTES.
+ * Idempotente: pula boards que já têm webhook ativo apontando pro WEBAPP_URL.
+ *
+ * Trello faz HEAD inicial pra verificar URL. Apps Script Web App responde
+ * 200 OK em GET (doGet), e Trello aceita isso como verificação.
+ */
+function garantirWebhooksTodosBoards() {
+  const props = getProps();
+  const url = props.getProperty("WEBAPP_URL");
+  const token = props.getProperty("WEBHOOK_TOKEN");
+  if (!url || !token) {
+    Logger.log("❌ Rode setupDaniProperties() primeiro");
+    return;
+  }
+  const callbackURL = url + (url.indexOf("?") === -1 ? "?" : "&") + "token=" + encodeURIComponent(token);
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const aba = ss.getSheetByName("CLIENTES");
+  if (!aba) { Logger.log("❌ Sem aba CLIENTES — rode MapearClientes() primeiro"); return; }
+  const dados = aba.getDataRange().getValues();
+  const headers = dados[0].map(h => String(h).trim().toUpperCase());
+  const idxBoard = headers.indexOf("ID DO QUADRO");
+  const idxNome  = headers.indexOf("NOME DO QUADRO");
+
+  // 1) Lista webhooks já existentes do token (1 chamada)
+  const rExistentes = trelloGet("/1/tokens/" + prop("TRELLO_TOKEN") + "/webhooks", {});
+  let webhooksExistentes = [];
+  if (rExistentes.getResponseCode() === 200) {
+    webhooksExistentes = JSON.parse(rExistentes.getContentText());
+  } else {
+    Logger.log("⚠️ Não consegui listar webhooks existentes: " + rExistentes.getContentText());
+  }
+  const webhooksPorBoard = {};
+  webhooksExistentes.forEach(w => {
+    if (!webhooksPorBoard[w.idModel]) webhooksPorBoard[w.idModel] = [];
+    webhooksPorBoard[w.idModel].push(w);
+  });
+
+  let totalCriados = 0, totalJaExistia = 0, totalErros = 0, boardsProcessados = 0;
+
+  for (let i = 1; i < dados.length; i++) {
+    const boardId = String(dados[i][idxBoard] || "").trim();
+    if (!boardId) continue;
+    const nomeBoard = idxNome >= 0 ? String(dados[i][idxNome] || "").trim() : boardId;
+    boardsProcessados++;
+
+    // Skip CENTRAL DE PROCESSO (espelhamento Placker)
+    const upBoard = nomeBoard.toUpperCase();
+    if (upBoard.indexOf("CENTRAL DE PROCESSO") !== -1 || upBoard.indexOf("CENTRAL DE PORCESSO") !== -1) {
+      Logger.log("  ⏭️  Pulando '" + nomeBoard + "' (espelhamento Placker)");
+      continue;
+    }
+
+    const existentes = (webhooksPorBoard[boardId] || []).filter(w => w.callbackURL === callbackURL && w.active);
+    if (existentes.length > 0) {
+      totalJaExistia++;
+      continue;
+    }
+
+    // Cria webhook
+    const r = trelloPost("/1/webhooks", {
+      idModel: boardId,
+      callbackURL: callbackURL,
+      description: "Dani 🤖 — webhook automático do board " + nomeBoard,
+    });
+    if (r.getResponseCode() === 200) {
+      totalCriados++;
+      Logger.log("  ✅ Webhook criado em '" + nomeBoard + "'");
+    } else {
+      totalErros++;
+      Logger.log("  ❌ Falha em '" + nomeBoard + "': " + r.getContentText());
+    }
+    Utilities.sleep(300); // rate limit Trello
+  }
+
+  Logger.log("═══════════════════════════════════");
+  Logger.log("🤖 Webhooks Dani — varredura concluída em " + boardsProcessados + " boards:");
+  Logger.log("   ✨ Criados:       " + totalCriados);
+  Logger.log("   ♻️ Já existiam: " + totalJaExistia);
+  Logger.log("   ⚠️ Erros:        " + totalErros);
+  Logger.log("═══════════════════════════════════");
+}
+
+/**
+ * Lista todos os webhooks do token atual (debug). Loga cada um.
+ */
+function listarWebhooks() {
+  const r = trelloGet("/1/tokens/" + prop("TRELLO_TOKEN") + "/webhooks", {});
+  if (r.getResponseCode() !== 200) { Logger.log("❌ " + r.getContentText()); return; }
+  const lista = JSON.parse(r.getContentText());
+  Logger.log("Total: " + lista.length + " webhooks");
+  lista.forEach(w => {
+    Logger.log("  • id=" + w.id + " | board=" + w.idModel + " | active=" + w.active + " | callback=" + w.callbackURL);
+  });
+}
+
+/**
+ * Remove TODOS os webhooks ativos. Use apenas em rollback / migração.
+ */
+function removerTodosWebhooks() {
+  const r = trelloGet("/1/tokens/" + prop("TRELLO_TOKEN") + "/webhooks", {});
+  if (r.getResponseCode() !== 200) { Logger.log("❌ " + r.getContentText()); return; }
+  const lista = JSON.parse(r.getContentText());
+  let ok = 0, fail = 0;
+  lista.forEach(w => {
+    const u = "https://api.trello.com/1/webhooks/" + w.id +
+      "?key=" + prop("TRELLO_KEY") + "&token=" + prop("TRELLO_TOKEN");
+    const resp = fetchRetry(u, { method: "delete" });
+    if (resp.getResponseCode() === 200) ok++;
+    else fail++;
+  });
+  Logger.log("Removidos: " + ok + " | Falhas: " + fail);
 }
 
 // ╔══════════════════════════════════════╗
