@@ -1,6 +1,19 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.5.0 — 25/04/2026 — DANI ONDA 3 (regras especiais por lista)
+//   • v7.5.0 G10: chegada em ALVARÁS E LICENÇAS → oferece orçamento ao cliente
+//                 (mensagem premium + email + comentário; salva data pra G11)
+//   • v7.5.0 G11: cron 9h30 — ALVARÁS sem retorno em 5d → move pra
+//                 PROCESSOS FINALIZADOS + email cliente
+//   • v7.5.0 G12: chegada em MAT → lembra contador (aplica RESPOSTA PENDENTE,
+//                 explica importância da escolha tributária)
+//   • v7.5.0 G13: cron 9h30 — ARQUIVO MENSAL +30d → email LGPD cliente +
+//                 deleta anexos do card
+//   • v7.5.0 G14: cron 9h30 — BLOQUEADOS 15d → pergunta se mantém
+//   • v7.5.0 G15: cron 9h30 — BLOQUEADOS 30d → deleta anexos (não o card)
+//   • v7.5.0 setupTriggersDani agora cria trigger rotinasDiariasDani (9h30)
+//                 (idempotente — Thales precisa re-rodar 1 vez no editor)
 // v7.4.0 — 25/04/2026 — DANI ONDA 1.C + ONDA 2 (lembretes refinados + email órgão)
 //   • v7.4.0 ONDA 1.C: lembretes refinados (G6)
 //     - 5 max por etapa (lista + etiquetas pendência)
@@ -2107,14 +2120,112 @@ function handlerEtiquetaRemove(action, cli) {
   return _respJson({ ok: true, handler: "etiqueta_remove", label: label, _todo: "Onda 4 (cálculo de prazo)" });
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 Onda 3 — Regras especiais por lista de destino
+// ────────────────────────────────────────────────────────────────────────────
+// Quando card muda de lista, alguns destinos disparam ações específicas:
+//   • 🍀 ALVARÁS E LICENÇAS  → G10: oferece orçamento ao cliente (1x/dia, 5d)
+//   • 🍀 MAT                  → G12: lembra contador do MAT (cron 9h)
+// Demais listas: só registra movimento. Outros disparos por lista (ex.:
+// PENDENTE DE ASSINATURA, AGUARDANDO PAGAMENTO) usam G2 do funcionário.
+// ════════════════════════════════════════════════════════════════════════════
+
 function handlerCardAtualizado(action, cli) {
   const before = action.data.listBefore;
   const after  = action.data.listAfter;
-  if (before && after) {
-    Logger.log("  ↔️  card movido: '" + before.name + "' → '" + after.name + "'");
-    return _respJson({ ok: true, handler: "card_movido", from: before.name, to: after.name, _todo: "Onda 3 (regras por lista)" });
+  if (!before || !after) {
+    return _respJson({ ok: true, ignored: "updateCard sem mudança de lista" });
   }
-  return _respJson({ ok: true, ignored: "updateCard sem mudança de lista" });
+
+  const cardId = (action.data.card && action.data.card.id) || "";
+  _daniLog("MOVIMENTO", "card movido", { cardId: cardId, de: before.name, para: after.name });
+
+  if (_jaProcessadoAcao(action.id)) {
+    return _respJson({ ok: true, ignored: "ja_processado" });
+  }
+
+  if (!daniAtiva()) {
+    _daniLog("DRY-RUN", "card movido — não age (dry-run)");
+    return _respJson({ ok: true, dry_run: true });
+  }
+
+  const nomeAfter = String(after.name || "").toLowerCase();
+
+  // G10 — Chegou em ALVARÁS E LICENÇAS → oferta de orçamento
+  if (nomeAfter.indexOf("alvar") !== -1 && nomeAfter.indexOf("licenc") !== -1) {
+    return _g10AlvarasOferta(cardId);
+  }
+
+  // G12 — Chegou em MAT → lembra contador
+  if (/\bmat\b/.test(nomeAfter)) {
+    return _g12MatLembrar(cardId);
+  }
+
+  return _respJson({ ok: true, lista: after.name, sem_acao_especial: true });
+}
+
+function _g10AlvarasOferta(cardId) {
+  _daniLog("G10", "ALVARÁS — oferecendo orçamento ao cliente", { cardId: cardId });
+  const card = _danigetCardCompleto(cardId);
+  if (!card) return _respJson({ ok: false, error: "card nao encontrado" });
+
+  const cardUrl = card.shortUrl || ("https://trello.com/c/" + cardId);
+  const mensagemCliente =
+    "Olá! Aqui é a dani.ai da Trevo Legaliza. Seu processo principal foi concluído com sucesso. " +
+    "Agora chegamos na fase de **Alvarás e Licenças** — etapa em que muitas empresas ficam em risco " +
+    "de operar irregularmente.\n\n" +
+    "Somos especialistas neste tipo de regularização — nossos orçamentos são pensados pra dar uma " +
+    "boa margem de lucro pro contador. Quer que a gente prepare um estudo personalizado pra esta empresa?\n\n" +
+    "Se quiser, basta responder este email ou comentar aqui no card. Em 5 dias úteis, se não tivermos retorno, " +
+    "concluímos o processo no estado atual.";
+
+  // Email
+  const html = _daniMontarEmailHTML({
+    titulo: "Alvarás e Licenças — quer um orçamento? 🍀",
+    mensagem: mensagemCliente,
+    cardNome: card.name,
+    cardUrl: cardUrl,
+  });
+  _daniEnviarEmailCliente(card, "🍀 Alvarás e Licenças — orçamento personalizado — " + card.name, html, mensagemCliente);
+
+  // Comentário no card
+  _daniComentar(cardId, mensagemCliente, /* marcarBoard */ true);
+
+  // Salva data de chegada (cron G11 vai monitorar 5 dias)
+  getProps().setProperty("alvaras_chegada_" + cardId, new Date().toISOString());
+
+  incMetrica("dani_g10_alvaras_oferta");
+  return _respJson({ ok: true, acao: "G10_alvaras_oferta", emailEnviado: true });
+}
+
+function _g12MatLembrar(cardId) {
+  _daniLog("G12", "MAT — lembrando contador", { cardId: cardId });
+  const card = _danigetCardCompleto(cardId);
+  if (!card) return _respJson({ ok: false, error: "card nao encontrado" });
+
+  const cardUrl = card.shortUrl || ("https://trello.com/c/" + cardId);
+  const mensagemCliente =
+    "Olá! Aqui é a dani.ai da Trevo Legaliza. O processo de abertura foi deferido pela Junta Comercial 🎉\n\n" +
+    "Agora precisamos do seu próximo passo: acessar o **MAT (Módulo de Administração Tributária)** " +
+    "pra realizar a assinatura junto com os sócios e definir o regime tributário (Simples Nacional ou IBS/CBS).\n\n" +
+    "**Atenção:** o regime tributário é definido AQUI, antes da emissão do CNPJ. Decisão importante.\n\n" +
+    "Após você concluir o MAT no portal, anexe o CNPJ neste card pra darmos seguimento.";
+
+  // Aplica RESPOSTA DE COMENTÁRIO PENDENTE (cliente precisa fazer ação)
+  _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_RESP);
+
+  const html = _daniMontarEmailHTML({
+    titulo: "Próximo passo: MAT (Módulo Administrativo Tributário)",
+    mensagem: mensagemCliente,
+    cardNome: card.name,
+    cardUrl: cardUrl,
+    etiquetaPendencia: DANI_ETIQUETA_RESP,
+  });
+  _daniEnviarEmailCliente(card, "🍀 Próximo passo: MAT — " + card.name, html, mensagemCliente);
+  _daniComentar(cardId, mensagemCliente, /* marcarBoard */ true);
+
+  incMetrica("dani_g12_mat_lembrar");
+  return _respJson({ ok: true, acao: "G12_mat_lembrar" });
 }
 
 function handlerAnexo(action, cli) {
@@ -2677,21 +2788,31 @@ function listarWebhooks() {
  */
 function setupTriggersDani() {
   // Remove triggers existentes pros handlers nossos (evita duplicar)
-  const handlers = ["sincronizarBoardsETrevoDani"];
+  const handlers = ["sincronizarBoardsETrevoDani", "rotinasDiariasDani"];
   ScriptApp.getProjectTriggers().forEach(t => {
     if (handlers.indexOf(t.getHandlerFunction()) !== -1) {
       ScriptApp.deleteTrigger(t);
     }
   });
 
-  // Cria trigger diário 8h
+  // Trigger 1: sincronização de boards (8h)
   ScriptApp.newTrigger("sincronizarBoardsETrevoDani")
     .timeBased()
     .everyDays(1)
     .atHour(8)
     .create();
 
-  Logger.log("✅ Trigger sincronizarBoardsETrevoDani criado (diário 8h).");
+  // Trigger 2: rotinas diárias da Dani (G11, G13, G14, G15) — 9h30 (depois dos lembretes)
+  ScriptApp.newTrigger("rotinasDiariasDani")
+    .timeBased()
+    .everyDays(1)
+    .atHour(9)
+    .nearMinute(30)
+    .create();
+
+  Logger.log("✅ Triggers criados:");
+  Logger.log("  • sincronizarBoardsETrevoDani — diário 8h");
+  Logger.log("  • rotinasDiariasDani          — diário 9h30 (G11/G13/G14/G15)");
   Logger.log("ℹ️ Triggers existentes (LembretesPendencias 9h, VarrerEmails 15min) mantidos.");
 }
 
@@ -2711,6 +2832,241 @@ function sincronizarBoardsETrevoDani() {
   } finally {
     lock.releaseLock();
   }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 ROTINAS DIÁRIAS DA DANI (Onda 3 — cron 9h)
+// ────────────────────────────────────────────────────────────────────────────
+// Trigger 'rotinasDiariasDani' roda toda manhã 9h e cuida de:
+//   • G11: ALVARÁS sem resposta há 5 dias → move pra PROCESSOS FINALIZADOS
+//   • G13: ARQUIVO MENSAL +30 dias → deleta anexos (LGPD)
+//   • G14: BLOQUEADOS dia 15 → pergunta se permanece
+//   • G15: BLOQUEADOS dia 30 → deleta anexos
+//   • G9 (Onda 2): SEM_MOVIMENTACAO em EM ANÁLISE há ≥1 dia → notifica cliente
+// ════════════════════════════════════════════════════════════════════════════
+
+function rotinasDiariasDani() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(600000)) { Logger.log("⚠️ rotinasDiariasDani: lock ocupado"); return; }
+  try {
+    _daniLog("ROTINA", "rotinas diárias iniciadas");
+    if (!daniAtiva()) {
+      _daniLog("ROTINA", "DRY-RUN — rotinas diárias não rodam quando DANI_ATIVA=false");
+      return;
+    }
+    try { _rotinaG11AlvarasTimeout(); } catch (e) { _daniLog("ERRO", "G11", { erro: String(e) }); }
+    try { _rotinaG13ArquivoMensal(); } catch (e) { _daniLog("ERRO", "G13", { erro: String(e) }); }
+    try { _rotinaG14G15Bloqueados(); } catch (e) { _daniLog("ERRO", "G14/G15", { erro: String(e) }); }
+    _daniLog("ROTINA", "rotinas diárias concluídas");
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// G11 — ALVARÁS: 5 dias sem resposta → move pra PROCESSOS FINALIZADOS
+function _rotinaG11AlvarasTimeout() {
+  const props = getProps();
+  const todasProps = props.getProperties();
+  const agora = new Date();
+
+  Object.keys(todasProps).forEach(chave => {
+    if (chave.indexOf("alvaras_chegada_") !== 0) return;
+    const cardId = chave.replace("alvaras_chegada_", "");
+    const dataChegada = new Date(todasProps[chave]);
+    const dias = Math.floor((agora - dataChegada) / (1000 * 60 * 60 * 24));
+
+    if (dias < 5) return;
+
+    _daniLog("G11", "ALVARÁS timeout 5d — finalizando", { cardId: cardId, dias: dias });
+    const card = _danigetCardCompleto(cardId);
+    if (!card) {
+      props.deleteProperty(chave);
+      return;
+    }
+
+    // Move pra PROCESSOS FINALIZADOS — busca lista do board
+    try {
+      const r = trelloGet("/1/boards/" + card.idBoard + "/lists", { fields: "name,id" });
+      if (r.getResponseCode() === 200) {
+        const listas = JSON.parse(r.getContentText());
+        const finalizados = listas.find(l => /processos\s+finalizados/i.test(l.name || ""));
+        if (finalizados) {
+          trelloPut("/1/cards/" + cardId, { idList: finalizados.id });
+          const cardUrl = card.shortUrl || ("https://trello.com/c/" + cardId);
+          const msg = "Olá! Aqui é a dani.ai da Trevo Legaliza. Como não recebemos retorno sobre " +
+            "o orçamento de Alvarás e Licenças nos últimos 5 dias, fechamos esta solicitação como " +
+            "concluída. Se precisar de regularização no futuro, é só nos chamar. ✨";
+          const html = _daniMontarEmailHTML({
+            titulo: "Processo finalizado 🍀",
+            mensagem: msg,
+            cardNome: card.name,
+            cardUrl: cardUrl,
+          });
+          _daniEnviarEmailCliente(card, "🍀 Processo finalizado — " + card.name, html, msg);
+          _daniComentar(cardId, msg, /* marcarBoard */ true);
+          incMetrica("dani_g11_alvaras_finalizado");
+        }
+      }
+    } catch (e) {
+      _daniLog("ERRO", "G11: falha ao mover", { erro: String(e), cardId: cardId });
+    }
+    props.deleteProperty(chave);
+  });
+}
+
+// G13 — ARQUIVO MENSAL: +30 dias → avisa LGPD + deleta anexos
+function _rotinaG13ArquivoMensal() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const aba = ss.getSheetByName("CLIENTES");
+  if (!aba) return;
+  const dados = aba.getDataRange().getValues();
+  const headers = dados[0].map(h => String(h).trim().toUpperCase());
+  const idxBoard = headers.indexOf("ID DO QUADRO");
+
+  for (let i = 1; i < dados.length; i++) {
+    const boardId = String(dados[i][idxBoard] || "").trim();
+    if (!boardId) continue;
+    try {
+      _processarArquivoMensalDoBoard(boardId);
+    } catch (e) { _daniLog("ERRO", "G13 board", { boardId: boardId, erro: String(e) }); }
+  }
+}
+
+function _processarArquivoMensalDoBoard(boardId) {
+  // Busca lista ARQUIVO MENSAL
+  const rL = trelloGet("/1/boards/" + boardId + "/lists", { fields: "name,id" });
+  if (rL.getResponseCode() !== 200) return;
+  const listas = JSON.parse(rL.getContentText());
+  const arquivo = listas.find(l => /arquivo\s+mensal/i.test(l.name || ""));
+  if (!arquivo) return;
+
+  // Busca cards na lista com data de entrada > 30 dias
+  const rC = trelloGet("/1/lists/" + arquivo.id + "/cards", {
+    fields: "name,shortUrl,desc,idBoard,dateLastActivity,attachments",
+    attachments: "true",
+  });
+  if (rC.getResponseCode() !== 200) return;
+  const cards = JSON.parse(rC.getContentText());
+  const agora = new Date();
+
+  cards.forEach(card => {
+    const dataAtv = new Date(card.dateLastActivity);
+    const dias = Math.floor((agora - dataAtv) / (1000 * 60 * 60 * 24));
+    if (dias < 30) return;
+    if ((card.attachments || []).length === 0) return; // já está limpo
+
+    _daniLog("G13", "deletando anexos LGPD (30d em ARQUIVO MENSAL)", { cardId: card.id, attachments: card.attachments.length });
+
+    // Avisa cliente antes
+    const msg = "Olá! Aqui é a dani.ai. Conforme nossa política de LGPD, todos os documentos anexados " +
+      "neste processo serão removidos após 30 dias na pasta Arquivo Mensal. Se ainda não salvou os " +
+      "arquivos, baixe agora pelo link do processo. Obrigada! 🔒";
+    const html = _daniMontarEmailHTML({
+      titulo: "Política LGPD — anexos serão removidos",
+      mensagem: msg,
+      cardNome: card.name,
+      cardUrl: card.shortUrl,
+    });
+    _daniEnviarEmailCliente(card, "🔒 LGPD — " + card.name, html, msg);
+
+    // Deleta anexos do Trello
+    (card.attachments || []).forEach(att => {
+      try {
+        const u = "https://api.trello.com/1/cards/" + card.id + "/attachments/" + att.id +
+          "?key=" + prop("TRELLO_KEY") + "&token=" + prop("TRELLO_TOKEN");
+        fetchRetry(u, { method: "delete" });
+      } catch (e) { _daniLog("AVISO", "G13: falha ao deletar anexo", { erro: String(e) }); }
+    });
+
+    incMetrica("dani_g13_arquivo_mensal");
+  });
+}
+
+// G14/G15 — BLOQUEADOS: dia 15 pergunta, dia 30 deleta anexos
+function _rotinaG14G15Bloqueados() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const aba = ss.getSheetByName("CLIENTES");
+  if (!aba) return;
+  const dados = aba.getDataRange().getValues();
+  const headers = dados[0].map(h => String(h).trim().toUpperCase());
+  const idxBoard = headers.indexOf("ID DO QUADRO");
+
+  for (let i = 1; i < dados.length; i++) {
+    const boardId = String(dados[i][idxBoard] || "").trim();
+    if (!boardId) continue;
+    try {
+      _processarBloqueadosDoBoard(boardId);
+    } catch (e) { _daniLog("ERRO", "G14/G15 board", { boardId: boardId, erro: String(e) }); }
+  }
+}
+
+function _processarBloqueadosDoBoard(boardId) {
+  const rL = trelloGet("/1/boards/" + boardId + "/lists", { fields: "name,id" });
+  if (rL.getResponseCode() !== 200) return;
+  const listas = JSON.parse(rL.getContentText());
+  const bloq = listas.find(l => /bloquead/i.test(l.name || ""));
+  if (!bloq) return;
+
+  const rC = trelloGet("/1/lists/" + bloq.id + "/cards", {
+    fields: "name,shortUrl,desc,idBoard,dateLastActivity,attachments",
+    attachments: "true",
+  });
+  if (rC.getResponseCode() !== 200) return;
+  const cards = JSON.parse(rC.getContentText());
+  const agora = new Date();
+
+  cards.forEach(card => {
+    const dataAtv = new Date(card.dateLastActivity);
+    const dias = Math.floor((agora - dataAtv) / (1000 * 60 * 60 * 24));
+    const props = getProps();
+    const chave = "bloqueado_" + card.id;
+    const estadoRaw = props.getProperty(chave);
+    const estado = estadoRaw ? JSON.parse(estadoRaw) : { dia15: false, dia30: false };
+
+    // G14 — Dia 15
+    if (dias >= 15 && !estado.dia15) {
+      const msg = "Olá! Aqui é a dani.ai. Este processo está bloqueado há 15 dias. " +
+        "Você ainda quer mantê-lo nessa situação? Se em mais 15 dias não tivermos retorno, os anexos " +
+        "serão removidos. Se quiser retomar, é só responder.";
+      const html = _daniMontarEmailHTML({
+        titulo: "Processo bloqueado — confirma se mantém?",
+        mensagem: msg,
+        cardNome: card.name,
+        cardUrl: card.shortUrl,
+      });
+      _daniEnviarEmailCliente(card, "⚠️ Processo bloqueado há 15d — " + card.name, html, msg);
+      _daniComentar(card.id, msg, /* marcarBoard */ true);
+      estado.dia15 = true;
+      props.setProperty(chave, JSON.stringify(estado));
+      _daniLog("G14", "BLOQUEADOS dia 15 — perguntou cliente", { cardId: card.id });
+      incMetrica("dani_g14_bloqueado_15");
+    }
+
+    // G15 — Dia 30 → deleta anexos (NÃO o card)
+    if (dias >= 30 && !estado.dia30) {
+      (card.attachments || []).forEach(att => {
+        try {
+          const u = "https://api.trello.com/1/cards/" + card.id + "/attachments/" + att.id +
+            "?key=" + prop("TRELLO_KEY") + "&token=" + prop("TRELLO_TOKEN");
+          fetchRetry(u, { method: "delete" });
+        } catch (e) {}
+      });
+      const msg = "Olá! Aqui é a dani.ai. Como este processo permaneceu bloqueado por 30 dias sem retorno, " +
+        "removemos os anexos por segurança e LGPD. O card permanece pra histórico. Se precisar retomar, " +
+        "é só nos chamar — começamos uma nova solicitação.";
+      const html = _daniMontarEmailHTML({
+        titulo: "Anexos removidos por LGPD",
+        mensagem: msg,
+        cardNome: card.name,
+        cardUrl: card.shortUrl,
+      });
+      _daniEnviarEmailCliente(card, "🔒 Anexos removidos — " + card.name, html, msg);
+      estado.dia30 = true;
+      props.setProperty(chave, JSON.stringify(estado));
+      _daniLog("G15", "BLOQUEADOS dia 30 — anexos deletados", { cardId: card.id });
+      incMetrica("dani_g15_bloqueado_30");
+    }
+  });
 }
 
 /**
