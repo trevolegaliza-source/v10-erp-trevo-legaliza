@@ -1,6 +1,18 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.3.0 — 25/04/2026 — DANI ONDA 1.B — G4 (cliente responde) + G5 (anexa)
+//   • v7.3.0: _classificarAutorTrello — usa fullName + username pra detectar
+//             override DANI_FORCAR_CLIENTE corretamente (bug v7.2.x:
+//             Carolina entrava como Trevo porque DANI_FORCAR_CLIENTE tinha
+//             username "carolinaguirado7" mas fullName é "Carolina Guirado")
+//   • v7.3.0: G4 — cliente comenta em card com etiqueta de pendência →
+//             Claude avalia se cumpriu (CUMPRIU/NAO_CUMPRIU/PARCIAL) →
+//             remove DOCUMENTO/RESPOSTA PENDENTE + aplica PRONTO PARA SER FEITO,
+//             ou mantém + comenta pedindo o que falta
+//   • v7.3.0: G5 — cliente anexa arquivo → roda G4 com texto sintético
+//             "[Cliente anexou arquivo: NOME]" → mesma lógica
+//   • v7.3.0: handlerAnexo agora usa _daniLog (estava sem persistência)
 // v7.2.6 — 25/04/2026 — DANI ONDA 1.A — fix Claude JSON parsing
 //   • v7.2.6: chamarClaudeJson com fallback (regex extrai 1º {...}) +
 //             prompt apertado com instrução crítica de formato +
@@ -1717,11 +1729,12 @@ function _classificarComentarioFuncionario(textoComentario, contexto) {
 function handlerComentario(action, cli) {
   const texto = (action.data && action.data.text) || "";
   const autor = (action.memberCreator && action.memberCreator.fullName) || "?";
+  const username = (action.memberCreator && action.memberCreator.username) || "";
   const cardId = (action.data && action.data.card && action.data.card.id) || "";
-  const tipoAutor = ehEquipeInterna(autor) ? "trevo" : "cliente";
+  const tipoAutor = _classificarAutorTrello(action);
 
   _daniLog("WEBHOOK", "comentário recebido", {
-    autor: autor, tipoAutor: tipoAutor, cardId: cardId,
+    autor: autor, username: username, tipoAutor: tipoAutor, cardId: cardId,
     texto: texto.substring(0, 150), actionId: action.id,
   });
 
@@ -1748,9 +1761,8 @@ function handlerComentario(action, cli) {
     return _danihandlerG2(action, cli, texto, autor, cardId);
   }
 
-  // ── G4: cliente comenta — Onda 1.B implementa ────────────────────────
-  _daniLog("INFO", "[G4] cliente comentou — Onda 1.B implementa");
-  return _respJson({ ok: true, handler: "comentario_cliente", _todo: "Onda 1.B" });
+  // ── G4: cliente comenta ──────────────────────────────────────────────
+  return _danihandlerG4(action, cli, texto, autor, cardId);
 }
 
 function _danihandlerG2(action, cli, texto, autor, cardId) {
@@ -1866,6 +1878,206 @@ function _danihandlerG2(action, cli, texto, autor, cardId) {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 G4 — Cliente responde no card
+// ────────────────────────────────────────────────────────────────────────────
+// Quando o cliente comenta num card que está com etiqueta de pendência
+// (DOCUMENTO PENDENTE ou RESPOSTA DE COMENTÁRIO PENDENTE), Dani avalia
+// via Claude se o cliente CUMPRIU a pendência:
+//   • CUMPRIU       → remove etiqueta + aplica PRONTO PARA SER FEITO
+//                     + comentário Dani agradecendo
+//   • NAO_CUMPRIU   → mantém etiqueta + comentário Dani pedindo o que falta
+//                     (cliente "respondeu" mas com info irrelevante/recusa)
+//   • PARCIAL       → trata como CUMPRIU mas registra pra equipe revisar
+//
+// Se o card NÃO tem etiqueta de pendência ativa, Dani não age (cliente
+// só comentou algo solto, sem responder a um pedido específico).
+// ════════════════════════════════════════════════════════════════════════════
+
+const DANI_ETIQUETAS_PENDENCIA = [
+  "DOCUMENTO PENDENTE",
+  "RESPOSTA DE COMENTÁRIO PENDENTE",
+];
+
+function _danihandlerG4(action, cli, texto, autor, cardId) {
+  _daniLog("G4", "iniciado", { cardId: cardId, autor: autor });
+
+  const card = _danigetCardCompleto(cardId);
+  if (!card) {
+    _daniLog("ERRO", "G4: card não encontrado", { cardId: cardId });
+    return _respJson({ ok: false, error: "card_nao_encontrado" });
+  }
+
+  // 1. Verifica se há etiqueta de pendência ativa
+  const etiquetasAtuais = (card.labels || []).map(l => (l.name || "").trim()).filter(Boolean);
+  const pendenciasAtivas = etiquetasAtuais.filter(e => DANI_ETIQUETAS_PENDENCIA.indexOf(e) !== -1);
+
+  if (pendenciasAtivas.length === 0) {
+    _daniLog("G4", "sem pendência ativa — Dani fica em silêncio", { etiquetas: etiquetasAtuais });
+    return _respJson({ ok: true, acao: "SEM_PENDENCIA", silencio: true });
+  }
+
+  _daniLog("G4", "pendência ativa detectada", { pendencias: pendenciasAtivas });
+
+  // 2. Busca último pedido feito pela equipe Trevo (pra dar contexto à IA)
+  let ultimoPedidoTrevo = "";
+  try {
+    const comentarios = _danigetUltimosComentarios(cardId, 10);
+    // Última mensagem com texto não-vazio ANTES da resposta atual,
+    // de autor = equipe interna (Dani ou funcionário)
+    for (const c of comentarios) {
+      if (c.texto && c.texto !== texto && ehEquipeInterna(c.autor)) {
+        ultimoPedidoTrevo = c.texto;
+        break;
+      }
+    }
+  } catch (e) {
+    _daniLog("AVISO", "G4: falha ao buscar último pedido", { erro: String(e) });
+  }
+
+  // 3. Modo dry-run
+  if (!daniAtiva()) {
+    _daniLog("DRY-RUN", "DANI_ATIVA=false. Não chamo Claude nem ajo.");
+    return _respJson({ ok: true, dry_run: true });
+  }
+
+  // 4. Avalia via Claude se cumpriu
+  _daniLog("G4", "chamando Claude pra avaliar cumprimento...");
+  let aval;
+  try {
+    aval = _avaliarRespostaCliente(texto, ultimoPedidoTrevo, pendenciasAtivas, card);
+  } catch (e) {
+    _daniLog("ERRO", "G4: exceção em Claude", { erro: String(e), stack: (e.stack || "").substring(0, 500) });
+    return _respJson({ ok: false, error: "avaliacao_excecao" });
+  }
+  if (!aval) {
+    _daniLog("ERRO", "G4: Claude retornou null");
+    return _respJson({ ok: false, error: "avaliacao_falha" });
+  }
+
+  _daniLog("G4", "Claude avaliou", { veredito: aval.veredito, confianca: aval.confianca, msg_len: (aval.mensagemCliente || "").length });
+  incMetrica("dani_g4_" + aval.veredito);
+
+  // 5. Aplica decisão
+  try {
+    if (aval.veredito === "CUMPRIU" || aval.veredito === "PARCIAL") {
+      // Remove TODAS as etiquetas de pendência ativas + aplica PRONTO PARA SER FEITO
+      pendenciasAtivas.forEach(et => _daniRemoverEtiqueta(cardId, card.idBoard, et));
+      _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_PRONTO);
+
+      const comentTexto = (aval.veredito === "PARCIAL")
+        ? "✅ " + (aval.mensagemCliente || "Recebido! Equipe vai revisar e pode pedir mais detalhes em breve.")
+        : "✅ " + (aval.mensagemCliente || "Recebido, obrigada! Vamos seguir com a análise.");
+      const comentOk = _daniComentar(cardId, comentTexto, /* marcarBoard */ false);
+
+      _daniLog("G4", "veredito " + aval.veredito + " aplicado", {
+        etiquetas_removidas: pendenciasAtivas, etiqueta_aplicada: DANI_ETIQUETA_PRONTO, comentarioPostado: comentOk,
+      });
+      return _respJson({ ok: true, veredito: aval.veredito, etiquetas_removidas: pendenciasAtivas });
+    }
+
+    if (aval.veredito === "NAO_CUMPRIU") {
+      // Mantém etiquetas. Comenta pedindo o que falta.
+      const texto = "ℹ️ " + (aval.mensagemCliente || "Obrigada pela mensagem, mas ainda preciso do que foi solicitado pra prosseguir. Pode revisar?");
+      const comentOk = _daniComentar(cardId, texto, /* marcarBoard */ true);
+      _daniLog("G4", "NAO_CUMPRIU — pendência mantida", { comentarioPostado: comentOk });
+      return _respJson({ ok: true, veredito: "NAO_CUMPRIU" });
+    }
+
+    _daniLog("G4", "veredito desconhecido — silêncio", { veredito: aval.veredito });
+    return _respJson({ ok: true, veredito: "DESCONHECIDO", silencio: true });
+  } catch (e) {
+    _daniLog("ERRO", "G4: exceção ao aplicar decisão", { erro: String(e), stack: (e.stack || "").substring(0, 500) });
+    return _respJson({ ok: false, error: "aplicacao_excecao" });
+  }
+}
+
+/**
+ * Avalia via Claude se o cliente cumpriu a pendência.
+ * Retorna { veredito: CUMPRIU|NAO_CUMPRIU|PARCIAL, confianca: 0-100, mensagemCliente: "..." }
+ */
+function _avaliarRespostaCliente(textoCliente, ultimoPedidoTrevo, pendenciasAtivas, card) {
+  const houveAnexo = textoCliente.toLowerCase().indexOf("anex") !== -1 || textoCliente.toLowerCase().indexOf("segue") !== -1;
+  const prompt =
+    'Você é a Dani, IA da Trevo Legaliza. Cliente acabou de comentar num card\n' +
+    'que está com etiqueta de pendência ativa. Avalie se a resposta dele\n' +
+    'CUMPRIU o que foi pedido pela equipe.\n\n' +
+    'CONTEXTO:\n' +
+    '  Card: ' + card.name + '\n' +
+    '  Pendências ativas: ' + pendenciasAtivas.join(", ") + '\n\n' +
+    'ÚLTIMO PEDIDO DA EQUIPE TREVO (contexto pra avaliar):\n' +
+    '"' + (ultimoPedidoTrevo || "(não encontrado — avalie pela pendência ativa)").substring(0, 1000) + '"\n\n' +
+    'RESPOSTA DO CLIENTE:\n' +
+    '"' + (textoCliente || "").substring(0, 1500) + '"\n\n' +
+    'CRITÉRIOS:\n' +
+    '  CUMPRIU      = cliente forneceu o que foi pedido (info clara, anexo coerente, confirmação direta).\n' +
+    '                 Em caso de DOCUMENTO PENDENTE: cliente menciona ter enviado/anexado.\n' +
+    '                 Em caso de RESPOSTA PENDENTE: cliente respondeu objetivamente o que foi perguntado.\n' +
+    '  NAO_CUMPRIU  = cliente respondeu mas SEM atender (recusou, pediu esclarecimento, fugiu do tema,\n' +
+    '                 disse que nunca precisou fornecer aquilo, deu resposta vaga sem conteúdo útil).\n' +
+    '  PARCIAL      = cliente cumpriu em parte (ex: enviou só 1 de 2 documentos solicitados).\n\n' +
+    'COMPONHA mensagemCliente (curta, gentil, identifique-se "dani.ai"):\n' +
+    '  - CUMPRIU: agradeça brevemente.\n' +
+    '  - NAO_CUMPRIU: peça novamente com clareza o que falta. Tom paciente.\n' +
+    '  - PARCIAL: agradeça + sinalize que equipe vai revisar.\n\n' +
+    'Considere também: cliente teve anexo no comentário? ' + (houveAnexo ? "TALVEZ (texto sugere)" : "DESCONHECIDO") + '\n\n' +
+    'INSTRUÇÃO CRÍTICA DE FORMATO:\n' +
+    'Sua resposta DEVE ser exclusivamente JSON válido, começando com { e terminando com }.\n' +
+    'NÃO escreva nada antes ou depois. NÃO use blocos de código (```). NÃO comente.\n\n' +
+    'Schema:\n' +
+    '{"veredito":"CUMPRIU|NAO_CUMPRIU|PARCIAL","confianca":<0-100>,"mensagemCliente":"<texto curto>"}';
+
+  const j = chamarClaudeJson(prompt, 600);
+  if (!j) return null;
+  if (["CUMPRIU", "NAO_CUMPRIU", "PARCIAL"].indexOf(j.veredito) === -1) {
+    _daniLog("CLAUDE_FAIL", "_avaliarRespostaCliente: veredito inválido", j);
+    return null;
+  }
+  return j;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 G5 — Cliente anexa documento (sem comentar OU com comentário curto)
+// ────────────────────────────────────────────────────────────────────────────
+// Quando cliente adiciona anexo num card com etiqueta DOCUMENTO PENDENTE,
+// Dani assume que provavelmente é o documento esperado e dispara G4 com
+// texto sintético "[anexou: NOME_DO_ARQUIVO]" — IA avalia se faz sentido.
+//
+// Se o autor é equipe interna anexando, ignora (Dani não age em anexos
+// internos).
+// ════════════════════════════════════════════════════════════════════════════
+
+function _danihandlerG5(action, cli) {
+  const cardId = (action.data && action.data.card && action.data.card.id) || "";
+  const autor = (action.memberCreator && action.memberCreator.fullName) || "?";
+  const username = (action.memberCreator && action.memberCreator.username) || "";
+  const tipoAutor = _classificarAutorTrello(action);
+  const att = action.data && action.data.attachment;
+  const nomeArquivo = (att && att.name) || "";
+
+  _daniLog("WEBHOOK", "anexo adicionado", {
+    autor: autor, username: username, tipoAutor: tipoAutor,
+    cardId: cardId, arquivo: nomeArquivo, actionId: action.id,
+  });
+
+  if (_jaProcessadoAcao(action.id)) {
+    _daniLog("SKIP", "anexo: ja_processado");
+    return _respJson({ ok: true, ignored: "ja_processado" });
+  }
+
+  // Equipe interna anexando: Dani não age
+  if (tipoAutor === "trevo") {
+    _daniLog("G5", "anexo da equipe interna — Dani não age");
+    return _respJson({ ok: true, handler: "anexo_interno", silencio: true });
+  }
+
+  if (!cardId) return _respJson({ ok: false, error: "card_id ausente" });
+
+  // Cliente anexando: roda G4 com texto sintético
+  const textoSintetico = "[Cliente anexou arquivo: " + nomeArquivo + "]";
+  return _danihandlerG4(action, cli, textoSintetico, autor, cardId);
+}
+
 // ─── Outros handlers (stubs) — implementação em ondas seguintes ────────────
 
 function handlerEtiquetaAdd(action, cli) {
@@ -1891,9 +2103,7 @@ function handlerCardAtualizado(action, cli) {
 }
 
 function handlerAnexo(action, cli) {
-  const attachment = action.data && action.data.attachment;
-  Logger.log("  📎 anexo adicionado: " + (attachment ? attachment.name : "?"));
-  return _respJson({ ok: true, handler: "anexo", _todo: "Onda 1.B" });
+  return _danihandlerG5(action, cli);
 }
 
 function resolverClientePorBoard(boardId) {
@@ -2575,17 +2785,34 @@ function getEquipeInterna() {
 
 function ehEquipeInterna(nome) {
   const n = (nome || "").toLowerCase().trim();
-  // Override de teste: usuários listados em DANI_FORCAR_CLIENTE NUNCA são equipe interna.
-  // Útil pra simular fluxo cliente em board de teste sem ter conta Trello externa.
-  // Formato: "carolinaguirado7,outrouser" (sem @, separados por vírgula).
-  const forcarRaw = getProps().getProperty("DANI_FORCAR_CLIENTE") || "";
+  return getEquipeInterna().some(i => n.includes(i));
+}
+
+/**
+ * Classifica autor de uma action Trello como "trevo" ou "cliente".
+ * Considera fullName E username pra detectar override DANI_FORCAR_CLIENTE
+ * (que aceita username sem @ ou parte do fullName).
+ */
+function _classificarAutorTrello(action) {
+  const m = (action && action.memberCreator) || {};
+  const fullName = String(m.fullName || "").toLowerCase().trim();
+  const username = String(m.username || "").toLowerCase().trim();
+
+  // 1) Override DANI_FORCAR_CLIENTE — bate com fullName OU username
+  const forcarRaw = String(getProps().getProperty("DANI_FORCAR_CLIENTE") || "").toLowerCase();
   if (forcarRaw) {
-    const lista = forcarRaw.toLowerCase().split(/[,;]/).map(s => s.trim()).filter(Boolean);
-    if (lista.some(u => n.indexOf(u) !== -1)) {
-      return false;
+    const lista = forcarRaw.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    for (const u of lista) {
+      if (!u) continue;
+      if (fullName.indexOf(u) !== -1) return "cliente";
+      if (username.indexOf(u) !== -1) return "cliente";
+      // Match parcial reverso (forçar pode ser substring do username)
+      if (u.indexOf(username) !== -1 && username.length >= 3) return "cliente";
     }
   }
-  return getEquipeInterna().some(i => n.includes(i));
+
+  // 2) Equipe interna pelo fullName
+  return ehEquipeInterna(fullName) ? "trevo" : "cliente";
 }
 
 /**
