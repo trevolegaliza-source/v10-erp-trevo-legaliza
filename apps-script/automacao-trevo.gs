@@ -1,6 +1,21 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.4.0 — 25/04/2026 — DANI ONDA 1.C + ONDA 2 (lembretes refinados + email órgão)
+//   • v7.4.0 ONDA 1.C: lembretes refinados (G6)
+//     - 5 max por etapa (lista + etiquetas pendência)
+//     - Reset quando muda de etapa
+//     - Texto gentil progressivo (5º = "último lembrete por aqui")
+//     - Comentário no card a cada lembrete + email
+//     - Caso AGUARDANDO PAGAMENTO JUNTA: 1º imediato, 2º 4h depois, depois 1x/dia
+//     - _calcularChaveEtapa(card) detecta mudança de fase
+//   • v7.4.0 ONDA 2: email do órgão (G8)
+//     - interpretarEmailOrgao retorna veredito DEFERIDO/INDEFERIDO/SEM_MOVIMENTACAO/OUTRO
+//     - DEFERIDO: comenta @board + email cliente + remove EM ANÁLISE NO ÓRGÃO
+//     - INDEFERIDO: DISCRETO — comentário marcando @leticiatonelli3 + @trevolegaliza
+//                   + email interno (cliente NÃO sabe — regra do Thales)
+//     - SEM_MOVIMENTACAO: registra (G9 cron 9h cuida de avisar cliente — Onda 3)
+//     - OUTRO: registra como pendência manual
 // v7.3.0 — 25/04/2026 — DANI ONDA 1.B — G4 (cliente responde) + G5 (anexa)
 //   • v7.3.0: _classificarAutorTrello — usa fullName + username pra detectar
 //             override DANI_FORCAR_CLIENTE corretamente (bug v7.2.x:
@@ -2138,61 +2153,111 @@ function buscarCardsComEtiquetaLembrete(boardId) {
   });
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// 🔔 LEMBRETES v7.3.1 — Onda 1.C
+// ────────────────────────────────────────────────────────────────────────────
+// Regras (do relatório do Thales):
+//   • Máximo 5 lembretes POR ETAPA (lista + etiqueta principal)
+//   • Reset do contador quando a ETAPA muda (cliente migrou de fase)
+//   • 5º lembrete = texto gentil "não solicitarei mais por aqui"
+//   • Cada lembrete = email + comentário no card (@card pra notificar cliente)
+//
+// Caso especial AGUARDANDO PAGAMENTO JUNTA COMERCIAL:
+//   • 1º lembrete: imediato (forcarPrimeiro)
+//   • 2º lembrete: 4h após o 1º (dentro do mesmo dia)
+//   • 3º a 5º: 1x ao dia
+//
+// Estado por card+etapa: PropertiesService key "lembrete_{cardId}_{chaveEtapa}"
+//   { primeiroEnvio, ultimoEnvio, tentativas, finalizado, etapaSig }
+// ════════════════════════════════════════════════════════════════════════════
+
 /**
- * Decide se manda email hoje para este card.
- * Regras:
- *   Dias 1-5: diário
- *   Dias 6-10: dia sim, dia não
- *   Dia 11+: avisa Thales uma vez e para
- * Conta dia a partir do primeiro envio registrado.
- * Reset se etiqueta sair (o histórico morre por expiração de Property).
+ * Calcula a "assinatura da etapa" (chave) do card pra rastrear lembretes.
+ * Etapa = lista atual + etiquetas de pendência ativas.
+ * Quando o card muda de lista OU as etiquetas mudam, a chave muda → reset.
+ */
+function _calcularChaveEtapa(card) {
+  const lista = (card.idList || "").substring(0, 8); // 8 chars já bastam pra unicidade
+  const etiquetas = (card.labels || [])
+    .map(l => (l.name || "").trim())
+    .filter(n => DANI_ETIQUETAS_PENDENCIA.indexOf(n) !== -1)
+    .sort()
+    .join(",");
+  return lista + "|" + etiquetas;
+}
+
+/**
+ * Detecta se o card está na lista AGUARDANDO PAGAMENTO JUNTA COMERCIAL.
+ * Esta lista tem regra própria de cadência (1º imediato, 2º 4h depois, depois 1x/dia).
+ */
+function _ehListaAguardandoPagamento(nomeLista) {
+  const n = String(nomeLista || "").toLowerCase();
+  return n.indexOf("aguardando pagamento") !== -1 && n.indexOf("junta") !== -1;
+}
+
+/**
+ * Decide se deve mandar lembrete agora pra este card.
+ * Implementa regras Onda 1.C: 5 max por etapa, reset ao mudar etapa,
+ * tom gentil no 5º. Caso especial AGUARDANDO PAGAMENTO JUNTA.
  */
 function processarLembreteCard(card, codigoCliente, emailsLembretes, emailBloqueado, forcarPrimeiro) {
   const props = PropertiesService.getScriptProperties();
-  const chaveCard = "lembrete_" + card.id;
-  const estadoRaw = props.getProperty(chaveCard);
-  const estado = estadoRaw ? JSON.parse(estadoRaw) : { primeiroEnvio: null, ultimoEnvio: null, tentativas: 0, abandonado: false };
+  const chaveEtapa = _calcularChaveEtapa(card);
+  const chaveProp = "lembrete_" + card.id + "_" + chaveEtapa;
+  const estadoRaw = props.getProperty(chaveProp);
+  const estado = estadoRaw
+    ? JSON.parse(estadoRaw)
+    : { primeiroEnvio: null, ultimoEnvio: null, tentativas: 0, finalizado: false, etapaSig: chaveEtapa };
 
-  if (estado.abandonado) return false;
-
-  const hoje = new Date();
-  const hojeISO = Utilities.formatDate(hoje, Session.getScriptTimeZone(), "yyyy-MM-dd");
-
-  // Calcula dia número (1 = primeiro envio)
-  let diaNumero = 1;
-  if (estado.primeiroEnvio) {
-    const primeiro = new Date(estado.primeiroEnvio + "T00:00:00");
-    const diffMs = hoje.getTime() - primeiro.getTime();
-    diaNumero = Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 1;
-  }
-
-  // Regras de escalonamento
-  let deveMandarHoje = false;
-  let abandonarAgora = false;
-  if (!estado.primeiroEnvio || forcarPrimeiro) {
-    deveMandarHoje = true;
-    diaNumero = 1;
-  } else if (diaNumero <= 5) {
-    deveMandarHoje = estado.ultimoEnvio !== hojeISO;
-  } else if (diaNumero <= 10) {
-    // dia sim, dia não a partir do dia 6 (par sim, ímpar não, relativo ao primeiro)
-    const dpar = (diaNumero - 5) % 2 === 1;
-    deveMandarHoje = dpar && estado.ultimoEnvio !== hojeISO;
-  } else {
-    // dia 11+: Thales é avisado, Dani para
-    abandonarAgora = true;
-  }
-
-  if (abandonarAgora) {
-    avisarThalesAbandono(card, codigoCliente, estado.tentativas);
-    estado.abandonado = true;
-    props.setProperty(chaveCard, JSON.stringify(estado));
+  if (estado.finalizado) {
+    _daniLog("LEMBRETE", "etapa já finalizada (5 lembretes esgotados)", { cardId: card.id, etapa: chaveEtapa });
     return false;
   }
 
-  if (!deveMandarHoje) return false;
+  const MAX_LEMBRETES = 5;
+  const agora = new Date();
+  const hojeISO = Utilities.formatDate(agora, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  const tentativaAtual = (estado.tentativas || 0) + 1;
 
-  // Descobre destinatários
+  // Busca nome da lista (pra detectar caso especial)
+  let nomeLista = "";
+  try { nomeLista = _danigetNomeLista(card.idList); } catch (e) {}
+  const ehAguardandoPag = _ehListaAguardandoPagamento(nomeLista);
+
+  // Decide se deve mandar AGORA
+  let deveMandar = false;
+  let motivo = "";
+
+  if (forcarPrimeiro || !estado.primeiroEnvio) {
+    deveMandar = true;
+    motivo = "primeiro envio";
+  } else if (ehAguardandoPag && tentativaAtual === 2) {
+    // Caso especial: 2º lembrete da AGUARDANDO PAGAMENTO = 4h após 1º
+    const ultimoEnvio = new Date(estado.ultimoEnvio + "T00:00:00");
+    const horasDesdeUltimo = (agora.getTime() - ultimoEnvio.getTime()) / (1000 * 60 * 60);
+    if (horasDesdeUltimo >= 4) {
+      deveMandar = true;
+      motivo = "2º lembrete pagamento (4h após 1º)";
+    }
+  } else if (estado.ultimoEnvio !== hojeISO) {
+    // Regular: 1x ao dia (a partir do 2º — ou 3º no caso pagamento)
+    deveMandar = true;
+    motivo = "lembrete diário";
+  }
+
+  if (!deveMandar) {
+    _daniLog("LEMBRETE", "ainda não é hora", { cardId: card.id, ultimoEnvio: estado.ultimoEnvio, tentativas: estado.tentativas });
+    return false;
+  }
+
+  if (tentativaAtual > MAX_LEMBRETES) {
+    estado.finalizado = true;
+    props.setProperty(chaveProp, JSON.stringify(estado));
+    _daniLog("LEMBRETE", "esgotou max — finalizado pra esta etapa", { cardId: card.id, tentativas: estado.tentativas });
+    return false;
+  }
+
+  // Descobre destinatários (mesma lógica anterior)
   const destinatarios = [];
   if (emailsLembretes) {
     String(emailsLembretes).split(/[,;]/).map(s => s.trim()).filter(validarEmail).forEach(e => {
@@ -2201,41 +2266,61 @@ function processarLembreteCard(card, codigoCliente, emailsLembretes, emailBloque
       }
     });
   }
-
-  // Fallback: extrai email do corpo do card se não há EMAIL_LEMBRETES
   if (destinatarios.length === 0) {
     const emailCard = extrairEmailDoCardDesc(card.desc || "");
     if (emailCard && String(emailBloqueado).toLowerCase() !== emailCard.toLowerCase()) destinatarios.push(emailCard);
   }
-
   if (destinatarios.length === 0) {
-    Logger.log("⚠️ Nenhum destinatário pra card " + card.id);
+    _daniLog("LEMBRETE", "sem destinatário — pulando", { cardId: card.id });
     return false;
   }
 
-  // Busca email de comentário do card (pra CC — resposta vira comentário automático)
   const emailCardTrello = getEmailDoCard(card.id);
-
-  // Monta e envia email
   const etiquetas = (card.labels || []).map(l => l.name).filter(Boolean);
-  const enviou = enviarEmailLembrete({
+  const ehUltimo = tentativaAtual === MAX_LEMBRETES;
+
+  const enviouEmail = enviarEmailLembrete({
     destinatarios: destinatarios,
     emailCardTrello: emailCardTrello,
     cardNome: card.name,
     cardUrl: card.shortUrl,
     etiquetas: etiquetas,
     codigoCliente: codigoCliente,
-    diaNumero: diaNumero,
+    diaNumero: tentativaAtual,
+    ehUltimo: ehUltimo,
   });
 
-  if (enviou) {
+  // Comentário no card a cada lembrete (cliente também é notificado pelo @card)
+  let comentouNoCard = false;
+  try {
+    const textoComent = ehUltimo
+      ? "🔔 Último lembrete por aqui sobre este pendência. Quando puder, fala com a gente — estamos prontos pra seguir. ✨"
+      : "🔔 Lembrete " + tentativaAtual + "/5: ainda aguardamos sua resposta sobre os itens pendentes. Pode dar uma olhadinha quando puder?";
+    comentouNoCard = _daniComentar(card.id, textoComent, /* marcarBoard */ true);
+  } catch (e) {
+    _daniLog("AVISO", "lembrete: falha ao comentar no card", { erro: String(e) });
+  }
+
+  if (enviouEmail || comentouNoCard) {
     if (!estado.primeiroEnvio) estado.primeiroEnvio = hojeISO;
     estado.ultimoEnvio = hojeISO;
-    estado.tentativas = (estado.tentativas || 0) + 1;
-    props.setProperty(chaveCard, JSON.stringify(estado));
-    registrarLembrete({ cardId: card.id, cardNome: card.name, cardUrl: card.shortUrl, codigo: codigoCliente, destinatarios: destinatarios.join(", "), tentativa: estado.tentativas, etiquetas: etiquetas.join(", ") });
+    estado.tentativas = tentativaAtual;
+    if (ehUltimo) estado.finalizado = true;
+    props.setProperty(chaveProp, JSON.stringify(estado));
+
+    registrarLembrete({
+      cardId: card.id, cardNome: card.name, cardUrl: card.shortUrl,
+      codigo: codigoCliente, destinatarios: destinatarios.join(", "),
+      tentativa: tentativaAtual, etiquetas: etiquetas.join(", "),
+    });
+    _daniLog("LEMBRETE", motivo + " enviado", {
+      cardId: card.id, tentativa: tentativaAtual + "/" + MAX_LEMBRETES,
+      etapa: nomeLista, ehUltimo: ehUltimo, destinatarios: destinatarios,
+    });
+    incMetrica("lembrete_enviado");
   }
-  return enviou;
+
+  return enviouEmail || comentouNoCard;
 }
 
 function extrairEmailDoCardDesc(desc) {
@@ -2271,8 +2356,18 @@ function registrarLembrete(d) {
 // =============================================
 function enviarEmailLembrete(opts) {
   const etiquetaTxt = opts.etiquetas.join(" · ");
-  const diaTxt = opts.diaNumero === 1 ? "Novo lembrete" : "Lembrete — dia " + opts.diaNumero;
+  const ehUltimo = opts.ehUltimo === true;
+  const diaTxt = ehUltimo
+    ? "Último lembrete"
+    : (opts.diaNumero === 1 ? "Novo lembrete" : "Lembrete " + opts.diaNumero + "/5");
   const assunto = "🍀 " + diaTxt + " — Pendência no processo " + opts.cardNome;
+  // Mensagem do corpo varia conforme tentativa (gentil progressivo, gentil no fim)
+  const mensagemCorpo = ehUltimo
+    ? 'Esse é o <strong>último lembrete</strong> que vou mandar por aqui sobre essa pendência. ' +
+      'Não é cobrança! Só quero garantir que você não perdeu nossas mensagens. ' +
+      'Quando puder, dá uma olhadinha pra gente seguir o processo. 💛'
+    : 'Identifiquei que o processo abaixo está com uma ou mais <strong>pendências</strong> esperando ação. ' +
+      'Quando puder, vai me ajudar muito pra darmos andamento.';
 
   const html =
     '<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;background:#0d1310;color:#f2f2f2;">' +
@@ -2282,10 +2377,7 @@ function enviarEmailLembrete(opts) {
       '</div>' +
       '<div style="background:#fff;color:#2d2d2d;padding:32px 28px;">' +
         '<p style="font-size:16px;margin:0 0 16px;">Olá! Aqui é a <strong>Dani</strong>, IA da Trevo Legaliza.</p>' +
-        '<p style="font-size:15px;line-height:1.6;margin:0 0 20px;">' +
-          'Identifiquei que o processo abaixo está com uma ou mais <strong>pendências</strong> esperando ação. ' +
-          'Enquanto a etiqueta não for resolvida, vou lembrar você por aqui.' +
-        '</p>' +
+        '<p style="font-size:15px;line-height:1.6;margin:0 0 20px;">' + mensagemCorpo + '</p>' +
         '<div style="background:#fff7ed;border-left:4px solid #f59e0b;padding:16px 20px;margin:20px 0;border-radius:4px;">' +
           '<p style="margin:0 0 6px;color:#92400e;font-size:12px;text-transform:uppercase;font-weight:700;">Pendência(s)</p>' +
           '<p style="margin:0;color:#1a1a1a;font-size:14px;font-weight:600;">' + etiquetaTxt + '</p>' +
@@ -2691,6 +2783,25 @@ function varrerComentariosTrello() {
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 G8 — Email do órgão (Onda 2 — 25/04/2026)
+// ────────────────────────────────────────────────────────────────────────────
+// Lê emails na label Gmail "🏛️ TRIAGEM DE ÓRGÃOS", interpreta via Claude
+// e age conforme veredito:
+//   • DEFERIDO        — comenta no card + email pro cliente "boa notícia"
+//                       + remove etiqueta EM ANÁLISE NO ÓRGÃO
+//   • INDEFERIDO      — DISCRETO: comenta marcando @leticiatonelli3 +
+//                       @trevolegaliza pedindo consulta manual; email
+//                       interno pra trevolegaliza@gmail.com +
+//                       leticia.tonelli@trevolegaliza.com.br
+//                       CLIENTE NÃO É NOTIFICADO (regra do Thales)
+//   • SEM_MOVIMENTACAO — só registra; cron G9 cuida de notificar cliente
+//                       periodicamente
+//   • OUTRO           — registra como pendência pra equipe revisar manual
+// ════════════════════════════════════════════════════════════════════════════
+
+const DANI_ETIQUETA_ANALISE_ORGAO = "EM ANÁLISE NO ÓRGÃO";
+
 function varrerEmailsOrgaos() {
   const nomes = ["🏛️ TRIAGEM DE ÓRGÃOS","TRIAGEM DE ÓRGÃOS","TRIAGEM DE ORGAOS"];
   let label = null;
@@ -2701,36 +2812,182 @@ function varrerEmailsOrgaos() {
     for (const msg of thread.getMessages()) {
       if (!msg.isUnread()) continue;
       try {
-        const interp = interpretarEmailOrgao(msg.getPlainBody(), msg.getSubject(), msg.getFrom());
-        Utilities.sleep(2000);
-        let card = null;
-        if (interp.protocolo) card = buscarCardPorProtocoloViaSearch(interp.protocolo);
-        let respostaDani = "";
-        let cardUrl = "";
-        if (card && card.cardId) {
-          cardUrl = "https://trello.com/c/" + card.cardId;
-          const t = "📧 **Atualização do Órgão Público**\n\n🏛️ **Órgão:** " + (interp.orgao || "N/I") +
-            "\n📋 **Protocolo:** " + (interp.protocolo || "N/A") + "\n\n📝 **Resumo:** " + interp.resumo +
-            "\n\n⚡ **Ação necessária:** " + interp.acao + ASSINATURA_DANI;
-          if (postarComentarioNoCard(card.cardId, t)) {
-            respostaDani = t;
-            incMetrica("dani_comentou_orgao");
-          }
-        }
-        registrarPendencia({
-          dataHora: msg.getDate(), tipo: "E-MAIL ÓRGÃO",
-          cliente: interp.orgao || msg.getFrom(),
-          quadro: card ? card.quadro : "NÃO IDENTIFICADO",
-          card: card ? card.card : "PROTOCOLO: " + (interp.protocolo || "N/A"),
-          cardUrl: cardUrl,
-          conteudo: interp.resumo, respostaDani: respostaDani,
-          classificacao: interp.nivel, acaoSugerida: interp.acao,
-          status: card ? "✅ DANI POSTOU NO CARD" : "PENDENTE"
-        });
-        msg.markRead();
-      } catch (e) { Logger.log("⚠️ Erro órgão (mantido): " + e.message); }
+        _processarEmailOrgao(msg);
+      } catch (e) {
+        _daniLog("ERRO", "varrerEmailsOrgaos: exceção", { erro: String(e), assunto: msg.getSubject() });
+      }
     }
   }
+}
+
+function _processarEmailOrgao(msg) {
+  const corpo = msg.getPlainBody();
+  const assunto = msg.getSubject();
+  const remetente = msg.getFrom();
+
+  _daniLog("ORGAO", "interpretando email", { remetente: remetente, assunto: assunto.substring(0, 100) });
+
+  if (!daniAtiva()) {
+    _daniLog("DRY-RUN", "DANI_ATIVA=false. Não processo email do órgão.");
+    return;
+  }
+
+  const interp = interpretarEmailOrgao(corpo, assunto, remetente);
+  if (!interp) {
+    _daniLog("ORGAO", "interpretação falhou — mantém email não lido");
+    return;
+  }
+  Utilities.sleep(2000);
+
+  let card = null;
+  if (interp.protocolo) card = buscarCardPorProtocoloViaSearch(interp.protocolo);
+
+  _daniLog("ORGAO", "interpretado", {
+    veredito: interp.veredito, orgao: interp.orgao, protocolo: interp.protocolo,
+    cardEncontrado: !!card, cardId: card ? card.cardId : null,
+  });
+
+  // Sem card identificado: registra pendência manual e marca lido
+  if (!card || !card.cardId) {
+    registrarPendencia({
+      dataHora: msg.getDate(), tipo: "E-MAIL ÓRGÃO",
+      cliente: interp.orgao || remetente,
+      quadro: "NÃO IDENTIFICADO",
+      card: "PROTOCOLO: " + (interp.protocolo || "N/A"),
+      cardUrl: "",
+      conteudo: interp.resumo, respostaDani: "",
+      classificacao: "🟡 IMPORTANTE",
+      acaoSugerida: "Verificar manualmente — Dani não achou card pelo protocolo.",
+      status: "PENDENTE",
+    });
+    msg.markRead();
+    return;
+  }
+
+  const cardUrl = "https://trello.com/c/" + card.cardId;
+
+  // Roteamento por veredito
+  if (interp.veredito === "DEFERIDO") {
+    _agirDeferido(card, interp, msg, cardUrl);
+  } else if (interp.veredito === "INDEFERIDO") {
+    _agirIndeferido(card, interp, msg, corpo, cardUrl);
+  } else if (interp.veredito === "SEM_MOVIMENTACAO") {
+    _agirSemMovimentacao(card, interp, msg, cardUrl);
+  } else {
+    _agirOrgaoOutro(card, interp, msg, cardUrl);
+  }
+
+  msg.markRead();
+}
+
+function _agirDeferido(card, interp, msg, cardUrl) {
+  _daniLog("ORGAO", "DEFERIDO — agindo", { cardId: card.cardId });
+
+  // 1. Comentário no card (cliente VÊ — vai marcar @board pra notificar)
+  const textoCard =
+    "✅ **Boa notícia!** Recebemos confirmação do " + (interp.orgao || "órgão") +
+    " — processo **DEFERIDO**.\n\n" +
+    (interp.protocolo ? "📋 Protocolo: " + interp.protocolo + "\n" : "") +
+    (interp.resumo ? "📝 " + interp.resumo + "\n" : "");
+  _daniComentar(card.cardId, textoCard, /* marcarBoard */ true);
+
+  // 2. Email pro cliente
+  const cardCompleto = _danigetCardCompleto(card.cardId);
+  if (cardCompleto && interp.mensagemCliente) {
+    const html = _daniMontarEmailHTML({
+      titulo: "Processo deferido! ✅",
+      mensagem: interp.mensagemCliente,
+      cardNome: cardCompleto.name,
+      cardUrl: cardUrl,
+    });
+    _daniEnviarEmailCliente(cardCompleto, "✅ Deferido — " + cardCompleto.name, html, interp.mensagemCliente);
+  }
+
+  // 3. Remove etiqueta EM ANÁLISE NO ÓRGÃO (se tiver)
+  if (cardCompleto) {
+    _daniRemoverEtiqueta(card.cardId, cardCompleto.idBoard, DANI_ETIQUETA_ANALISE_ORGAO);
+  }
+
+  registrarPendencia({
+    dataHora: msg.getDate(), tipo: "E-MAIL ÓRGÃO",
+    cliente: interp.orgao, quadro: card.quadro, card: card.card, cardUrl: cardUrl,
+    conteudo: interp.resumo, respostaDani: textoCard,
+    classificacao: "🟢 INFORMATIVO", acaoSugerida: "Deferimento — cliente notificado",
+    status: "✅ DANI NOTIFICOU CLIENTE",
+  });
+  incMetrica("dani_orgao_deferido");
+}
+
+function _agirIndeferido(card, interp, msg, corpoOriginal, cardUrl) {
+  _daniLog("ORGAO", "INDEFERIDO — agindo discretamente (cliente NÃO sabe)", { cardId: card.cardId });
+
+  // 1. Comentário discreto no card marcando equipe interna (cliente vê o card mas NÃO entende)
+  const textoCardDiscreto =
+    "🔎 @leticiatonelli3 @trevolegaliza — favor consultar este processo manualmente. " +
+    "O e-mail do órgão sobre este processo não pôde ser visualizado por completo.";
+  _daniComentar(card.cardId, textoCardDiscreto, /* marcarBoard */ false);
+
+  // 2. Email INTERNO explícito (cliente NÃO recebe nada)
+  const destinatariosInternos = (getProps().getProperty("INDEFERIDO_NOTIFY_EMAILS") ||
+    "trevolegaliza@gmail.com,leticia.tonelli@trevolegaliza.com.br")
+    .split(/[,;]/).map(s => s.trim()).filter(validarEmail);
+
+  const corpoEmail =
+    "🚨 INDEFERIMENTO detectado em processo da Trevo Legaliza\n\n" +
+    "Card: " + card.card + "\n" +
+    "Quadro: " + card.quadro + "\n" +
+    "Link: " + cardUrl + "\n" +
+    "Órgão: " + (interp.orgao || "N/A") + "\n" +
+    "Protocolo: " + (interp.protocolo || "N/A") + "\n\n" +
+    "Resumo da Dani:\n" + interp.resumo + "\n\n" +
+    "─── Email original do órgão ───\n" +
+    (corpoOriginal || "").substring(0, 4000) + "\n\n" +
+    "🍀 Dani — IA da Trevo Legaliza";
+
+  try {
+    MailApp.sendEmail({
+      to: destinatariosInternos.join(","),
+      subject: "🚨 INDEFERIMENTO — " + card.card,
+      body: corpoEmail,
+      name: "Dani 🍀 Trevo Legaliza",
+    });
+    _daniLog("ORGAO", "email INDEFERIDO enviado pra equipe", { destinatarios: destinatariosInternos });
+  } catch (e) {
+    _daniLog("ERRO", "INDEFERIDO: falha ao enviar email interno", { erro: String(e) });
+  }
+
+  registrarPendencia({
+    dataHora: msg.getDate(), tipo: "E-MAIL ÓRGÃO",
+    cliente: interp.orgao, quadro: card.quadro, card: card.card, cardUrl: cardUrl,
+    conteudo: interp.resumo, respostaDani: textoCardDiscreto,
+    classificacao: "🔴 URGENTE", acaoSugerida: "INDEFERIMENTO — equipe deve consultar manualmente",
+    status: "🚨 INDEFERIDO — EQUIPE NOTIFICADA",
+  });
+  incMetrica("dani_orgao_indeferido");
+}
+
+function _agirSemMovimentacao(card, interp, msg, cardUrl) {
+  _daniLog("ORGAO", "SEM_MOVIMENTACAO — registra", { cardId: card.cardId });
+  registrarPendencia({
+    dataHora: msg.getDate(), tipo: "E-MAIL ÓRGÃO",
+    cliente: interp.orgao, quadro: card.quadro, card: card.card, cardUrl: cardUrl,
+    conteudo: interp.resumo, respostaDani: "",
+    classificacao: "🟢 INFORMATIVO", acaoSugerida: "Sem movimentação — cron diário cuida de notificar",
+    status: "REGISTRADO",
+  });
+  incMetrica("dani_orgao_sem_mov");
+}
+
+function _agirOrgaoOutro(card, interp, msg, cardUrl) {
+  _daniLog("ORGAO", "OUTRO — registra como pendência manual", { cardId: card.cardId });
+  registrarPendencia({
+    dataHora: msg.getDate(), tipo: "E-MAIL ÓRGÃO",
+    cliente: interp.orgao, quadro: card.quadro, card: card.card, cardUrl: cardUrl,
+    conteudo: interp.resumo, respostaDani: "",
+    classificacao: "🟡 IMPORTANTE", acaoSugerida: "Equipe revisar manualmente",
+    status: "PENDENTE",
+  });
+  incMetrica("dani_orgao_outro");
 }
 
 function parsearEmailTrello(corpo) {
@@ -2869,9 +3126,46 @@ function classificarComentario(com, card, quadro) {
 }
 
 function interpretarEmailOrgao(corpo, assunto, remetente) {
-  const p = 'Você é a Dani, secretária virtual da Trevo Legaliza.\n\nE-MAIL de órgão:\nREMETENTE: ' + remetente + '\nASSUNTO: ' + assunto + '\nCORPO:\n' + corpo.substring(0, 3000) + '\n\nJSON: {"protocolo":"num ou null","resumo":"1-2 frases","nivel":"🟡 IMPORTANTE | 🟢 INFORMATIVO | 🔴 URGENTE","acao":"ação","orgao":"nome"}';
-  try { const j = JSON.parse(chamarClaude(p)); return { protocolo: j.protocolo || null, resumo: j.resumo || "N/A", nivel: j.nivel || "🟡 IMPORTANTE", acao: j.acao || "Verificar.", orgao: j.orgao || remetente }; }
-  catch (e) { return { protocolo: null, resumo: assunto, nivel: "🟡 IMPORTANTE", acao: "Verificar manualmente.", orgao: remetente }; }
+  const p =
+    'Você é a Dani, IA da Trevo Legaliza. Acabou de chegar um email\n' +
+    'de um órgão público sobre um processo. Você precisa interpretar.\n\n' +
+    'EMAIL:\n' +
+    '  De: ' + remetente + '\n' +
+    '  Assunto: ' + assunto + '\n' +
+    '  Corpo:\n' + (corpo || "").substring(0, 3000) + '\n\n' +
+    'EXTRAIA E CLASSIFIQUE:\n\n' +
+    '1. veredito (CRÍTICO — escolha exatamente um):\n' +
+    '   • DEFERIDO        — processo aprovado pelo órgão (sucesso)\n' +
+    '   • INDEFERIDO      — processo recusado/exigência (problema; cliente NÃO pode saber direto)\n' +
+    '   • SEM_MOVIMENTACAO — email só comunica que processo continua em análise\n' +
+    '   • OUTRO           — qualquer outra coisa (esclarecimento, informativo geral)\n\n' +
+    '2. protocolo: número do protocolo do processo (apenas dígitos, ou null se não tem)\n' +
+    '3. orgao: nome do órgão (Junta Comercial, Receita Federal, Prefeitura, etc)\n' +
+    '4. resumo: 1-2 frases descrevendo o conteúdo\n' +
+    '5. mensagemCliente: SE veredito=DEFERIDO, texto curto, gentil, identificando-se como dani.ai,\n' +
+    '   informando o cliente que o processo foi aprovado. Em outros casos, deixe vazio.\n\n' +
+    'INSTRUÇÃO CRÍTICA DE FORMATO:\n' +
+    'Sua resposta DEVE ser exclusivamente JSON válido, começando com { e terminando com }.\n' +
+    'NÃO escreva nada antes ou depois. NÃO use blocos de código. NÃO comente.\n\n' +
+    'Schema:\n' +
+    '{"veredito":"<um dos 4>","protocolo":"<num ou null>","orgao":"<nome>","resumo":"<frase>","mensagemCliente":"<texto ou vazio>"}';
+
+  const j = chamarClaudeJson(p, 800);
+  if (!j) {
+    _daniLog("CLAUDE_FAIL", "interpretarEmailOrgao: retorno null", { remetente: remetente, assunto: (assunto || "").substring(0, 100) });
+    return null;
+  }
+  if (["DEFERIDO", "INDEFERIDO", "SEM_MOVIMENTACAO", "OUTRO"].indexOf(j.veredito) === -1) {
+    _daniLog("CLAUDE_FAIL", "interpretarEmailOrgao: veredito inválido", j);
+    j.veredito = "OUTRO";
+  }
+  return {
+    veredito: j.veredito,
+    protocolo: j.protocolo || null,
+    orgao: j.orgao || remetente,
+    resumo: j.resumo || assunto,
+    mensagemCliente: j.mensagemCliente || "",
+  };
 }
 
 function buscarCardPorProtocoloViaSearch(protocolo) {
