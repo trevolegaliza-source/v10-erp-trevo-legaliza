@@ -1,6 +1,18 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.7.0 — 25/04/2026 — DANI ONDA 4 COMPLETA — G3 + Dashboard
+//   • v7.7.0 G3: EM ANDAMENTO automática via keyword detection
+//     (16 padrões regex: "iniciando", "começando", "vou redigir",
+//      "redigindo", "preparando", etc). Roda ANTES da classificação
+//     Claude — barato, determinístico. Aplica EM ANDAMENTO + remove
+//     PRONTO PARA SER FEITO.
+//   • v7.7.0 G2 SOLICITA_*: agora também REMOVE EM ANDAMENTO e
+//     PRONTO PARA SER FEITO antes de aplicar pendência. "Bola tá com
+//     cliente" — limpa etiquetas Trevo.
+//   • v7.7.0 gerarDashboardDani(): cria/atualiza aba DANI_DASHBOARD
+//     com status, métricas do dia, cards com lembretes em curso,
+//     top cards mais demorados em cada bucket.
 // v7.6.1 — 25/04/2026 — Onda 4 + G9 (notificação periódica análise órgão)
 //   • v7.6.1 G9: cron 9h30 — pra cada card com EM ANÁLISE NO ÓRGÃO há ≥1d,
 //     envia email pro cliente "permanece em análise". Anti-spam: 1x/dia.
@@ -1809,6 +1821,32 @@ function handlerComentario(action, cli) {
   return _danihandlerG4(action, cli, texto, autor, cardId);
 }
 
+// G3 — EM ANDAMENTO automática (keyword detection)
+// Detecta se funcionário sinalizou que começou a trabalhar.
+// Roda ANTES da classificação Claude — barato, determinístico.
+const DANI_KEYWORDS_INICIO = [
+  /\biniciando\b/i, /\binicio\b/i, /\binício\b/i,
+  /\bcome[çc]ando\b/i, /\bcome[çc]o\b/i, /\bvou come[çc]ar\b/i,
+  /\bvou trabalhar\b/i, /\btrabalhando agora\b/i, /\bem andamento\b/i,
+  /\bjá em an[áa]lise\b/i, /\bj[áa] estou\b.*\b(redigindo|preparando|montando|fazendo)\b/i,
+  /\bvou redigir\b/i, /\bvou preparar\b/i, /\bvou montar\b/i,
+  /\bredigindo\b/i, /\bpreparando\b/i, /\bmontando\b/i,
+  /\btomei (esse|este) processo\b/i, /\bpegando esse processo\b/i,
+];
+
+function _detectarInicioTrabalho(texto) {
+  const t = String(texto || "");
+  return DANI_KEYWORDS_INICIO.some(rx => rx.test(t));
+}
+
+function _aplicarEmAndamento(cardId, boardId) {
+  // Remove PRONTO PARA SER FEITO (se tiver) e aplica EM ANDAMENTO
+  _daniRemoverEtiqueta(cardId, boardId, DANI_ETIQUETA_PRONTO);
+  _daniAplicarEtiqueta(cardId, boardId, "EM ANDAMENTO");
+  incMetrica("dani_g3_em_andamento_aplicada");
+  _daniLog("G3", "EM ANDAMENTO aplicada (keyword detect)", { cardId: cardId });
+}
+
 function _danihandlerG2(action, cli, texto, autor, cardId) {
   _daniLog("G2", "iniciado", { cardId: cardId, autor: autor });
 
@@ -1829,6 +1867,11 @@ function _danihandlerG2(action, cli, texto, autor, cardId) {
   };
 
   _daniLog("G2", "contexto montado", contexto);
+
+  // G3 — Detecção de início de trabalho (keyword, sem IA)
+  if (_detectarInicioTrabalho(texto) && daniAtiva()) {
+    _aplicarEmAndamento(cardId, card.idBoard);
+  }
 
   // Modo dry-run: só loga o que faria
   if (!daniAtiva()) {
@@ -1862,6 +1905,9 @@ function _danihandlerG2(action, cli, texto, autor, cardId) {
   try {
     if (cls.acao === "SOLICITA_DOC") {
       _daniLog("G2", "aplicando SOLICITA_DOC...");
+      // Bola tá com cliente agora — remove etiquetas Trevo
+      _daniRemoverEtiqueta(cardId, card.idBoard, "EM ANDAMENTO");
+      _daniRemoverEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_PRONTO);
       _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_DOC);
       let emailOk = false, comentOk = false;
       if (cls.mensagemCliente) {
@@ -1881,6 +1927,8 @@ function _danihandlerG2(action, cli, texto, autor, cardId) {
 
     if (cls.acao === "SOLICITA_RESPOSTA") {
       _daniLog("G2", "aplicando SOLICITA_RESPOSTA...");
+      _daniRemoverEtiqueta(cardId, card.idBoard, "EM ANDAMENTO");
+      _daniRemoverEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_PRONTO);
       _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_RESP);
       let emailOk = false, comentOk = false;
       if (cls.mensagemCliente) {
@@ -2317,6 +2365,146 @@ function reconstruirBucketsCard(cardId) {
   Logger.log("  Cliente: " + prazos.cliente_dias + "d");
   Logger.log("  Órgão:   " + prazos.orgao_dias + "d");
   return prazos;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 DANI DASHBOARD — visão geral em 1 aba (Onda 4 final)
+// ────────────────────────────────────────────────────────────────────────────
+// Cria/atualiza aba "DANI_DASHBOARD" da planilha com:
+//   • Status atual (DANI_ATIVA, total webhooks, total cards monitorados)
+//   • Métricas de hoje (de aba MÉTRICAS — chamadas Claude, ações tomadas)
+//   • Top 10 cards com mais lembretes ativos
+//   • Top 10 cards mais demorados em cada bucket
+//
+// Roda manualmente do editor: gerarDashboardDani()
+// ════════════════════════════════════════════════════════════════════════════
+
+function gerarDashboardDani() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let aba = ss.getSheetByName("DANI_DASHBOARD");
+  if (!aba) {
+    aba = ss.insertSheet("DANI_DASHBOARD");
+  }
+  aba.clear();
+
+  const props = getProps();
+  const todasProps = props.getProperties();
+  const agora = new Date();
+  const hoje = Utilities.formatDate(agora, Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+  let linha = 1;
+  const escrever = (col, valor, bold) => {
+    aba.getRange(linha, col).setValue(valor);
+    if (bold) aba.getRange(linha, col).setFontWeight("bold");
+  };
+  const titulo = (txt) => {
+    aba.getRange(linha, 1).setValue(txt).setFontWeight("bold").setFontSize(14).setBackground("#1a3d26").setFontColor("#ffffff");
+    linha++;
+  };
+  const sub = (txt) => {
+    aba.getRange(linha, 1).setValue(txt).setFontWeight("bold").setBackground("#f0f7f2");
+    linha++;
+  };
+
+  // ─── 1. STATUS ATUAL ──
+  titulo("🤖 DANI v1.0 — Dashboard");
+  escrever(1, "Atualizado em:", true); escrever(2, agora);
+  linha++;
+
+  sub("⚙️ Status");
+  escrever(1, "DANI_ATIVA:"); escrever(2, daniAtiva() ? "🟢 LIGADA" : "🔴 DESLIGADA"); linha++;
+  escrever(1, "WEBAPP_URL:"); escrever(2, props.getProperty("WEBAPP_URL") || "(vazio)"); linha++;
+  escrever(1, "DANI_FORCAR_CLIENTE:"); escrever(2, props.getProperty("DANI_FORCAR_CLIENTE") || "(vazio)"); linha++;
+
+  // Webhooks
+  let totalWebhooks = "?";
+  try {
+    const r = trelloGet("/1/tokens/" + prop("TRELLO_TOKEN") + "/webhooks", {});
+    if (r.getResponseCode() === 200) {
+      const lista = JSON.parse(r.getContentText());
+      totalWebhooks = lista.filter(w => w.active).length + " ativos";
+    }
+  } catch (e) {}
+  escrever(1, "Webhooks Trello:"); escrever(2, totalWebhooks); linha++;
+  linha++;
+
+  // ─── 2. MÉTRICAS DE HOJE ──
+  sub("📊 Métricas de hoje (" + hoje + ")");
+  try {
+    const abaMetricas = ss.getSheetByName("MÉTRICAS");
+    if (abaMetricas) {
+      const dados = abaMetricas.getDataRange().getValues();
+      let temAlguma = false;
+      escrever(1, "Métrica", true); escrever(2, "Valor", true); linha++;
+      for (let i = 1; i < dados.length; i++) {
+        if (Utilities.formatDate(new Date(dados[i][0]), Session.getScriptTimeZone(), "yyyy-MM-dd") === hoje) {
+          escrever(1, dados[i][1]); escrever(2, dados[i][2]); linha++;
+          temAlguma = true;
+        }
+      }
+      if (!temAlguma) { escrever(1, "(nenhuma ação Dani hoje ainda)"); linha++; }
+    } else {
+      escrever(1, "(aba MÉTRICAS não existe ainda)"); linha++;
+    }
+  } catch (e) { escrever(1, "Erro: " + e.message); linha++; }
+  linha++;
+
+  // ─── 3. CARDS COM PENDÊNCIAS / LEMBRETES ──
+  sub("🔔 Cards com lembretes em curso");
+  escrever(1, "Card ID", true); escrever(2, "Etapa", true); escrever(3, "Tentativas", true);
+  escrever(4, "Último envio", true); escrever(5, "Finalizado?", true); linha++;
+
+  let cardsLembrete = [];
+  Object.keys(todasProps).forEach(k => {
+    if (k.indexOf("lembrete_") !== 0) return;
+    try {
+      const partes = k.replace("lembrete_", "").split("_");
+      const cardId = partes[0];
+      const estado = JSON.parse(todasProps[k]);
+      cardsLembrete.push({ cardId: cardId, etapa: partes.slice(1).join("_"), estado: estado });
+    } catch (e) {}
+  });
+  cardsLembrete.sort((a, b) => (b.estado.tentativas || 0) - (a.estado.tentativas || 0));
+  cardsLembrete.slice(0, 15).forEach(c => {
+    escrever(1, c.cardId);
+    escrever(2, (c.etapa || "").substring(0, 50));
+    escrever(3, c.estado.tentativas || 0);
+    escrever(4, c.estado.ultimoEnvio || "-");
+    escrever(5, c.estado.finalizado ? "✅" : "");
+    linha++;
+  });
+  if (cardsLembrete.length === 0) { escrever(1, "(nenhum card em sequência de lembretes)"); linha++; }
+  linha++;
+
+  // ─── 4. TOP CARDS POR BUCKET ──
+  sub("⏱️ Cards mais demorados por bucket (acumulado)");
+  escrever(1, "Card ID", true); escrever(2, "Bucket", true); escrever(3, "Dias", true); linha++;
+
+  const buckets = {};
+  Object.keys(todasProps).forEach(k => {
+    const m = k.match(/^bucket_total_(.+?)_(TREVO|CLIENTE|ORGAO)$/);
+    if (!m) return;
+    const segundos = parseInt(todasProps[k], 10);
+    if (segundos < 86400) return; // só mostra ≥1 dia
+    if (!buckets[m[2]]) buckets[m[2]] = [];
+    buckets[m[2]].push({ cardId: m[1], segundos: segundos });
+  });
+
+  ["TREVO", "CLIENTE", "ORGAO"].forEach(b => {
+    const lista = (buckets[b] || []).sort((x, y) => y.segundos - x.segundos).slice(0, 5);
+    lista.forEach(item => {
+      escrever(1, item.cardId);
+      escrever(2, b);
+      escrever(3, (item.segundos / 86400).toFixed(1));
+      linha++;
+    });
+  });
+  if (Object.keys(buckets).length === 0) { escrever(1, "(buckets ainda sendo populados — entre 1-7 dias)"); linha++; }
+
+  // Auto-fit
+  for (let c = 1; c <= 5; c++) aba.autoResizeColumn(c);
+
+  Logger.log("✅ Dashboard gerado em DANI_DASHBOARD (linha " + linha + ")");
 }
 
 /**
