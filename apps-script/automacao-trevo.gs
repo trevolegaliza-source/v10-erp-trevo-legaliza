@@ -418,6 +418,31 @@ function avisarFalhaCriacao(emailSolicitante, nomeSolicitante, nomeEmpresa) {
 // Agora: olha o VALOR — se o texto já está na descrição, pula;
 // caso contrário, adiciona em "Campos adicionais". Sem blacklist.
 // =============================================
+// Chaves que NUNCA aparecem em "Campos Adicionais" — declarações de ciência,
+// LGPD, pesquisa de satisfação. Elas existem só pra tracking, não fazem parte
+// das informações operacionais do processo.
+const CAMPOS_IGNORAR_SEMPRE = [
+  /declara[çc][ãa]o\s+de\s+ci[êe]ncia/i,
+  /li\s+e\s+aceito/i,
+  /aceito\s+os\s+termos/i,
+  /lgpd/i,
+];
+
+// Pares (regex chave, regexes valores default).
+// Se chave casa E valor bate com algum default, ignora.
+// Se cliente ESCREVEU algo diferente (ex.: feedback real), aparece normalmente.
+const CAMPOS_IGNORAR_SE_DEFAULT = [
+  {
+    chave: /fe?ed?back/i,
+    valoresDefault: [
+      /^achei\s+muito\s+bom/i,
+      /^agora\s+n[ãa]o/i,
+      /^sem\s+feedback/i,
+      /^nada\s+a\s+declarar/i,
+    ],
+  },
+];
+
 function montarCamposNaoMapeados(r, descricaoAtual) {
   let out = "\n\n═══════════════════════════\n📋 **CAMPOS ADICIONAIS DO FORMULÁRIO**\n═══════════════════════════\n\n";
   let teveAlgo = false;
@@ -425,18 +450,23 @@ function montarCamposNaoMapeados(r, descricaoAtual) {
 
   for (const chave in r) {
     if (CAMPOS_JA_USADOS.has(chave)) continue;
-    // 🔑 v6.3: pula chaves que já foram consumidas por alguma chamada campo(...)
-    // durante a montagem da descrição do tipo (Abertura/Alteração/etc).
     if (__chavesUsadasDescricao && __chavesUsadasDescricao.has(chave)) continue;
+
+    // 🔇 Declarações de ciência / LGPD: ignora SEMPRE
+    if (CAMPOS_IGNORAR_SEMPRE.some(rx => rx.test(chave))) continue;
 
     const valor = (r[chave] || [""])[0];
     if (!valor || String(valor).trim() === "") continue;
     if (String(valor).includes("drive.google.com")) continue;
 
     const valorLimpo = String(valor).trim();
-    // Check secundário por valor (amostra 60 chars) — redundância de segurança
-    // pra pegar casos onde o mapeamento da chave falhou mas o valor foi pra descrição
-    // por outra via.
+
+    // 🔇 Feedback com valor default: ignora.
+    // Feedback real (cliente escreveu algo diferente) aparece normalmente.
+    const regraDefault = CAMPOS_IGNORAR_SE_DEFAULT.find(c => c.chave.test(chave));
+    if (regraDefault && regraDefault.valoresDefault.some(rx => rx.test(valorLimpo))) continue;
+
+    // Check secundário: se valor já está na descrição, pula
     const amostra = valorLimpo.substring(0, 60).toLowerCase();
     if (amostra.length >= 15 && descLower.includes(amostra)) continue;
 
