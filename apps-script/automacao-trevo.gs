@@ -1272,21 +1272,35 @@ function desativarDani() {
 }
 
 /**
- * Prepara ambiente de teste: roda MapearClientes + garantirWebhooks + pede
- * usuário Trello que vai simular cliente. Uso em board novo (ex.: TESTE DANI).
+ * Prepara ambiente de teste: roda MapearClientes + garantirWebhooks +
+ * pede usuário Trello que vai simular cliente.
+ *
+ * Tolerante a UI ausente: se rodar direto do editor (sem planilha aberta),
+ * faz as 2 primeiras etapas e instrui Thales a setar manualmente.
  */
 function setupTesteDani() {
-  const ui = SpreadsheetApp.getUi();
-
   // 1) Mapeia boards (pega novos)
-  Logger.log("🔄 Mapeando clientes...");
+  Logger.log("🔄 [1/3] Mapeando clientes...");
   try { MapearClientes(); } catch (e) { Logger.log("⚠️ MapearClientes: " + e.message); }
 
   // 2) Cria webhooks pros novos
-  Logger.log("🔗 Garantindo webhooks...");
+  Logger.log("🔗 [2/3] Garantindo webhooks...");
   try { garantirWebhooksTodosBoards(); } catch (e) { Logger.log("⚠️ garantirWebhooks: " + e.message); }
 
-  // 3) Pede usuário cliente fake
+  // 3) Tenta UI; se falhar, instrui setup manual
+  Logger.log("🧪 [3/3] Configurando DANI_FORCAR_CLIENTE...");
+  let ui;
+  try {
+    ui = SpreadsheetApp.getUi();
+  } catch (e) {
+    const atual = getProps().getProperty("DANI_FORCAR_CLIENTE") || "(vazio)";
+    Logger.log("⚠️ UI não disponível (rode da planilha pra ter prompt).");
+    Logger.log("ℹ️ DANI_FORCAR_CLIENTE atual: " + atual);
+    Logger.log("ℹ️ Pra setar manualmente, rode: setForcarCliente('carolinaguirado7')");
+    Logger.log("ℹ️ Pra limpar, rode: setForcarCliente('')");
+    return;
+  }
+
   const atualForcar = getProps().getProperty("DANI_FORCAR_CLIENTE") || "";
   const resp = ui.prompt(
     "🧪 Setup teste Dani",
@@ -1299,16 +1313,49 @@ function setupTesteDani() {
   );
   if (resp.getSelectedButton() === ui.Button.OK) {
     const valor = resp.getResponseText().trim();
+    setForcarCliente(valor);
     if (valor) {
-      getProps().setProperty("DANI_FORCAR_CLIENTE", valor);
-      __equipeInternaCache = null;
       ui.alert("✅ Setup teste concluído.\n\nForçando como cliente: " + valor + "\n\nProx passos:\n1) Ativa Dani: ativarDani()\n2) Cria card no board com desc contendo:\n📧 E-MAIL: seu-email@aqui.com\n3) Comente no card como funcionário interno (ex: Letícia)");
     } else {
-      getProps().deleteProperty("DANI_FORCAR_CLIENTE");
-      __equipeInternaCache = null;
       ui.alert("✅ DANI_FORCAR_CLIENTE limpo. Comportamento padrão.");
     }
   }
+}
+
+/**
+ * Atalho não-UI: seta DANI_FORCAR_CLIENTE direto. Rodar do editor.
+ * Use string vazia pra limpar.
+ */
+function setForcarCliente(usernames) {
+  if (usernames && String(usernames).trim()) {
+    getProps().setProperty("DANI_FORCAR_CLIENTE", String(usernames).trim());
+    Logger.log("✅ DANI_FORCAR_CLIENTE = " + usernames);
+  } else {
+    getProps().deleteProperty("DANI_FORCAR_CLIENTE");
+    Logger.log("✅ DANI_FORCAR_CLIENTE limpo.");
+  }
+  __equipeInternaCache = null;
+}
+
+/**
+ * Shortcut hardcoded pro teste atual: força Carolina como cliente fake.
+ * Rode UMA VEZ no editor depois de colar a v7.2.1.
+ */
+function setupTesteDani_Carolina() {
+  Logger.log("🧪 Configurando teste Dani com Carolina como cliente fake...");
+  try { MapearClientes(); Logger.log("✅ MapearClientes OK"); }
+  catch (e) { Logger.log("⚠️ MapearClientes: " + e.message); }
+  try { garantirWebhooksTodosBoards(); Logger.log("✅ garantirWebhooks OK"); }
+  catch (e) { Logger.log("⚠️ garantirWebhooks: " + e.message); }
+  setForcarCliente("carolinaguirado7");
+  Logger.log("");
+  Logger.log("═══════════════════════════════════════");
+  Logger.log("✅ Setup teste pronto. Próximos passos:");
+  Logger.log("  1. Roda ativarDani() no editor");
+  Logger.log("  2. Cria card no board TESTE DANI com 📧 E-MAIL: na desc");
+  Logger.log("  3. Letícia comenta @card pedindo doc");
+  Logger.log("  4. Verifica etiqueta + email + comentário Dani");
+  Logger.log("═══════════════════════════════════════");
 }
 
 function daniAtiva() {
