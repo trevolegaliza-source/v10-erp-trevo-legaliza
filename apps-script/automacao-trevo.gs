@@ -1,6 +1,16 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.6.0 — 25/04/2026 — DANI ONDA 4 (cálculo dos 3 buckets de prazo)
+//   • v7.6.0 handlerEtiquetaAdd registra timestamp de início em property
+//   • v7.6.0 handlerEtiquetaRemove calcula tempo decorrido e soma no
+//     bucket correspondente (TREVO/CLIENTE/ORGAO)
+//   • v7.6.0 DANI_ETIQUETA_BUCKET — mapa etiqueta → bucket
+//   • v7.6.0 getPrazosDani(cardId) → {trevo, cliente, orgao} em segundos
+//     incluindo tempo "em curso" das etiquetas atualmente aplicadas
+//   • v7.6.0 reconstruirBucketsCard(cardId) — popula histórico via
+//     /actions do Trello pra cards já existentes (limite 1000 actions)
+//   • v7.6.0 mostrarPrazosCard(cardId) — utility de debug (Logger)
 // v7.5.0 — 25/04/2026 — DANI ONDA 3 (regras especiais por lista)
 //   • v7.5.0 G10: chegada em ALVARÁS E LICENÇAS → oferece orçamento ao cliente
 //                 (mensagem premium + email + comentário; salva data pra G11)
@@ -2108,16 +2118,215 @@ function _danihandlerG5(action, cli) {
 
 // ─── Outros handlers (stubs) — implementação em ondas seguintes ────────────
 
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 Onda 4 — CÁLCULO DOS 3 BUCKETS DE PRAZO
+// ────────────────────────────────────────────────────────────────────────────
+// Cada etiqueta de status do Trello mapeia pra um bucket de prazo:
+//   • TREVO     — trabalho conosco (PRONTO PARA SER FEITO, EM ANDAMENTO,
+//                 EXIGÊNCIA)
+//   • CLIENTE   — espera pelo cliente (DOCUMENTO PENDENTE, RESPOSTA DE
+//                 COMENTÁRIO PENDENTE, AGUARDANDO ASSINATURAS)
+//   • ORGAO     — espera pelo órgão (EM ANÁLISE NO ÓRGÃO, CHAMADO ABERTO)
+//
+// Quando etiqueta é APLICADA: salvamos timestamp_inicio em property.
+// Quando etiqueta é REMOVIDA: calculamos tempo decorrido e somamos no total
+// daquele bucket pro card.
+//
+// Properties:
+//   "bucket_inicio_<cardId>_<etiqueta>" — timestamp ISO do início (limpa ao remover)
+//   "bucket_total_<cardId>_<TREVO|CLIENTE|ORGAO>" — segundos acumulados
+//
+// Pra acessar relatório: getPrazosDani(cardId) retorna {trevo, cliente, orgao}
+// em segundos. Conversão pra dias/horas é responsabilidade do consumidor.
+// ════════════════════════════════════════════════════════════════════════════
+
+const DANI_ETIQUETA_BUCKET = {
+  // Etiquetas Trevo (trabalho nosso)
+  "PRONTO PARA SER FEITO":              "TREVO",
+  "EM ANDAMENTO":                       "TREVO",
+  "EXIGÊNCIA":                          "TREVO",
+  // Etiquetas Cliente (espera deles)
+  "DOCUMENTO PENDENTE":                 "CLIENTE",
+  "RESPOSTA DE COMENTÁRIO PENDENTE":    "CLIENTE",
+  "AGUARDANDO ASSINATURAS":             "CLIENTE",
+  // Etiquetas Órgão (espera deles)
+  "EM ANÁLISE NO ÓRGÃO":                "ORGAO",
+  "CHAMADO ABERTO":                     "ORGAO",
+};
+
+function _bucketDaEtiqueta(nomeEtiqueta) {
+  return DANI_ETIQUETA_BUCKET[(nomeEtiqueta || "").trim()] || null;
+}
+
 function handlerEtiquetaAdd(action, cli) {
   const label = (action.data && action.data.label && action.data.label.name) || "";
-  Logger.log("  🏷️  etiqueta adicionada: " + label);
-  return _respJson({ ok: true, handler: "etiqueta_add", label: label, _todo: "Onda 4 (cálculo de prazo)" });
+  const cardId = (action.data && action.data.card && action.data.card.id) || "";
+  const bucket = _bucketDaEtiqueta(label);
+
+  _daniLog("ETIQUETA+", label, { cardId: cardId, bucket: bucket });
+
+  if (_jaProcessadoAcao(action.id)) return _respJson({ ok: true, ignored: "ja_processado" });
+  if (!bucket || !cardId) return _respJson({ ok: true, ignored: "sem_bucket_ou_card" });
+
+  // Salva timestamp de início (mesmo em dry-run — não custa nada e é só estado)
+  const props = getProps();
+  const chaveInicio = "bucket_inicio_" + cardId + "_" + label;
+  props.setProperty(chaveInicio, new Date().toISOString());
+
+  return _respJson({ ok: true, bucket: bucket, registrado: true });
 }
 
 function handlerEtiquetaRemove(action, cli) {
   const label = (action.data && action.data.label && action.data.label.name) || "";
-  Logger.log("  🚫 etiqueta removida: " + label);
-  return _respJson({ ok: true, handler: "etiqueta_remove", label: label, _todo: "Onda 4 (cálculo de prazo)" });
+  const cardId = (action.data && action.data.card && action.data.card.id) || "";
+  const bucket = _bucketDaEtiqueta(label);
+
+  _daniLog("ETIQUETA-", label, { cardId: cardId, bucket: bucket });
+
+  if (_jaProcessadoAcao(action.id)) return _respJson({ ok: true, ignored: "ja_processado" });
+  if (!bucket || !cardId) return _respJson({ ok: true, ignored: "sem_bucket_ou_card" });
+
+  const props = getProps();
+  const chaveInicio = "bucket_inicio_" + cardId + "_" + label;
+  const inicioRaw = props.getProperty(chaveInicio);
+
+  if (!inicioRaw) {
+    _daniLog("BUCKET", "remove sem inicio registrado — ignorando", { cardId: cardId, label: label });
+    return _respJson({ ok: true, ignored: "sem_inicio" });
+  }
+
+  const inicio = new Date(inicioRaw);
+  const fim = new Date();
+  const segundos = Math.max(0, Math.floor((fim - inicio) / 1000));
+
+  // Soma no acumulado
+  const chaveTotal = "bucket_total_" + cardId + "_" + bucket;
+  const totalAtual = parseInt(props.getProperty(chaveTotal) || "0", 10);
+  props.setProperty(chaveTotal, String(totalAtual + segundos));
+  props.deleteProperty(chaveInicio);
+
+  _daniLog("BUCKET", "tempo somado", {
+    cardId: cardId, etiqueta: label, bucket: bucket,
+    segundos: segundos, total_segundos: totalAtual + segundos,
+  });
+
+  return _respJson({ ok: true, bucket: bucket, segundos_adicionados: segundos, total_segundos: totalAtual + segundos });
+}
+
+/**
+ * Retorna prazos acumulados de um card em segundos pra cada bucket.
+ * Inclui o tempo "em curso" das etiquetas atualmente aplicadas (não
+ * só os já fechados).
+ */
+function getPrazosDani(cardId) {
+  const props = getProps();
+  const todas = props.getProperties();
+  const result = { TREVO: 0, CLIENTE: 0, ORGAO: 0 };
+
+  // 1) Acumulados (etiquetas já removidas)
+  Object.keys(todas).forEach(k => {
+    const m = k.match(/^bucket_total_(.+?)_(TREVO|CLIENTE|ORGAO)$/);
+    if (m && m[1] === cardId) {
+      result[m[2]] = (result[m[2]] || 0) + parseInt(todas[k], 10);
+    }
+  });
+
+  // 2) Em curso (etiquetas ativas)
+  const agora = new Date();
+  Object.keys(todas).forEach(k => {
+    const prefix = "bucket_inicio_" + cardId + "_";
+    if (k.indexOf(prefix) !== 0) return;
+    const etiqueta = k.replace(prefix, "");
+    const bucket = _bucketDaEtiqueta(etiqueta);
+    if (!bucket) return;
+    const inicio = new Date(todas[k]);
+    const segundos = Math.max(0, Math.floor((agora - inicio) / 1000));
+    result[bucket] += segundos;
+  });
+
+  return {
+    trevo: result.TREVO,
+    cliente: result.CLIENTE,
+    orgao: result.ORGAO,
+    trevo_dias: Math.round(result.TREVO / 86400 * 10) / 10,
+    cliente_dias: Math.round(result.CLIENTE / 86400 * 10) / 10,
+    orgao_dias: Math.round(result.ORGAO / 86400 * 10) / 10,
+  };
+}
+
+/**
+ * Reconstrói buckets de um card percorrendo o histórico completo de actions
+ * do Trello (commentCard, addLabelToCard, removeLabelToCard). Útil pra
+ * popular cards já existentes que não tiveram webhook ativo desde a criação.
+ *
+ * Custo: 1 chamada API por card (limite 1000 actions).
+ */
+function reconstruirBucketsCard(cardId) {
+  Logger.log("🔁 Reconstruindo buckets do card " + cardId + "...");
+  const r = trelloGet("/1/cards/" + cardId + "/actions", {
+    filter: "addLabelToCard,removeLabelToCard",
+    limit: "1000",
+  });
+  if (r.getResponseCode() !== 200) {
+    Logger.log("❌ Erro: " + r.getContentText());
+    return;
+  }
+  const acoes = JSON.parse(r.getContentText()).reverse(); // ordem cronológica
+  const props = getProps();
+
+  // Limpa estado anterior do card
+  Object.keys(props.getProperties()).forEach(k => {
+    if (k.indexOf("bucket_inicio_" + cardId + "_") === 0 ||
+        k.indexOf("bucket_total_" + cardId + "_") === 0) {
+      props.deleteProperty(k);
+    }
+  });
+
+  let totalEventos = 0;
+  acoes.forEach(a => {
+    const label = (a.data && a.data.label && a.data.label.name) || "";
+    const bucket = _bucketDaEtiqueta(label);
+    if (!bucket) return;
+
+    if (a.type === "addLabelToCard") {
+      props.setProperty("bucket_inicio_" + cardId + "_" + label, a.date);
+      totalEventos++;
+    } else if (a.type === "removeLabelToCard") {
+      const chaveInicio = "bucket_inicio_" + cardId + "_" + label;
+      const inicioRaw = props.getProperty(chaveInicio);
+      if (inicioRaw) {
+        const segundos = Math.max(0, Math.floor((new Date(a.date) - new Date(inicioRaw)) / 1000));
+        const chaveTotal = "bucket_total_" + cardId + "_" + bucket;
+        const totalAtual = parseInt(props.getProperty(chaveTotal) || "0", 10);
+        props.setProperty(chaveTotal, String(totalAtual + segundos));
+        props.deleteProperty(chaveInicio);
+        totalEventos++;
+      }
+    }
+  });
+
+  const prazos = getPrazosDani(cardId);
+  Logger.log("✅ Reconstruído. " + totalEventos + " eventos processados.");
+  Logger.log("  Trevo:   " + prazos.trevo_dias + "d");
+  Logger.log("  Cliente: " + prazos.cliente_dias + "d");
+  Logger.log("  Órgão:   " + prazos.orgao_dias + "d");
+  return prazos;
+}
+
+/**
+ * Mostra prazos de um card. Roda do editor.
+ */
+function mostrarPrazosCard(cardId) {
+  if (!cardId) {
+    Logger.log("Uso: mostrarPrazosCard('<id_do_card>')");
+    return;
+  }
+  const p = getPrazosDani(cardId);
+  Logger.log("══ Prazos do card " + cardId + " ══");
+  Logger.log("  🟢 Trevo:   " + p.trevo_dias + "d (" + p.trevo + "s)");
+  Logger.log("  🟡 Cliente: " + p.cliente_dias + "d (" + p.cliente + "s)");
+  Logger.log("  🔵 Órgão:   " + p.orgao_dias + "d (" + p.orgao + "s)");
+  Logger.log("  Total:     " + (p.trevo_dias + p.cliente_dias + p.orgao_dias).toFixed(1) + "d");
 }
 
 // ════════════════════════════════════════════════════════════════════════════
