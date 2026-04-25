@@ -1,6 +1,11 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.2.5 — 25/04/2026 — DANI ONDA 1.A + LOG PERSISTENTE
+//   • v7.2.5: aba DANI_LOG persiste cada passo do fluxo G2 na planilha
+//             (Logger.log às vezes não persiste em deploys publicados).
+//             Loop guard agora usa string explícita "Dani — Secretária Virtual".
+//             Try/catch em todas as etapas → erro é registrado em DANI_LOG.
 // v7.2.3 — 24/04/2026 — DANI ONDA 1.A — G2 (FUNCIONÁRIO PEDE)
 //   • v7.2.3: filtra "Declaração de ciência" / LGPD do card
 //             + filtra Feedback default ("Achei muito bom 💓") —
@@ -1402,6 +1407,38 @@ function daniAtiva() {
 }
 
 /**
+ * Log persistente em aba DANI_LOG da planilha. Usar em fluxo de webhook
+ * onde Logger.log às vezes não aparece no painel Execuções (deploys).
+ * Mantém últimos 500 registros (rotaciona).
+ */
+function _daniLog(nivel, mensagem, dados) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let aba = ss.getSheetByName("DANI_LOG");
+    if (!aba) {
+      aba = ss.insertSheet("DANI_LOG");
+      aba.getRange(1, 1, 1, 4).setValues([["TIMESTAMP", "NÍVEL", "MENSAGEM", "DADOS"]]);
+      aba.getRange(1, 1, 1, 4).setFontWeight("bold");
+      aba.setFrozenRows(1);
+      aba.setColumnWidth(1, 180);
+      aba.setColumnWidth(3, 500);
+      aba.setColumnWidth(4, 600);
+    }
+    const dadosStr = dados ? (typeof dados === "string" ? dados : JSON.stringify(dados).substring(0, 1000)) : "";
+    aba.insertRowAfter(1);
+    aba.getRange(2, 1, 1, 4).setValues([[new Date(), nivel, mensagem, dadosStr]]);
+    // Rotação: mantém últimos 500
+    if (aba.getLastRow() > 502) {
+      aba.deleteRows(502, aba.getLastRow() - 501);
+    }
+  } catch (e) {
+    Logger.log("⚠️ _daniLog falhou: " + e.message);
+  }
+  // Também loga em Logger pra ter nos 2 lugares
+  Logger.log("[" + nivel + "] " + mensagem + (dados ? " | " + JSON.stringify(dados).substring(0, 200) : ""));
+}
+
+/**
  * Diagnóstico completo da Dani. Roda no editor pra ver estado atual.
  */
 function statusDani() {
@@ -1666,19 +1703,28 @@ function handlerComentario(action, cli) {
   const cardId = (action.data && action.data.card && action.data.card.id) || "";
   const tipoAutor = ehEquipeInterna(autor) ? "trevo" : "cliente";
 
-  Logger.log("  💬 comentário " + tipoAutor + " (" + autor + "): " + texto.substring(0, 100));
+  _daniLog("WEBHOOK", "comentário recebido", {
+    autor: autor, tipoAutor: tipoAutor, cardId: cardId,
+    texto: texto.substring(0, 150), actionId: action.id,
+  });
 
   // Skip: comentário da própria Dani (loop guard)
-  if (texto.indexOf(ASSINATURA_DANI.trim().substring(5, 25)) !== -1) {
+  // Match pela hashtag explícita pra evitar problema de surrogate pair em emoji
+  if (texto.indexOf("Dani — Secretária Virtual") !== -1) {
+    _daniLog("SKIP", "self_comment (loop guard)");
     return _respJson({ ok: true, ignored: "self_comment" });
   }
 
   // Idempotência
   if (_jaProcessadoAcao(action.id)) {
+    _daniLog("SKIP", "ja_processado (cache 24h)", { actionId: action.id });
     return _respJson({ ok: true, ignored: "ja_processado" });
   }
 
-  if (!cardId) return _respJson({ ok: false, error: "card_id ausente" });
+  if (!cardId) {
+    _daniLog("ERRO", "card_id ausente");
+    return _respJson({ ok: false, error: "card_id ausente" });
+  }
 
   // ── G2: funcionário comenta ──────────────────────────────────────────
   if (tipoAutor === "trevo") {
@@ -1686,14 +1732,17 @@ function handlerComentario(action, cli) {
   }
 
   // ── G4: cliente comenta — Onda 1.B implementa ────────────────────────
-  Logger.log("    [G4] Onda 1.B implementa resposta de cliente");
+  _daniLog("INFO", "[G4] cliente comentou — Onda 1.B implementa");
   return _respJson({ ok: true, handler: "comentario_cliente", _todo: "Onda 1.B" });
 }
 
 function _danihandlerG2(action, cli, texto, autor, cardId) {
+  _daniLog("G2", "iniciado", { cardId: cardId, autor: autor });
+
   // Busca contexto completo do card
   const card = _danigetCardCompleto(cardId);
   if (!card) {
+    _daniLog("ERRO", "G2: card não encontrado via API Trello", { cardId: cardId });
     return _respJson({ ok: false, error: "card não encontrado" });
   }
   const listaNome = _danigetNomeLista(card.idList);
@@ -1706,76 +1755,98 @@ function _danihandlerG2(action, cli, texto, autor, cardId) {
     autor: autor,
   };
 
+  _daniLog("G2", "contexto montado", contexto);
+
   // Modo dry-run: só loga o que faria
   if (!daniAtiva()) {
-    Logger.log("    [DRY-RUN] DANI_ATIVA=false. Não chamo Claude nem ajo.");
-    Logger.log("    Contexto que iria pra IA: " + JSON.stringify(contexto));
+    _daniLog("DRY-RUN", "DANI_ATIVA=false. Não chamo Claude nem ajo.", contexto);
     return _respJson({ ok: true, dry_run: true, contexto: contexto });
   }
 
   // Classifica via Claude
-  const cls = _classificarComentarioFuncionario(texto, contexto);
+  _daniLog("G2", "chamando Claude pra classificar...");
+  let cls;
+  try {
+    cls = _classificarComentarioFuncionario(texto, contexto);
+  } catch (e) {
+    _daniLog("ERRO", "G2: exceção em Claude", { erro: String(e), stack: (e.stack || "").substring(0, 500) });
+    return _respJson({ ok: false, error: "classificacao_excecao" });
+  }
   if (!cls) {
-    Logger.log("    ⚠️ Classificação falhou — ignorando");
+    _daniLog("ERRO", "G2: Claude retornou null (JSON inválido ou modelo recusou)");
     incMetrica("dani_classificacao_falha");
     return _respJson({ ok: false, error: "classificacao_falha" });
   }
 
-  Logger.log("    🧠 Claude classificou: " + cls.acao + " — " + (cls.resumo || ""));
+  _daniLog("G2", "Claude classificou", {
+    acao: cls.acao, resumo: cls.resumo, msg_len: (cls.mensagemCliente || "").length,
+  });
   incMetrica("dani_classificou_" + cls.acao);
 
   const cardUrl = card.shortUrl || ("https://trello.com/c/" + cardId);
 
   // ── Aplica ação conforme classificação ────────────────────────────────
-  if (cls.acao === "SOLICITA_DOC") {
-    _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_DOC);
-    if (cls.mensagemCliente) {
-      const html = _daniMontarEmailHTML({
-        titulo: "Pendência no seu processo 🍀",
-        mensagem: cls.mensagemCliente,
-        cardNome: card.name,
-        cardUrl: cardUrl,
-        etiquetaPendencia: DANI_ETIQUETA_DOC,
-      });
-      _daniEnviarEmailCliente(card, "🍀 " + (cls.resumo || "Documento pendente") + " — " + card.name, html, cls.mensagemCliente);
-      _daniComentar(cardId, "📄 " + cls.mensagemCliente, /* marcarBoard */ true);
+  try {
+    if (cls.acao === "SOLICITA_DOC") {
+      _daniLog("G2", "aplicando SOLICITA_DOC...");
+      _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_DOC);
+      let emailOk = false, comentOk = false;
+      if (cls.mensagemCliente) {
+        const html = _daniMontarEmailHTML({
+          titulo: "Pendência no seu processo 🍀",
+          mensagem: cls.mensagemCliente,
+          cardNome: card.name,
+          cardUrl: cardUrl,
+          etiquetaPendencia: DANI_ETIQUETA_DOC,
+        });
+        emailOk = _daniEnviarEmailCliente(card, "🍀 " + (cls.resumo || "Documento pendente") + " — " + card.name, html, cls.mensagemCliente);
+        comentOk = _daniComentar(cardId, "📄 " + cls.mensagemCliente, /* marcarBoard */ true);
+      }
+      _daniLog("G2", "SOLICITA_DOC concluída", { emailEnviado: emailOk, comentarioPostado: comentOk });
+      return _respJson({ ok: true, acao: cls.acao, etiqueta: DANI_ETIQUETA_DOC, email: emailOk, comentario: comentOk });
     }
-    return _respJson({ ok: true, acao: cls.acao, etiqueta_aplicada: DANI_ETIQUETA_DOC });
-  }
 
-  if (cls.acao === "SOLICITA_RESPOSTA") {
-    _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_RESP);
-    if (cls.mensagemCliente) {
-      const html = _daniMontarEmailHTML({
-        titulo: "Precisamos de uma resposta sua 🍀",
-        mensagem: cls.mensagemCliente,
-        cardNome: card.name,
-        cardUrl: cardUrl,
-        etiquetaPendencia: DANI_ETIQUETA_RESP,
-      });
-      _daniEnviarEmailCliente(card, "🍀 " + (cls.resumo || "Resposta pendente") + " — " + card.name, html, cls.mensagemCliente);
-      _daniComentar(cardId, "💬 " + cls.mensagemCliente, /* marcarBoard */ true);
+    if (cls.acao === "SOLICITA_RESPOSTA") {
+      _daniLog("G2", "aplicando SOLICITA_RESPOSTA...");
+      _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_RESP);
+      let emailOk = false, comentOk = false;
+      if (cls.mensagemCliente) {
+        const html = _daniMontarEmailHTML({
+          titulo: "Precisamos de uma resposta sua 🍀",
+          mensagem: cls.mensagemCliente,
+          cardNome: card.name,
+          cardUrl: cardUrl,
+          etiquetaPendencia: DANI_ETIQUETA_RESP,
+        });
+        emailOk = _daniEnviarEmailCliente(card, "🍀 " + (cls.resumo || "Resposta pendente") + " — " + card.name, html, cls.mensagemCliente);
+        comentOk = _daniComentar(cardId, "💬 " + cls.mensagemCliente, /* marcarBoard */ true);
+      }
+      _daniLog("G2", "SOLICITA_RESPOSTA concluída", { emailEnviado: emailOk, comentarioPostado: comentOk });
+      return _respJson({ ok: true, acao: cls.acao, etiqueta: DANI_ETIQUETA_RESP, email: emailOk, comentario: comentOk });
     }
-    return _respJson({ ok: true, acao: cls.acao, etiqueta_aplicada: DANI_ETIQUETA_RESP });
-  }
 
-  if (cls.acao === "ATUALIZA_STATUS") {
-    if (cls.mensagemCliente) {
-      const html = _daniMontarEmailHTML({
-        titulo: "Atualização do seu processo 🍀",
-        mensagem: cls.mensagemCliente,
-        cardNome: card.name,
-        cardUrl: cardUrl,
-      });
-      _daniEnviarEmailCliente(card, "🍀 Atualização — " + card.name, html, cls.mensagemCliente);
-      // Comentário ATUALIZA_STATUS no card é redundante (funcionário já comentou).
-      // Só emails. Cliente recebe a tradução.
+    if (cls.acao === "ATUALIZA_STATUS") {
+      _daniLog("G2", "aplicando ATUALIZA_STATUS...");
+      let emailOk = false;
+      if (cls.mensagemCliente) {
+        const html = _daniMontarEmailHTML({
+          titulo: "Atualização do seu processo 🍀",
+          mensagem: cls.mensagemCliente,
+          cardNome: card.name,
+          cardUrl: cardUrl,
+        });
+        emailOk = _daniEnviarEmailCliente(card, "🍀 Atualização — " + card.name, html, cls.mensagemCliente);
+      }
+      _daniLog("G2", "ATUALIZA_STATUS concluída", { emailEnviado: emailOk });
+      return _respJson({ ok: true, acao: cls.acao, email: emailOk });
     }
-    return _respJson({ ok: true, acao: cls.acao });
-  }
 
-  // OUTRO: nada
-  return _respJson({ ok: true, acao: "OUTRO", silencio: true });
+    _daniLog("G2", "OUTRO — Dani fica em silêncio");
+    return _respJson({ ok: true, acao: "OUTRO", silencio: true });
+  } catch (e) {
+    _daniLog("ERRO", "G2: exceção ao aplicar ação", { acao: cls.acao, erro: String(e), stack: (e.stack || "").substring(0, 500) });
+    return _respJson({ ok: false, error: "execucao_acao_excecao", acao: cls.acao });
+  }
 }
 
 // ─── Outros handlers (stubs) — implementação em ondas seguintes ────────────
