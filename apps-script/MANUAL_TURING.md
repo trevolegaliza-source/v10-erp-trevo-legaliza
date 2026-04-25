@@ -229,7 +229,79 @@ Se precisar mexer em uma dessas, **avise um desenvolvedor antes**.
 
 ---
 
-**Última atualização:** 2026-04-23 (auditoria completa v6.1)
+## 🤖 ARQUITETURA DANI v1.0 — Estado em 25/04/2026
+
+A Dani está em produção do form-submit ao cron diário. Status por gatilho:
+
+| Gatilho | O que faz | Status |
+|---|---|---|
+| **G1** Form submit | Cria card + pasta Drive + email cliente | ✅ produção (v6.0+) |
+| **G2** Funcionário comenta | Claude classifica → SOLICITA_DOC/RESP/ATUALIZA → etiqueta + email | ✅ produção (v7.2+) |
+| **G4** Cliente comenta | Avalia se cumpriu pendência → remove etiqueta OU pede de novo | ✅ produção (v7.3) |
+| **G5** Cliente anexa arquivo | Roda G4 com texto sintético "[anexou: X]" | ✅ produção (v7.3) |
+| **G6** Lembretes pendência | 5 max/etapa, reset, gentil no 5º. Caso especial pagamento (4h). | ✅ produção (v7.4) |
+| **G8** Email do órgão | DEFERIDO/INDEFERIDO/SEM_MOV/OUTRO. Indeferido é discreto. | ✅ produção (v7.4) |
+| **G10** ALVARÁS chegada | Oferece orçamento ao cliente | ✅ produção (v7.5) |
+| **G11** ALVARÁS timeout 5d | Move pra PROCESSOS FINALIZADOS + email | ✅ produção (v7.5) |
+| **G12** MAT chegada | Lembra contador + RESPOSTA PENDENTE | ✅ produção (v7.5) |
+| **G13** ARQUIVO MENSAL +30d | Email LGPD + deleta anexos | ✅ produção (v7.5) |
+| **G14** BLOQUEADOS dia 15 | Pergunta se mantém | ✅ produção (v7.5) |
+| **G15** BLOQUEADOS dia 30 | Deleta anexos | ✅ produção (v7.5) |
+| **G3** EM ANDAMENTO automática | Detecta funcionário começou a trabalhar | ⏳ Onda 4 |
+| **G9** SEM_MOVIMENTACAO follow-up | Notifica cliente periodicamente | ⏳ Onda 4 |
+| **3 buckets** (Trevo/Cliente/Órgão) | Cálculo de prazo por etiqueta pra relatório | ⏳ Onda 4 |
+
+### Properties novas (v7.0+)
+| Property | Função |
+|---|---|
+| `DANI_ATIVA` | Trava de segurança (`true`/`false`). Default false (dry-run). |
+| `WEBHOOK_TOKEN` | Auth do doPost (gerado por setupDaniProperties) |
+| `WEBAPP_URL` | URL do deploy (pra Edge Function proxy chamar) |
+| `INDEFERIDO_NOTIFY_EMAILS` | Destinatários do alerta INDEFERIDO |
+| `DANI_FORCAR_CLIENTE` | Lista de usernames forçados como cliente (testes) |
+| `alvaras_chegada_<cardId>` | Timestamp pra G11 timeout 5d |
+| `bloqueado_<cardId>` | Estado JSON {dia15, dia30} pra G14/G15 |
+| `lembrete_<cardId>_<etapa>` | Estado dos lembretes G6 |
+
+### Abas novas (v7.1+)
+| Aba | Conteúdo |
+|---|---|
+| `EQUIPE` | NOME, USUARIO_TRELLO, EMAIL, ATIVO — fonte da verdade pra ehEquipeInterna |
+| `DANI_LOG` | Log persistente de cada execução (rotaciona em 500 linhas) |
+
+### Triggers (após setupTriggersDani)
+| Trigger | Frequência | Função |
+|---|---|---|
+| onFormSubmit | Form | aoEnviarFormulario |
+| LembretesPendencias | 9h diário | LembretesPendencias |
+| VarrerEmails | 15min | VarrerEmails |
+| sincronizarBoardsETrevoDani | 8h diário | MapearClientes + garantirWebhooks |
+| **rotinasDiariasDani** | **9h30 diário** | **G11+G13+G14+G15 (NOVO v7.5)** |
+
+### Edge Function: dani-webhook-proxy
+- Path: `supabase/functions/dani-webhook-proxy/index.ts`
+- URL pública: `https://gwyinucaeaayuckvevma.supabase.co/functions/v1/dani-webhook-proxy`
+- Env vars: APPS_SCRIPT_WEBAPP_URL + APPS_SCRIPT_TOKEN
+- Existe pra contornar redirect 302 do Apps Script Web App "Anyone"
+
+### Funções de ops da Dani
+| Função | Uso |
+|---|---|
+| `ativarDani()` / `desativarDani()` | Liga/desliga (default: desligada) |
+| `daniAtiva()` | Retorna estado |
+| `statusDani()` | Diagnóstico completo (rodar quando algo não age) |
+| `setupDaniProperties()` | Wizard 3 passos config inicial (planilha aberta) |
+| `setupTriggersDani()` | Cria triggers agendados (idempotente) |
+| `garantirWebhooksTodosBoards()` | Cria webhook em cada board CLIENTES |
+| `removerTodosWebhooks()` | Rollback completo |
+| `listarWebhooks()` | Debug |
+| `MapearEquipeInterna()` | Cria aba EQUIPE inicial |
+| `setForcarCliente('usernames')` | Atalho não-UI pra DANI_FORCAR_CLIENTE |
+| `setupTesteDani_Carolina()` | Shortcut pro teste atual com Carolina |
+
+---
+
+**Última atualização:** 2026-04-25 (Dani v1.0 ondas 0/1/2/3 em produção, v7.5.0)
 **Versão:** 6.0
 **Perguntas?** Mande uma mensagem pro desenvolvedor ou abra um card no Trevo com tag "SUPORTE-SCRIPT"
 
