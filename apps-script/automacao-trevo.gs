@@ -1,7 +1,13 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
-// v7.2 — 24/04/2026 — DANI ONDA 1.A — G2 (FUNCIONÁRIO PEDE)
+// v7.2.2 — 24/04/2026 — DANI ONDA 1.A — G2 (FUNCIONÁRIO PEDE)
+//   • v7.2.2: setupTesteDani tolerante a UI ausente +
+//             setupTesteDani_Carolina (shortcut pro teste atual) +
+//             setForcarCliente() helper
+//   • v7.2.1: DANI_FORCAR_CLIENTE pra simular cliente em teste sem
+//             remover usuário da aba EQUIPE
+//   • v7.2.0:
 //   • Trava de segurança DANI_ATIVA (default false → dry-run)
 //   • ativarDani() / desativarDani() / daniAtiva()
 //   • Idempotência por action.id (cache 24h)
