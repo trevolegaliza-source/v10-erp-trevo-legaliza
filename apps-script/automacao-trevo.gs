@@ -1271,6 +1271,46 @@ function desativarDani() {
   Logger.log("⏸️ Dani DESATIVADA — só loga o que faria (modo dry-run).");
 }
 
+/**
+ * Prepara ambiente de teste: roda MapearClientes + garantirWebhooks + pede
+ * usuário Trello que vai simular cliente. Uso em board novo (ex.: TESTE DANI).
+ */
+function setupTesteDani() {
+  const ui = SpreadsheetApp.getUi();
+
+  // 1) Mapeia boards (pega novos)
+  Logger.log("🔄 Mapeando clientes...");
+  try { MapearClientes(); } catch (e) { Logger.log("⚠️ MapearClientes: " + e.message); }
+
+  // 2) Cria webhooks pros novos
+  Logger.log("🔗 Garantindo webhooks...");
+  try { garantirWebhooksTodosBoards(); } catch (e) { Logger.log("⚠️ garantirWebhooks: " + e.message); }
+
+  // 3) Pede usuário cliente fake
+  const atualForcar = getProps().getProperty("DANI_FORCAR_CLIENTE") || "";
+  const resp = ui.prompt(
+    "🧪 Setup teste Dani",
+    "Username Trello (sem @) que vai simular CLIENTE no board de teste.\n" +
+    "Mesmo se estiver na aba EQUIPE, será tratado como cliente.\n\n" +
+    "Múltiplos? Separe com vírgula.\n\n" +
+    "Atual: " + (atualForcar || "(vazio)") + "\n\n" +
+    "Deixe em branco pra limpar.",
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (resp.getSelectedButton() === ui.Button.OK) {
+    const valor = resp.getResponseText().trim();
+    if (valor) {
+      getProps().setProperty("DANI_FORCAR_CLIENTE", valor);
+      __equipeInternaCache = null;
+      ui.alert("✅ Setup teste concluído.\n\nForçando como cliente: " + valor + "\n\nProx passos:\n1) Ativa Dani: ativarDani()\n2) Cria card no board com desc contendo:\n📧 E-MAIL: seu-email@aqui.com\n3) Comente no card como funcionário interno (ex: Letícia)");
+    } else {
+      getProps().deleteProperty("DANI_FORCAR_CLIENTE");
+      __equipeInternaCache = null;
+      ui.alert("✅ DANI_FORCAR_CLIENTE limpo. Comportamento padrão.");
+    }
+  }
+}
+
 function daniAtiva() {
   return getProps().getProperty("DANI_ATIVA") === "true";
 }
@@ -2312,6 +2352,16 @@ function getEquipeInterna() {
 
 function ehEquipeInterna(nome) {
   const n = (nome || "").toLowerCase().trim();
+  // Override de teste: usuários listados em DANI_FORCAR_CLIENTE NUNCA são equipe interna.
+  // Útil pra simular fluxo cliente em board de teste sem ter conta Trello externa.
+  // Formato: "carolinaguirado7,outrouser" (sem @, separados por vírgula).
+  const forcarRaw = getProps().getProperty("DANI_FORCAR_CLIENTE") || "";
+  if (forcarRaw) {
+    const lista = forcarRaw.toLowerCase().split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    if (lista.some(u => n.indexOf(u) !== -1)) {
+      return false;
+    }
+  }
   return getEquipeInterna().some(i => n.includes(i));
 }
 
