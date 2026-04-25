@@ -1,6 +1,12 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.6.1 — 25/04/2026 — Onda 4 + G9 (notificação periódica análise órgão)
+//   • v7.6.1 G9: cron 9h30 — pra cada card com EM ANÁLISE NO ÓRGÃO há ≥1d,
+//     envia email pro cliente "permanece em análise". Anti-spam: 1x/dia.
+//     Texto contextual com nome do solicitante + nome do órgão inferido
+//     pela lista atual (Junta/Receita/Prefeitura).
+//     Reusa bucket_inicio_<cardId>_EM ANÁLISE NO ÓRGÃO da Onda 4.
 // v7.6.0 — 25/04/2026 — DANI ONDA 4 (cálculo dos 3 buckets de prazo)
 //   • v7.6.0 handlerEtiquetaAdd registra timestamp de início em property
 //   • v7.6.0 handlerEtiquetaRemove calcula tempo decorrido e soma no
@@ -3066,6 +3072,7 @@ function rotinasDiariasDani() {
     try { _rotinaG11AlvarasTimeout(); } catch (e) { _daniLog("ERRO", "G11", { erro: String(e) }); }
     try { _rotinaG13ArquivoMensal(); } catch (e) { _daniLog("ERRO", "G13", { erro: String(e) }); }
     try { _rotinaG14G15Bloqueados(); } catch (e) { _daniLog("ERRO", "G14/G15", { erro: String(e) }); }
+    try { _rotinaG9NotificarAnaliseOrgao(); } catch (e) { _daniLog("ERRO", "G9", { erro: String(e) }); }
     _daniLog("ROTINA", "rotinas diárias concluídas");
   } finally {
     lock.releaseLock();
@@ -3276,6 +3283,84 @@ function _processarBloqueadosDoBoard(boardId) {
       incMetrica("dani_g15_bloqueado_30");
     }
   });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 G9 — Notificação periódica de cards EM ANÁLISE NO ÓRGÃO
+// ────────────────────────────────────────────────────────────────────────────
+// Pra cada card com etiqueta EM ANÁLISE NO ÓRGÃO há ≥1 dia, manda email
+// pro cliente avisando que o processo continua em análise.
+// Cadência: 1x/dia (rodada em rotinasDiariasDani às 9h30).
+// Anti-spam: property "g9_ultimo_aviso_<cardId>" guarda data ISO do último
+// aviso (formato YYYY-MM-DD). Não envia 2x no mesmo dia.
+// Reaproveita property "bucket_inicio_<cardId>_EM ANÁLISE NO ÓRGÃO" (Onda 4).
+// ════════════════════════════════════════════════════════════════════════════
+
+function _rotinaG9NotificarAnaliseOrgao() {
+  const props = getProps();
+  const todas = props.getProperties();
+  const hojeISO = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  const prefix = "bucket_inicio_";
+  const sufixo = "_EM ANÁLISE NO ÓRGÃO";
+
+  let processados = 0, enviados = 0;
+
+  Object.keys(todas).forEach(k => {
+    if (k.indexOf(prefix) !== 0 || k.indexOf(sufixo) === -1) return;
+    const cardId = k.substring(prefix.length, k.length - sufixo.length);
+    if (!cardId) return;
+    processados++;
+
+    // Pula se já avisou hoje
+    const chaveAviso = "g9_ultimo_aviso_" + cardId;
+    if (props.getProperty(chaveAviso) === hojeISO) return;
+
+    const inicio = new Date(todas[k]);
+    const dias = Math.floor((new Date() - inicio) / (1000 * 60 * 60 * 24));
+    if (dias < 1) return; // ainda muito cedo (entrou na análise hoje)
+
+    try {
+      const card = _danigetCardCompleto(cardId);
+      if (!card) return;
+
+      const cardUrl = card.shortUrl || ("https://trello.com/c/" + cardId);
+      // Tenta extrair nome do solicitante e órgão da descrição (formato do form)
+      const desc = card.desc || "";
+      const matchSol = desc.match(/SOLICITANTE:\s*([^\n]+)/i);
+      const nome = matchSol ? matchSol[1].trim() : "tudo bem";
+      // Inferir órgão pela lista atual
+      const listaNome = _danigetNomeLista(card.idList) || "";
+      let orgao = "no órgão competente";
+      if (/viabilidade/i.test(listaNome)) orgao = "na prefeitura";
+      else if (/dbe/i.test(listaNome)) orgao = "na Receita Federal";
+      else if (/em an[áa]lise/i.test(listaNome) || /vre/i.test(listaNome)) orgao = "na Junta Comercial";
+      else if (/inscri[çc][ãa]o/i.test(listaNome)) orgao = "na prefeitura/estado";
+
+      const mensagem =
+        "Olá, " + nome + ". Eu sou a dani.ai, inteligência artificial da Trevo Legaliza. " +
+        "Estou passando aqui pra avisar que consultei seu processo (" + card.name + ") " +
+        "e ele permanece em análise " + orgao + " (há " + dias + " dia" + (dias === 1 ? "" : "s") + "). " +
+        "Assim que houver retorno, te aviso na hora.";
+
+      const html = _daniMontarEmailHTML({
+        titulo: "Processo em análise no órgão 📋",
+        mensagem: mensagem,
+        cardNome: card.name,
+        cardUrl: cardUrl,
+      });
+
+      const okEmail = _daniEnviarEmailCliente(card, "📋 Em análise " + orgao + " — " + card.name, html, mensagem);
+      if (okEmail) {
+        props.setProperty(chaveAviso, hojeISO);
+        enviados++;
+        incMetrica("dani_g9_aviso_analise");
+      }
+    } catch (e) {
+      _daniLog("ERRO", "G9: falha em card " + cardId, { erro: String(e) });
+    }
+  });
+
+  _daniLog("G9", "varredura concluída", { processados: processados, enviados: enviados });
 }
 
 /**
