@@ -1,6 +1,10 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.2.6 — 25/04/2026 — DANI ONDA 1.A — fix Claude JSON parsing
+//   • v7.2.6: chamarClaudeJson com fallback (regex extrai 1º {...}) +
+//             prompt apertado com instrução crítica de formato +
+//             log da resposta bruta no CLAUDE_PARSE_FAIL pra debug
 // v7.2.5 — 25/04/2026 — DANI ONDA 1.A + LOG PERSISTENTE
 //   • v7.2.5: aba DANI_LOG persiste cada passo do fluxo G2 na planilha
 //             (Logger.log às vezes não persiste em deploys publicados).
@@ -1502,15 +1506,24 @@ function _jaProcessadoAcao(actionId) {
 
 /**
  * Wrapper sobre chamarClaude que retorna JSON parseado ou null.
- * Tolerante a respostas com markdown wrap.
+ * Tolerante a respostas com markdown wrap, prefixo/sufixo em prosa, etc.
  */
 function chamarClaudeJson(prompt, maxTokens) {
+  let txt = "";
   try {
-    const txt = chamarClaude(prompt, maxTokens || 600);
-    // chamarClaude já remove ```json e \n,\r,\t. Tenta parsear direto.
+    txt = chamarClaude(prompt, maxTokens || 600);
+    // Tenta parsear direto
     return JSON.parse(txt);
-  } catch (e) {
-    Logger.log("⚠️ Claude não retornou JSON válido: " + e.message);
+  } catch (e1) {
+    // Fallback: extrai PRIMEIRO objeto JSON ({...}) na resposta
+    try {
+      const m = txt.match(/\{[\s\S]*\}/);
+      if (m) return JSON.parse(m[0]);
+    } catch (e2) {}
+    _daniLog("CLAUDE_PARSE_FAIL", "Claude não retornou JSON válido", {
+      erro: String(e1),
+      resposta_bruta: txt.substring(0, 800),
+    });
     return null;
   }
 }
@@ -1663,31 +1676,35 @@ function _daniMontarEmailHTML(opts) {
 function _classificarComentarioFuncionario(textoComentario, contexto) {
   const prompt =
     'Você é a Dani, IA da Trevo Legaliza (assessoria societária B2B).\n' +
-    'Um funcionário interno acabou de comentar num card do Trello. Você precisa\n' +
-    'classificar a intenção do comentário pra decidir se aplica etiqueta de\n' +
-    'pendência (e notifica o cliente) ou só repassa atualização.\n\n' +
-    'CONTEXTO DO CARD:\n' +
-    '  Nome: ' + (contexto.cardNome || "?") + '\n' +
-    '  Lista atual: ' + (contexto.listaNome || "?") + '\n' +
-    '  Etiquetas atuais: ' + (contexto.etiquetas.join(", ") || "(nenhuma)") + '\n\n' +
-    'COMENTÁRIO DO FUNCIONÁRIO (' + (contexto.autor || "?") + '):\n' +
+    'Funcionário interno comentou num card do Trello. Classifique a intenção.\n\n' +
+    'CONTEXTO:\n' +
+    '  Card: ' + (contexto.cardNome || "?") + '\n' +
+    '  Lista: ' + (contexto.listaNome || "?") + '\n' +
+    '  Etiquetas: ' + (contexto.etiquetas.join(", ") || "(nenhuma)") + '\n\n' +
+    'COMENTÁRIO de ' + (contexto.autor || "?") + ':\n' +
     '"' + (textoComentario || "").substring(0, 1500) + '"\n\n' +
-    'CLASSIFIQUE EM EXATAMENTE UMA AÇÃO:\n' +
-    '  • SOLICITA_DOC      — funcionário pediu documento/arquivo do cliente\n' +
-    '  • SOLICITA_RESPOSTA — funcionário pediu confirmação/resposta/info do cliente\n' +
-    '  • ATUALIZA_STATUS   — funcionário só atualizou andamento (ex: "viabilidade transmitida pelo protocolo X", "DBE deferido")\n' +
-    '  • OUTRO             — anotação interna, fofoca, sem ação pro cliente\n\n' +
-    'COMPONHA A MENSAGEM PARA O CLIENTE (se aplicável):\n' +
-    '  • Tom: gentil, profissional, direto, breve. Cliente é contador (intermediário).\n' +
-    '  • Sempre se identifique no início como "dani.ai".\n' +
-    '  • Se SOLICITA_DOC ou SOLICITA_RESPOSTA: peça com clareza o que é necessário.\n' +
-    '  • Se ATUALIZA_STATUS: comunique com naturalidade o que aconteceu.\n' +
-    '  • Se OUTRO: deixe mensagemCliente vazia.\n\n' +
-    'RESPONDA EM JSON puro (sem markdown). Schema:\n' +
-    '{"acao":"SOLICITA_DOC|SOLICITA_RESPOSTA|ATUALIZA_STATUS|OUTRO","resumo":"frase curta do que foi pedido/atualizado","mensagemCliente":"texto pro cliente ou string vazia"}';
+    'AÇÕES POSSÍVEIS (escolha exatamente uma):\n' +
+    '  SOLICITA_DOC      = funcionário pediu documento/arquivo ao cliente\n' +
+    '  SOLICITA_RESPOSTA = funcionário pediu confirmação/info ao cliente (sem doc)\n' +
+    '  ATUALIZA_STATUS   = funcionário só atualizou andamento (ex: viabilidade transmitida)\n' +
+    '  OUTRO             = anotação interna sem ação pro cliente\n\n' +
+    'COMPONHA mensagemCliente (gentil, profissional, breve, sempre se identifique como "dani.ai"):\n' +
+    '  - Se SOLICITA_*: peça com clareza\n' +
+    '  - Se ATUALIZA_STATUS: traduza a atualização pra cliente\n' +
+    '  - Se OUTRO: deixe vazio\n\n' +
+    'INSTRUÇÃO CRÍTICA DE FORMATO:\n' +
+    'Sua resposta DEVE ser exclusivamente um objeto JSON válido, começando com { e terminando com }.\n' +
+    'NÃO escreva nada antes ou depois. NÃO use blocos de código (```). NÃO comente.\n\n' +
+    'Schema exato:\n' +
+    '{"acao":"<uma das 4 acoes>","resumo":"<frase curta>","mensagemCliente":"<texto ou vazio>"}';
 
   const j = chamarClaudeJson(prompt, 800);
-  if (!j || DANI_NIVELS.indexOf(j.acao) === -1) {
+  if (!j) {
+    _daniLog("CLAUDE_FAIL", "_classificarComentarioFuncionario: chamarClaudeJson retornou null");
+    return null;
+  }
+  if (DANI_NIVELS.indexOf(j.acao) === -1) {
+    _daniLog("CLAUDE_FAIL", "_classificarComentarioFuncionario: acao inválida", { acao_recebida: j.acao, json: j });
     return null;
   }
   return j;
