@@ -1402,6 +1402,55 @@ function daniAtiva() {
 }
 
 /**
+ * Diagnóstico completo da Dani. Roda no editor pra ver estado atual.
+ */
+function statusDani() {
+  const props = getProps();
+  const dani = props.getProperty("DANI_ATIVA");
+  const webappUrl = props.getProperty("WEBAPP_URL") || "(não configurado)";
+  const tokenSet = !!props.getProperty("WEBHOOK_TOKEN");
+  const forcarCliente = props.getProperty("DANI_FORCAR_CLIENTE") || "(vazio)";
+  const claudeKeySet = !!props.getProperty("CLAUDE_API_KEY");
+  const trelloKeySet = !!props.getProperty("TRELLO_KEY");
+
+  // Conta webhooks ativos
+  let totalWebhooks = "?";
+  try {
+    const r = trelloGet("/1/tokens/" + prop("TRELLO_TOKEN") + "/webhooks", {});
+    if (r.getResponseCode() === 200) {
+      const lista = JSON.parse(r.getContentText());
+      totalWebhooks = lista.filter(w => w.active).length + " ativos / " + lista.length + " total";
+    }
+  } catch (e) { totalWebhooks = "erro: " + e.message; }
+
+  // Conta linhas de aba EQUIPE
+  let totalEquipe = "?";
+  try {
+    const aba = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("EQUIPE");
+    totalEquipe = aba ? (aba.getLastRow() - 1) + " funcionários" : "aba não existe";
+  } catch (e) { totalEquipe = "erro: " + e.message; }
+
+  Logger.log("══════ STATUS DANI ══════");
+  Logger.log("DANI_ATIVA: " + (dani || "(não setado, default false)"));
+  Logger.log("  → " + (daniAtiva() ? "🟢 LIGADA — vai chamar Claude e agir" : "🔴 DESLIGADA (dry-run) — só loga, não age"));
+  Logger.log("");
+  Logger.log("WEBAPP_URL: " + webappUrl);
+  Logger.log("WEBHOOK_TOKEN configurado: " + tokenSet);
+  Logger.log("CLAUDE_API_KEY configurado: " + claudeKeySet);
+  Logger.log("TRELLO_KEY configurado: " + trelloKeySet);
+  Logger.log("");
+  Logger.log("DANI_FORCAR_CLIENTE: " + forcarCliente);
+  Logger.log("");
+  Logger.log("Webhooks Trello: " + totalWebhooks);
+  Logger.log("Equipe interna: " + totalEquipe);
+  Logger.log("");
+  if (!daniAtiva()) {
+    Logger.log("⚠️ Pra Dani agir, rode: ativarDani()");
+  }
+  Logger.log("═══════════════════════════");
+}
+
+/**
  * Idempotência: ignora action.id já processada (Trello pode reentregar).
  * Cache 24h.
  */
