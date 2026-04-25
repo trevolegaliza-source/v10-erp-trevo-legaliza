@@ -1,6 +1,16 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.2 — 24/04/2026 — DANI ONDA 1.A — G2 (FUNCIONÁRIO PEDE)
+//   • Trava de segurança DANI_ATIVA (default false → dry-run)
+//   • ativarDani() / desativarDani() / daniAtiva()
+//   • Idempotência por action.id (cache 24h)
+//   • Helpers Trello: aplicar/remover etiqueta por nome, comentar como Dani
+//   • Email cliente HTML reaproveitando estilo do lembrete
+//   • Claude classifica em SOLICITA_DOC, SOLICITA_RESPOSTA, ATUALIZA_STATUS, OUTRO
+//   • Aplica DOCUMENTO PENDENTE / RESPOSTA DE COMENTÁRIO PENDENTE
+//   • chamarClaude(p, maxTokens) parametrizável
+//   • Loop guard: ignora comentários da própria Dani
 // v7.1 — 24/04/2026 — DANI ONDA 0 + AUTOMAÇÃO DE GROWTH
 //   • v7.1: aba EQUIPE — fonte da verdade pros funcionários internos
 //           (adicionar/remover via planilha, sem editar código)
@@ -1223,36 +1233,396 @@ function _doPostWebhookTrello(action) {
   }
 }
 
-// ─── Handlers (stubs de Onda 0 — logam e retornam) ─────────────────────────
-// Onda 1 implementa as ações de cada um.
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 DANI v1.0 — INTELIGÊNCIA (Onda 1.A — 24/04/2026)
+// ────────────────────────────────────────────────────────────────────────────
+// Implementa G2: funcionário interno comenta no card pedindo doc/info ou
+// atualizando status. Dani classifica via Claude e age:
+//   • SOLICITA_DOC      → aplica DOCUMENTO PENDENTE + email cliente
+//   • SOLICITA_RESPOSTA → aplica RESPOSTA DE COMENTÁRIO PENDENTE + email
+//   • ATUALIZA_STATUS   → email cliente com a atualização (sem etiqueta)
+//   • OUTRO             → não age (ex: fofoca interna, anotação)
+//
+// 🔒 Trava de segurança:
+//   Property DANI_ATIVA. Se "false" (default), Dani só LOGA o que faria,
+//   sem chamar Claude API e sem aplicar etiquetas/email/comentários.
+//   Use ativarDani() / desativarDani() pra ligar/desligar.
+//
+// Idempotência:
+//   Cada action.id do Trello é cacheado por 24h. Webhook duplicado é skip.
+// ════════════════════════════════════════════════════════════════════════════
+
+const DANI_NIVELS = ["SOLICITA_DOC", "SOLICITA_RESPOSTA", "ATUALIZA_STATUS", "OUTRO"];
+const DANI_ETIQUETA_DOC = "DOCUMENTO PENDENTE";
+const DANI_ETIQUETA_RESP = "RESPOSTA DE COMENTÁRIO PENDENTE";
+const DANI_ETIQUETA_PRONTO = "PRONTO PARA SER FEITO";
+
+/**
+ * Liga a Dani: passa a chamar Claude e a aplicar ações reais.
+ * Sem isso, ela só loga.
+ */
+function ativarDani() {
+  getProps().setProperty("DANI_ATIVA", "true");
+  Logger.log("✅ Dani ATIVA — vai chamar Claude e aplicar etiquetas/emails/comentários.");
+}
+
+function desativarDani() {
+  getProps().setProperty("DANI_ATIVA", "false");
+  Logger.log("⏸️ Dani DESATIVADA — só loga o que faria (modo dry-run).");
+}
+
+function daniAtiva() {
+  return getProps().getProperty("DANI_ATIVA") === "true";
+}
+
+/**
+ * Idempotência: ignora action.id já processada (Trello pode reentregar).
+ * Cache 24h.
+ */
+function _jaProcessadoAcao(actionId) {
+  if (!actionId) return false;
+  const cache = CacheService.getScriptCache();
+  const k = "dani_action_" + actionId;
+  if (cache.get(k)) return true;
+  cache.put(k, "1", 86400);
+  return false;
+}
+
+/**
+ * Wrapper sobre chamarClaude que retorna JSON parseado ou null.
+ * Tolerante a respostas com markdown wrap.
+ */
+function chamarClaudeJson(prompt, maxTokens) {
+  try {
+    const txt = chamarClaude(prompt, maxTokens || 600);
+    // chamarClaude já remove ```json e \n,\r,\t. Tenta parsear direto.
+    return JSON.parse(txt);
+  } catch (e) {
+    Logger.log("⚠️ Claude não retornou JSON válido: " + e.message);
+    return null;
+  }
+}
+
+// ─── Trello helpers da Dani ────────────────────────────────────────────────
+
+function _danigetCardCompleto(cardId) {
+  const r = trelloGet("/1/cards/" + cardId, {
+    fields: "name,idBoard,idList,shortUrl,desc,labels,closed",
+    labels: "true",
+  });
+  if (r.getResponseCode() !== 200) return null;
+  return JSON.parse(r.getContentText());
+}
+
+function _danigetNomeLista(idList) {
+  const r = trelloGet("/1/lists/" + idList, { fields: "name" });
+  if (r.getResponseCode() !== 200) return "?";
+  return JSON.parse(r.getContentText()).name || "?";
+}
+
+function _danigetUltimosComentarios(cardId, limite) {
+  const r = trelloGet("/1/cards/" + cardId + "/actions", {
+    filter: "commentCard",
+    limit: String(limite || 5),
+  });
+  if (r.getResponseCode() !== 200) return [];
+  const acoes = JSON.parse(r.getContentText());
+  return acoes.map(a => ({
+    autor: (a.memberCreator && a.memberCreator.fullName) || "?",
+    texto: (a.data && a.data.text) || "",
+    data: a.date || "",
+  }));
+}
+
+/**
+ * Aplica etiqueta no card POR NOME. Auto-cria se não existir no board.
+ * Reusa aplicarEtiquetasNoCartao() existente.
+ */
+function _daniAplicarEtiqueta(cardId, boardId, nomeEtiqueta) {
+  if (!nomeEtiqueta) return;
+  // Verifica se já tem (evita request desnecessário)
+  const card = _danigetCardCompleto(cardId);
+  if (card && (card.labels || []).some(l => (l.name || "").trim() === nomeEtiqueta)) {
+    Logger.log("    ✓ etiqueta '" + nomeEtiqueta + "' já existe no card");
+    return;
+  }
+  aplicarEtiquetasNoCartao(cardId, boardId, [nomeEtiqueta]);
+  Logger.log("    ✅ etiqueta '" + nomeEtiqueta + "' aplicada");
+}
+
+/**
+ * Remove etiqueta do card POR NOME.
+ */
+function _daniRemoverEtiqueta(cardId, boardId, nomeEtiqueta) {
+  if (!nomeEtiqueta) return;
+  const card = _danigetCardCompleto(cardId);
+  if (!card) return;
+  const label = (card.labels || []).find(l => (l.name || "").trim() === nomeEtiqueta);
+  if (!label) {
+    Logger.log("    ✓ etiqueta '" + nomeEtiqueta + "' não estava no card");
+    return;
+  }
+  const u = "https://api.trello.com/1/cards/" + cardId + "/idLabels/" + label.id +
+    "?key=" + prop("TRELLO_KEY") + "&token=" + prop("TRELLO_TOKEN");
+  const r = fetchRetry(u, { method: "delete" });
+  if (r.getResponseCode() === 200) Logger.log("    ✅ etiqueta '" + nomeEtiqueta + "' removida");
+  else Logger.log("    ⚠️ falha ao remover etiqueta: " + r.getContentText());
+}
+
+/**
+ * Posta comentário no card identificado como Dani (com assinatura).
+ * Marca @board pra notificar todo mundo (cliente + equipe estão no board).
+ */
+function _daniComentar(cardId, texto, marcarBoard) {
+  const sufixo = marcarBoard ? "\n\n@board" : "";
+  const textoFinal = texto + sufixo + ASSINATURA_DANI;
+  return postarComentarioNoCard(cardId, textoFinal);
+}
+
+/**
+ * Envia email pro cliente do card. Email vem da descrição (campo 📧 E-MAIL).
+ * Retorna true/false.
+ */
+function _daniEnviarEmailCliente(card, assunto, html, textoPlano) {
+  const email = extrairEmailDoCardDesc(card.desc || "");
+  if (!email) {
+    Logger.log("    ⚠️ sem email do cliente no card — não envio");
+    return false;
+  }
+  try {
+    MailApp.sendEmail({
+      to: email,
+      subject: assunto,
+      htmlBody: html,
+      body: textoPlano,
+      name: "Dani 🍀 Trevo Legaliza",
+    });
+    Logger.log("    📧 email enviado pra " + email);
+    return true;
+  } catch (e) {
+    Logger.log("    ⚠️ falha email: " + e.message);
+    return false;
+  }
+}
+
+/**
+ * Template de email da Dani (HTML bonito reaproveitando o estilo dos lembretes).
+ */
+function _daniMontarEmailHTML(opts) {
+  // opts: { titulo, mensagem, cardNome, cardUrl, etiquetaPendencia (opcional) }
+  const blocoEtiqueta = opts.etiquetaPendencia
+    ? '<div style="background:#fff7ed;border-left:4px solid #f59e0b;padding:16px 20px;margin:20px 0;border-radius:4px;">' +
+        '<p style="margin:0 0 6px;color:#92400e;font-size:12px;text-transform:uppercase;font-weight:700;">Pendência registrada</p>' +
+        '<p style="margin:0;color:#1a1a1a;font-size:14px;font-weight:600;">' + opts.etiquetaPendencia + '</p>' +
+      '</div>'
+    : '';
+  return '<div style="font-family:Arial,sans-serif;max-width:620px;margin:0 auto;background:#0d1310;color:#f2f2f2;">' +
+      '<div style="background:linear-gradient(135deg,#0d1310 0%,#1a3d26 100%);padding:32px 28px;text-align:center;">' +
+        '<img src="' + LOGO_TREVO_URL + '" alt="Trevo Legaliza" style="height:56px;margin-bottom:12px;" />' +
+        '<h1 style="color:#fff;margin:0;font-size:20px;letter-spacing:0.3px;">' + opts.titulo + '</h1>' +
+      '</div>' +
+      '<div style="background:#fff;color:#2d2d2d;padding:32px 28px;">' +
+        '<p style="font-size:15px;line-height:1.6;margin:0 0 18px;">' + opts.mensagem + '</p>' +
+        blocoEtiqueta +
+        '<div style="background:#f0f7f2;border-left:4px solid #2d5a3d;padding:16px 20px;margin:20px 0;border-radius:4px;">' +
+          '<p style="margin:0 0 6px;color:#1a1a1a;font-size:12px;text-transform:uppercase;font-weight:700;">Processo</p>' +
+          '<p style="margin:0;color:#1a1a1a;font-size:14px;font-weight:600;">' + opts.cardNome + '</p>' +
+        '</div>' +
+        '<div style="text-align:center;margin:28px 0;">' +
+          '<a href="' + opts.cardUrl + '" style="display:inline-block;background:#2d5a3d;color:#fff;padding:14px 32px;text-decoration:none;border-radius:6px;font-size:15px;font-weight:600;">🔗 Acessar o processo</a>' +
+        '</div>' +
+        '<p style="font-size:13px;color:#4a4a4a;line-height:1.6;margin:20px 0 0;">' +
+          'Você pode <strong>responder este email direto</strong> — sua resposta entra no processo automaticamente.' +
+        '</p>' +
+      '</div>' +
+      '<div style="background:#0d1310;padding:20px 28px;text-align:center;">' +
+        '<img src="' + LOGO_DANI_URL + '" alt="Dani by Trevo" style="height:40px;margin-bottom:8px;" />' +
+        '<p style="color:#a8d5b8;font-size:12px;margin:6px 0 0;font-weight:600;">Dani · IA da Trevo Legaliza</p>' +
+      '</div>' +
+    '</div>';
+}
+
+// ─── G2: funcionário interno comenta ───────────────────────────────────────
+
+/**
+ * Classifica comentário de funcionário via Claude.
+ * Retorna { acao, resumo, mensagemCliente } ou null em erro.
+ */
+function _classificarComentarioFuncionario(textoComentario, contexto) {
+  const prompt =
+    'Você é a Dani, IA da Trevo Legaliza (assessoria societária B2B).\n' +
+    'Um funcionário interno acabou de comentar num card do Trello. Você precisa\n' +
+    'classificar a intenção do comentário pra decidir se aplica etiqueta de\n' +
+    'pendência (e notifica o cliente) ou só repassa atualização.\n\n' +
+    'CONTEXTO DO CARD:\n' +
+    '  Nome: ' + (contexto.cardNome || "?") + '\n' +
+    '  Lista atual: ' + (contexto.listaNome || "?") + '\n' +
+    '  Etiquetas atuais: ' + (contexto.etiquetas.join(", ") || "(nenhuma)") + '\n\n' +
+    'COMENTÁRIO DO FUNCIONÁRIO (' + (contexto.autor || "?") + '):\n' +
+    '"' + (textoComentario || "").substring(0, 1500) + '"\n\n' +
+    'CLASSIFIQUE EM EXATAMENTE UMA AÇÃO:\n' +
+    '  • SOLICITA_DOC      — funcionário pediu documento/arquivo do cliente\n' +
+    '  • SOLICITA_RESPOSTA — funcionário pediu confirmação/resposta/info do cliente\n' +
+    '  • ATUALIZA_STATUS   — funcionário só atualizou andamento (ex: "viabilidade transmitida pelo protocolo X", "DBE deferido")\n' +
+    '  • OUTRO             — anotação interna, fofoca, sem ação pro cliente\n\n' +
+    'COMPONHA A MENSAGEM PARA O CLIENTE (se aplicável):\n' +
+    '  • Tom: gentil, profissional, direto, breve. Cliente é contador (intermediário).\n' +
+    '  • Sempre se identifique no início como "dani.ai".\n' +
+    '  • Se SOLICITA_DOC ou SOLICITA_RESPOSTA: peça com clareza o que é necessário.\n' +
+    '  • Se ATUALIZA_STATUS: comunique com naturalidade o que aconteceu.\n' +
+    '  • Se OUTRO: deixe mensagemCliente vazia.\n\n' +
+    'RESPONDA EM JSON puro (sem markdown). Schema:\n' +
+    '{"acao":"SOLICITA_DOC|SOLICITA_RESPOSTA|ATUALIZA_STATUS|OUTRO","resumo":"frase curta do que foi pedido/atualizado","mensagemCliente":"texto pro cliente ou string vazia"}';
+
+  const j = chamarClaudeJson(prompt, 800);
+  if (!j || DANI_NIVELS.indexOf(j.acao) === -1) {
+    return null;
+  }
+  return j;
+}
+
+/**
+ * Handler do webhook commentCard. G2 (funcionário) implementado.
+ * Cliente (G4) fica como stub — Onda 1.B implementa.
+ */
 function handlerComentario(action, cli) {
   const texto = (action.data && action.data.text) || "";
   const autor = (action.memberCreator && action.memberCreator.fullName) || "?";
+  const cardId = (action.data && action.data.card && action.data.card.id) || "";
   const tipoAutor = ehEquipeInterna(autor) ? "trevo" : "cliente";
+
   Logger.log("  💬 comentário " + tipoAutor + " (" + autor + "): " + texto.substring(0, 100));
-  return _respJson({ ok: true, handler: "comentario", autor: tipoAutor, _todo: "Onda 1" });
+
+  // Skip: comentário da própria Dani (loop guard)
+  if (texto.indexOf(ASSINATURA_DANI.trim().substring(5, 25)) !== -1) {
+    return _respJson({ ok: true, ignored: "self_comment" });
+  }
+
+  // Idempotência
+  if (_jaProcessadoAcao(action.id)) {
+    return _respJson({ ok: true, ignored: "ja_processado" });
+  }
+
+  if (!cardId) return _respJson({ ok: false, error: "card_id ausente" });
+
+  // ── G2: funcionário comenta ──────────────────────────────────────────
+  if (tipoAutor === "trevo") {
+    return _danihandlerG2(action, cli, texto, autor, cardId);
+  }
+
+  // ── G4: cliente comenta — Onda 1.B implementa ────────────────────────
+  Logger.log("    [G4] Onda 1.B implementa resposta de cliente");
+  return _respJson({ ok: true, handler: "comentario_cliente", _todo: "Onda 1.B" });
 }
+
+function _danihandlerG2(action, cli, texto, autor, cardId) {
+  // Busca contexto completo do card
+  const card = _danigetCardCompleto(cardId);
+  if (!card) {
+    return _respJson({ ok: false, error: "card não encontrado" });
+  }
+  const listaNome = _danigetNomeLista(card.idList);
+  const etiquetas = (card.labels || []).map(l => (l.name || "").trim()).filter(Boolean);
+
+  const contexto = {
+    cardNome: card.name,
+    listaNome: listaNome,
+    etiquetas: etiquetas,
+    autor: autor,
+  };
+
+  // Modo dry-run: só loga o que faria
+  if (!daniAtiva()) {
+    Logger.log("    [DRY-RUN] DANI_ATIVA=false. Não chamo Claude nem ajo.");
+    Logger.log("    Contexto que iria pra IA: " + JSON.stringify(contexto));
+    return _respJson({ ok: true, dry_run: true, contexto: contexto });
+  }
+
+  // Classifica via Claude
+  const cls = _classificarComentarioFuncionario(texto, contexto);
+  if (!cls) {
+    Logger.log("    ⚠️ Classificação falhou — ignorando");
+    incMetrica("dani_classificacao_falha");
+    return _respJson({ ok: false, error: "classificacao_falha" });
+  }
+
+  Logger.log("    🧠 Claude classificou: " + cls.acao + " — " + (cls.resumo || ""));
+  incMetrica("dani_classificou_" + cls.acao);
+
+  const cardUrl = card.shortUrl || ("https://trello.com/c/" + cardId);
+
+  // ── Aplica ação conforme classificação ────────────────────────────────
+  if (cls.acao === "SOLICITA_DOC") {
+    _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_DOC);
+    if (cls.mensagemCliente) {
+      const html = _daniMontarEmailHTML({
+        titulo: "Pendência no seu processo 🍀",
+        mensagem: cls.mensagemCliente,
+        cardNome: card.name,
+        cardUrl: cardUrl,
+        etiquetaPendencia: DANI_ETIQUETA_DOC,
+      });
+      _daniEnviarEmailCliente(card, "🍀 " + (cls.resumo || "Documento pendente") + " — " + card.name, html, cls.mensagemCliente);
+      _daniComentar(cardId, "📄 " + cls.mensagemCliente, /* marcarBoard */ true);
+    }
+    return _respJson({ ok: true, acao: cls.acao, etiqueta_aplicada: DANI_ETIQUETA_DOC });
+  }
+
+  if (cls.acao === "SOLICITA_RESPOSTA") {
+    _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_RESP);
+    if (cls.mensagemCliente) {
+      const html = _daniMontarEmailHTML({
+        titulo: "Precisamos de uma resposta sua 🍀",
+        mensagem: cls.mensagemCliente,
+        cardNome: card.name,
+        cardUrl: cardUrl,
+        etiquetaPendencia: DANI_ETIQUETA_RESP,
+      });
+      _daniEnviarEmailCliente(card, "🍀 " + (cls.resumo || "Resposta pendente") + " — " + card.name, html, cls.mensagemCliente);
+      _daniComentar(cardId, "💬 " + cls.mensagemCliente, /* marcarBoard */ true);
+    }
+    return _respJson({ ok: true, acao: cls.acao, etiqueta_aplicada: DANI_ETIQUETA_RESP });
+  }
+
+  if (cls.acao === "ATUALIZA_STATUS") {
+    if (cls.mensagemCliente) {
+      const html = _daniMontarEmailHTML({
+        titulo: "Atualização do seu processo 🍀",
+        mensagem: cls.mensagemCliente,
+        cardNome: card.name,
+        cardUrl: cardUrl,
+      });
+      _daniEnviarEmailCliente(card, "🍀 Atualização — " + card.name, html, cls.mensagemCliente);
+      // Comentário ATUALIZA_STATUS no card é redundante (funcionário já comentou).
+      // Só emails. Cliente recebe a tradução.
+    }
+    return _respJson({ ok: true, acao: cls.acao });
+  }
+
+  // OUTRO: nada
+  return _respJson({ ok: true, acao: "OUTRO", silencio: true });
+}
+
+// ─── Outros handlers (stubs) — implementação em ondas seguintes ────────────
 
 function handlerEtiquetaAdd(action, cli) {
   const label = (action.data && action.data.label && action.data.label.name) || "";
   Logger.log("  🏷️  etiqueta adicionada: " + label);
-  return _respJson({ ok: true, handler: "etiqueta_add", label: label, _todo: "Onda 1+" });
+  return _respJson({ ok: true, handler: "etiqueta_add", label: label, _todo: "Onda 4 (cálculo de prazo)" });
 }
 
 function handlerEtiquetaRemove(action, cli) {
   const label = (action.data && action.data.label && action.data.label.name) || "";
   Logger.log("  🚫 etiqueta removida: " + label);
-  return _respJson({ ok: true, handler: "etiqueta_remove", label: label, _todo: "Onda 1+" });
+  return _respJson({ ok: true, handler: "etiqueta_remove", label: label, _todo: "Onda 4 (cálculo de prazo)" });
 }
 
 function handlerCardAtualizado(action, cli) {
-  // Trello envia updateCard pra muita coisa (idList, name, desc, due, closed...)
-  // Nos importamos só com mudança de lista.
   const before = action.data.listBefore;
   const after  = action.data.listAfter;
   if (before && after) {
     Logger.log("  ↔️  card movido: '" + before.name + "' → '" + after.name + "'");
-    return _respJson({ ok: true, handler: "card_movido", from: before.name, to: after.name, _todo: "Onda 3" });
+    return _respJson({ ok: true, handler: "card_movido", from: before.name, to: after.name, _todo: "Onda 3 (regras por lista)" });
   }
   return _respJson({ ok: true, ignored: "updateCard sem mudança de lista" });
 }
@@ -1260,7 +1630,7 @@ function handlerCardAtualizado(action, cli) {
 function handlerAnexo(action, cli) {
   const attachment = action.data && action.data.attachment;
   Logger.log("  📎 anexo adicionado: " + (attachment ? attachment.name : "?"));
-  return _respJson({ ok: true, handler: "anexo", _todo: "Onda 1" });
+  return _respJson({ ok: true, handler: "anexo", _todo: "Onda 1.B" });
 }
 
 function resolverClientePorBoard(boardId) {
@@ -1975,8 +2345,8 @@ function MapearEquipeInterna() {
   Logger.log("✅ Aba EQUIPE criada com " + linhas.length + " funcionários. Edite a coluna ATIVO=false pra desativar alguém.");
 }
 
-function chamarClaude(p) {
-  const payload = { model: CLAUDE_MODEL, max_tokens: 500, messages: [{ role: "user", content: p }] };
+function chamarClaude(p, maxTokens) {
+  const payload = { model: CLAUDE_MODEL, max_tokens: maxTokens || 500, messages: [{ role: "user", content: p }] };
   const opts = { method: "post", headers: { "x-api-key": prop("CLAUDE_API_KEY"), "anthropic-version": "2023-06-01", "content-type": "application/json" }, payload: JSON.stringify(payload), muteHttpExceptions: true };
   for (let t = 1; t <= 3; t++) {
     const r = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", opts);
