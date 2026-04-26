@@ -377,6 +377,53 @@ Roda `gerarDashboardDani()`.
 
 ---
 
-**Última atualização:** 25/04/2026 02h
-**Versão alvo:** v7.7.0
-**Total de testes:** 22 cenários distintos cobrindo Ondas 0/1.A/1.B/1.C/2/3/4
+## 🆕 Testes adicionais v7.8.0
+
+### Teste 4.Buckets.3 — Matriz POR LISTA
+
+Após sequência de etiquetas em listas DIFERENTES (ex.: aplica DOCUMENTO PENDENTE em ANÁLISE DOCUMENTAL, depois move pra VIABILIDADE e aplica EM ANÁLISE NO ÓRGÃO).
+
+Roda `mostrarPrazosCard("<cardId>")`.
+
+**Esperado no Logger:**
+```
+══════════ Prazos do card 69ec... ══════════
+
+  Lista                          | Trevo  | Cliente | Órgão
+  -------------------------------|--------|---------|-------
+  ANALISE_DOCUMENTAL             | -      | 0.5d    | -
+  VIABILIDADE                    | -      | -       | 2.0d
+  -------------------------------|--------|---------|-------
+  TOTAL                          | -      | 0.5d    | 2.0d
+  Total processo: 2.5d
+```
+
+Cada lista vira uma linha. Total no rodapé.
+
+### Teste 4.Indice — Função `dani_indice()`
+Roda no editor. **Esperado:** log com lista organizada de funções por categoria (USO, SETUP, MANUTENÇÃO, TESTE) + abas da planilha.
+
+### Teste 4.Heartbeat — Health check
+Roda `heartbeatDani()` no editor. **Esperado:**
+- Se Claude API responde: silencioso (zera contador)
+- Se falhar 3x consecutivas: email pro Thales
+
+### Teste 4.Limpeza — Properties órfãs
+1. Cria card teste, aplica e remove etiquetas (popula properties)
+2. Arquiva o card no Trello
+3. Roda `limparPropertiesOrfas()` no editor
+**Esperado:** log mostra "deletadas: N properties" do card arquivado.
+
+### Teste 4.Aviso Segurança
+Roda `statusDani()` com DANI_FORCAR_CLIENTE setado.
+**Esperado:** "⚠️ ATENÇÃO: usuário X tratado como cliente em TODOS os boards"
+
+### Teste 4.Custo Modelo
+Após varias ações G2 (Haiku) + G4 (Sonnet) + G8 (Haiku), checa o painel da Anthropic.
+**Esperado:** Maior parte do custo em Haiku, Sonnet só em G4. Relatório de gasto baixo.
+
+---
+
+**Última atualização:** 25/04/2026 noite
+**Versão alvo:** v7.8.0
+**Total de testes:** 28 cenários distintos cobrindo Ondas 0/1.A/1.B/1.C/2/3/4 + adequações v7.8.0
