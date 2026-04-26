@@ -1262,10 +1262,16 @@ function LembretesPendencias() {
 // ════════════════════════════════════════════════════════════════════════════
 
 function doGet(e) {
-  // Trello faz HEAD inicial pra verificar URL ao criar webhook.
-  // Apps Script Web App responde HEAD via doGet. Retornar 200 OK basta.
-  return ContentService.createTextOutput("Dani webhook online")
-    .setMimeType(ContentService.MimeType.TEXT);
+  // Webhook do Trello vai via Edge Function proxy (não bate aqui mais).
+  // Acesso direto via /exec abre o PAINEL completo como web app.
+  // Param ?ping=1 retorna texto curto (compat com health checks).
+  if (e && e.parameter && e.parameter.ping) {
+    return ContentService.createTextOutput("Dani webhook online")
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+  return HtmlService.createHtmlOutputFromFile("dani_painel")
+    .setTitle("🤖 Painel Dani v1.0 — Trevo Legaliza")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function doPost(e) {
