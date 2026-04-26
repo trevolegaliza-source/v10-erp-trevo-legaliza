@@ -1903,47 +1903,40 @@ function _danihandlerG2(action, cli, texto, autor, cardId) {
 
   // ── Aplica ação conforme classificação ────────────────────────────────
   try {
-    if (cls.acao === "SOLICITA_DOC") {
-      _daniLog("G2", "aplicando SOLICITA_DOC...");
-      // Bola tá com cliente agora — remove etiquetas Trevo
-      _daniRemoverEtiqueta(cardId, card.idBoard, "EM ANDAMENTO");
-      _daniRemoverEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_PRONTO);
-      _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_DOC);
-      let emailOk = false, comentOk = false;
-      if (cls.mensagemCliente) {
-        const html = _daniMontarEmailHTML({
-          titulo: "Pendência no seu processo 🍀",
-          mensagem: cls.mensagemCliente,
-          cardNome: card.name,
-          cardUrl: cardUrl,
-          etiquetaPendencia: DANI_ETIQUETA_DOC,
-        });
-        emailOk = _daniEnviarEmailCliente(card, "🍀 " + (cls.resumo || "Documento pendente") + " — " + card.name, html, cls.mensagemCliente);
-        comentOk = _daniComentar(cardId, "📄 " + cls.mensagemCliente, /* marcarBoard */ true);
-      }
-      _daniLog("G2", "SOLICITA_DOC concluída", { emailEnviado: emailOk, comentarioPostado: comentOk });
-      return _respJson({ ok: true, acao: cls.acao, etiqueta: DANI_ETIQUETA_DOC, email: emailOk, comentario: comentOk });
-    }
+    if (cls.acao === "SOLICITA_DOC" || cls.acao === "SOLICITA_RESPOSTA") {
+      const isDoc = cls.acao === "SOLICITA_DOC";
+      const etiqueta = isDoc ? DANI_ETIQUETA_DOC : DANI_ETIQUETA_RESP;
+      const titulo = isDoc ? "Pendência no seu processo 🍀" : "Precisamos de uma resposta sua 🍀";
+      const assuntoBase = cls.resumo || (isDoc ? "Documento pendente" : "Resposta pendente");
 
-    if (cls.acao === "SOLICITA_RESPOSTA") {
-      _daniLog("G2", "aplicando SOLICITA_RESPOSTA...");
+      _daniLog("G2", "aplicando " + cls.acao + " (sem comentário no card — segue regra 4h)");
+      // Bola tá com cliente — remove etiquetas Trevo
       _daniRemoverEtiqueta(cardId, card.idBoard, "EM ANDAMENTO");
       _daniRemoverEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_PRONTO);
-      _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_RESP);
-      let emailOk = false, comentOk = false;
+      _daniAplicarEtiqueta(cardId, card.idBoard, etiqueta);
+
+      let emailOk = false;
       if (cls.mensagemCliente) {
         const html = _daniMontarEmailHTML({
-          titulo: "Precisamos de uma resposta sua 🍀",
-          mensagem: cls.mensagemCliente,
-          cardNome: card.name,
-          cardUrl: cardUrl,
-          etiquetaPendencia: DANI_ETIQUETA_RESP,
+          titulo: titulo, mensagem: cls.mensagemCliente,
+          cardNome: card.name, cardUrl: cardUrl, etiquetaPendencia: etiqueta,
         });
-        emailOk = _daniEnviarEmailCliente(card, "🍀 " + (cls.resumo || "Resposta pendente") + " — " + card.name, html, cls.mensagemCliente);
-        comentOk = _daniComentar(cardId, "💬 " + cls.mensagemCliente, /* marcarBoard */ true);
+        emailOk = _daniEnviarEmailCliente(card, "🍀 " + assuntoBase + " — " + card.name, html, cls.mensagemCliente);
       }
-      _daniLog("G2", "SOLICITA_RESPOSTA concluída", { emailEnviado: emailOk, comentarioPostado: comentOk });
-      return _respJson({ ok: true, acao: cls.acao, etiqueta: DANI_ETIQUETA_RESP, email: emailOk, comentario: comentOk });
+
+      // Salva pendência pra _rotinaG2FollowUp4h verificar daqui 4h
+      const propsR = getProps();
+      const chavePend = "g2_pendencia_" + cardId + "_" + etiqueta;
+      propsR.setProperty(chavePend, JSON.stringify({
+        timestamp_inicio: new Date().toISOString(),
+        mensagem_cliente: cls.mensagemCliente || "",
+        resumo: cls.resumo || "",
+        etiqueta: etiqueta,
+        follow_up_enviado: false,
+      }));
+
+      _daniLog("G2", cls.acao + " concluída — aguardando 4h pra follow-up", { emailEnviado: emailOk });
+      return _respJson({ ok: true, acao: cls.acao, etiqueta: etiqueta, email: emailOk, comentario: false, aguardando_4h: true });
     }
 
     if (cls.acao === "ATUALIZA_STATUS") {
@@ -2054,7 +2047,11 @@ function _danihandlerG4(action, cli, texto, autor, cardId) {
   try {
     if (aval.veredito === "CUMPRIU" || aval.veredito === "PARCIAL") {
       // Remove TODAS as etiquetas de pendência ativas + aplica PRONTO PARA SER FEITO
-      pendenciasAtivas.forEach(et => _daniRemoverEtiqueta(cardId, card.idBoard, et));
+      pendenciasAtivas.forEach(et => {
+        _daniRemoverEtiqueta(cardId, card.idBoard, et);
+        // Limpa pendência G2 pra _rotinaG2FollowUp4h não disparar
+        getProps().deleteProperty("g2_pendencia_" + cardId + "_" + et);
+      });
       _daniAplicarEtiqueta(cardId, card.idBoard, DANI_ETIQUETA_PRONTO);
 
       const comentTexto = (aval.veredito === "PARCIAL")
@@ -3191,7 +3188,7 @@ function listarWebhooks() {
  */
 function setupTriggersDani() {
   // Remove triggers existentes pros handlers nossos (evita duplicar)
-  const handlers = ["sincronizarBoardsETrevoDani", "rotinasDiariasDani"];
+  const handlers = ["sincronizarBoardsETrevoDani", "rotinasDiariasDani", "rotinaG2FollowUp4h"];
   ScriptApp.getProjectTriggers().forEach(t => {
     if (handlers.indexOf(t.getHandlerFunction()) !== -1) {
       ScriptApp.deleteTrigger(t);
@@ -3200,22 +3197,20 @@ function setupTriggersDani() {
 
   // Trigger 1: sincronização de boards (8h)
   ScriptApp.newTrigger("sincronizarBoardsETrevoDani")
-    .timeBased()
-    .everyDays(1)
-    .atHour(8)
-    .create();
+    .timeBased().everyDays(1).atHour(8).create();
 
-  // Trigger 2: rotinas diárias da Dani (G11, G13, G14, G15) — 9h30 (depois dos lembretes)
+  // Trigger 2: rotinas diárias da Dani (G11/G13/G14/G15/G9) — 9h30
   ScriptApp.newTrigger("rotinasDiariasDani")
-    .timeBased()
-    .everyDays(1)
-    .atHour(9)
-    .nearMinute(30)
-    .create();
+    .timeBased().everyDays(1).atHour(9).nearMinute(30).create();
+
+  // Trigger 3: G2 follow-up 4h — roda a cada 1h, dispara só quando ≥4h sem resposta
+  ScriptApp.newTrigger("rotinaG2FollowUp4h")
+    .timeBased().everyHours(1).create();
 
   Logger.log("✅ Triggers criados:");
   Logger.log("  • sincronizarBoardsETrevoDani — diário 8h");
-  Logger.log("  • rotinasDiariasDani          — diário 9h30 (G11/G13/G14/G15)");
+  Logger.log("  • rotinasDiariasDani          — diário 9h30 (G11/G13/G14/G15/G9)");
+  Logger.log("  • rotinaG2FollowUp4h          — a cada 1h (verifica ≥4h sem resposta)");
   Logger.log("ℹ️ Triggers existentes (LembretesPendencias 9h, VarrerEmails 15min) mantidos.");
 }
 
@@ -3471,6 +3466,101 @@ function _processarBloqueadosDoBoard(boardId) {
       incMetrica("dani_g15_bloqueado_30");
     }
   });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 G2 follow-up de 4h (Onda 1.A — fix 25/04 madrugada)
+// ────────────────────────────────────────────────────────────────────────────
+// Quando funcionário comenta pedindo doc/info, Dani aplica etiqueta + email
+// IMEDIATAMENTE — mas NÃO comenta no card. O comentário só vem se cliente
+// não responder em 4h (regra do Thales: "se cliente não respondeu, AÍ sim
+// comenta no cartão e manda novo email").
+//
+// Trigger: rotinaG2FollowUp4h roda a cada 1h.
+// State: property "g2_pendencia_<cardId>_<etiqueta>" = JSON com timestamp_inicio,
+//        mensagem original, follow_up_enviado.
+// Limpa: G4 CUMPRIU/PARCIAL deleta a property — sem follow-up.
+// Idempotente: marca follow_up_enviado=true após disparar (1 follow-up só).
+// ════════════════════════════════════════════════════════════════════════════
+
+function rotinaG2FollowUp4h() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(120000)) { Logger.log("⚠️ rotinaG2FollowUp4h: lock"); return; }
+  try {
+    if (!daniAtiva()) {
+      _daniLog("G2_4H", "DRY-RUN — pula");
+      return;
+    }
+    const props = getProps();
+    const todas = props.getProperties();
+    const agora = new Date();
+    let processadas = 0, disparadas = 0;
+
+    Object.keys(todas).forEach(k => {
+      if (k.indexOf("g2_pendencia_") !== 0) return;
+      processadas++;
+      let est;
+      try { est = JSON.parse(todas[k]); } catch (e) { return; }
+      if (est.follow_up_enviado) return;
+
+      const inicio = new Date(est.timestamp_inicio);
+      const horas = (agora - inicio) / (1000 * 60 * 60);
+      if (horas < 4) return;
+
+      // Extrai cardId + etiqueta da chave (cardId pode ter underscore? não — Trello id é hex)
+      const resto = k.replace("g2_pendencia_", "");
+      const idx = resto.indexOf("_");
+      if (idx === -1) return;
+      const cardId = resto.substring(0, idx);
+      const etiqueta = resto.substring(idx + 1);
+
+      try {
+        const card = _danigetCardCompleto(cardId);
+        if (!card) { props.deleteProperty(k); return; }
+
+        // Se cliente já respondeu (etiqueta de pendência foi removida), limpa silencioso
+        const aindaTem = (card.labels || []).some(l => (l.name || "").trim() === etiqueta);
+        if (!aindaTem) {
+          props.deleteProperty(k);
+          _daniLog("G2_4H", "etiqueta já removida — pendência cancelada", { cardId: cardId, etiqueta: etiqueta });
+          return;
+        }
+
+        const cardUrl = card.shortUrl || ("https://trello.com/c/" + cardId);
+        const isDoc = etiqueta === DANI_ETIQUETA_DOC;
+        const emoji = isDoc ? "📄" : "💬";
+
+        // Comenta no card (com @board)
+        const textoCard = emoji + " Lembrando: " + (est.mensagem_cliente || est.resumo || "ainda preciso da sua resposta sobre o que pedimos.");
+        _daniComentar(cardId, textoCard, /* marcarBoard */ true);
+
+        // Email follow-up
+        const html = _daniMontarEmailHTML({
+          titulo: "Ainda aguardamos sua resposta 🍀",
+          mensagem: "Olá! Aqui é a dani.ai novamente. Há cerca de 4h pedimos uma informação sobre " +
+            "o seu processo, mas ainda não tivemos retorno. Pode dar uma olhadinha quando puder?\n\n" +
+            "Resumo do que pedimos: " + (est.resumo || "(ver detalhes no card)"),
+          cardNome: card.name,
+          cardUrl: cardUrl,
+          etiquetaPendencia: etiqueta,
+        });
+        _daniEnviarEmailCliente(card, "🍀 Ainda aguardamos: " + (est.resumo || "pendência") + " — " + card.name, html, est.mensagem_cliente);
+
+        est.follow_up_enviado = true;
+        est.timestamp_followup = new Date().toISOString();
+        props.setProperty(k, JSON.stringify(est));
+        disparadas++;
+        _daniLog("G2_4H", "follow-up disparado (4h sem resposta)", { cardId: cardId, etiqueta: etiqueta });
+        incMetrica("dani_g2_followup_4h");
+      } catch (e) {
+        _daniLog("ERRO", "G2_4H falha em " + k, { erro: String(e) });
+      }
+    });
+
+    _daniLog("G2_4H", "varredura concluída", { processadas: processadas, disparadas: disparadas });
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
