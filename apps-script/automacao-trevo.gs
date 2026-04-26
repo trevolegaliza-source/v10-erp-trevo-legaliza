@@ -1,6 +1,32 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.10.1 — 26/04/2026 — FIX replyTo email (G4 nunca disparava)
+//   • FIX CRÍTICO: _daniEnviarEmailCliente agora seta replyTo = email do card.
+//     Sem isso, cliente respondia o email e a resposta caía em
+//     trevolegaliza@gmail.com (caixa normal) — NÃO entrava no card como
+//     comentário. Resultado: webhook commentCard nunca disparava, G4 nunca
+//     avaliava se cliente cumpriu, etiqueta DOCUMENTO PENDENTE ficava
+//     pendurada eternamente.
+//   • Comprovado em 26/04: Carolina respondeu email Dani com CPF+estado civil,
+//     processo não atualizou. Bug encontrado.
+// v7.10.0 — 26/04/2026 — G2 PROMPT v2 + BUG REMOVE ETIQUETA
+//   • FIX CRÍTICO: case "removeLabelToCard" → "removeLabelFromCard" no doPost
+//     dispatch (linha ~1375). Trello envia evento como removeLabelFromCard,
+//     sem essa correção webhook nunca chegava no handlerEtiquetaRemove e
+//     buckets POR LISTA não populavam.
+//   • FIX em reconstruirBucketsCard: filter da API + else-if usavam o nome
+//     errado também. Reconstrução de histórico não pegava removes.
+//   • G2 PROMPT v2 com regras críticas explícitas:
+//     1) HIERARQUIA — cliente Trevo é o CONTADOR; sócios são terceiros.
+//        Proibido usar "seu/sua" pra info de sócio (deve usar nome).
+//     2) TIPO DO PROCESSO via cor da capa (verde/roxo/laranja/vermelho/preto)
+//        — não assumir abertura por default. Cinza = alvarás/licenças.
+//     3) Descrição do card (~500 chars) entra no contexto pra IA ter
+//        info de solicitante, sócios, dados.
+//     4) Sonnet primário (decisão crítica) + fallback Haiku se Sonnet cair.
+//   • _danigetCardCompleto agora busca campo cover (cor da capa).
+//   • Helper _corCapaParaTipo mapeia cor → tipo legível.
 // v7.9.0 — 26/04/2026 — PAINEL DANI (sidebar HTML no Apps Script)
 //   • Arquivo dani_painel.html (precisa criar manual: Arquivos → + → HTML)
 //   • mostrarPainelDani() abre como sidebar lateral na planilha
@@ -1372,7 +1398,7 @@ function _doPostWebhookTrello(action) {
   switch (tipo) {
     case "commentCard":         return handlerComentario(action, cli);
     case "addLabelToCard":      return handlerEtiquetaAdd(action, cli);
-    case "removeLabelToCard":   return handlerEtiquetaRemove(action, cli);
+    case "removeLabelFromCard": return handlerEtiquetaRemove(action, cli);
     case "updateCard":          return handlerCardAtualizado(action, cli);
     case "addAttachmentToCard": return handlerAnexo(action, cli);
     default:
@@ -1783,7 +1809,7 @@ function chamarClaudeJson(prompt, maxTokens, modelo) {
 
 function _danigetCardCompleto(cardId) {
   const r = trelloGet("/1/cards/" + cardId, {
-    fields: "name,idBoard,idList,shortUrl,desc,labels,closed",
+    fields: "name,idBoard,idList,shortUrl,desc,labels,closed,cover",
     labels: "true",
   });
   if (r.getResponseCode() !== 200) return null;
@@ -1858,6 +1884,12 @@ function _daniComentar(cardId, texto, marcarBoard) {
 /**
  * Envia email pro cliente do card. Email vem da descrição (campo 📧 E-MAIL).
  * Retorna true/false.
+ *
+ * v7.10.1: Seta replyTo = email do card no Trello. Sem isso, resposta do
+ * cliente caía em trevolegaliza@gmail.com (caixa normal) e NÃO entrava
+ * no card, então fluxo G4 (cliente respondeu) nunca disparava.
+ * Com replyTo, a resposta vira comentário no card automaticamente,
+ * webhook commentCard chega na Dani, e ela avalia (G4 — CUMPRIU/etc).
  */
 function _daniEnviarEmailCliente(card, assunto, html, textoPlano) {
   const email = extrairEmailDoCardDesc(card.desc || "");
@@ -1865,15 +1897,19 @@ function _daniEnviarEmailCliente(card, assunto, html, textoPlano) {
     Logger.log("    ⚠️ sem email do cliente no card — não envio");
     return false;
   }
+  // CRÍTICO: replyTo = email do card no Trello, pra resposta entrar como comentário
+  const emailCardTrello = getEmailDoCard(card.id);
   try {
-    MailApp.sendEmail({
+    const opcoes = {
       to: email,
       subject: assunto,
       htmlBody: html,
       body: textoPlano,
       name: "Dani 🍀 Trevo Legaliza",
-    });
-    Logger.log("    📧 email enviado pra " + email);
+    };
+    if (emailCardTrello) opcoes.replyTo = emailCardTrello;
+    MailApp.sendEmail(opcoes);
+    Logger.log("    📧 email enviado pra " + email + (emailCardTrello ? " (replyTo card)" : " (sem replyTo card)"));
     return true;
   } catch (e) {
     Logger.log("    ⚠️ falha email: " + e.message);
@@ -1920,39 +1956,77 @@ function _daniMontarEmailHTML(opts) {
 
 // ─── G2: funcionário interno comenta ───────────────────────────────────────
 
+// Mapa cor da capa Trello → tipo de processo (espelha buildSpecPorTipo)
+function _corCapaParaTipo(cor) {
+  const map = {
+    green:  "ABERTURA DE EMPRESA",
+    purple: "ALTERAÇÃO DE EMPRESA",
+    orange: "TRANSFORMAÇÃO DE EMPRESA",
+    red:    "ENCERRAMENTO DE EMPRESA",
+    black:  "ALVARÁS / LICENÇAS / INSCRIÇÕES (capa cinza)",
+  };
+  return map[String(cor || "").toLowerCase()] || "";
+}
+
 /**
  * Classifica comentário de funcionário via Claude.
  * Retorna { acao, resumo, mensagemCliente } ou null em erro.
+ *
+ * v7.10.0: Sonnet primário (Haiku como fallback) + regras explícitas
+ * de hierarquia (cliente = contador; sócios = terceiros) e tipo do
+ * processo via cor da capa do card.
  */
 function _classificarComentarioFuncionario(textoComentario, contexto) {
   const prompt =
-    'Você é a Dani, IA da Trevo Legaliza (assessoria societária B2B).\n' +
-    'Funcionário interno comentou num card do Trello. Classifique a intenção.\n\n' +
-    'CONTEXTO:\n' +
-    '  Card: ' + (contexto.cardNome || "?") + '\n' +
-    '  Lista: ' + (contexto.listaNome || "?") + '\n' +
-    '  Etiquetas: ' + (contexto.etiquetas.join(", ") || "(nenhuma)") + '\n\n' +
-    'COMENTÁRIO de ' + (contexto.autor || "?") + ':\n' +
+    'Você é a Dani, IA da Trevo Legaliza (assessoria societária B2B).\n\n' +
+    '═══ REGRAS CRÍTICAS (siga RIGOROSAMENTE) ═══\n\n' +
+    '1) HIERARQUIA DE PESSOAS:\n' +
+    '   • CLIENTE TREVO = é o CONTADOR/escritório de contabilidade. É com ele que você fala.\n' +
+    '   • SÓCIOS = pessoas físicas da empresa em processo. São TERCEIROS, representados pelo contador.\n' +
+    '   • Use "seu/sua" SOMENTE pra coisas do contador.\n' +
+    '   • Pra info de sócio, use o NOME do sócio (ex: "do sócio João Silva") OU "do sócio principal".\n' +
+    '   • ERRADO: "preciso do SEU CPF" (quando é CPF do sócio)\n' +
+    '   • CERTO:  "preciso do CPF do sócio Fulano"\n\n' +
+    '2) TIPO DO PROCESSO (NUNCA assumir abertura por default):\n' +
+    '   • Tipo identificado pela cor da capa: ' + (contexto.tipoProcesso || "DESCONHECIDO") + '\n' +
+    '   • Use ESSA info pra contextualizar a mensagem corretamente.\n' +
+    '   • Se DESCONHECIDO: use linguagem neutra ("seu processo", "a solicitação"), NÃO invente tipo.\n' +
+    '   • Cinza = Alvará/Licença/Inscrição (NÃO é abertura de empresa).\n\n' +
+    '═══ CONTEXTO DO CARD ═══\n\n' +
+    '  Card:            ' + (contexto.cardNome || "?") + '\n' +
+    '  Lista atual:     ' + (contexto.listaNome || "?") + '\n' +
+    '  Etiquetas:       ' + (contexto.etiquetas.join(", ") || "(nenhuma)") + '\n' +
+    '  Tipo (cor capa): ' + (contexto.tipoProcesso || "DESCONHECIDO") + '\n\n' +
+    '  Descrição do card (primeiros 500 chars — contém solicitante, sócios, dados):\n' +
+    '  """\n' + (contexto.descResumo || "(sem descrição)") + '\n  """\n\n' +
+    '═══ COMENTÁRIO RECEBIDO ═══\n\n' +
+    'Funcionário ' + (contexto.autor || "?") + ' comentou:\n' +
     '"' + (textoComentario || "").substring(0, 1500) + '"\n\n' +
-    'AÇÕES POSSÍVEIS (escolha exatamente uma):\n' +
+    '═══ AÇÕES POSSÍVEIS (escolha exatamente 1) ═══\n\n' +
     '  SOLICITA_DOC      = funcionário pediu documento/arquivo ao cliente\n' +
     '  SOLICITA_RESPOSTA = funcionário pediu confirmação/info ao cliente (sem doc)\n' +
     '  ATUALIZA_STATUS   = funcionário só atualizou andamento (ex: viabilidade transmitida)\n' +
     '  OUTRO             = anotação interna sem ação pro cliente\n\n' +
-    'COMPONHA mensagemCliente (gentil, profissional, breve, sempre se identifique como "dani.ai"):\n' +
-    '  - Se SOLICITA_*: peça com clareza\n' +
-    '  - Se ATUALIZA_STATUS: traduza a atualização pra cliente\n' +
-    '  - Se OUTRO: deixe vazio\n\n' +
-    'INSTRUÇÃO CRÍTICA DE FORMATO:\n' +
-    'Sua resposta DEVE ser exclusivamente um objeto JSON válido, começando com { e terminando com }.\n' +
+    '═══ COMPONHA mensagemCliente ═══\n\n' +
+    '  - Tom: gentil, profissional, breve, B2B (interlocutor é contador, não leigo).\n' +
+    '  - SEMPRE se identifique como "dani.ai".\n' +
+    '  - RESPEITE rigorosamente as regras 1 e 2 acima.\n' +
+    '  - Se OUTRO: deixe mensagemCliente vazio.\n\n' +
+    '═══ FORMATO DE RESPOSTA (CRÍTICO) ═══\n\n' +
+    'Resposta DEVE ser EXCLUSIVAMENTE um JSON válido começando com { e terminando com }.\n' +
     'NÃO escreva nada antes ou depois. NÃO use blocos de código (```). NÃO comente.\n\n' +
-    'Schema exato:\n' +
+    'Schema:\n' +
     '{"acao":"<uma das 4 acoes>","resumo":"<frase curta>","mensagemCliente":"<texto ou vazio>"}';
 
-  // G2 = classificação simples + composição de mensagem → Haiku (4x mais barato)
-  const j = chamarClaudeJson(prompt, 800, CLAUDE_MODEL_HAIKU);
+  // G2 v7.10.0 = Sonnet primário (decisão crítica do que falar pro contador).
+  // Fallback Haiku se Sonnet falhar (rate limit, indisponível, etc).
+  let j = chamarClaudeJson(prompt, 800, CLAUDE_MODEL_SONNET);
   if (!j) {
-    _daniLog("CLAUDE_FAIL", "_classificarComentarioFuncionario: chamarClaudeJson retornou null");
+    _daniLog("CLAUDE_FALLBACK", "G2: Sonnet falhou, tentando Haiku como fallback");
+    j = chamarClaudeJson(prompt, 800, CLAUDE_MODEL_HAIKU);
+  }
+  if (!j) {
+    _daniLog("CLAUDE_FAIL", "_classificarComentarioFuncionario: ambos modelos falharam");
     return null;
   }
   if (DANI_NIVELS.indexOf(j.acao) === -1) {
@@ -2042,12 +2116,18 @@ function _danihandlerG2(action, cli, texto, autor, cardId) {
   }
   const listaNome = _danigetNomeLista(card.idList);
   const etiquetas = (card.labels || []).map(l => (l.name || "").trim()).filter(Boolean);
+  const corCapa = (card.cover && card.cover.color) || "";
+  const tipoProcesso = _corCapaParaTipo(corCapa);
+  const descResumo = String(card.desc || "").substring(0, 500).replace(/\n{3,}/g, "\n\n");
 
   const contexto = {
     cardNome: card.name,
     listaNome: listaNome,
     etiquetas: etiquetas,
     autor: autor,
+    corCapa: corCapa,
+    tipoProcesso: tipoProcesso,
+    descResumo: descResumo,
   };
 
   _daniLog("G2", "contexto montado", contexto);
@@ -2604,7 +2684,7 @@ function reconstruirBucketsCard(cardId) {
   }
   Logger.log("🔁 Reconstruindo buckets POR LISTA do card " + cardId + "...");
   const r = trelloGet("/1/cards/" + cardId + "/actions", {
-    filter: "addLabelToCard,removeLabelToCard,updateCard:idList,createCard,copyCard",
+    filter: "addLabelToCard,removeLabelFromCard,updateCard:idList,createCard,copyCard",
     limit: "1000",
   });
   if (r.getResponseCode() !== 200) {
@@ -2654,7 +2734,7 @@ function reconstruirBucketsCard(cardId) {
         ts: a.date, lista: listaAtual,
       }));
       totalEventos++;
-    } else if (a.type === "removeLabelToCard") {
+    } else if (a.type === "removeLabelFromCard") {
       const chaveInicio = "bucket_inicio_" + cardId + "_" + label;
       const inicioRaw = props.getProperty(chaveInicio);
       if (!inicioRaw) return;
