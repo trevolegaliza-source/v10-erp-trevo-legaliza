@@ -1,6 +1,16 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.9.0 — 26/04/2026 — PAINEL DANI (sidebar HTML no Apps Script)
+//   • Arquivo dani_painel.html (precisa criar manual: Arquivos → + → HTML)
+//   • mostrarPainelDani() abre como sidebar lateral na planilha
+//   • onOpen() adiciona menu "🤖 Dani" na barra superior da planilha
+//   • Endpoints HTML→GS: painel_status, painel_runFuncao (whitelist),
+//     painel_logs (lê DANI_LOG)
+//   • Botões clicáveis pra: status, dashboard, prazos, ativar/desativar,
+//     sincronizar, rotinas diárias, follow-up 4h, limpar órfãs, heartbeat
+//   • Inputs com argumento: cardId pra prazos, username pra forçar cliente
+// v7.8.1 — 25/04/2026 — wrappers sem args (mostrarPrazosCardTeste, etc)
 // v7.8.0 — 25/04/2026 — DANI v1.0 — Refactor + Adequações
 //   • BUCKETS POR LISTA: matriz lista×bucket, permite relatório por etapa
 //     (handlerEtiqueta salva {ts,lista}, getPrazosDani retorna por_lista+total,
@@ -1530,6 +1540,103 @@ function _daniLog(nivel, mensagem, dados) {
 // ────────────────────────────────────────────────────────────────────────────
 // Roda dani_indice() pra ver lista organizada das funções disponíveis.
 // ════════════════════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════════════════════
+// 🎛️ PAINEL DANI — sidebar HTML no Apps Script (v7.9.0)
+// ────────────────────────────────────────────────────────────────────────────
+// Use: roda mostrarPainelDani() na planilha pra abrir sidebar.
+// Pré-req: arquivo "dani_painel" (HTML) precisa existir no projeto Apps Script.
+// ════════════════════════════════════════════════════════════════════════════
+
+function mostrarPainelDani() {
+  const html = HtmlService.createHtmlOutputFromFile("dani_painel")
+    .setTitle("🤖 Painel Dani v1.0")
+    .setWidth(420);
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
+// Atalho: também adiciona menu na planilha (auto-load se rodar onOpen)
+function onOpen() {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu("🤖 Dani")
+      .addItem("Abrir painel", "mostrarPainelDani")
+      .addItem("Status", "statusDani")
+      .addItem("Atualizar dashboard", "gerarDashboardDani")
+      .addToUi();
+  } catch (e) {}
+}
+
+// ─── Endpoints chamados pelo painel HTML via google.script.run ──────────────
+
+function painel_status() {
+  const props = getProps();
+  let webhooks = "?";
+  try {
+    const r = trelloGet("/1/tokens/" + prop("TRELLO_TOKEN") + "/webhooks", {});
+    if (r.getResponseCode() === 200) {
+      const lista = JSON.parse(r.getContentText());
+      webhooks = lista.filter(w => w.active).length + " ativos / " + lista.length + " total";
+    }
+  } catch (e) {}
+
+  let equipe = "?";
+  try {
+    const aba = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("EQUIPE");
+    equipe = aba ? (aba.getLastRow() - 1) : "aba não existe";
+  } catch (e) {}
+
+  return {
+    daniAtiva: daniAtiva(),
+    webhooks: webhooks,
+    equipe: equipe,
+    forcarCliente: props.getProperty("DANI_FORCAR_CLIENTE") || "",
+    webappUrl: props.getProperty("WEBAPP_URL") || "",
+  };
+}
+
+// Whitelist de funções permitidas via painel (segurança)
+const PAINEL_FUNCOES_PERMITIDAS = [
+  "statusDani", "gerarDashboardDani", "mostrarPrazosCardTeste",
+  "reconstruirBucketsCardTeste", "ativarDani", "desativarDani",
+  "sincronizarBoardsETrevoDani", "rotinasDiariasDani", "rotinaG2FollowUp4h",
+  "limparPropertiesOrfas", "heartbeatDani", "listarWebhooks",
+  "mostrarPrazosCard", "setForcarCliente",
+];
+
+function painel_runFuncao(nome, arg) {
+  if (PAINEL_FUNCOES_PERMITIDAS.indexOf(nome) === -1) {
+    throw new Error("Função não permitida via painel: " + nome);
+  }
+  // Captura logs durante a execução pra retornar pro painel
+  const fn = this[nome];
+  if (typeof fn !== "function") {
+    throw new Error("Função não encontrada: " + nome);
+  }
+  if (arg !== null && arg !== undefined && arg !== "") {
+    return String(fn(arg) || "OK");
+  }
+  return String(fn() || "OK");
+}
+
+function painel_logs() {
+  try {
+    const aba = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("DANI_LOG");
+    if (!aba) return [{ timestamp: "—", nivel: "INFO", mensagem: "Aba DANI_LOG ainda não existe" }];
+    const lastRow = aba.getLastRow();
+    if (lastRow < 2) return [];
+    const n = Math.min(30, lastRow - 1);
+    const dados = aba.getRange(2, 1, n, 4).getValues();
+    return dados.map(r => ({
+      timestamp: r[0] ? Utilities.formatDate(new Date(r[0]), Session.getScriptTimeZone(), "HH:mm:ss") : "",
+      nivel: String(r[1] || ""),
+      mensagem: String(r[2] || "").substring(0, 200),
+      dados: String(r[3] || "").substring(0, 200),
+    }));
+  } catch (e) {
+    return [{ timestamp: "—", nivel: "ERRO", mensagem: "Falha ao ler DANI_LOG: " + e.message }];
+  }
+}
 
 function dani_indice() {
   Logger.log("══════════ 🤖 ÍNDICE DANI v7.8 ══════════");
