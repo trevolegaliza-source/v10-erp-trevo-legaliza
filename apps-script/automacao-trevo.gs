@@ -2480,7 +2480,15 @@ function getPrazosDani(cardId) {
  * rastreando mudanças de lista (updateCard:idList) pra atribuir cada
  * intervalo de etiqueta à lista correta no momento.
  */
+function reconstruirBucketsCardTeste() {
+  reconstruirBucketsCard("69ec2d293f4d7941bdcd603e");
+}
+
 function reconstruirBucketsCard(cardId) {
+  if (!cardId) {
+    Logger.log("⚠️ Sem cardId. Roda reconstruirBucketsCardTeste() pra card de teste.");
+    return;
+  }
   Logger.log("🔁 Reconstruindo buckets POR LISTA do card " + cardId + "...");
   const r = trelloGet("/1/cards/" + cardId + "/actions", {
     filter: "addLabelToCard,removeLabelToCard,updateCard:idList,createCard,copyCard",
@@ -2705,8 +2713,48 @@ function gerarDashboardDani() {
 /**
  * Mostra prazos de um card. Roda do editor.
  */
+/**
+ * Atalho pra ver prazos do card de teste atual (TESTE DANI - 010101).
+ * Rode esse direto no editor — não precisa passar argumento.
+ */
+function mostrarPrazosCardTeste() {
+  mostrarPrazosCard("69ec2d293f4d7941bdcd603e");
+}
+
+/**
+ * Versão com UI prompt — pede o cardId via janela popup. Precisa
+ * planilha aberta. Use se quiser ver outro card sem editar código.
+ */
+function mostrarPrazosCardComPrompt() {
+  let cardId = null;
+  try {
+    const ui = SpreadsheetApp.getUi();
+    const resp = ui.prompt(
+      "🤖 Mostrar prazos",
+      "Cole o ID do card do Trello (24 caracteres hex):",
+      ui.ButtonSet.OK_CANCEL
+    );
+    if (resp.getSelectedButton() === ui.Button.OK) {
+      cardId = resp.getResponseText().trim();
+    }
+  } catch (e) {
+    Logger.log("⚠️ UI não disponível. Rode da planilha (não do editor).");
+    Logger.log("OU edite mostrarPrazosCardTeste() pra ter outro cardId.");
+    return;
+  }
+  if (cardId) mostrarPrazosCard(cardId);
+}
+
 function mostrarPrazosCard(cardId) {
-  if (!cardId) { Logger.log("Uso: mostrarPrazosCard('<id_do_card>')"); return; }
+  if (!cardId) {
+    Logger.log("⚠️ Apps Script editor não aceita argumentos.");
+    Logger.log("Opções:");
+    Logger.log("  1) Roda mostrarPrazosCardTeste() — atalho pro card de teste");
+    Logger.log("  2) Roda mostrarPrazosCardComPrompt() (precisa planilha aberta)");
+    Logger.log("  3) Edita esta função e cola o cardId direto:");
+    Logger.log("     mostrarPrazosCard('SEU_CARD_ID_AQUI')");
+    return;
+  }
   const p = getPrazosDani(cardId);
   Logger.log("══════════ Prazos do card " + cardId + " ══════════");
   Logger.log("");
