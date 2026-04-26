@@ -2,93 +2,290 @@
 <html>
 <head>
   <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-      background: #0f1410;
+      background: #0a0f0c;
       color: #e8f5ee;
-      padding: 16px;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 22px;
+      margin-bottom: 4px;
+      color: #a8d5b8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .subtitle { font-size: 12px; color: #6b9080; margin-bottom: 16px; }
+    h2 {
       font-size: 13px;
-      line-height: 1.4;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6b9080;
+      margin: 24px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #1a3d26;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    h1 { font-size: 16px; margin-bottom: 8px; color: #a8d5b8; }
-    h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #6b9080; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #2d5a3d; }
+
+    /* Status card */
     .status-card {
-      background: #1a2520;
-      border-radius: 8px;
-      padding: 12px;
+      background: #141f18;
+      border-radius: 10px;
+      padding: 14px 16px;
       margin-bottom: 12px;
-      border: 1px solid #2d5a3d;
+      border: 1px solid #1f3528;
     }
-    .status-row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 12px; }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 6px 0;
+      font-size: 13px;
+    }
     .status-row strong { color: #a8d5b8; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold; }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
     .badge.on { background: #16a34a; color: white; }
     .badge.off { background: #dc2626; color: white; }
-    .badge.warn { background: #f59e0b; color: white; }
-    button {
+    .badge.warn { background: #f59e0b; color: #1a1a1a; }
+    .badge.info { background: #2563eb; color: white; }
+
+    /* Switch Carolina */
+    .switch-card {
+      background: linear-gradient(135deg, #1a3d26 0%, #2d5a3d 100%);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin: 10px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .switch-card .info { flex: 1; }
+    .switch-card .label { font-size: 12px; color: #c8e6d2; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .switch-card .estado { font-size: 16px; font-weight: 700; color: #fff; margin-top: 2px; }
+    .switch-toggle {
+      background: #0a0f0c;
+      color: #fff;
+      padding: 10px 16px;
+      border: 2px solid #fff;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+      transition: all 0.15s;
+    }
+    .switch-toggle:hover { background: #fff; color: #0a0f0c; }
+
+    /* Action button */
+    .action-btn {
       width: 100%;
-      padding: 10px;
-      margin: 4px 0;
-      background: #2d5a3d;
+      padding: 12px 14px;
+      margin: 6px 0;
+      background: #1a2d22;
       color: white;
-      border: none;
-      border-radius: 6px;
+      border: 1px solid #2d5a3d;
+      border-radius: 8px;
       cursor: pointer;
       font-size: 13px;
       text-align: left;
       font-family: inherit;
-      transition: background 0.15s;
+      transition: all 0.15s;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
     }
-    button:hover:not(:disabled) { background: #16a34a; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    button.danger { background: #7f1d1d; }
-    button.danger:hover { background: #dc2626; }
-    .btn-desc { font-size: 11px; color: #a8d5b8; margin-top: 2px; opacity: 0.8; }
-    .input-row { display: flex; gap: 6px; margin: 8px 0; }
-    .input-row input { flex: 1; padding: 8px; background: #1a2520; border: 1px solid #2d5a3d; color: #e8f5ee; border-radius: 6px; font-size: 12px; font-family: inherit; }
-    .input-row button { width: auto; padding: 8px 14px; }
-    #log {
-      background: #0a0d0b;
+    .action-btn:hover:not(:disabled) {
+      background: #2d5a3d;
+      border-color: #16a34a;
+      transform: translateX(2px);
+    }
+    .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .action-btn.danger { border-color: #7f1d1d; }
+    .action-btn.danger:hover:not(:disabled) { background: #7f1d1d; border-color: #dc2626; }
+    .action-btn.primary { background: #2d5a3d; border-color: #16a34a; }
+    .action-btn.primary:hover:not(:disabled) { background: #16a34a; }
+
+    .btn-content { flex: 1; }
+    .btn-title { font-weight: 600; font-size: 13px; line-height: 1.3; }
+    .btn-desc {
+      font-size: 11px;
+      color: #8db09c;
+      margin-top: 3px;
+      line-height: 1.4;
+      font-weight: 400;
+    }
+    .btn-icon { font-size: 18px; flex-shrink: 0; line-height: 1; }
+
+    /* Forms */
+    .form-card {
+      background: #141f18;
+      border: 1px solid #1f3528;
+      border-radius: 10px;
+      padding: 14px;
+      margin: 8px 0;
+    }
+    .form-row { margin: 8px 0; }
+    .form-row label {
+      display: block;
+      font-size: 11px;
+      color: #8db09c;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+    .form-row input,
+    .form-row select {
+      width: 100%;
+      padding: 9px 12px;
+      background: #0a0f0c;
       border: 1px solid #2d5a3d;
+      color: #e8f5ee;
       border-radius: 6px;
-      padding: 10px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .form-row input:focus,
+    .form-row select:focus {
+      outline: none;
+      border-color: #16a34a;
+    }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+
+    /* Playbook accordion */
+    .playbook-item {
+      background: #141f18;
+      border: 1px solid #1f3528;
+      border-radius: 8px;
+      margin: 6px 0;
+      overflow: hidden;
+    }
+    .playbook-header {
+      padding: 12px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .playbook-header:hover { background: #1a2d22; }
+    .playbook-header .arrow { transition: transform 0.2s; color: #6b9080; }
+    .playbook-item.open .arrow { transform: rotate(90deg); }
+    .playbook-body {
+      display: none;
+      padding: 0 14px 14px;
+      font-size: 12px;
+      color: #c8d8c8;
+      line-height: 1.6;
+    }
+    .playbook-item.open .playbook-body { display: block; }
+    .playbook-body strong { color: #a8d5b8; }
+    .playbook-body code {
+      background: #0a0f0c;
+      padding: 2px 6px;
+      border-radius: 3px;
       font-family: 'Menlo', monospace;
       font-size: 11px;
-      max-height: 240px;
+      color: #f59e0b;
+    }
+
+    /* Log */
+    #log {
+      background: #050807;
+      border: 1px solid #1a3d26;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'Menlo', 'Consolas', monospace;
+      font-size: 11px;
+      max-height: 300px;
       overflow-y: auto;
       white-space: pre-wrap;
       color: #c8d8c8;
     }
-    .log-entry { padding: 3px 0; border-bottom: 1px solid #1a2520; }
+    .log-entry { padding: 3px 0; border-bottom: 1px solid #0a1410; }
     .log-entry.erro { color: #fca5a5; }
     .log-entry.ok { color: #a8d5b8; }
-    .toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
-    .toolbar button { width: auto; padding: 6px 10px; font-size: 11px; }
-    #spinner { display: none; color: #f59e0b; font-size: 11px; margin: 4px 0; }
+    .log-entry.warn { color: #fcd34d; }
+
+    /* Toolbar */
+    .toolbar { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+    .toolbar button {
+      padding: 6px 10px;
+      font-size: 11px;
+      background: #1a2d22;
+      color: #a8d5b8;
+      border: 1px solid #1f3528;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .toolbar button:hover { background: #2d5a3d; }
+
+    #spinner {
+      display: none;
+      color: #f59e0b;
+      font-size: 12px;
+      margin: 8px 0;
+      padding: 8px;
+      background: #1a1410;
+      border-radius: 6px;
+      border: 1px solid #f59e0b;
+      text-align: center;
+    }
+
     .toast {
       position: fixed;
-      bottom: 16px;
-      left: 16px;
-      right: 16px;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
       background: #16a34a;
       color: white;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
       display: none;
+      z-index: 1000;
+      max-width: 90%;
     }
     .toast.erro { background: #dc2626; }
+
+    .help-text {
+      font-size: 11px;
+      color: #6b9080;
+      margin-top: 4px;
+      line-height: 1.5;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
 
 <h1>🤖 Painel Dani v1.0</h1>
+<div class="subtitle">Trevo Legaliza · IA de processos · v7.10.1</div>
 
 <!-- ─── STATUS ─── -->
-<h2>📊 Status</h2>
+<h2>📊 Status atual</h2>
 <div class="status-card" id="status-card">
   <div class="status-row"><span>Carregando...</span></div>
 </div>
@@ -96,47 +293,287 @@
   <button onclick="carregarStatus()">🔄 Atualizar status</button>
 </div>
 
-<!-- ─── USO FREQUENTE ─── -->
-<h2>⚡ Uso frequente</h2>
-<button onclick="rodar('statusDani')">📋 Diagnóstico geral</button>
-<div class="btn-desc">Mostra DANI_ATIVA, webhooks, properties</div>
-
-<button onclick="rodar('gerarDashboardDani')">📊 Gerar Dashboard</button>
-<div class="btn-desc">Atualiza aba DANI_DASHBOARD da planilha</div>
-
-<button onclick="rodar('mostrarPrazosCardTeste')">⏱️ Prazos do card de teste</button>
-<div class="btn-desc">Matriz lista×bucket do card TESTE DANI</div>
-
-<button onclick="rodar('reconstruirBucketsCardTeste')">🔁 Reconstruir buckets (teste)</button>
-<div class="btn-desc">Popula buckets via histórico Trello</div>
-
-<!-- ─── DANI ON/OFF ─── -->
-<h2>🎚️ Liga / Desliga</h2>
-<button onclick="rodar('ativarDani')">🟢 Ativar Dani</button>
-<button onclick="rodar('desativarDani')" class="danger">🔴 Desativar Dani (dry-run)</button>
-
-<!-- ─── MANUTENÇÃO ─── -->
-<h2>🔧 Manutenção</h2>
-<button onclick="rodar('sincronizarBoardsETrevoDani')">🔄 Sincronizar boards (cron 8h)</button>
-<button onclick="rodar('rotinasDiariasDani')">⏰ Rotinas diárias (cron 9h30)</button>
-<button onclick="rodar('rotinaG2FollowUp4h')">⏳ G2 Follow-up 4h</button>
-<button onclick="rodar('limparPropertiesOrfas')">🧹 Limpar properties órfãs</button>
-<button onclick="rodar('heartbeatDani')">🩺 Heartbeat (testa Claude API)</button>
-<button onclick="rodar('listarWebhooks')">🔗 Listar webhooks</button>
-
-<!-- ─── COM ARGUMENTO ─── -->
-<h2>📝 Com argumento</h2>
-<div class="input-row">
-  <input type="text" id="cardId-input" placeholder="ID do card Trello (24 chars hex)">
-  <button onclick="rodarComArg('mostrarPrazosCard')">Prazos</button>
+<!-- ─── SWITCH CAROLINA ─── -->
+<h2>👤 Conta de teste</h2>
+<div class="switch-card">
+  <div class="info">
+    <div class="label">Carolina Guirado está como</div>
+    <div class="estado" id="carolina-estado">—</div>
+  </div>
+  <button class="switch-toggle" onclick="switchCarolina()">🔄 Trocar</button>
 </div>
-<div class="input-row">
-  <input type="text" id="forcar-input" placeholder="username (vazio = limpa)">
-  <button onclick="rodarComArg('setForcarCliente', 'forcar-input')">Forçar</button>
+<div class="help-text">
+  Quando "cliente teste", todas as ações da Carolina no Trello viram cliente fictício (pra você testar fluxos sem cliente real). Quando "funcionária", ela é tratada como equipe Trevo normal.
+</div>
+
+<!-- ─── ONBOARDING ─── -->
+<h2>🆕 Quando aparecer algo NOVO</h2>
+
+<button class="action-btn primary" onclick="rodar('sincronizarBoardsETrevoDani')">
+  <span class="btn-icon">🔄</span>
+  <div class="btn-content">
+    <div class="btn-title">Sincronizar boards (cliente novo)</div>
+    <div class="btn-desc">Use quando criou novo board no Trello pra cliente novo. Mapeia o cliente + cria webhook automaticamente. Roda sozinho às 8h, mas dá pra forçar agora.</div>
+  </div>
+</button>
+
+<button class="action-btn" onclick="abrirModalEquipe()">
+  <span class="btn-icon">👥</span>
+  <div class="btn-content">
+    <div class="btn-title">Funcionário novo na Trevo</div>
+    <div class="btn-desc">Hoje gambiarra: edita aba EQUIPE da planilha (NOME, USUARIO_TRELLO, EMAIL, ATIVO). Em breve UI no ERP.</div>
+  </div>
+</button>
+
+<!-- ─── OPERAÇÃO DIÁRIA ─── -->
+<h2>📅 Operação diária</h2>
+
+<button class="action-btn" onclick="rodar('gerarDashboardDani')">
+  <span class="btn-icon">📊</span>
+  <div class="btn-content">
+    <div class="btn-title">Gerar dashboard</div>
+    <div class="btn-desc">Atualiza aba DANI_DASHBOARD da planilha com status, métricas do dia, top cards mais demorados. Use de manhã pra ver como tá tudo.</div>
+  </div>
+</button>
+
+<!-- ─── RELATÓRIOS ─── -->
+<h2>📥 Relatório SLA</h2>
+<div class="form-card">
+  <div class="help-text" style="margin-bottom: 12px;">
+    Gera <strong>rascunho de email</strong> no Gmail (não envia direto). Você revisa, edita se quiser, e envia pro cliente quando tiver pronto.
+  </div>
+  <div class="form-row">
+    <label>Código do cliente (opcional)</label>
+    <input type="text" id="rel-codigo" placeholder="Ex: 10101 (vazio = todos)">
+  </div>
+  <div class="form-grid">
+    <div class="form-row">
+      <label>Data início (opcional)</label>
+      <input type="date" id="rel-inicio">
+    </div>
+    <div class="form-row">
+      <label>Data fim (opcional)</label>
+      <input type="date" id="rel-fim">
+    </div>
+  </div>
+  <div class="form-row">
+    <label>Tipo de processo (opcional)</label>
+    <select id="rel-tipo">
+      <option value="">Todos os tipos</option>
+      <option value="ABERTURA DE EMPRESA">Abertura</option>
+      <option value="ALTERAÇÃO DE EMPRESA">Alteração</option>
+      <option value="TRANSFORMAÇÃO DE EMPRESA">Transformação</option>
+      <option value="ENCERRAMENTO DE EMPRESA">Encerramento</option>
+      <option value="ALVARÁS / LICENÇAS / INSCRIÇÕES (capa cinza)">Alvarás/Licenças/Inscrições</option>
+    </select>
+  </div>
+  <button class="action-btn primary" onclick="exportarRelatorio()">
+    <span class="btn-icon">📤</span>
+    <div class="btn-content">
+      <div class="btn-title">Gerar rascunho no Gmail</div>
+      <div class="btn-desc">Cria draft em "Rascunhos" do trevolegaliza@gmail.com. Você abre, confere, edita destinatário, e envia.</div>
+    </div>
+  </button>
+</div>
+
+<!-- ─── DIAGNÓSTICO ─── -->
+<h2>🔧 Diagnóstico</h2>
+
+<button class="action-btn" onclick="rodar('statusDani')">
+  <span class="btn-icon">📋</span>
+  <div class="btn-content">
+    <div class="btn-title">Diagnóstico completo</div>
+    <div class="btn-desc">Mostra TODOS os ajustes da Dani (DANI_ATIVA, properties, webhooks, equipe). Use quando algo "não funcionou" pra ver o que tá configurado.</div>
+  </div>
+</button>
+
+<button class="action-btn" onclick="rodar('heartbeatDani')">
+  <span class="btn-icon">🩺</span>
+  <div class="btn-content">
+    <div class="btn-title">Heartbeat (testar Claude)</div>
+    <div class="btn-desc">Faz uma chamada de teste pra Claude API. Use quando suspeitar que a IA tá fora do ar (Dani não responde comentários).</div>
+  </div>
+</button>
+
+<button class="action-btn" onclick="rodar('listarWebhooks')">
+  <span class="btn-icon">🔗</span>
+  <div class="btn-content">
+    <div class="btn-title">Listar webhooks Trello</div>
+    <div class="btn-desc">Lista todos os webhooks registrados. Use pra debugar quando suspeitar que webhook quebrou em algum board.</div>
+  </div>
+</button>
+
+<button class="action-btn" onclick="rodar('limparPropertiesOrfas')">
+  <span class="btn-icon">🧹</span>
+  <div class="btn-content">
+    <div class="btn-title">Limpar properties órfãs</div>
+    <div class="btn-desc">Remove dados antigos de cards que foram arquivados/deletados. Roda automático às 9h30, mas dá pra forçar agora.</div>
+  </div>
+</button>
+
+<!-- ─── TESTES & DEBUG ─── -->
+<h2>🧪 Testes & Debug</h2>
+
+<button class="action-btn" onclick="rodar('mostrarPrazosCardTeste')">
+  <span class="btn-icon">⏱️</span>
+  <div class="btn-content">
+    <div class="btn-title">Prazos do card de teste</div>
+    <div class="btn-desc">Mostra matriz lista×bucket do card "TESTE DANI" (hardcoded). Use só pra verificar se cálculo de tempo tá certo.</div>
+  </div>
+</button>
+
+<button class="action-btn" onclick="rodar('reconstruirBucketsCardTeste')">
+  <span class="btn-icon">🔁</span>
+  <div class="btn-content">
+    <div class="btn-title">Reconstruir buckets (card teste)</div>
+    <div class="btn-desc">Apaga todos os tempos do card teste e recalcula via histórico Trello. Use se algum dado de prazo ficar zoado.</div>
+  </div>
+</button>
+
+<div class="form-card">
+  <div class="form-row">
+    <label>Card específico — prazos</label>
+    <input type="text" id="cardId-input" placeholder="ID do card Trello (24 chars hex)">
+  </div>
+  <button class="action-btn" onclick="rodarComArg('mostrarPrazosCard')">
+    <span class="btn-icon">🔍</span>
+    <div class="btn-content">
+      <div class="btn-title">Ver prazos de um card</div>
+      <div class="btn-desc">Use pra investigar tempo decorrido em qualquer card.</div>
+    </div>
+  </button>
+</div>
+
+<button class="action-btn" onclick="rodar('rotinaG2FollowUp4h')">
+  <span class="btn-icon">⏳</span>
+  <div class="btn-content">
+    <div class="btn-title">Forçar G2 follow-up 4h</div>
+    <div class="btn-desc">Verifica pendências G2 com 4h+ sem resposta e dispara follow-up. Roda automático a cada 1h, use só pra debug.</div>
+  </div>
+</button>
+
+<button class="action-btn" onclick="rodar('rotinasDiariasDani')">
+  <span class="btn-icon">⏰</span>
+  <div class="btn-content">
+    <div class="btn-title">Forçar rotinas diárias</div>
+    <div class="btn-desc">Roda manualmente G9/G11/G13/G14/G15. Roda automático às 9h30, use só pra debug.</div>
+  </div>
+</button>
+
+<!-- ─── LIGA / DESLIGA ─── -->
+<h2>🎚️ Liga / Desliga</h2>
+<button class="action-btn primary" onclick="confirmarAcao('ativarDani', 'Ativar Dani — vai começar a agir nos cartões?')">
+  <span class="btn-icon">🟢</span>
+  <div class="btn-content">
+    <div class="btn-title">Ativar Dani (modo produção)</div>
+    <div class="btn-desc">Dani começa a chamar Claude e aplicar ações reais (etiquetas, emails, comentários).</div>
+  </div>
+</button>
+<button class="action-btn danger" onclick="confirmarAcao('desativarDani', 'Desativar Dani — ela só vai LOGAR sem agir. Confirma?')">
+  <span class="btn-icon">🔴</span>
+  <div class="btn-content">
+    <div class="btn-title">Desativar Dani (dry-run)</div>
+    <div class="btn-desc">Dani só LOGA o que faria. Não envia email, não comenta, não aplica etiqueta. Use pra testar sem efeito.</div>
+  </div>
+</button>
+
+<!-- ─── PLAYBOOK ─── -->
+<h2>📖 Playbook — "Como faço quando..."</h2>
+
+<div class="playbook-item">
+  <div class="playbook-header" onclick="this.parentElement.classList.toggle('open')">
+    <span>🆕 Cliente novo (board novo no Trello)</span>
+    <span class="arrow">▶</span>
+  </div>
+  <div class="playbook-body">
+    1. Cria o board no Trello com nome incluindo código numérico (ex: <code>10234 - JOÃO CONTABILIDADE</code>)<br>
+    2. Aguarda até 8h da manhã seguinte (cron sincroniza automático)<br>
+    <strong>OU</strong><br>
+    3. Clica em <strong>"🔄 Sincronizar boards"</strong> aqui no painel pra acelerar<br><br>
+    <strong>Resultado:</strong> Cliente entra na aba CLIENTES da planilha, webhook é criado no board, Dani começa a escutar.
+  </div>
+</div>
+
+<div class="playbook-item">
+  <div class="playbook-header" onclick="this.parentElement.classList.toggle('open')">
+    <span>👤 Funcionário novo na Trevo</span>
+    <span class="arrow">▶</span>
+  </div>
+  <div class="playbook-body">
+    Hoje (provisório):<br>
+    1. Abre a planilha → aba <strong>EQUIPE</strong><br>
+    2. Adiciona linha: <code>NOME</code> | <code>USUARIO_TRELLO</code> (com @) | <code>EMAIL</code> | <code>ATIVO=true</code><br>
+    3. Salva. Dani já considera ele equipe interna.<br><br>
+    <strong>Em breve:</strong> botão no ERP pra adicionar sem mexer em planilha.
+  </div>
+</div>
+
+<div class="playbook-item">
+  <div class="playbook-header" onclick="this.parentElement.classList.toggle('open')">
+    <span>👋 Funcionário sai da Trevo</span>
+    <span class="arrow">▶</span>
+  </div>
+  <div class="playbook-body">
+    1. Abre planilha → aba <strong>EQUIPE</strong><br>
+    2. Acha a linha do funcionário<br>
+    3. Coluna <strong>ATIVO</strong> = <code>false</code><br>
+    4. Salva. Dani para de tratar como equipe interna (passa a tratar comentários dele como cliente).
+  </div>
+</div>
+
+<div class="playbook-item">
+  <div class="playbook-header" onclick="this.parentElement.classList.toggle('open')">
+    <span>📝 Novo processo de cliente existente</span>
+    <span class="arrow">▶</span>
+  </div>
+  <div class="playbook-body">
+    <strong>Nada!</strong> Webhook do board já existe. Dani escuta automaticamente assim que o cartão for criado (via formulário ou manual).
+  </div>
+</div>
+
+<div class="playbook-item">
+  <div class="playbook-header" onclick="this.parentElement.classList.toggle('open')">
+    <span>📊 Cliente quer relatório de SLA</span>
+    <span class="arrow">▶</span>
+  </div>
+  <div class="playbook-body">
+    1. Vai na seção <strong>"📥 Relatório SLA"</strong> aqui em cima<br>
+    2. Coloca código do cliente (opcional), datas (opcional), tipo (opcional)<br>
+    3. Clica <strong>"Gerar rascunho no Gmail"</strong><br>
+    4. Vai na sua caixa Gmail → pasta <strong>Rascunhos</strong><br>
+    5. Confere se tá certo, edita se quiser, ajusta destinatário, envia
+  </div>
+</div>
+
+<div class="playbook-item">
+  <div class="playbook-header" onclick="this.parentElement.classList.toggle('open')">
+    <span>🚨 Dani não respondeu o cliente — o que fazer?</span>
+    <span class="arrow">▶</span>
+  </div>
+  <div class="playbook-body">
+    Sequência de checagem:<br>
+    1. Clica <strong>"📋 Diagnóstico completo"</strong> — confere se DANI_ATIVA está LIGADA<br>
+    2. Clica <strong>"🩺 Heartbeat"</strong> — confere se Claude API está respondendo<br>
+    3. Clica <strong>"🔄 Carregar últimas 30"</strong> no Log abaixo — vê se webhook chegou e o que aconteceu<br>
+    4. Se tudo OK mas mesmo assim Dani não agiu, abre o card no Trello e olha as etiquetas (pode ser que ela já agiu mas você não viu)
+  </div>
+</div>
+
+<div class="playbook-item">
+  <div class="playbook-header" onclick="this.parentElement.classList.toggle('open')">
+    <span>🔇 Dani está mandando coisa errada — como pausar?</span>
+    <span class="arrow">▶</span>
+  </div>
+  <div class="playbook-body">
+    1. Clica <strong>"🔴 Desativar Dani (dry-run)"</strong> — para imediato<br>
+    2. Investiga o problema<br>
+    3. Quando resolvido, <strong>"🟢 Ativar Dani"</strong> de novo<br><br>
+    Em modo dry-run, Dani só loga, não age. Webhooks continuam chegando.
+  </div>
 </div>
 
 <!-- ─── LOG ─── -->
-<h2>📝 Log da sessão</h2>
+<h2>📝 Log de execução</h2>
 <div class="toolbar">
   <button onclick="carregarLogs()">🔄 Carregar últimas 30</button>
   <button onclick="document.getElementById('log').innerHTML=''">🗑️ Limpar tela</button>
@@ -144,7 +581,6 @@
 <div id="log"></div>
 
 <div id="spinner">⏳ Executando...</div>
-
 <div class="toast" id="toast"></div>
 
 <script>
@@ -153,7 +589,7 @@ function showToast(msg, isErro) {
   t.textContent = msg;
   t.className = 'toast' + (isErro ? ' erro' : '');
   t.style.display = 'block';
-  setTimeout(() => { t.style.display = 'none'; }, 4000);
+  setTimeout(() => { t.style.display = 'none'; }, 5000);
 }
 
 function showSpinner(s) {
@@ -173,18 +609,23 @@ function carregarStatus() {
   google.script.run
     .withSuccessHandler(s => {
       const html = `
-        <div class="status-row"><span>DANI_ATIVA:</span><span class="badge ${s.daniAtiva ? 'on' : 'off'}">${s.daniAtiva ? 'LIGADA' : 'DESLIGADA'}</span></div>
+        <div class="status-row"><span>Dani:</span><span class="badge ${s.daniAtiva ? 'on' : 'off'}">${s.daniAtiva ? 'LIGADA' : 'DESLIGADA'}</span></div>
         <div class="status-row"><span>Webhooks Trello:</span><strong>${s.webhooks}</strong></div>
-        <div class="status-row"><span>Equipe interna:</span><strong>${s.equipe} funcionários</strong></div>
-        <div class="status-row"><span>Forçar cliente:</span><strong>${s.forcarCliente || '(vazio)'}</strong></div>
-        ${s.forcarCliente ? '<div class="status-row"><span class="badge warn">⚠ Override de teste ativo</span></div>' : ''}
+        <div class="status-row"><span>Equipe interna:</span><strong>${s.equipe}</strong></div>
         <div class="status-row"><span>WEBAPP_URL:</span></div>
-        <div style="font-size:10px;color:#a8d5b8;word-break:break-all">${s.webappUrl || '(vazio)'}</div>
+        <div style="font-size:10px;color:#6b9080;word-break:break-all;margin-top:-2px;">${s.webappUrl || '(vazio)'}</div>
       `;
       document.getElementById('status-card').innerHTML = html;
+
+      // Atualiza switch Carolina
+      const fc = (s.forcarCliente || '').toLowerCase();
+      const ehCliente = fc.indexOf('carolinaguirado') !== -1;
+      document.getElementById('carolina-estado').innerHTML = ehCliente
+        ? '<span class="badge warn">CLIENTE TESTE</span>'
+        : '<span class="badge info">FUNCIONÁRIA TREVO</span>';
     })
     .withFailureHandler(e => {
-      document.getElementById('status-card').innerHTML = '<div class="status-row erro">Erro: ' + e.message + '</div>';
+      document.getElementById('status-card').innerHTML = '<div class="status-row" style="color:#fca5a5">Erro: ' + e.message + '</div>';
     })
     .painel_status();
 }
@@ -196,7 +637,7 @@ function rodar(nomeFn) {
     .withSuccessHandler(r => {
       showSpinner(false);
       appendLog('✅ ' + nomeFn + ' OK', 'ok');
-      if (r && typeof r === 'string') appendLog(r);
+      if (r && typeof r === 'string' && r !== 'OK') appendLog(r);
       showToast('✅ ' + nomeFn + ' executou');
       if (['ativarDani', 'desativarDani'].indexOf(nomeFn) !== -1) {
         setTimeout(carregarStatus, 500);
@@ -210,19 +651,15 @@ function rodar(nomeFn) {
     .painel_runFuncao(nomeFn, null);
 }
 
-function rodarComArg(nomeFn, inputId) {
-  const argId = inputId || 'cardId-input';
-  const arg = document.getElementById(argId).value.trim();
-  if (!arg && argId === 'cardId-input') {
-    showToast('Digite um cardId primeiro', true);
-    return;
-  }
+function rodarComArg(nomeFn) {
+  const arg = document.getElementById('cardId-input').value.trim();
+  if (!arg) { showToast('Cole o cardId primeiro', true); return; }
   showSpinner(true);
   appendLog('▶ Executando ' + nomeFn + "('" + arg + "')...");
   google.script.run
     .withSuccessHandler(r => {
       showSpinner(false);
-      appendLog('✅ ' + nomeFn + ' OK', 'ok');
+      appendLog('✅ OK', 'ok');
       if (r && typeof r === 'string') appendLog(r);
       showToast('✅ Executado');
     })
@@ -234,6 +671,63 @@ function rodarComArg(nomeFn, inputId) {
     .painel_runFuncao(nomeFn, arg);
 }
 
+function confirmarAcao(nomeFn, msg) {
+  if (confirm(msg)) rodar(nomeFn);
+}
+
+function switchCarolina() {
+  showSpinner(true);
+  google.script.run
+    .withSuccessHandler(novoEstado => {
+      showSpinner(false);
+      showToast('✅ Carolina agora é: ' + novoEstado);
+      carregarStatus();
+    })
+    .withFailureHandler(e => {
+      showSpinner(false);
+      showToast('❌ ' + e.message, true);
+    })
+    .painel_switchCarolina();
+}
+
+function abrirModalEquipe() {
+  alert(
+    "Pra adicionar funcionário novo, edite a aba EQUIPE da planilha:\n\n" +
+    "1) Abre Google Sheets da automação Trevo\n" +
+    "2) Vai na aba EQUIPE\n" +
+    "3) Adiciona linha:\n" +
+    "   • NOME (ex: João Silva)\n" +
+    "   • USUARIO_TRELLO (ex: @joaosilva123)\n" +
+    "   • EMAIL (opcional)\n" +
+    "   • ATIVO = true\n" +
+    "4) Salva — Dani já considera ele equipe interna\n\n" +
+    "Em breve teremos botão no ERP pra fazer isso sem mexer em planilha."
+  );
+}
+
+function exportarRelatorio() {
+  const filtros = {
+    codigo:  document.getElementById('rel-codigo').value.trim(),
+    inicio:  document.getElementById('rel-inicio').value,
+    fim:     document.getElementById('rel-fim').value,
+    tipo:    document.getElementById('rel-tipo').value,
+  };
+  showSpinner(true);
+  appendLog('▶ Gerando relatório...');
+  google.script.run
+    .withSuccessHandler(r => {
+      showSpinner(false);
+      appendLog('✅ Relatório: ' + r, 'ok');
+      showToast('✅ ' + r);
+    })
+    .withFailureHandler(e => {
+      showSpinner(false);
+      appendLog('❌ ' + e.message, 'erro');
+      showToast('❌ ' + e.message, true);
+    })
+    .painel_exportarRelatorio(filtros);
+}
+
 function carregarLogs() {
   showSpinner(true);
   google.script.run
@@ -243,7 +737,11 @@ function carregarLogs() {
       log.innerHTML = '';
       linhas.forEach(l => {
         const div = document.createElement('div');
-        div.className = 'log-entry' + (l.nivel === 'ERRO' ? ' erro' : (l.nivel === 'G2' || l.nivel === 'G4' ? ' ok' : ''));
+        let cls = 'log-entry';
+        if (l.nivel === 'ERRO') cls += ' erro';
+        else if (l.nivel === 'G2' || l.nivel === 'G4' || l.nivel === 'BUCKET') cls += ' ok';
+        else if (l.nivel === 'AVISO' || l.nivel === 'DRY-RUN') cls += ' warn';
+        div.className = cls;
         div.textContent = l.timestamp + ' [' + l.nivel + '] ' + l.mensagem;
         log.appendChild(div);
       });

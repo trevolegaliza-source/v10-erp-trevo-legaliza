@@ -1,6 +1,20 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.11.0 — 26/04/2026 — PAINEL v2 + EXPORT RELATÓRIO + SWITCH CAROLINA
+//   • Painel HTML refeito com seções claras: Onboarding, Operação Diária,
+//     Diagnóstico, Testes & Debug, Liga/Desliga, Playbook, Log.
+//   • Cada botão tem descrição "quando usar" — não fica mais perdido.
+//   • Switch Carolina cliente/funcionária no topo (1 clique).
+//   • Playbook colapsável embutido com FAQ "Como faço quando…" pro Thales
+//     consultar sem sair do painel.
+//   • painel_exportarRelatorio() — gera DRAFT no Gmail (NÃO envia direto)
+//     com tabela HTML por cliente×card×prazos. Filtros opcionais:
+//     codigo, dataInicio, dataFim, tipoProcesso. Thales abre rascunho,
+//     edita destinatário, envia manual.
+//   • painel_switchCarolina() — toggle DANI_FORCAR_CLIENTE.
+//   • mostrarPrazosCard agora RETORNA string formatada (cosmético — antes
+//     painel mostrava só "OK"). Logger.log preserved pra audit no editor.
 // v7.10.1 — 26/04/2026 — FIX replyTo email (G4 nunca disparava)
 //   • FIX CRÍTICO: _daniEnviarEmailCliente agora seta replyTo = email do card.
 //     Sem isso, cliente respondia o email e a resposta caía em
@@ -1627,6 +1641,157 @@ function painel_status() {
   };
 }
 
+/**
+ * Switch Carolina entre "cliente teste" e "funcionária Trevo".
+ * Retorna o novo estado pra mostrar no painel.
+ */
+function painel_switchCarolina() {
+  const props = getProps();
+  const atual = String(props.getProperty("DANI_FORCAR_CLIENTE") || "").toLowerCase();
+  const ehCliente = atual.indexOf("carolinaguirado") !== -1;
+  if (ehCliente) {
+    // Tira do override → volta a ser funcionária
+    props.deleteProperty("DANI_FORCAR_CLIENTE");
+    __equipeInternaCache = null;
+    return "funcionária Trevo";
+  } else {
+    // Põe no override → vira cliente teste
+    props.setProperty("DANI_FORCAR_CLIENTE", "carolinaguirado7");
+    __equipeInternaCache = null;
+    return "cliente teste";
+  }
+}
+
+/**
+ * Gera rascunho de email com relatório SLA. NÃO envia direto.
+ * Filtros opcionais: { codigo, inicio (YYYY-MM-DD), fim (YYYY-MM-DD), tipo }.
+ * Cliente acessa o draft em "Rascunhos" do Gmail e envia manualmente.
+ */
+function painel_exportarRelatorio(filtros) {
+  filtros = filtros || {};
+  const codigo = String(filtros.codigo || "").trim();
+  const inicio = filtros.inicio ? new Date(filtros.inicio + "T00:00:00") : null;
+  const fim    = filtros.fim    ? new Date(filtros.fim    + "T23:59:59") : null;
+  const tipo   = String(filtros.tipo || "").trim();
+
+  // 1) Resolve clientes alvo
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const abaCli = ss.getSheetByName("CLIENTES");
+  if (!abaCli) throw new Error("Aba CLIENTES não encontrada");
+  const dadosCli = abaCli.getDataRange().getValues();
+  const headers = dadosCli[0].map(h => String(h).trim().toUpperCase());
+  const idxCodigo = headers.indexOf("CÓDIGO CLIENTE");
+  const idxNome   = headers.indexOf("NOME DO QUADRO");
+  const idxBoard  = headers.indexOf("ID DO QUADRO");
+
+  const clientes = [];
+  for (let i = 1; i < dadosCli.length; i++) {
+    const cod = String(dadosCli[i][idxCodigo] || "").trim();
+    const board = String(dadosCli[i][idxBoard] || "").trim();
+    if (!cod || !board) continue;
+    if (codigo && cod !== codigo) continue;
+    clientes.push({ codigo: cod, nome: String(dadosCli[i][idxNome] || "").trim(), boardId: board });
+  }
+  if (clientes.length === 0) throw new Error("Nenhum cliente encontrado pra esses filtros");
+
+  // 2) Pra cada cliente, busca cards do board e calcula prazos
+  const linhasRel = [];
+  let totalCards = 0;
+  clientes.forEach(cli => {
+    try {
+      const r = trelloGet("/1/boards/" + cli.boardId + "/cards", {
+        fields: "name,shortUrl,desc,dateLastActivity,idList,closed,cover,labels",
+        labels: "true",
+      });
+      if (r.getResponseCode() !== 200) return;
+      const cards = JSON.parse(r.getContentText());
+      cards.forEach(card => {
+        if (card.closed) return;
+        // Filtro por tipo (cor da capa)
+        const corCapa = (card.cover && card.cover.color) || "";
+        const tipoCard = _corCapaParaTipo(corCapa);
+        if (tipo && tipoCard !== tipo) return;
+        // Filtro por data (dateLastActivity)
+        const data = new Date(card.dateLastActivity);
+        if (inicio && data < inicio) return;
+        if (fim && data > fim) return;
+        // Calcula prazos
+        const prazos = getPrazosDani(card.id);
+        const t = prazos.total;
+        const totalDias = (t.trevo + t.cliente + t.orgao) / 86400;
+        linhasRel.push({
+          codigo: cli.codigo, cliente: cli.nome,
+          card: card.name, url: card.shortUrl,
+          tipo: tipoCard || "—",
+          ultimaAtv: Utilities.formatDate(data, Session.getScriptTimeZone(), "dd/MM/yyyy"),
+          trevoDias: t.trevo_dias, clienteDias: t.cliente_dias, orgaoDias: t.orgao_dias,
+          totalDias: Math.round(totalDias * 10) / 10,
+        });
+        totalCards++;
+      });
+    } catch (e) {
+      Logger.log("⚠️ relatório: erro no cliente " + cli.codigo + ": " + e.message);
+    }
+    Utilities.sleep(200);
+  });
+
+  if (linhasRel.length === 0) throw new Error("Nenhum card encontrado nos filtros");
+
+  // 3) Monta HTML do relatório
+  const periodoTxt = (inicio || fim)
+    ? "Período: " + (inicio ? Utilities.formatDate(inicio, Session.getScriptTimeZone(), "dd/MM/yyyy") : "início") +
+      " a " + (fim ? Utilities.formatDate(fim, Session.getScriptTimeZone(), "dd/MM/yyyy") : "hoje")
+    : "Sem filtro de período";
+  const tipoTxt = tipo || "Todos os tipos";
+  const clienteTxt = codigo || "Todos os clientes";
+
+  let html = '<div style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;color:#1a1a1a;">';
+  html += '<h2 style="color:#1a3d26;border-bottom:2px solid #2d5a3d;padding-bottom:8px;">📊 Relatório SLA — Trevo Legaliza</h2>';
+  html += '<div style="background:#f0f7f2;padding:12px 16px;border-radius:6px;margin:12px 0;font-size:13px;">';
+  html += '<strong>Filtros aplicados:</strong><br>';
+  html += '• Cliente: ' + clienteTxt + '<br>';
+  html += '• ' + periodoTxt + '<br>';
+  html += '• Tipo: ' + tipoTxt + '<br>';
+  html += '• Total de cards: <strong>' + totalCards + '</strong>';
+  html += '</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;">';
+  html += '<thead><tr style="background:#1a3d26;color:white;">';
+  ['Código','Cliente','Card','Tipo','Última atividade','Dias Trevo','Dias Cliente','Dias Órgão','Total dias']
+    .forEach(c => { html += '<th style="padding:8px;text-align:left;font-size:11px;">' + c + '</th>'; });
+  html += '</tr></thead><tbody>';
+  linhasRel.sort((a,b) => b.totalDias - a.totalDias);
+  linhasRel.forEach((row, i) => {
+    const bg = i % 2 === 0 ? '#ffffff' : '#f0f7f2';
+    html += '<tr style="background:' + bg + ';">';
+    html += '<td style="padding:6px 8px;">' + row.codigo + '</td>';
+    html += '<td style="padding:6px 8px;">' + row.cliente + '</td>';
+    html += '<td style="padding:6px 8px;"><a href="' + row.url + '" style="color:#2d5a3d;">' + row.card + '</a></td>';
+    html += '<td style="padding:6px 8px;font-size:11px;">' + row.tipo + '</td>';
+    html += '<td style="padding:6px 8px;">' + row.ultimaAtv + '</td>';
+    html += '<td style="padding:6px 8px;text-align:right;">' + row.trevoDias.toFixed(1) + '</td>';
+    html += '<td style="padding:6px 8px;text-align:right;">' + row.clienteDias.toFixed(1) + '</td>';
+    html += '<td style="padding:6px 8px;text-align:right;">' + row.orgaoDias.toFixed(1) + '</td>';
+    html += '<td style="padding:6px 8px;text-align:right;font-weight:bold;">' + row.totalDias.toFixed(1) + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  html += '<p style="font-size:11px;color:#6b9080;margin-top:16px;">Relatório gerado por Dani 🍀 em ' +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm") + '</p>';
+  html += '</div>';
+
+  // 4) Cria DRAFT no Gmail (não envia)
+  const subject = "📊 Relatório SLA — " + clienteTxt + " — " +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+  GmailApp.createDraft(
+    "", // sem destinatário — Thales preenche manual
+    subject,
+    "Relatório SLA gerado pela Dani.\n\n(Veja versão HTML abaixo. Edite o destinatário e envie quando pronto.)",
+    { htmlBody: html, name: "Trevo Legaliza" }
+  );
+
+  return totalCards + " cards processados. Rascunho criado em Gmail → Rascunhos.";
+}
+
 // Whitelist de funções permitidas via painel (segurança)
 const PAINEL_FUNCOES_PERMITIDAS = [
   "statusDani", "gerarDashboardDani", "mostrarPrazosCardTeste",
@@ -2911,7 +3076,7 @@ function gerarDashboardDani() {
  * Rode esse direto no editor — não precisa passar argumento.
  */
 function mostrarPrazosCardTeste() {
-  mostrarPrazosCard("69ec2d293f4d7941bdcd603e");
+  return mostrarPrazosCard("69ec2d293f4d7941bdcd603e");
 }
 
 /**
@@ -2940,29 +3105,27 @@ function mostrarPrazosCardComPrompt() {
 
 function mostrarPrazosCard(cardId) {
   if (!cardId) {
-    Logger.log("⚠️ Apps Script editor não aceita argumentos.");
-    Logger.log("Opções:");
-    Logger.log("  1) Roda mostrarPrazosCardTeste() — atalho pro card de teste");
-    Logger.log("  2) Roda mostrarPrazosCardComPrompt() (precisa planilha aberta)");
-    Logger.log("  3) Edita esta função e cola o cardId direto:");
-    Logger.log("     mostrarPrazosCard('SEU_CARD_ID_AQUI')");
-    return;
+    const msg = "⚠️ Sem cardId. Use mostrarPrazosCardTeste() pro card de teste, " +
+      "ou cole um cardId hex de 24 chars no input do painel.";
+    Logger.log(msg);
+    return msg;
   }
   const p = getPrazosDani(cardId);
-  Logger.log("══════════ Prazos do card " + cardId + " ══════════");
-  Logger.log("");
-  Logger.log("  Lista                          | Trevo  | Cliente | Órgão");
-  Logger.log("  -------------------------------|--------|---------|-------");
   const fmt = (d) => (d > 0 ? d.toFixed(1) + "d" : "-").padEnd(6);
+  let out = "══════════ Prazos do card " + cardId + " ══════════\n\n";
+  out += "  Lista                          | Trevo  | Cliente | Órgão\n";
+  out += "  -------------------------------|--------|---------|-------\n";
   Object.keys(p.por_lista).sort().forEach(lista => {
     const v = p.por_lista[lista];
-    Logger.log("  " + lista.substring(0, 30).padEnd(31) + "| " +
-      fmt(v.trevo_dias) + " | " + fmt(v.cliente_dias) + "  | " + fmt(v.orgao_dias));
+    out += "  " + lista.substring(0, 30).padEnd(31) + "| " +
+      fmt(v.trevo_dias) + " | " + fmt(v.cliente_dias) + "  | " + fmt(v.orgao_dias) + "\n";
   });
-  Logger.log("  -------------------------------|--------|---------|-------");
-  Logger.log("  TOTAL                          | " +
-    fmt(p.total.trevo_dias) + " | " + fmt(p.total.cliente_dias) + "  | " + fmt(p.total.orgao_dias));
-  Logger.log("  Total processo: " + (p.total.trevo_dias + p.total.cliente_dias + p.total.orgao_dias).toFixed(1) + "d");
+  out += "  -------------------------------|--------|---------|-------\n";
+  out += "  TOTAL                          | " +
+    fmt(p.total.trevo_dias) + " | " + fmt(p.total.cliente_dias) + "  | " + fmt(p.total.orgao_dias) + "\n";
+  out += "  Total processo: " + (p.total.trevo_dias + p.total.cliente_dias + p.total.orgao_dias).toFixed(1) + "d";
+  Logger.log(out);
+  return out;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
