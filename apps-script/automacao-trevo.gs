@@ -1,6 +1,19 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.8.0 — 25/04/2026 — DANI v1.0 — Refactor + Adequações
+//   • BUCKETS POR LISTA: matriz lista×bucket, permite relatório por etapa
+//     (handlerEtiqueta salva {ts,lista}, getPrazosDani retorna por_lista+total,
+//      mostrarPrazosCard formata como tabela, reconstruir rastreia mudança lista)
+//   • MODELO DINÂMICO Haiku/Sonnet: ~70% economia. Haiku pra G2/G8
+//     (classificação alta freq), Sonnet pra G4 (decisão crítica).
+//   • HEARTBEAT 1h: alerta Thales se Claude API cair (3 falhas consecutivas)
+//   • LIMPEZA AUTOMÁTICA: limparPropertiesOrfas() no cron diário (cards
+//     arquivados/deletados deixam de acumular state)
+//   • dani_indice(): lista organizada de funções (USO/SETUP/MANUTENÇÃO/TESTE)
+//   • SEGURANÇA: statusDani avisa quando DANI_FORCAR_CLIENTE setado
+//   • Fix v7.7.1 mantido: G2 timing 4h (etiqueta+email imediato; comentário
+//     no card só após 4h sem resposta)
 // v7.7.0 — 25/04/2026 — DANI ONDA 4 COMPLETA — G3 + Dashboard
 //   • v7.7.0 G3: EM ANDAMENTO automática via keyword detection
 //     (16 padrões regex: "iniciando", "começando", "vou redigir",
@@ -129,7 +142,9 @@ function prop(key) {
 const TRELLO_LIST_ID_PADRAO = "69e107569c0cbec9277ffc46";
 const PASTA_CLIENTES_ATIVOS_ID = "1jD3F_eTZMNlI_e2aS2DJYKI0EkUdr91_";
 const EMAIL_ALERTA_ERRO = "thales.burger@trevolegaliza.com.br";
-const CLAUDE_MODEL = "claude-sonnet-4-5-20250929";
+const CLAUDE_MODEL = "claude-sonnet-4-5-20250929"; // legacy — fallback default
+const CLAUDE_MODEL_SONNET = "claude-sonnet-4-5-20250929"; // decisões críticas
+const CLAUDE_MODEL_HAIKU  = "claude-haiku-4-5-20251001"; // classificação alta freq (4x mais barato)
 const ASSINATURA_DANI = "\n\n---\n🍀 *Dani — Secretária Virtual da Trevo Legaliza*\n_Mensagem gerada por inteligência artificial._";
 
 // URLs de imagens hospedadas (Trevo usa subdomínio próprio)
@@ -1510,6 +1525,54 @@ function _daniLog(nivel, mensagem, dados) {
   Logger.log("[" + nivel + "] " + mensagem + (dados ? " | " + JSON.stringify(dados).substring(0, 200) : ""));
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// 🤖 ÍNDICE DA DANI — função de orientação (rode no editor)
+// ────────────────────────────────────────────────────────────────────────────
+// Roda dani_indice() pra ver lista organizada das funções disponíveis.
+// ════════════════════════════════════════════════════════════════════════════
+
+function dani_indice() {
+  Logger.log("══════════ 🤖 ÍNDICE DANI v7.8 ══════════");
+  Logger.log("");
+  Logger.log("📍 USO FREQUENTE (operação do dia-a-dia):");
+  Logger.log("  statusDani()                   — diagnóstico geral");
+  Logger.log("  ativarDani() / desativarDani() — liga/desliga IA");
+  Logger.log("  gerarDashboardDani()           — atualiza aba DANI_DASHBOARD");
+  Logger.log("  mostrarPrazosCard('<id>')      — matriz lista×bucket de um card");
+  Logger.log("  setForcarCliente('user')       — força usuário Trello como cliente (testes)");
+  Logger.log("  setForcarCliente('')           — limpa override de teste");
+  Logger.log("");
+  Logger.log("⚙️ SETUP (executar 1x ou eventualmente):");
+  Logger.log("  setupDaniProperties()          — wizard config (URL, token, emails)");
+  Logger.log("  setupTriggersDani()            — cria/atualiza 3 triggers (8h/9h30/1h)");
+  Logger.log("  setupTesteDani_Carolina()      — atalho pro setup de teste com Carolina");
+  Logger.log("  garantirWebhooksTodosBoards()  — cria webhook em cada board CLIENTES");
+  Logger.log("");
+  Logger.log("🔧 MANUTENÇÃO (eventual / debug):");
+  Logger.log("  MapearClientes()               — atualiza aba CLIENTES (cron 8h faz auto)");
+  Logger.log("  MapearEquipeInterna()          — cria aba EQUIPE inicial");
+  Logger.log("  reconstruirBucketsCard('<id>') — popula buckets via histórico Trello");
+  Logger.log("  limparPropertiesOrfas()        — limpa props de cards arquivados");
+  Logger.log("  listarWebhooks()               — debug, lista webhooks ativos");
+  Logger.log("  removerTodosWebhooks()         — ⚠️ ROLLBACK total (cuidado!)");
+  Logger.log("  heartbeatDani()                — testa Claude API (cron 1h faz auto)");
+  Logger.log("");
+  Logger.log("🧪 TESTE MANUAL (rodar pendência específica):");
+  Logger.log("  TestedoCartao()                — simula form na linha 2 da planilha");
+  Logger.log("  TestarVarredura()              — força VarrerEmails");
+  Logger.log("  rotinasDiariasDani()           — força G11/G13/G14/G15/G9");
+  Logger.log("  rotinaG2FollowUp4h()           — força follow-up 4h");
+  Logger.log("");
+  Logger.log("══ ABAS DA PLANILHA (onde olhar) ══");
+  Logger.log("  CLIENTES        — boards mapeados (auto-update 8h)");
+  Logger.log("  EQUIPE          — funcionários internos (você edita)");
+  Logger.log("  DANI_LOG        — log persistente (último 500)");
+  Logger.log("  DANI_DASHBOARD  — visão geral (gerar manual)");
+  Logger.log("  MÉTRICAS        — contadores diários");
+  Logger.log("  LEMBRETES       — histórico de cada lembrete");
+  Logger.log("  PENDÊNCIAS      — comentários classificados pela Dani");
+}
+
 /**
  * Diagnóstico completo da Dani. Roda no editor pra ver estado atual.
  */
@@ -1549,6 +1612,11 @@ function statusDani() {
   Logger.log("TRELLO_KEY configurado: " + trelloKeySet);
   Logger.log("");
   Logger.log("DANI_FORCAR_CLIENTE: " + forcarCliente);
+  if (forcarCliente !== "(vazio)") {
+    Logger.log("  ⚠️  ATENÇÃO: usuário " + forcarCliente + " está sendo tratado");
+    Logger.log("  como cliente em TODOS os boards. Isso é seguro só pra teste.");
+    Logger.log("  Em produção, rode: setForcarCliente('')");
+  }
   Logger.log("");
   Logger.log("Webhooks Trello: " + totalWebhooks);
   Logger.log("Equipe interna: " + totalEquipe);
@@ -1556,6 +1624,8 @@ function statusDani() {
   if (!daniAtiva()) {
     Logger.log("⚠️ Pra Dani agir, rode: ativarDani()");
   }
+  Logger.log("");
+  Logger.log("ℹ️ Pra ver lista de funções disponíveis: dani_indice()");
   Logger.log("═══════════════════════════");
 }
 
@@ -1576,10 +1646,10 @@ function _jaProcessadoAcao(actionId) {
  * Wrapper sobre chamarClaude que retorna JSON parseado ou null.
  * Tolerante a respostas com markdown wrap, prefixo/sufixo em prosa, etc.
  */
-function chamarClaudeJson(prompt, maxTokens) {
+function chamarClaudeJson(prompt, maxTokens, modelo) {
   let txt = "";
   try {
-    txt = chamarClaude(prompt, maxTokens || 600);
+    txt = chamarClaude(prompt, maxTokens || 600, modelo);
     // Tenta parsear direto
     return JSON.parse(txt);
   } catch (e1) {
@@ -1766,7 +1836,8 @@ function _classificarComentarioFuncionario(textoComentario, contexto) {
     'Schema exato:\n' +
     '{"acao":"<uma das 4 acoes>","resumo":"<frase curta>","mensagemCliente":"<texto ou vazio>"}';
 
-  const j = chamarClaudeJson(prompt, 800);
+  // G2 = classificação simples + composição de mensagem → Haiku (4x mais barato)
+  const j = chamarClaudeJson(prompt, 800, CLAUDE_MODEL_HAIKU);
   if (!j) {
     _daniLog("CLAUDE_FAIL", "_classificarComentarioFuncionario: chamarClaudeJson retornou null");
     return null;
@@ -2116,7 +2187,8 @@ function _avaliarRespostaCliente(textoCliente, ultimoPedidoTrevo, pendenciasAtiv
     'Schema:\n' +
     '{"veredito":"CUMPRIU|NAO_CUMPRIU|PARCIAL","confianca":<0-100>,"mensagemCliente":"<texto curto>"}';
 
-  const j = chamarClaudeJson(prompt, 600);
+  // G4 = decisão crítica (cumpriu vs não cumpriu) → Sonnet
+  const j = chamarClaudeJson(prompt, 600, CLAUDE_MODEL_SONNET);
   if (!j) return null;
   if (["CUMPRIU", "NAO_CUMPRIU", "PARCIAL"].indexOf(j.veredito) === -1) {
     _daniLog("CLAUDE_FAIL", "_avaliarRespostaCliente: veredito inválido", j);
@@ -2209,6 +2281,20 @@ function _bucketDaEtiqueta(nomeEtiqueta) {
   return DANI_ETIQUETA_BUCKET[(nomeEtiqueta || "").trim()] || null;
 }
 
+// v7.8.0: Buckets agora granulares POR LISTA — cada (lista, bucket) tem
+// seu próprio acumulado, permitindo relatório por etapa do processo.
+// Property keys:
+//   bucket_inicio_<cardId>_<etiqueta> = JSON {ts, lista}
+//   bucket_total_<cardId>__<lista>__<bucket> = segundos (sep '__' duplo)
+
+function _normLista(nome) {
+  return String(nome || "")
+    .replace(/[^\p{L}\p{N}]+/gu, "_")
+    .toUpperCase()
+    .replace(/^_+|_+$/g, "")
+    .substring(0, 60);
+}
+
 function handlerEtiquetaAdd(action, cli) {
   const label = (action.data && action.data.label && action.data.label.name) || "";
   const cardId = (action.data && action.data.card && action.data.card.id) || "";
@@ -2219,12 +2305,25 @@ function handlerEtiquetaAdd(action, cli) {
   if (_jaProcessadoAcao(action.id)) return _respJson({ ok: true, ignored: "ja_processado" });
   if (!bucket || !cardId) return _respJson({ ok: true, ignored: "sem_bucket_ou_card" });
 
-  // Salva timestamp de início (mesmo em dry-run — não custa nada e é só estado)
+  // Pega lista atual do card pra granularidade por etapa
+  let listaNorm = "DESCONHECIDA", listaOriginal = "";
+  try {
+    const card = _danigetCardCompleto(cardId);
+    if (card) {
+      listaOriginal = _danigetNomeLista(card.idList);
+      listaNorm = _normLista(listaOriginal) || "DESCONHECIDA";
+    }
+  } catch (e) {}
+
   const props = getProps();
   const chaveInicio = "bucket_inicio_" + cardId + "_" + label;
-  props.setProperty(chaveInicio, new Date().toISOString());
+  props.setProperty(chaveInicio, JSON.stringify({
+    ts: new Date().toISOString(),
+    lista: listaNorm,
+    listaOriginal: listaOriginal,
+  }));
 
-  return _respJson({ ok: true, bucket: bucket, registrado: true });
+  return _respJson({ ok: true, bucket: bucket, lista: listaNorm, registrado: true });
 }
 
 function handlerEtiquetaRemove(action, cli) {
@@ -2246,43 +2345,83 @@ function handlerEtiquetaRemove(action, cli) {
     return _respJson({ ok: true, ignored: "sem_inicio" });
   }
 
-  const inicio = new Date(inicioRaw);
+  // Tenta JSON novo (v7.8+); fallback string ISO (compat v7.7.x)
+  let inicio, listaNorm = "DESCONHECIDA";
+  try {
+    const obj = JSON.parse(inicioRaw);
+    if (obj && obj.ts) {
+      inicio = new Date(obj.ts);
+      listaNorm = obj.lista || "DESCONHECIDA";
+    } else throw new Error("legacy");
+  } catch (e) {
+    inicio = new Date(inicioRaw);
+  }
+
   const fim = new Date();
   const segundos = Math.max(0, Math.floor((fim - inicio) / 1000));
 
-  // Soma no acumulado
-  const chaveTotal = "bucket_total_" + cardId + "_" + bucket;
+  // Acumulado granular: bucket_total_<cardId>__<lista>__<bucket>
+  const chaveTotal = "bucket_total_" + cardId + "__" + listaNorm + "__" + bucket;
   const totalAtual = parseInt(props.getProperty(chaveTotal) || "0", 10);
   props.setProperty(chaveTotal, String(totalAtual + segundos));
   props.deleteProperty(chaveInicio);
 
   _daniLog("BUCKET", "tempo somado", {
-    cardId: cardId, etiqueta: label, bucket: bucket,
-    segundos: segundos, total_segundos: totalAtual + segundos,
+    cardId: cardId, etiqueta: label, bucket: bucket, lista: listaNorm,
+    segundos: segundos, total_lista_bucket: totalAtual + segundos,
   });
 
-  return _respJson({ ok: true, bucket: bucket, segundos_adicionados: segundos, total_segundos: totalAtual + segundos });
+  return _respJson({
+    ok: true, bucket: bucket, lista: listaNorm,
+    segundos_adicionados: segundos, total: totalAtual + segundos,
+  });
 }
 
 /**
- * Retorna prazos acumulados de um card em segundos pra cada bucket.
- * Inclui o tempo "em curso" das etiquetas atualmente aplicadas (não
- * só os já fechados).
+ * v7.8.0: Retorna matriz lista × bucket.
+ * Estrutura:
+ *   {
+ *     por_lista: {
+ *       "VIABILIDADE": { trevo, cliente, orgao, _dias }
+ *     },
+ *     total: { trevo, cliente, orgao, _dias }
+ *   }
+ * Inclui tempo em curso das etiquetas ativas. Compat retro com properties
+ * v7.7.x (tempo sem lista vai pra "DESCONHECIDA").
  */
 function getPrazosDani(cardId) {
   const props = getProps();
   const todas = props.getProperties();
-  const result = { TREVO: 0, CLIENTE: 0, ORGAO: 0 };
+  const porLista = {};
+  const garantir = (l) => {
+    if (!porLista[l]) porLista[l] = { TREVO: 0, CLIENTE: 0, ORGAO: 0 };
+  };
 
-  // 1) Acumulados (etiquetas já removidas)
+  // 1) Acumulados granulares: bucket_total_<cardId>__<lista>__<bucket>
+  const prefixGran = "bucket_total_" + cardId + "__";
   Object.keys(todas).forEach(k => {
+    if (k.indexOf(prefixGran) !== 0) return;
+    const resto = k.substring(prefixGran.length);
+    const idx = resto.lastIndexOf("__");
+    if (idx === -1) return;
+    const lista = resto.substring(0, idx);
+    const bucket = resto.substring(idx + 2);
+    if (["TREVO","CLIENTE","ORGAO"].indexOf(bucket) === -1) return;
+    garantir(lista);
+    porLista[lista][bucket] += parseInt(todas[k], 10);
+  });
+
+  // 1b) Compat: properties antigas sem lista (v7.7.x) → "DESCONHECIDA"
+  Object.keys(todas).forEach(k => {
+    if (k.indexOf(prefixGran) === 0) return;
     const m = k.match(/^bucket_total_(.+?)_(TREVO|CLIENTE|ORGAO)$/);
     if (m && m[1] === cardId) {
-      result[m[2]] = (result[m[2]] || 0) + parseInt(todas[k], 10);
+      garantir("DESCONHECIDA");
+      porLista["DESCONHECIDA"][m[2]] += parseInt(todas[k], 10);
     }
   });
 
-  // 2) Em curso (etiquetas ativas)
+  // 2) Em curso: etiquetas atualmente ativas (lê JSON com ts+lista)
   const agora = new Date();
   Object.keys(todas).forEach(k => {
     const prefix = "bucket_inicio_" + cardId + "_";
@@ -2290,18 +2429,42 @@ function getPrazosDani(cardId) {
     const etiqueta = k.replace(prefix, "");
     const bucket = _bucketDaEtiqueta(etiqueta);
     if (!bucket) return;
-    const inicio = new Date(todas[k]);
+    let inicio, lista;
+    try {
+      const obj = JSON.parse(todas[k]);
+      inicio = new Date(obj.ts || todas[k]);
+      lista = obj.lista || "DESCONHECIDA";
+    } catch (e) {
+      inicio = new Date(todas[k]);
+      lista = "DESCONHECIDA";
+    }
     const segundos = Math.max(0, Math.floor((agora - inicio) / 1000));
-    result[bucket] += segundos;
+    garantir(lista);
+    porLista[lista][bucket] += segundos;
+  });
+
+  // Formata + agrega total
+  const formatado = {};
+  let totalT = 0, totalC = 0, totalO = 0;
+  Object.keys(porLista).forEach(lista => {
+    const v = porLista[lista];
+    formatado[lista] = {
+      trevo: v.TREVO, cliente: v.CLIENTE, orgao: v.ORGAO,
+      trevo_dias: Math.round(v.TREVO / 86400 * 10) / 10,
+      cliente_dias: Math.round(v.CLIENTE / 86400 * 10) / 10,
+      orgao_dias: Math.round(v.ORGAO / 86400 * 10) / 10,
+    };
+    totalT += v.TREVO; totalC += v.CLIENTE; totalO += v.ORGAO;
   });
 
   return {
-    trevo: result.TREVO,
-    cliente: result.CLIENTE,
-    orgao: result.ORGAO,
-    trevo_dias: Math.round(result.TREVO / 86400 * 10) / 10,
-    cliente_dias: Math.round(result.CLIENTE / 86400 * 10) / 10,
-    orgao_dias: Math.round(result.ORGAO / 86400 * 10) / 10,
+    por_lista: formatado,
+    total: {
+      trevo: totalT, cliente: totalC, orgao: totalO,
+      trevo_dias: Math.round(totalT / 86400 * 10) / 10,
+      cliente_dias: Math.round(totalC / 86400 * 10) / 10,
+      orgao_dias: Math.round(totalO / 86400 * 10) / 10,
+    },
   };
 }
 
@@ -2312,20 +2475,25 @@ function getPrazosDani(cardId) {
  *
  * Custo: 1 chamada API por card (limite 1000 actions).
  */
+/**
+ * v7.8.0: Reconstrói buckets POR LISTA percorrendo histórico do card,
+ * rastreando mudanças de lista (updateCard:idList) pra atribuir cada
+ * intervalo de etiqueta à lista correta no momento.
+ */
 function reconstruirBucketsCard(cardId) {
-  Logger.log("🔁 Reconstruindo buckets do card " + cardId + "...");
+  Logger.log("🔁 Reconstruindo buckets POR LISTA do card " + cardId + "...");
   const r = trelloGet("/1/cards/" + cardId + "/actions", {
-    filter: "addLabelToCard,removeLabelToCard",
+    filter: "addLabelToCard,removeLabelToCard,updateCard:idList,createCard,copyCard",
     limit: "1000",
   });
   if (r.getResponseCode() !== 200) {
     Logger.log("❌ Erro: " + r.getContentText());
     return;
   }
-  const acoes = JSON.parse(r.getContentText()).reverse(); // ordem cronológica
+  const acoes = JSON.parse(r.getContentText()).reverse(); // ASC
   const props = getProps();
 
-  // Limpa estado anterior do card
+  // Limpa estado anterior (granular E v7.7.x)
   Object.keys(props.getProperties()).forEach(k => {
     if (k.indexOf("bucket_inicio_" + cardId + "_") === 0 ||
         k.indexOf("bucket_total_" + cardId + "_") === 0) {
@@ -2333,34 +2501,64 @@ function reconstruirBucketsCard(cardId) {
     }
   });
 
+  // Lista atual como ponto de partida (caso histórico não tenha createCard)
+  let listaAtual = "DESCONHECIDA";
+  try {
+    const card = _danigetCardCompleto(cardId);
+    if (card) listaAtual = _normLista(_danigetNomeLista(card.idList));
+  } catch (e) {}
+
+  // Tenta inferir lista inicial pela primeira ação
+  for (let i = 0; i < acoes.length; i++) {
+    const a = acoes[i];
+    if ((a.type === "createCard" || a.type === "copyCard") &&
+        a.data && a.data.list && a.data.list.name) {
+      listaAtual = _normLista(a.data.list.name);
+      break;
+    }
+  }
+
   let totalEventos = 0;
   acoes.forEach(a => {
+    if (a.type === "updateCard" && a.data && a.data.listAfter) {
+      listaAtual = _normLista(a.data.listAfter.name || "");
+      return;
+    }
     const label = (a.data && a.data.label && a.data.label.name) || "";
     const bucket = _bucketDaEtiqueta(label);
     if (!bucket) return;
 
     if (a.type === "addLabelToCard") {
-      props.setProperty("bucket_inicio_" + cardId + "_" + label, a.date);
+      props.setProperty("bucket_inicio_" + cardId + "_" + label, JSON.stringify({
+        ts: a.date, lista: listaAtual,
+      }));
       totalEventos++;
     } else if (a.type === "removeLabelToCard") {
       const chaveInicio = "bucket_inicio_" + cardId + "_" + label;
       const inicioRaw = props.getProperty(chaveInicio);
-      if (inicioRaw) {
-        const segundos = Math.max(0, Math.floor((new Date(a.date) - new Date(inicioRaw)) / 1000));
-        const chaveTotal = "bucket_total_" + cardId + "_" + bucket;
-        const totalAtual = parseInt(props.getProperty(chaveTotal) || "0", 10);
-        props.setProperty(chaveTotal, String(totalAtual + segundos));
-        props.deleteProperty(chaveInicio);
-        totalEventos++;
+      if (!inicioRaw) return;
+      let inicio, listaOrigem;
+      try {
+        const obj = JSON.parse(inicioRaw);
+        inicio = new Date(obj.ts);
+        listaOrigem = obj.lista || listaAtual;
+      } catch (e) {
+        inicio = new Date(inicioRaw);
+        listaOrigem = listaAtual;
       }
+      const segundos = Math.max(0, Math.floor((new Date(a.date) - inicio) / 1000));
+      const chaveTotal = "bucket_total_" + cardId + "__" + listaOrigem + "__" + bucket;
+      const totalAtual = parseInt(props.getProperty(chaveTotal) || "0", 10);
+      props.setProperty(chaveTotal, String(totalAtual + segundos));
+      props.deleteProperty(chaveInicio);
+      totalEventos++;
     }
   });
 
   const prazos = getPrazosDani(cardId);
-  Logger.log("✅ Reconstruído. " + totalEventos + " eventos processados.");
-  Logger.log("  Trevo:   " + prazos.trevo_dias + "d");
-  Logger.log("  Cliente: " + prazos.cliente_dias + "d");
-  Logger.log("  Órgão:   " + prazos.orgao_dias + "d");
+  Logger.log("✅ Reconstruído. " + totalEventos + " eventos.");
+  Logger.log("Total: Trevo " + prazos.total.trevo_dias + "d / Cliente " +
+    prazos.total.cliente_dias + "d / Órgão " + prazos.total.orgao_dias + "d");
   return prazos;
 }
 
@@ -2508,16 +2706,22 @@ function gerarDashboardDani() {
  * Mostra prazos de um card. Roda do editor.
  */
 function mostrarPrazosCard(cardId) {
-  if (!cardId) {
-    Logger.log("Uso: mostrarPrazosCard('<id_do_card>')");
-    return;
-  }
+  if (!cardId) { Logger.log("Uso: mostrarPrazosCard('<id_do_card>')"); return; }
   const p = getPrazosDani(cardId);
-  Logger.log("══ Prazos do card " + cardId + " ══");
-  Logger.log("  🟢 Trevo:   " + p.trevo_dias + "d (" + p.trevo + "s)");
-  Logger.log("  🟡 Cliente: " + p.cliente_dias + "d (" + p.cliente + "s)");
-  Logger.log("  🔵 Órgão:   " + p.orgao_dias + "d (" + p.orgao + "s)");
-  Logger.log("  Total:     " + (p.trevo_dias + p.cliente_dias + p.orgao_dias).toFixed(1) + "d");
+  Logger.log("══════════ Prazos do card " + cardId + " ══════════");
+  Logger.log("");
+  Logger.log("  Lista                          | Trevo  | Cliente | Órgão");
+  Logger.log("  -------------------------------|--------|---------|-------");
+  const fmt = (d) => (d > 0 ? d.toFixed(1) + "d" : "-").padEnd(6);
+  Object.keys(p.por_lista).sort().forEach(lista => {
+    const v = p.por_lista[lista];
+    Logger.log("  " + lista.substring(0, 30).padEnd(31) + "| " +
+      fmt(v.trevo_dias) + " | " + fmt(v.cliente_dias) + "  | " + fmt(v.orgao_dias));
+  });
+  Logger.log("  -------------------------------|--------|---------|-------");
+  Logger.log("  TOTAL                          | " +
+    fmt(p.total.trevo_dias) + " | " + fmt(p.total.cliente_dias) + "  | " + fmt(p.total.orgao_dias));
+  Logger.log("  Total processo: " + (p.total.trevo_dias + p.total.cliente_dias + p.total.orgao_dias).toFixed(1) + "d");
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -3256,6 +3460,7 @@ function rotinasDiariasDani() {
     try { _rotinaG13ArquivoMensal(); } catch (e) { _daniLog("ERRO", "G13", { erro: String(e) }); }
     try { _rotinaG14G15Bloqueados(); } catch (e) { _daniLog("ERRO", "G14/G15", { erro: String(e) }); }
     try { _rotinaG9NotificarAnaliseOrgao(); } catch (e) { _daniLog("ERRO", "G9", { erro: String(e) }); }
+    try { limparPropertiesOrfas(); } catch (e) { _daniLog("ERRO", "limparPropertiesOrfas", { erro: String(e) }); }
     _daniLog("ROTINA", "rotinas diárias concluídas");
   } finally {
     lock.releaseLock();
@@ -3469,6 +3674,132 @@ function _processarBloqueadosDoBoard(boardId) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// 🩺 HEARTBEAT — testa Claude API a cada 1h (junto com follow-up 4h)
+// ────────────────────────────────────────────────────────────────────────────
+// Se Claude API falhar 3x consecutivas (3h), envia alerta pro EMAIL_ALERTA_ERRO.
+// Estado em property "heartbeat_falhas_consecutivas" + "heartbeat_ultimo_alerta".
+// ════════════════════════════════════════════════════════════════════════════
+
+function heartbeatDani() {
+  const props = getProps();
+  let ok = false;
+  try {
+    const resp = chamarClaude("Responda apenas: OK", 10, CLAUDE_MODEL_HAIKU);
+    ok = String(resp || "").toUpperCase().indexOf("OK") !== -1;
+  } catch (e) {
+    _daniLog("HEARTBEAT", "falha", { erro: String(e) });
+  }
+
+  const falhas = parseInt(props.getProperty("heartbeat_falhas_consecutivas") || "0", 10);
+  if (ok) {
+    if (falhas > 0) {
+      _daniLog("HEARTBEAT", "Claude API voltou ao normal", { falhas_anteriores: falhas });
+    }
+    props.setProperty("heartbeat_falhas_consecutivas", "0");
+    props.setProperty("heartbeat_ultimo_ok", new Date().toISOString());
+    return;
+  }
+
+  const novasFalhas = falhas + 1;
+  props.setProperty("heartbeat_falhas_consecutivas", String(novasFalhas));
+
+  if (novasFalhas >= 3) {
+    const ultimoAlerta = props.getProperty("heartbeat_ultimo_alerta");
+    const horasSemAlerta = ultimoAlerta
+      ? (new Date() - new Date(ultimoAlerta)) / (1000 * 60 * 60) : 999;
+    if (horasSemAlerta >= 6) {
+      try {
+        MailApp.sendEmail(EMAIL_ALERTA_ERRO,
+          "🚨 Dani — Claude API fora do ar há " + novasFalhas + "h",
+          "Heartbeat falhou " + novasFalhas + " vezes consecutivas.\n\n" +
+          "Verificar:\n" +
+          "1. Saldo da conta Anthropic (https://console.anthropic.com/settings/billing)\n" +
+          "2. Status da Anthropic (https://status.anthropic.com)\n" +
+          "3. Logs em DANI_LOG\n\n" +
+          "Dani não está agindo em comentários novos. ⚠️");
+        props.setProperty("heartbeat_ultimo_alerta", new Date().toISOString());
+        _daniLog("HEARTBEAT", "alerta enviado pro Thales", { falhas: novasFalhas });
+      } catch (e) {
+        _daniLog("ERRO", "heartbeat: falha ao enviar alerta", { erro: String(e) });
+      }
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 🧹 LIMPEZA DE PROPERTIES ÓRFÃS
+// ────────────────────────────────────────────────────────────────────────────
+// Cards arquivados / movidos pra fora deixam properties acumuladas.
+// Esta rotina varre todas e deleta as órfãs (card não existe mais ou
+// foi arquivado). Roda dentro de rotinasDiariasDani 9h30.
+// ════════════════════════════════════════════════════════════════════════════
+
+function limparPropertiesOrfas() {
+  Logger.log("🧹 Limpando properties órfãs...");
+  const props = getProps();
+  const todas = props.getProperties();
+  const cardsConhecidos = new Set();
+  const cardsExistem = {};
+  const PREFIXES = ["bucket_inicio_", "bucket_total_", "lembrete_",
+                    "g2_pendencia_", "bloqueado_", "alvaras_chegada_",
+                    "g9_ultimo_aviso_"];
+
+  // Extrai cardIds candidatos
+  Object.keys(todas).forEach(k => {
+    PREFIXES.forEach(p => {
+      if (k.indexOf(p) !== 0) return;
+      const resto = k.substring(p.length);
+      // CardId é o trecho até primeiro "_" ou "__"
+      const idx1 = resto.indexOf("__"); // bucket_total_<id>__lista__bucket
+      const idx2 = resto.indexOf("_");
+      const cardId = (idx1 !== -1 ? resto.substring(0, idx1)
+                    : (idx2 !== -1 ? resto.substring(0, idx2) : resto));
+      if (cardId && cardId.length === 24) cardsConhecidos.add(cardId);
+    });
+  });
+
+  Logger.log("  " + cardsConhecidos.size + " cards únicos com properties");
+
+  let deletadas = 0, verificados = 0;
+  cardsConhecidos.forEach(cardId => {
+    if (cardsExistem[cardId] !== undefined) return; // cache
+    verificados++;
+    try {
+      const r = trelloGet("/1/cards/" + cardId, { fields: "closed,id" });
+      if (r.getResponseCode() === 200) {
+        const c = JSON.parse(r.getContentText());
+        cardsExistem[cardId] = !c.closed;
+      } else if (r.getResponseCode() === 404) {
+        cardsExistem[cardId] = false;
+      } else {
+        cardsExistem[cardId] = true; // dúvida = não deleta
+      }
+    } catch (e) {
+      cardsExistem[cardId] = true;
+    }
+    Utilities.sleep(150); // rate limit
+  });
+
+  Object.keys(todas).forEach(k => {
+    PREFIXES.forEach(p => {
+      if (k.indexOf(p) !== 0) return;
+      const resto = k.substring(p.length);
+      const idx1 = resto.indexOf("__");
+      const idx2 = resto.indexOf("_");
+      const cardId = (idx1 !== -1 ? resto.substring(0, idx1)
+                    : (idx2 !== -1 ? resto.substring(0, idx2) : resto));
+      if (cardId && cardsExistem[cardId] === false) {
+        props.deleteProperty(k);
+        deletadas++;
+      }
+    });
+  });
+
+  Logger.log("✅ Limpeza concluída: " + verificados + " cards verificados, " + deletadas + " properties deletadas");
+  _daniLog("LIMPEZA", "properties órfãs removidas", { verificados: verificados, deletadas: deletadas });
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // 🤖 G2 follow-up de 4h (Onda 1.A — fix 25/04 madrugada)
 // ────────────────────────────────────────────────────────────────────────────
 // Quando funcionário comenta pedindo doc/info, Dani aplica etiqueta + email
@@ -3487,6 +3818,9 @@ function rotinaG2FollowUp4h() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(120000)) { Logger.log("⚠️ rotinaG2FollowUp4h: lock"); return; }
   try {
+    // Heartbeat aproveitando o slot horário (zero overhead extra de trigger)
+    try { heartbeatDani(); } catch (e) { _daniLog("ERRO", "heartbeat", { erro: String(e) }); }
+
     if (!daniAtiva()) {
       _daniLog("G2_4H", "DRY-RUN — pula");
       return;
@@ -4030,8 +4364,9 @@ function MapearEquipeInterna() {
   Logger.log("✅ Aba EQUIPE criada com " + linhas.length + " funcionários. Edite a coluna ATIVO=false pra desativar alguém.");
 }
 
-function chamarClaude(p, maxTokens) {
-  const payload = { model: CLAUDE_MODEL, max_tokens: maxTokens || 500, messages: [{ role: "user", content: p }] };
+function chamarClaude(p, maxTokens, modelo) {
+  const modeloEfetivo = modelo || CLAUDE_MODEL;
+  const payload = { model: modeloEfetivo, max_tokens: maxTokens || 500, messages: [{ role: "user", content: p }] };
   const opts = { method: "post", headers: { "x-api-key": prop("CLAUDE_API_KEY"), "anthropic-version": "2023-06-01", "content-type": "application/json" }, payload: JSON.stringify(payload), muteHttpExceptions: true };
   for (let t = 1; t <= 3; t++) {
     const r = UrlFetchApp.fetch("https://api.anthropic.com/v1/messages", opts);
@@ -4078,7 +4413,8 @@ function interpretarEmailOrgao(corpo, assunto, remetente) {
     'Schema:\n' +
     '{"veredito":"<um dos 4>","protocolo":"<num ou null>","orgao":"<nome>","resumo":"<frase>","mensagemCliente":"<texto ou vazio>"}';
 
-  const j = chamarClaudeJson(p, 800);
+  // G8 email órgão = classificação + extração de dados → Haiku
+  const j = chamarClaudeJson(p, 800, CLAUDE_MODEL_HAIKU);
   if (!j) {
     _daniLog("CLAUDE_FAIL", "interpretarEmailOrgao: retorno null", { remetente: remetente, assunto: (assunto || "").substring(0, 100) });
     return null;
