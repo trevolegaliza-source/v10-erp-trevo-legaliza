@@ -1,7 +1,7 @@
-# 🔍 Relatório de Auditoria — Dani v7.12.3
+# 🔍 Relatório de Auditoria — Dani v7.12.4
 
-**Data:** 27/04/2026 (atualizado tarde)
-**Arquivo:** `apps-script/automacao-trevo.gs` (~5210 linhas)
+**Data:** 27/04/2026 (atualizado tarde — patch regex)
+**Arquivo:** `apps-script/automacao-trevo.gs` (~5220 linhas)
 **Método:** 4 agentes Claude analisando zonas paralelas + validação manual + bugs reportados em produção
 
 ---
@@ -10,12 +10,20 @@
 
 Total: **26 issues mapeadas** distribuídas em 4 zonas do código.
 
-| Severidade | Total | Corrigido até v7.12.3 | Pendente decisão Thales |
+| Severidade | Total | Corrigido até v7.12.4 | Pendente decisão Thales |
 |---|---|---|---|
 | 🔴 CRÍTICO | 9 | 5 | 4 |
 | 🟠 IMPORTANTE | 10 | 1 | 9 |
 | 🟡 ATENÇÃO | 14 | 0 | 14 |
 | 🟢 NICE-TO-HAVE | 5 | 0 | 5 |
+
+---
+
+## 🔧 Patch v7.12.4 (27/04/2026 tarde) — fix regex Placker
+
+**Problema:** regex de v7.12.3 esperava `learn more` seguido direto de `\n`, mas Trello salva como `[learn more](URL)`, então o `](URL)` entre "learn more" e a quebra de linha fazia o match falhar.
+**Sintoma:** teste real com Letícia comentando na CENTRAL → comentário chegou no board cliente como `>**LETICIA TONELLI** commented from the **🍀 CENTRAL DE PROCESSO** board. [learn more](...)` → parser não disparou → caiu no G2 com texto inteiro do espelhamento → Claude confuso → email não enviado.
+**Fix:** regex aceita `learn more[^\n]*\n+` (qualquer não-newline entre "learn more" e a quebra).
 
 ---
 

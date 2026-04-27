@@ -1,6 +1,14 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.12.4 — 27/04/2026 tarde — FIX regex Placker (markdown link em "learn more")
+//   • Texto espelhado pelo Placker chega como "...board. [learn more](URL)\n\n
+//     texto real". A regex v7.12.3 esperava "learn more" seguido direto de \n,
+//     mas o "](URL)" entre eles fazia o match falhar. Comentário caía no
+//     fluxo G2 normal (com cabeçalho Placker incluído no texto), confundindo
+//     Claude.
+//   • Regex agora aceita "learn more[^\n]*\n+" — qualquer coisa entre
+//     "learn more" e a quebra de linha (markdown link, espaços, etc).
 // v7.12.3 — 27/04/2026 — FIX comentário espelhado pelo Placker (CRÍTICO)
 //   • Funcionários comentam 99% das vezes na CENTRAL DE PROCESSO. Placker
 //     espelha pro board do cliente como autor "Trevo Legaliza" + texto
@@ -2522,10 +2530,12 @@ function _classificarComentarioFuncionario(textoComentario, contexto) {
  */
 function _parsePlackerMirror(texto) {
   const limpo = String(texto || "")
-    .replace(/^[>\s]+/, "")          // remove blockquote/whitespace inicial
+    .replace(/^[>\s]+/, "")             // remove blockquote/whitespace inicial
     .replace(/\*\*([^*]+)\*\*/g, "$1"); // strip negrito markdown
+  // "learn more" aparece dentro de markdown link [learn more](URL); a regex
+  // tolera qualquer coisa não-newline depois ("[learn more](https://...)").
   const m = limpo.match(
-    /^([^\n]+?)\s+commented from the\s+.*?CENTRAL DE PROCESSO.*?\s+board\.\s+learn more\s*\n+([\s\S]+)$/i
+    /^([^\n]+?)\s+commented from the\s+.*?CENTRAL DE PROCESSO.*?\s+board\.\s+learn more[^\n]*\n+([\s\S]+)$/i
   );
   if (!m) return null;
   return {
