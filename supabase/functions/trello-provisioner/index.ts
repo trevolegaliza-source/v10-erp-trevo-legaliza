@@ -51,8 +51,24 @@ async function trelloCall(
   return fetch(url.toString(), { method });
 }
 
+// Comparação resistente a timing attacks (audit fix #12)
+function timingSafeEqual(a: string, b: string): boolean {
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
 async function verifySignature(req: Request, rawBody: string): Promise<boolean> {
-  if (!TRELLO_SECRET) return true;
+  if (!TRELLO_SECRET) {
+    // FAIL-CLOSED (audit fix #12): sem secret, recusa tudo
+    console.error(
+      "[trello-provisioner] CRITICAL: TRELLO_SECRET não configurado; rejeitando webhook",
+    );
+    return false;
+  }
   const signature = req.headers.get("x-trello-webhook");
   if (!signature) return false;
   const callbackUrl = `${SUPABASE_URL}/functions/v1/trello-provisioner`;
@@ -64,9 +80,13 @@ async function verifySignature(req: Request, rawBody: string): Promise<boolean> 
     false,
     ["sign"],
   );
-  const sigBuf = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(content));
+  const sigBuf = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(content),
+  );
   const expected = btoa(String.fromCharCode(...new Uint8Array(sigBuf)));
-  return expected === signature;
+  return timingSafeEqual(expected, signature);
 }
 
 async function logProvision(entry: {
