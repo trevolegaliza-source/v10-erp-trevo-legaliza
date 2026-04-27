@@ -1,21 +1,31 @@
-# 🔍 Relatório de Auditoria — Dani v7.12.1
+# 🔍 Relatório de Auditoria — Dani v7.12.2
 
-**Data:** 26/04/2026 noite
-**Arquivo:** `apps-script/automacao-trevo.gs` (5054 linhas)
-**Método:** 4 agentes Claude analisando zonas paralelas + validação manual
+**Data:** 27/04/2026 (atualizado)
+**Arquivo:** `apps-script/automacao-trevo.gs` (~5190 linhas)
+**Método:** 4 agentes Claude analisando zonas paralelas + validação manual + bug reportado em produção
 
 ---
 
 ## 📊 Sumário executivo
 
-Total: **24 issues mapeadas** distribuídas em 4 zonas do código.
+Total: **25 issues mapeadas** distribuídas em 4 zonas do código.
 
-| Severidade | Total | Já corrigido na v7.12.1 | Pendente decisão Thales |
+| Severidade | Total | Corrigido até v7.12.2 | Pendente decisão Thales |
 |---|---|---|---|
-| 🔴 CRÍTICO | 7 | 3 | 4 |
+| 🔴 CRÍTICO | 8 | 4 | 4 |
 | 🟠 IMPORTANTE | 10 | 1 | 9 |
 | 🟡 ATENÇÃO | 14 | 0 | 14 |
 | 🟢 NICE-TO-HAVE | 5 | 0 | 5 |
+
+---
+
+## ✅ Corrigido na v7.12.2 (27/04/2026)
+
+### 🔴 [Linha 5005] ehEquipeInterna não normalizava acentos — funcionário virava cliente
+**Antes:** Comparação por `.includes` em lowercase, sem remover acentos. Trello envia autor como "LETICIA TONELLI" (sem ç) mas a aba EQUIPE tem "Letícia Tonelli" (com ç). `.includes` falhava → Letícia era classificada como **cliente** → caía no fluxo G4 (avalia cumprimento de pendência) em vez do G2 (processa pedido interno) → comentários internos eram tratados como resposta de cliente.
+**Sintoma reportado em produção:** Letícia comentou `@card por favor responder comentário abaixo`, Dani respondeu cobrando o protocolo 3084 anterior em vez de processar o pedido. Etiqueta EM ANDAMENTO não removida, RESPOSTA PENDENTE não adicionada, email não encaminhado.
+**Causa-raiz confirmada por log:** `[G4] iniciado` → `[G4] pendência ativa detectada` → `[G4] NAO_CUMPRIU — pendência mantida`. Webhook chegou e foi roteado pra G4 em vez de G2.
+**Depois:** Adicionada `_normalizarNome(s)` (NFD + strip diacritics). `ehEquipeInterna` normaliza ambos os lados da comparação. Bug afetava qualquer membro da EQUIPE com á/é/í/ó/ú/â/ê/ô/ã/õ/ç no nome.
 
 ---
 

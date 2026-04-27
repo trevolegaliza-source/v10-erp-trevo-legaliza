@@ -1,6 +1,16 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.12.2 — 27/04/2026 — FIX classificação de funcionário com acento no nome
+//   • FIX CRÍTICO: ehEquipeInterna não normalizava acentos. Funcionário
+//     "Letícia Tonelli" cadastrado na aba EQUIPE não batia quando Trello
+//     enviava "LETICIA TONELLI" (sem ç). Resultado: era classificada como
+//     CLIENTE → caía no fluxo G4 (avalia cumprimento) em vez do G2 (pedido
+//     interno) → comentários internos com @card eram tratados como
+//     resposta de cliente. Bug afetava qualquer membro da EQUIPE com
+//     á/é/í/ó/ú/â/ê/ô/ã/õ/ç no nome.
+//   • Adicionada _normalizarNome(s) (NFD + strip diacritics).
+//   • ehEquipeInterna agora normaliza ambos os lados da comparação.
 // v7.12.1 — 26/04/2026 noite — Auditoria + 5 fixes críticos
 //   • SECURITY FIX: doPost agora exige WEBHOOK_TOKEN configurado (antes:
 //     se vazio, qualquer um podia chamar — fail-open). Sem token = 500.
@@ -5002,9 +5012,18 @@ function getEquipeInterna() {
   return __equipeInternaCache;
 }
 
+/**
+ * Normaliza nome pra comparação: lowercase, trim, remove acentos.
+ * Necessário porque Trello pode enviar "LETICIA" (sem ç) enquanto a aba
+ * EQUIPE tem "Letícia" (com ç) — sem normalizar, .includes falha.
+ */
+function _normalizarNome(s) {
+  return String(s || "").toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 function ehEquipeInterna(nome) {
-  const n = (nome || "").toLowerCase().trim();
-  return getEquipeInterna().some(i => n.includes(i));
+  const n = _normalizarNome(nome);
+  return getEquipeInterna().some(i => n.includes(_normalizarNome(i)));
 }
 
 /**
