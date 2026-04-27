@@ -1,15 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildCorsHeaders, handlePreflight } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+// RFC 5322-lite — basta pra rejeitar lixo óbvio sem ser draconiano
+// (audit fix #23 — antes, qualquer string passava)
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+function isValidEmail(s: unknown): s is string {
+  return typeof s === "string" && s.length <= 254 && EMAIL_REGEX.test(s);
+}
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // audit fix #21 — CORS allowlist
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
+  const corsHeaders = buildCorsHeaders(req.headers.get("Origin"));
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -63,6 +66,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // audit fix #23 — valida formato de email
+    if (!isValidEmail(email)) {
+      return new Response(
+        JSON.stringify({ error: "Email inválido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Don't allow inviting as master
     if (role === "master") {
       return new Response(
@@ -71,11 +82,28 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user already exists in auth.users
-    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
-    const existingAuthUser = existingUsers?.users?.find(
-      (u: any) => u.email?.toLowerCase() === email.toLowerCase()
-    );
+    // audit fix #22 — antes: listUsers() carregava TODOS usuários (timeout em volume).
+    // Agora: query direta em profiles por email (índice unique) + lookup em auth via id.
+    const emailLower = email.toLowerCase();
+    const { data: existingProfileByEmail } = await adminClient
+      .from("profiles")
+      .select("id")
+      .ilike("email", emailLower)
+      .maybeSingle();
+
+    let existingAuthUser: { id: string; email?: string; user_metadata?: any } | null = null;
+    if (existingProfileByEmail?.id) {
+      const { data: authUserData } = await adminClient.auth.admin.getUserById(
+        existingProfileByEmail.id,
+      );
+      if (authUserData?.user) {
+        existingAuthUser = {
+          id: authUserData.user.id,
+          email: authUserData.user.email,
+          user_metadata: authUserData.user.user_metadata,
+        };
+      }
+    }
 
     if (existingAuthUser) {
       // User exists in auth — check profile

@@ -46,6 +46,23 @@ export default function Login() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
 
+  // audit fix #31 — mensagens raw do Supabase (PGRST*, AuthApiError códigos
+  // técnicos) eram mostradas direto ao usuário. Agora mapeamos pra
+  // português user-friendly. Erros não mapeados mostram fallback genérico
+  // + mensagem original vai pro console (Thales/admin debugam pelo F12).
+  const friendlyAuthError = (raw: string): string => {
+    const msg = raw.toLowerCase();
+    if (msg.includes('invalid login credentials')) return 'Email ou senha incorretos';
+    if (msg.includes('email not confirmed')) return 'Confirme seu email antes de entrar (verifique a caixa de entrada)';
+    if (msg.includes('user not found')) return 'Usuário não encontrado';
+    if (msg.includes('email rate limit') || msg.includes('over_email_send_rate_limit')) return 'Muitas tentativas. Aguarde alguns minutos.';
+    if (msg.includes('too many requests') || msg.includes('rate limit')) return 'Muitas tentativas. Aguarde antes de tentar de novo.';
+    if (msg.includes('network') || msg.includes('failed to fetch')) return 'Sem conexão. Verifique sua internet.';
+    if (msg.includes('already registered') || msg.includes('user already registered')) return 'Este email já está cadastrado. Use "Entrar".';
+    if (msg.includes('password should be') || msg.includes('weak password')) return 'Senha muito fraca. Use no mínimo 8 caracteres.';
+    return 'Não foi possível concluir a operação. Tente novamente em instantes.';
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
@@ -55,11 +72,8 @@ export default function Login() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        toast.error('Email ou senha incorretos');
-      } else {
-        toast.error(error.message);
-      }
+      console.warn('[Login] auth error original:', error.message);
+      toast.error(friendlyAuthError(error.message));
     }
     setLoading(false);
   };
@@ -70,7 +84,8 @@ export default function Login() {
       redirect_uri: window.location.origin,
     });
     if (result.error) {
-      toast.error(result.error.message || 'Erro ao autenticar com Google');
+      console.warn('[Login] google oauth error original:', result.error.message);
+      toast.error(friendlyAuthError(result.error.message || ''));
     }
     if (result.redirected) return;
     setLoading(false);
@@ -143,11 +158,8 @@ export default function Login() {
       // Sign out immediately so they can't access anything
       await supabase.auth.signOut();
     } catch (e: any) {
-      if (e.message?.includes('already registered')) {
-        toast.error('Este email já está cadastrado. Use "Entrar" para fazer login.');
-      } else {
-        toast.error('Erro ao criar conta: ' + e.message);
-      }
+      console.warn('[Login] signUp error original:', e?.message);
+      toast.error(friendlyAuthError(e?.message || ''));
     } finally {
       setRegLoading(false);
     }
@@ -164,7 +176,8 @@ export default function Login() {
       if (error) throw error;
       setForgotSent(true);
     } catch (e: any) {
-      toast.error('Erro: ' + e.message);
+      console.warn('[Login] forgot password error original:', e?.message);
+      toast.error(friendlyAuthError(e?.message || ''));
     } finally {
       setForgotLoading(false);
     }

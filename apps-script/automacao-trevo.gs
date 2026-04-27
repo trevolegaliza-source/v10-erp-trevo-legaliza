@@ -1,6 +1,76 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.12.1 — 26/04/2026 noite — Auditoria + 5 fixes críticos
+//   • SECURITY FIX: doPost agora exige WEBHOOK_TOKEN configurado (antes:
+//     se vazio, qualquer um podia chamar — fail-open). Sem token = 500.
+//   • FIX bug spam: emails do órgão que Claude falha em interpretar agora
+//     são marcados como lidos + criam pendência manual no Sheets. Antes
+//     ficavam não-lidos e Claude era chamada infinitamente a cada cron.
+//   • FIX divisão por zero em médias do relatório SLA (defensive).
+//   • FIX painel_runFuncao: globalThis em vez de this (V8 strict mode +
+//     try/catch envolvendo execução pra log de erro estruturado).
+//   • NOVA função diagnosticarCard(cardId): mostra TUDO sobre um card
+//     (cor capa, lista, etiquetas, timers em curso, pendências G2 ativas,
+//     buckets, últimos 5 comentários). Botão no painel.
+//   • Painel HTML atualizado: nova seção "Card específico" com 3 botões
+//     (diagnóstico completo, prazos, reconstruir).
+//   • Auditoria documentada em apps-script/RELATORIO_AUDITORIA.md
+//     (24 issues mapeadas; 5 corrigidas nesta versão; 19 pendentes).
+// v7.12.0 — 26/04/2026 — RELATÓRIO SLA v2 (planilha + email executivo)
+//   • FIX bug "Limite excedido: Tamanho do corpo do e-mail" (HTML inline
+//     ficava enorme com muitos cards). Agora email tem APENAS resumo
+//     executivo (~30KB) e a tabela completa vai pra planilha no Drive.
+//   • Email novo: header verde, KPIs grandes (CRÍTICO/ATENÇÃO/OK),
+//     médias por bucket com %, top 10 cards, distribuição por tipo,
+//     botão "Abrir planilha completa".
+//   • Planilha: criada em PASTA_CLIENTES_ATIVOS_ID, nome
+//     "Relatorio_SLA_<codigo>_<periodo>", colunas com cores por nível
+//     (vermelho=crítico / amarelo=atenção / branco=ok).
+//   • Classificação automática:
+//     - CRÍTICO  → total >30d OU bucket cliente >15d
+//     - ATENÇÃO → total >15d OU bucket cliente >7d
+//     - OK      → demais
+// v7.11.0 — 26/04/2026 — PAINEL v2 + EXPORT RELATÓRIO + SWITCH CAROLINA
+//   • Painel HTML refeito com seções claras: Onboarding, Operação Diária,
+//     Diagnóstico, Testes & Debug, Liga/Desliga, Playbook, Log.
+//   • Cada botão tem descrição "quando usar" — não fica mais perdido.
+//   • Switch Carolina cliente/funcionária no topo (1 clique).
+//   • Playbook colapsável embutido com FAQ "Como faço quando…" pro Thales
+//     consultar sem sair do painel.
+//   • painel_exportarRelatorio() — gera DRAFT no Gmail (NÃO envia direto)
+//     com tabela HTML por cliente×card×prazos. Filtros opcionais:
+//     codigo, dataInicio, dataFim, tipoProcesso. Thales abre rascunho,
+//     edita destinatário, envia manual.
+//   • painel_switchCarolina() — toggle DANI_FORCAR_CLIENTE.
+//   • mostrarPrazosCard agora RETORNA string formatada (cosmético — antes
+//     painel mostrava só "OK"). Logger.log preserved pra audit no editor.
+// v7.10.1 — 26/04/2026 — FIX replyTo email (G4 nunca disparava)
+//   • FIX CRÍTICO: _daniEnviarEmailCliente agora seta replyTo = email do card.
+//     Sem isso, cliente respondia o email e a resposta caía em
+//     trevolegaliza@gmail.com (caixa normal) — NÃO entrava no card como
+//     comentário. Resultado: webhook commentCard nunca disparava, G4 nunca
+//     avaliava se cliente cumpriu, etiqueta DOCUMENTO PENDENTE ficava
+//     pendurada eternamente.
+//   • Comprovado em 26/04: Carolina respondeu email Dani com CPF+estado civil,
+//     processo não atualizou. Bug encontrado.
+// v7.10.0 — 26/04/2026 — G2 PROMPT v2 + BUG REMOVE ETIQUETA
+//   • FIX CRÍTICO: case "removeLabelToCard" → "removeLabelFromCard" no doPost
+//     dispatch (linha ~1375). Trello envia evento como removeLabelFromCard,
+//     sem essa correção webhook nunca chegava no handlerEtiquetaRemove e
+//     buckets POR LISTA não populavam.
+//   • FIX em reconstruirBucketsCard: filter da API + else-if usavam o nome
+//     errado também. Reconstrução de histórico não pegava removes.
+//   • G2 PROMPT v2 com regras críticas explícitas:
+//     1) HIERARQUIA — cliente Trevo é o CONTADOR; sócios são terceiros.
+//        Proibido usar "seu/sua" pra info de sócio (deve usar nome).
+//     2) TIPO DO PROCESSO via cor da capa (verde/roxo/laranja/vermelho/preto)
+//        — não assumir abertura por default. Cinza = alvarás/licenças.
+//     3) Descrição do card (~500 chars) entra no contexto pra IA ter
+//        info de solicitante, sócios, dados.
+//     4) Sonnet primário (decisão crítica) + fallback Haiku se Sonnet cair.
+//   • _danigetCardCompleto agora busca campo cover (cor da capa).
+//   • Helper _corCapaParaTipo mapeia cor → tipo legível.
 // v7.9.0 — 26/04/2026 — PAINEL DANI (sidebar HTML no Apps Script)
 //   • Arquivo dani_painel.html (precisa criar manual: Arquivos → + → HTML)
 //   • mostrarPainelDani() abre como sidebar lateral na planilha
@@ -1277,17 +1347,21 @@ function doGet(e) {
 function doPost(e) {
   try {
     // ── 1. Auth: token obrigatório (param OU body) ───────────────────────
+    // v7.12.1: token SEMPRE obrigatório (antes: se WEBHOOK_TOKEN vazio,
+    // pulava auth e qualquer um podia chamar doPost — fail-open inseguro).
     const tokenEsperado = getProps().getProperty("WEBHOOK_TOKEN");
-    if (tokenEsperado) {
-      const tokenRecebido =
-        (e.parameter && e.parameter.token) ||
-        (e.postData && e.postData.contents && (() => {
-          try { return JSON.parse(e.postData.contents).token; } catch (_) { return null; }
-        })());
-      if (tokenRecebido !== tokenEsperado) {
-        Logger.log("⚠️ doPost auth fail — token recebido: " + (tokenRecebido ? "[set]" : "[vazio]"));
-        return _respJson({ ok: false, error: "auth_fail" }, 401);
-      }
+    if (!tokenEsperado) {
+      Logger.log("🚨 doPost CONFIG ERRO: WEBHOOK_TOKEN não está configurado — rejeitando todos os webhooks por segurança");
+      return _respJson({ ok: false, error: "webhook_token_nao_configurado" }, 500);
+    }
+    const tokenRecebido =
+      (e.parameter && e.parameter.token) ||
+      (e.postData && e.postData.contents && (() => {
+        try { return JSON.parse(e.postData.contents).token; } catch (_) { return null; }
+      })());
+    if (tokenRecebido !== tokenEsperado) {
+      Logger.log("⚠️ doPost auth fail — token recebido: " + (tokenRecebido ? "[set]" : "[vazio]"));
+      return _respJson({ ok: false, error: "auth_fail" }, 401);
     }
 
     // ── 2. Parse do body ─────────────────────────────────────────────────
@@ -1372,7 +1446,7 @@ function _doPostWebhookTrello(action) {
   switch (tipo) {
     case "commentCard":         return handlerComentario(action, cli);
     case "addLabelToCard":      return handlerEtiquetaAdd(action, cli);
-    case "removeLabelToCard":   return handlerEtiquetaRemove(action, cli);
+    case "removeLabelFromCard": return handlerEtiquetaRemove(action, cli);
     case "updateCard":          return handlerCardAtualizado(action, cli);
     case "addAttachmentToCard": return handlerAnexo(action, cli);
     default:
@@ -1601,28 +1675,421 @@ function painel_status() {
   };
 }
 
+/**
+ * Switch Carolina entre "cliente teste" e "funcionária Trevo".
+ * Retorna o novo estado pra mostrar no painel.
+ */
+function painel_switchCarolina() {
+  const props = getProps();
+  const atual = String(props.getProperty("DANI_FORCAR_CLIENTE") || "").toLowerCase();
+  const ehCliente = atual.indexOf("carolinaguirado") !== -1;
+  if (ehCliente) {
+    // Tira do override → volta a ser funcionária
+    props.deleteProperty("DANI_FORCAR_CLIENTE");
+    __equipeInternaCache = null;
+    return "funcionária Trevo";
+  } else {
+    // Põe no override → vira cliente teste
+    props.setProperty("DANI_FORCAR_CLIENTE", "carolinaguirado7");
+    __equipeInternaCache = null;
+    return "cliente teste";
+  }
+}
+
+/**
+ * v7.12.0: Gera relatório SLA executivo + planilha completa anexa.
+ *
+ * EMAIL: resumo executivo enxuto (sumário, KPIs, top 10 cards críticos).
+ *        Não estoura limite de tamanho do Gmail mesmo com centenas de cards.
+ * PLANILHA: criada na pasta CLIENTES_ATIVOS do Drive, contém TODOS os cards
+ *           com filtros aplicados, link inserido no email.
+ *
+ * Filtros opcionais: { codigo, inicio (YYYY-MM-DD), fim (YYYY-MM-DD), tipo }.
+ * Cliente acessa o draft em "Rascunhos" do Gmail e envia manualmente.
+ *
+ * Cards são classificados em 3 níveis de criticidade:
+ *   • CRÍTICO  → tempo total >30d OU bucket cliente >15d
+ *   • ATENÇÃO → tempo total >15d OU bucket cliente >7d
+ *   • OK      → demais
+ */
+function painel_exportarRelatorio(filtros) {
+  filtros = filtros || {};
+  const codigo = String(filtros.codigo || "").trim();
+  const inicio = filtros.inicio ? new Date(filtros.inicio + "T00:00:00") : null;
+  const fim    = filtros.fim    ? new Date(filtros.fim    + "T23:59:59") : null;
+  const tipo   = String(filtros.tipo || "").trim();
+
+  // 1) Resolve clientes alvo
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const abaCli = ss.getSheetByName("CLIENTES");
+  if (!abaCli) throw new Error("Aba CLIENTES não encontrada");
+  const dadosCli = abaCli.getDataRange().getValues();
+  const headers = dadosCli[0].map(h => String(h).trim().toUpperCase());
+  const idxCodigo = headers.indexOf("CÓDIGO CLIENTE");
+  const idxNome   = headers.indexOf("NOME DO QUADRO");
+  const idxBoard  = headers.indexOf("ID DO QUADRO");
+
+  const clientes = [];
+  for (let i = 1; i < dadosCli.length; i++) {
+    const cod = String(dadosCli[i][idxCodigo] || "").trim();
+    const board = String(dadosCli[i][idxBoard] || "").trim();
+    if (!cod || !board) continue;
+    if (codigo && cod !== codigo) continue;
+    clientes.push({ codigo: cod, nome: String(dadosCli[i][idxNome] || "").trim(), boardId: board });
+  }
+  if (clientes.length === 0) throw new Error("Nenhum cliente encontrado pra esses filtros");
+
+  // 2) Pra cada cliente, busca cards do board e calcula prazos
+  const linhasRel = [];
+  let totalCards = 0;
+  clientes.forEach(cli => {
+    try {
+      const r = trelloGet("/1/boards/" + cli.boardId + "/cards", {
+        fields: "name,shortUrl,desc,dateLastActivity,idList,closed,cover,labels",
+        labels: "true",
+      });
+      if (r.getResponseCode() !== 200) return;
+      const cards = JSON.parse(r.getContentText());
+      cards.forEach(card => {
+        if (card.closed) return;
+        const corCapa = (card.cover && card.cover.color) || "";
+        const tipoCard = _corCapaParaTipo(corCapa);
+        if (tipo && tipoCard !== tipo) return;
+        const data = new Date(card.dateLastActivity);
+        if (inicio && data < inicio) return;
+        if (fim && data > fim) return;
+        const prazos = getPrazosDani(card.id);
+        const t = prazos.total;
+        const totalDias = (t.trevo + t.cliente + t.orgao) / 86400;
+        // Classifica criticidade
+        let nivel = "OK";
+        if (totalDias > 30 || t.cliente_dias > 15) nivel = "CRÍTICO";
+        else if (totalDias > 15 || t.cliente_dias > 7) nivel = "ATENÇÃO";
+        // Lista atual
+        let listaAtual = "—";
+        try { listaAtual = _danigetNomeLista(card.idList); } catch (e) {}
+        linhasRel.push({
+          codigo: cli.codigo, cliente: cli.nome,
+          card: card.name, url: card.shortUrl,
+          tipo: tipoCard || "—",
+          listaAtual: listaAtual,
+          ultimaAtv: Utilities.formatDate(data, Session.getScriptTimeZone(), "dd/MM/yyyy"),
+          trevoDias: t.trevo_dias, clienteDias: t.cliente_dias, orgaoDias: t.orgao_dias,
+          totalDias: Math.round(totalDias * 10) / 10,
+          nivel: nivel,
+        });
+        totalCards++;
+      });
+    } catch (e) {
+      Logger.log("⚠️ relatório: erro no cliente " + cli.codigo + ": " + e.message);
+    }
+    Utilities.sleep(200);
+  });
+
+  if (linhasRel.length === 0) throw new Error("Nenhum card encontrado nos filtros");
+  linhasRel.sort((a,b) => b.totalDias - a.totalDias);
+
+  // 3) Calcula KPIs
+  const totais = { trevo: 0, cliente: 0, orgao: 0 };
+  const contNivel = { "CRÍTICO": 0, "ATENÇÃO": 0, "OK": 0 };
+  const porTipo = {};
+  linhasRel.forEach(r => {
+    totais.trevo += r.trevoDias;
+    totais.cliente += r.clienteDias;
+    totais.orgao += r.orgaoDias;
+    contNivel[r.nivel] = (contNivel[r.nivel] || 0) + 1;
+    porTipo[r.tipo] = (porTipo[r.tipo] || 0) + 1;
+  });
+  // v7.12.1: protege contra divisão por zero (totalCards>=1 sempre nesse ponto, mas defensive)
+  const mediaTrevo = totalCards > 0 ? totais.trevo / totalCards : 0;
+  const mediaCliente = totalCards > 0 ? totais.cliente / totalCards : 0;
+  const mediaOrgao = totalCards > 0 ? totais.orgao / totalCards : 0;
+  const mediaTotal = mediaTrevo + mediaCliente + mediaOrgao;
+  const totalSomado = totais.trevo + totais.cliente + totais.orgao;
+  const pctTrevo = totalSomado > 0 ? Math.round(totais.trevo / totalSomado * 100) : 0;
+  const pctCliente = totalSomado > 0 ? Math.round(totais.cliente / totalSomado * 100) : 0;
+  const pctOrgao = totalSomado > 0 ? Math.round(totais.orgao / totalSomado * 100) : 0;
+
+  // 4) Cria PLANILHA com tabela completa (Drive)
+  const periodoTxt = (inicio || fim)
+    ? (inicio ? Utilities.formatDate(inicio, Session.getScriptTimeZone(), "dd-MM-yyyy") : "inicio") +
+      "_a_" + (fim ? Utilities.formatDate(fim, Session.getScriptTimeZone(), "dd-MM-yyyy") : "hoje")
+    : "todos_periodos";
+  const nomeArquivo = "Relatorio_SLA_" + (codigo || "todos_clientes") + "_" + periodoTxt;
+  const novaSS = SpreadsheetApp.create(nomeArquivo);
+  const sheet = novaSS.getActiveSheet();
+  sheet.setName("Relatório SLA");
+  // Move pra pasta CLIENTES_ATIVOS
+  try {
+    const arquivo = DriveApp.getFileById(novaSS.getId());
+    DriveApp.getFolderById(PASTA_CLIENTES_ATIVOS_ID).addFile(arquivo);
+    DriveApp.getRootFolder().removeFile(arquivo);
+  } catch (e) {
+    Logger.log("⚠️ não conseguiu mover planilha pra CLIENTES_ATIVOS: " + e.message);
+  }
+  // Headers
+  const headersSheet = ["Nível","Código","Cliente","Card","Lista atual","Tipo","Última atividade","Dias Trevo","Dias Cliente","Dias Órgão","Total dias","Link card"];
+  sheet.getRange(1, 1, 1, headersSheet.length).setValues([headersSheet])
+    .setFontWeight("bold").setBackground("#1a3d26").setFontColor("#ffffff");
+  sheet.setFrozenRows(1);
+  // Dados
+  const dadosSheet = linhasRel.map(r => [
+    r.nivel, r.codigo, r.cliente, r.card, r.listaAtual, r.tipo, r.ultimaAtv,
+    r.trevoDias, r.clienteDias, r.orgaoDias, r.totalDias, r.url,
+  ]);
+  sheet.getRange(2, 1, dadosSheet.length, headersSheet.length).setValues(dadosSheet);
+  // Cores por nível
+  for (let i = 0; i < linhasRel.length; i++) {
+    const cor = linhasRel[i].nivel === "CRÍTICO" ? "#fee2e2"
+              : linhasRel[i].nivel === "ATENÇÃO" ? "#fef3c7"
+              : "#ffffff";
+    if (cor !== "#ffffff") sheet.getRange(i + 2, 1, 1, headersSheet.length).setBackground(cor);
+  }
+  sheet.autoResizeColumns(1, headersSheet.length);
+  // Limita largura da coluna Card pra não ficar gigante
+  if (sheet.getColumnWidth(4) > 350) sheet.setColumnWidth(4, 350);
+
+  const linkPlanilha = novaSS.getUrl();
+
+  // 5) HTML do email — RESUMO EXECUTIVO ENXUTO (não estoura limite Gmail)
+  const tipoTxt = tipo || "Todos os tipos";
+  const clienteTxt = codigo
+    ? (codigo + " — " + (clientes[0] ? clientes[0].nome : ""))
+    : "Todos os clientes";
+  const periodoEmail = (inicio || fim)
+    ? (inicio ? Utilities.formatDate(inicio, Session.getScriptTimeZone(), "dd/MM/yyyy") : "início") +
+      " a " + (fim ? Utilities.formatDate(fim, Session.getScriptTimeZone(), "dd/MM/yyyy") : "hoje")
+    : "Sem filtro";
+
+  const top10 = linhasRel.slice(0, 10);
+
+  let html = '<div style="font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;max-width:680px;margin:0 auto;color:#1f2937;background:#f9fafb;padding:24px;">';
+
+  // Header
+  html += '<div style="background:linear-gradient(135deg,#166534 0%,#22c55e 100%);padding:24px;border-radius:12px 12px 0 0;text-align:center;">';
+  html += '<h1 style="color:#fff;margin:0;font-size:22px;letter-spacing:0.3px;">📊 Relatório SLA</h1>';
+  html += '<p style="color:rgba(255,255,255,0.9);margin:6px 0 0;font-size:13px;">Trevo Legaliza · Análise de prazos</p>';
+  html += '</div>';
+
+  // Body
+  html += '<div style="background:#fff;padding:24px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;">';
+
+  // Filtros
+  html += '<div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:14px 16px;margin-bottom:20px;border-radius:4px;">';
+  html += '<p style="margin:0 0 4px;font-size:11px;color:#166534;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;">Filtros aplicados</p>';
+  html += '<p style="margin:0;font-size:13px;line-height:1.6;">';
+  html += '<strong>Cliente:</strong> ' + clienteTxt + '<br>';
+  html += '<strong>Período:</strong> ' + periodoEmail + '<br>';
+  html += '<strong>Tipo:</strong> ' + tipoTxt;
+  html += '</p>';
+  html += '</div>';
+
+  // KPIs grandes
+  html += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;">';
+  const kpi = (rotulo, valor, cor) =>
+    '<div style="flex:1;min-width:120px;background:' + cor + ';padding:14px;border-radius:8px;text-align:center;">' +
+      '<div style="font-size:24px;font-weight:700;color:#fff;">' + valor + '</div>' +
+      '<div style="font-size:11px;color:rgba(255,255,255,0.9);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;">' + rotulo + '</div>' +
+    '</div>';
+  html += kpi('Total cards', totalCards, '#1f2937');
+  html += kpi('Críticos', contNivel['CRÍTICO'] || 0, '#dc2626');
+  html += kpi('Atenção', contNivel['ATENÇÃO'] || 0, '#f59e0b');
+  html += kpi('OK', contNivel['OK'] || 0, '#16a34a');
+  html += '</div>';
+
+  // Médias por bucket
+  html += '<h3 style="margin:20px 0 10px;font-size:14px;color:#166534;text-transform:uppercase;letter-spacing:0.05em;">⏱️ Tempo médio por bucket</h3>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<tr><td style="padding:8px;background:#f3f4f6;border-radius:4px 0 0 4px;"><strong>🍀 Trevo</strong></td>';
+  html += '<td style="padding:8px;background:#f3f4f6;text-align:right;">' + mediaTrevo.toFixed(1) + ' dias (' + pctTrevo + '%)</td></tr>';
+  html += '<tr><td style="padding:4px;"></td><td></td></tr>';
+  html += '<tr><td style="padding:8px;background:#f3f4f6;"><strong>👤 Cliente</strong></td>';
+  html += '<td style="padding:8px;background:#f3f4f6;text-align:right;">' + mediaCliente.toFixed(1) + ' dias (' + pctCliente + '%)</td></tr>';
+  html += '<tr><td style="padding:4px;"></td><td></td></tr>';
+  html += '<tr><td style="padding:8px;background:#f3f4f6;"><strong>🏛️ Órgão</strong></td>';
+  html += '<td style="padding:8px;background:#f3f4f6;text-align:right;">' + mediaOrgao.toFixed(1) + ' dias (' + pctOrgao + '%)</td></tr>';
+  html += '<tr><td style="padding:4px;"></td><td></td></tr>';
+  html += '<tr><td style="padding:10px;background:#166534;color:#fff;border-radius:0 0 0 4px;"><strong>Média total processo</strong></td>';
+  html += '<td style="padding:10px;background:#166534;color:#fff;text-align:right;border-radius:0 0 4px 0;"><strong>' + mediaTotal.toFixed(1) + ' dias</strong></td></tr>';
+  html += '</table>';
+
+  // Top 10 cards mais demorados
+  if (top10.length > 0) {
+    html += '<h3 style="margin:24px 0 10px;font-size:14px;color:#166534;text-transform:uppercase;letter-spacing:0.05em;">🔥 Top ' + top10.length + ' cards mais demorados</h3>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<thead><tr style="background:#1f2937;color:#fff;">';
+    html += '<th style="padding:8px;text-align:left;font-size:11px;">#</th>';
+    html += '<th style="padding:8px;text-align:left;font-size:11px;">Card</th>';
+    html += '<th style="padding:8px;text-align:left;font-size:11px;">Tipo</th>';
+    html += '<th style="padding:8px;text-align:right;font-size:11px;">Total</th>';
+    html += '</tr></thead><tbody>';
+    top10.forEach((row, i) => {
+      const corNivel = row.nivel === "CRÍTICO" ? "#fee2e2"
+                     : row.nivel === "ATENÇÃO" ? "#fef3c7"
+                     : "#ffffff";
+      const cardCurto = row.card.length > 50 ? row.card.substring(0, 47) + "..." : row.card;
+      html += '<tr style="background:' + corNivel + ';">';
+      html += '<td style="padding:6px 8px;font-weight:bold;">' + (i + 1) + '</td>';
+      html += '<td style="padding:6px 8px;"><a href="' + row.url + '" style="color:#166534;text-decoration:none;">' + cardCurto + '</a></td>';
+      html += '<td style="padding:6px 8px;font-size:11px;color:#6b7280;">' + (row.tipo === "—" ? "" : row.tipo.split(" ")[0]) + '</td>';
+      html += '<td style="padding:6px 8px;text-align:right;font-weight:bold;">' + row.totalDias.toFixed(1) + 'd</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  // Distribuição por tipo
+  if (Object.keys(porTipo).length > 1) {
+    html += '<h3 style="margin:24px 0 10px;font-size:14px;color:#166534;text-transform:uppercase;letter-spacing:0.05em;">📋 Distribuição por tipo</h3>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+    Object.keys(porTipo).sort((a,b) => porTipo[b] - porTipo[a]).forEach(t => {
+      const tNome = t === "—" ? "(sem tipo definido)" : t;
+      html += '<tr><td style="padding:6px 8px;background:#f3f4f6;">' + tNome + '</td>';
+      html += '<td style="padding:6px 8px;background:#f3f4f6;text-align:right;font-weight:600;">' + porTipo[t] + ' card(s)</td></tr>';
+      html += '<tr><td style="padding:2px;"></td><td></td></tr>';
+    });
+    html += '</table>';
+  }
+
+  // Link planilha completa
+  html += '<div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:14px 16px;margin:24px 0;border-radius:4px;">';
+  html += '<p style="margin:0 0 6px;font-size:11px;color:#92400e;text-transform:uppercase;font-weight:700;letter-spacing:0.05em;">📊 Tabela completa</p>';
+  html += '<p style="margin:0 0 10px;font-size:13px;color:#78350f;">Veja TODOS os ' + totalCards + ' cards (com filtros, cores e ordenação) na planilha:</p>';
+  html += '<a href="' + linkPlanilha + '" style="display:inline-block;background:#f59e0b;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-size:13px;font-weight:600;">📂 Abrir planilha completa</a>';
+  html += '</div>';
+
+  // Footer
+  html += '<p style="font-size:11px;color:#9ca3af;margin-top:20px;text-align:center;">Relatório gerado por Dani 🍀 em ' +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm") + '</p>';
+  html += '</div>'; // body
+  html += '</div>'; // wrapper
+
+  // 6) Cria DRAFT no Gmail (sem enviar)
+  const subject = "📊 Relatório SLA — " + (codigo || "Todos clientes") + " — " +
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy");
+  const corpoTexto = "Relatório SLA gerado pela Dani.\n\n" +
+    "Resumo:\n" +
+    "• " + totalCards + " cards analisados\n" +
+    "• " + (contNivel['CRÍTICO'] || 0) + " críticos / " + (contNivel['ATENÇÃO'] || 0) + " em atenção / " + (contNivel['OK'] || 0) + " OK\n" +
+    "• Tempo médio total: " + mediaTotal.toFixed(1) + " dias\n\n" +
+    "Tabela completa: " + linkPlanilha + "\n\n" +
+    "(Edite o destinatário e envie quando estiver pronto.)";
+  GmailApp.createDraft(
+    "", // sem destinatário — Thales preenche manual
+    subject,
+    corpoTexto,
+    { htmlBody: html, name: "Trevo Legaliza" }
+  );
+
+  return totalCards + " cards | Planilha em CLIENTES_ATIVOS | Rascunho em Gmail/Rascunhos";
+}
+
+/**
+ * v7.12.1: Diagnóstico completo de um card específico. Útil pra entender
+ * por que Dani comportou-se de uma forma estranha em determinado processo.
+ * Retorna: tipo (cor capa), lista, etiquetas, etiquetas em curso (timer),
+ * pendências G2 ativas, bucket totals, últimos comentários.
+ */
+function diagnosticarCard(cardId) {
+  if (!cardId) return "⚠️ Cole um cardId (24 chars hex)";
+  const card = _danigetCardCompleto(cardId);
+  if (!card) return "❌ Card não encontrado: " + cardId;
+
+  const lista = _danigetNomeLista(card.idList);
+  const etiquetas = (card.labels || []).map(l => (l.name || "").trim()).filter(Boolean);
+  const corCapa = (card.cover && card.cover.color) || "(sem capa)";
+  const tipoProcesso = _corCapaParaTipo(corCapa) || "(tipo não inferível)";
+  const prazos = getPrazosDani(cardId);
+
+  const props = getProps();
+  const todas = props.getProperties();
+  const etiquetasEmCurso = [];
+  const pendenciasG2 = [];
+  Object.keys(todas).forEach(k => {
+    if (k.indexOf("bucket_inicio_" + cardId + "_") === 0) {
+      const et = k.replace("bucket_inicio_" + cardId + "_", "");
+      try {
+        const obj = JSON.parse(todas[k]);
+        const horas = ((new Date() - new Date(obj.ts)) / 3600000).toFixed(1);
+        etiquetasEmCurso.push("  • " + et + " (rodando há " + horas + "h, lista: " + (obj.lista || "?") + ")");
+      } catch (e) {
+        etiquetasEmCurso.push("  • " + et + " (raw: " + todas[k] + ")");
+      }
+    }
+    if (k.indexOf("g2_pendencia_" + cardId + "_") === 0) {
+      const et = k.replace("g2_pendencia_" + cardId + "_", "");
+      try {
+        const obj = JSON.parse(todas[k]);
+        pendenciasG2.push("  • " + et + " (desde " + obj.timestamp_inicio + ", follow-up enviado: " + obj.follow_up_enviado + ")");
+      } catch (e) {
+        pendenciasG2.push("  • " + et + " (raw)");
+      }
+    }
+  });
+
+  let comentariosTxt = "";
+  try {
+    const ult = _danigetUltimosComentarios(cardId, 5);
+    comentariosTxt = ult.map(c =>
+      "  [" + (c.data || "?").substring(0, 19) + "] " + c.autor + ": " +
+      (c.texto || "").substring(0, 100).replace(/\n/g, " ")
+    ).join("\n");
+  } catch (e) { comentariosTxt = "  (erro ao buscar: " + e.message + ")"; }
+
+  let out = "═══════════ DIAGNÓSTICO DO CARD ═══════════\n";
+  out += "Nome:           " + card.name + "\n";
+  out += "Card ID:        " + cardId + "\n";
+  out += "Lista atual:    " + lista + "\n";
+  out += "Cor da capa:    " + corCapa + "\n";
+  out += "Tipo inferido:  " + tipoProcesso + "\n";
+  out += "Etiquetas:      " + (etiquetas.join(", ") || "(nenhuma)") + "\n";
+  out += "URL:            " + (card.shortUrl || "?") + "\n\n";
+  out += "─── Etiquetas com timer rodando ───\n";
+  out += (etiquetasEmCurso.length > 0 ? etiquetasEmCurso.join("\n") : "  (nenhuma)") + "\n\n";
+  out += "─── Pendências G2 ativas (esperando 4h) ───\n";
+  out += (pendenciasG2.length > 0 ? pendenciasG2.join("\n") : "  (nenhuma)") + "\n\n";
+  out += "─── Buckets de tempo (acumulado por lista) ───\n";
+  Object.keys(prazos.por_lista || {}).forEach(l => {
+    const v = prazos.por_lista[l];
+    out += "  " + l + ": Trevo " + v.trevo_dias + "d / Cliente " + v.cliente_dias + "d / Órgão " + v.orgao_dias + "d\n";
+  });
+  out += "  TOTAL: Trevo " + prazos.total.trevo_dias + "d / Cliente " + prazos.total.cliente_dias + "d / Órgão " + prazos.total.orgao_dias + "d\n\n";
+  out += "─── Últimos 5 comentários ───\n";
+  out += comentariosTxt + "\n";
+  out += "═════════════════════════════════════════════";
+  Logger.log(out);
+  return out;
+}
+
 // Whitelist de funções permitidas via painel (segurança)
 const PAINEL_FUNCOES_PERMITIDAS = [
   "statusDani", "gerarDashboardDani", "mostrarPrazosCardTeste",
   "reconstruirBucketsCardTeste", "ativarDani", "desativarDani",
   "sincronizarBoardsETrevoDani", "rotinasDiariasDani", "rotinaG2FollowUp4h",
   "limparPropertiesOrfas", "heartbeatDani", "listarWebhooks",
-  "mostrarPrazosCard", "setForcarCliente",
+  "mostrarPrazosCard", "setForcarCliente", "diagnosticarCard",
+  "reconstruirBucketsCard",
 ];
 
 function painel_runFuncao(nome, arg) {
   if (PAINEL_FUNCOES_PERMITIDAS.indexOf(nome) === -1) {
     throw new Error("Função não permitida via painel: " + nome);
   }
-  // Captura logs durante a execução pra retornar pro painel
-  const fn = this[nome];
+  // v7.12.1: globalThis em vez de this — Apps Script V8 prefere globalThis pra
+  // resolver funções globais. `this` pode ser undefined em strict mode.
+  const fn = (typeof globalThis !== "undefined" ? globalThis : this)[nome];
   if (typeof fn !== "function") {
     throw new Error("Função não encontrada: " + nome);
   }
-  if (arg !== null && arg !== undefined && arg !== "") {
-    return String(fn(arg) || "OK");
+  try {
+    const resultado = (arg !== null && arg !== undefined && arg !== "")
+      ? fn(arg)
+      : fn();
+    return String(resultado || "OK");
+  } catch (e) {
+    _daniLog("PAINEL_ERRO", "execução de " + nome + " falhou", { erro: String(e), stack: (e.stack || "").substring(0, 300) });
+    throw e; // re-lança pro painel mostrar
   }
-  return String(fn() || "OK");
 }
 
 function painel_logs() {
@@ -1783,7 +2250,7 @@ function chamarClaudeJson(prompt, maxTokens, modelo) {
 
 function _danigetCardCompleto(cardId) {
   const r = trelloGet("/1/cards/" + cardId, {
-    fields: "name,idBoard,idList,shortUrl,desc,labels,closed",
+    fields: "name,idBoard,idList,shortUrl,desc,labels,closed,cover",
     labels: "true",
   });
   if (r.getResponseCode() !== 200) return null;
@@ -1858,6 +2325,12 @@ function _daniComentar(cardId, texto, marcarBoard) {
 /**
  * Envia email pro cliente do card. Email vem da descrição (campo 📧 E-MAIL).
  * Retorna true/false.
+ *
+ * v7.10.1: Seta replyTo = email do card no Trello. Sem isso, resposta do
+ * cliente caía em trevolegaliza@gmail.com (caixa normal) e NÃO entrava
+ * no card, então fluxo G4 (cliente respondeu) nunca disparava.
+ * Com replyTo, a resposta vira comentário no card automaticamente,
+ * webhook commentCard chega na Dani, e ela avalia (G4 — CUMPRIU/etc).
  */
 function _daniEnviarEmailCliente(card, assunto, html, textoPlano) {
   const email = extrairEmailDoCardDesc(card.desc || "");
@@ -1865,15 +2338,19 @@ function _daniEnviarEmailCliente(card, assunto, html, textoPlano) {
     Logger.log("    ⚠️ sem email do cliente no card — não envio");
     return false;
   }
+  // CRÍTICO: replyTo = email do card no Trello, pra resposta entrar como comentário
+  const emailCardTrello = getEmailDoCard(card.id);
   try {
-    MailApp.sendEmail({
+    const opcoes = {
       to: email,
       subject: assunto,
       htmlBody: html,
       body: textoPlano,
       name: "Dani 🍀 Trevo Legaliza",
-    });
-    Logger.log("    📧 email enviado pra " + email);
+    };
+    if (emailCardTrello) opcoes.replyTo = emailCardTrello;
+    MailApp.sendEmail(opcoes);
+    Logger.log("    📧 email enviado pra " + email + (emailCardTrello ? " (replyTo card)" : " (sem replyTo card)"));
     return true;
   } catch (e) {
     Logger.log("    ⚠️ falha email: " + e.message);
@@ -1920,39 +2397,77 @@ function _daniMontarEmailHTML(opts) {
 
 // ─── G2: funcionário interno comenta ───────────────────────────────────────
 
+// Mapa cor da capa Trello → tipo de processo (espelha buildSpecPorTipo)
+function _corCapaParaTipo(cor) {
+  const map = {
+    green:  "ABERTURA DE EMPRESA",
+    purple: "ALTERAÇÃO DE EMPRESA",
+    orange: "TRANSFORMAÇÃO DE EMPRESA",
+    red:    "ENCERRAMENTO DE EMPRESA",
+    black:  "ALVARÁS / LICENÇAS / INSCRIÇÕES (capa cinza)",
+  };
+  return map[String(cor || "").toLowerCase()] || "";
+}
+
 /**
  * Classifica comentário de funcionário via Claude.
  * Retorna { acao, resumo, mensagemCliente } ou null em erro.
+ *
+ * v7.10.0: Sonnet primário (Haiku como fallback) + regras explícitas
+ * de hierarquia (cliente = contador; sócios = terceiros) e tipo do
+ * processo via cor da capa do card.
  */
 function _classificarComentarioFuncionario(textoComentario, contexto) {
   const prompt =
-    'Você é a Dani, IA da Trevo Legaliza (assessoria societária B2B).\n' +
-    'Funcionário interno comentou num card do Trello. Classifique a intenção.\n\n' +
-    'CONTEXTO:\n' +
-    '  Card: ' + (contexto.cardNome || "?") + '\n' +
-    '  Lista: ' + (contexto.listaNome || "?") + '\n' +
-    '  Etiquetas: ' + (contexto.etiquetas.join(", ") || "(nenhuma)") + '\n\n' +
-    'COMENTÁRIO de ' + (contexto.autor || "?") + ':\n' +
+    'Você é a Dani, IA da Trevo Legaliza (assessoria societária B2B).\n\n' +
+    '═══ REGRAS CRÍTICAS (siga RIGOROSAMENTE) ═══\n\n' +
+    '1) HIERARQUIA DE PESSOAS:\n' +
+    '   • CLIENTE TREVO = é o CONTADOR/escritório de contabilidade. É com ele que você fala.\n' +
+    '   • SÓCIOS = pessoas físicas da empresa em processo. São TERCEIROS, representados pelo contador.\n' +
+    '   • Use "seu/sua" SOMENTE pra coisas do contador.\n' +
+    '   • Pra info de sócio, use o NOME do sócio (ex: "do sócio João Silva") OU "do sócio principal".\n' +
+    '   • ERRADO: "preciso do SEU CPF" (quando é CPF do sócio)\n' +
+    '   • CERTO:  "preciso do CPF do sócio Fulano"\n\n' +
+    '2) TIPO DO PROCESSO (NUNCA assumir abertura por default):\n' +
+    '   • Tipo identificado pela cor da capa: ' + (contexto.tipoProcesso || "DESCONHECIDO") + '\n' +
+    '   • Use ESSA info pra contextualizar a mensagem corretamente.\n' +
+    '   • Se DESCONHECIDO: use linguagem neutra ("seu processo", "a solicitação"), NÃO invente tipo.\n' +
+    '   • Cinza = Alvará/Licença/Inscrição (NÃO é abertura de empresa).\n\n' +
+    '═══ CONTEXTO DO CARD ═══\n\n' +
+    '  Card:            ' + (contexto.cardNome || "?") + '\n' +
+    '  Lista atual:     ' + (contexto.listaNome || "?") + '\n' +
+    '  Etiquetas:       ' + (contexto.etiquetas.join(", ") || "(nenhuma)") + '\n' +
+    '  Tipo (cor capa): ' + (contexto.tipoProcesso || "DESCONHECIDO") + '\n\n' +
+    '  Descrição do card (primeiros 500 chars — contém solicitante, sócios, dados):\n' +
+    '  """\n' + (contexto.descResumo || "(sem descrição)") + '\n  """\n\n' +
+    '═══ COMENTÁRIO RECEBIDO ═══\n\n' +
+    'Funcionário ' + (contexto.autor || "?") + ' comentou:\n' +
     '"' + (textoComentario || "").substring(0, 1500) + '"\n\n' +
-    'AÇÕES POSSÍVEIS (escolha exatamente uma):\n' +
+    '═══ AÇÕES POSSÍVEIS (escolha exatamente 1) ═══\n\n' +
     '  SOLICITA_DOC      = funcionário pediu documento/arquivo ao cliente\n' +
     '  SOLICITA_RESPOSTA = funcionário pediu confirmação/info ao cliente (sem doc)\n' +
     '  ATUALIZA_STATUS   = funcionário só atualizou andamento (ex: viabilidade transmitida)\n' +
     '  OUTRO             = anotação interna sem ação pro cliente\n\n' +
-    'COMPONHA mensagemCliente (gentil, profissional, breve, sempre se identifique como "dani.ai"):\n' +
-    '  - Se SOLICITA_*: peça com clareza\n' +
-    '  - Se ATUALIZA_STATUS: traduza a atualização pra cliente\n' +
-    '  - Se OUTRO: deixe vazio\n\n' +
-    'INSTRUÇÃO CRÍTICA DE FORMATO:\n' +
-    'Sua resposta DEVE ser exclusivamente um objeto JSON válido, começando com { e terminando com }.\n' +
+    '═══ COMPONHA mensagemCliente ═══\n\n' +
+    '  - Tom: gentil, profissional, breve, B2B (interlocutor é contador, não leigo).\n' +
+    '  - SEMPRE se identifique como "dani.ai".\n' +
+    '  - RESPEITE rigorosamente as regras 1 e 2 acima.\n' +
+    '  - Se OUTRO: deixe mensagemCliente vazio.\n\n' +
+    '═══ FORMATO DE RESPOSTA (CRÍTICO) ═══\n\n' +
+    'Resposta DEVE ser EXCLUSIVAMENTE um JSON válido começando com { e terminando com }.\n' +
     'NÃO escreva nada antes ou depois. NÃO use blocos de código (```). NÃO comente.\n\n' +
-    'Schema exato:\n' +
+    'Schema:\n' +
     '{"acao":"<uma das 4 acoes>","resumo":"<frase curta>","mensagemCliente":"<texto ou vazio>"}';
 
-  // G2 = classificação simples + composição de mensagem → Haiku (4x mais barato)
-  const j = chamarClaudeJson(prompt, 800, CLAUDE_MODEL_HAIKU);
+  // G2 v7.10.0 = Sonnet primário (decisão crítica do que falar pro contador).
+  // Fallback Haiku se Sonnet falhar (rate limit, indisponível, etc).
+  let j = chamarClaudeJson(prompt, 800, CLAUDE_MODEL_SONNET);
   if (!j) {
-    _daniLog("CLAUDE_FAIL", "_classificarComentarioFuncionario: chamarClaudeJson retornou null");
+    _daniLog("CLAUDE_FALLBACK", "G2: Sonnet falhou, tentando Haiku como fallback");
+    j = chamarClaudeJson(prompt, 800, CLAUDE_MODEL_HAIKU);
+  }
+  if (!j) {
+    _daniLog("CLAUDE_FAIL", "_classificarComentarioFuncionario: ambos modelos falharam");
     return null;
   }
   if (DANI_NIVELS.indexOf(j.acao) === -1) {
@@ -2042,12 +2557,18 @@ function _danihandlerG2(action, cli, texto, autor, cardId) {
   }
   const listaNome = _danigetNomeLista(card.idList);
   const etiquetas = (card.labels || []).map(l => (l.name || "").trim()).filter(Boolean);
+  const corCapa = (card.cover && card.cover.color) || "";
+  const tipoProcesso = _corCapaParaTipo(corCapa);
+  const descResumo = String(card.desc || "").substring(0, 500).replace(/\n{3,}/g, "\n\n");
 
   const contexto = {
     cardNome: card.name,
     listaNome: listaNome,
     etiquetas: etiquetas,
     autor: autor,
+    corCapa: corCapa,
+    tipoProcesso: tipoProcesso,
+    descResumo: descResumo,
   };
 
   _daniLog("G2", "contexto montado", contexto);
@@ -2604,7 +3125,7 @@ function reconstruirBucketsCard(cardId) {
   }
   Logger.log("🔁 Reconstruindo buckets POR LISTA do card " + cardId + "...");
   const r = trelloGet("/1/cards/" + cardId + "/actions", {
-    filter: "addLabelToCard,removeLabelToCard,updateCard:idList,createCard,copyCard",
+    filter: "addLabelToCard,removeLabelFromCard,updateCard:idList,createCard,copyCard",
     limit: "1000",
   });
   if (r.getResponseCode() !== 200) {
@@ -2654,7 +3175,7 @@ function reconstruirBucketsCard(cardId) {
         ts: a.date, lista: listaAtual,
       }));
       totalEventos++;
-    } else if (a.type === "removeLabelToCard") {
+    } else if (a.type === "removeLabelFromCard") {
       const chaveInicio = "bucket_inicio_" + cardId + "_" + label;
       const inicioRaw = props.getProperty(chaveInicio);
       if (!inicioRaw) return;
@@ -2831,7 +3352,7 @@ function gerarDashboardDani() {
  * Rode esse direto no editor — não precisa passar argumento.
  */
 function mostrarPrazosCardTeste() {
-  mostrarPrazosCard("69ec2d293f4d7941bdcd603e");
+  return mostrarPrazosCard("69ec2d293f4d7941bdcd603e");
 }
 
 /**
@@ -2860,29 +3381,27 @@ function mostrarPrazosCardComPrompt() {
 
 function mostrarPrazosCard(cardId) {
   if (!cardId) {
-    Logger.log("⚠️ Apps Script editor não aceita argumentos.");
-    Logger.log("Opções:");
-    Logger.log("  1) Roda mostrarPrazosCardTeste() — atalho pro card de teste");
-    Logger.log("  2) Roda mostrarPrazosCardComPrompt() (precisa planilha aberta)");
-    Logger.log("  3) Edita esta função e cola o cardId direto:");
-    Logger.log("     mostrarPrazosCard('SEU_CARD_ID_AQUI')");
-    return;
+    const msg = "⚠️ Sem cardId. Use mostrarPrazosCardTeste() pro card de teste, " +
+      "ou cole um cardId hex de 24 chars no input do painel.";
+    Logger.log(msg);
+    return msg;
   }
   const p = getPrazosDani(cardId);
-  Logger.log("══════════ Prazos do card " + cardId + " ══════════");
-  Logger.log("");
-  Logger.log("  Lista                          | Trevo  | Cliente | Órgão");
-  Logger.log("  -------------------------------|--------|---------|-------");
   const fmt = (d) => (d > 0 ? d.toFixed(1) + "d" : "-").padEnd(6);
+  let out = "══════════ Prazos do card " + cardId + " ══════════\n\n";
+  out += "  Lista                          | Trevo  | Cliente | Órgão\n";
+  out += "  -------------------------------|--------|---------|-------\n";
   Object.keys(p.por_lista).sort().forEach(lista => {
     const v = p.por_lista[lista];
-    Logger.log("  " + lista.substring(0, 30).padEnd(31) + "| " +
-      fmt(v.trevo_dias) + " | " + fmt(v.cliente_dias) + "  | " + fmt(v.orgao_dias));
+    out += "  " + lista.substring(0, 30).padEnd(31) + "| " +
+      fmt(v.trevo_dias) + " | " + fmt(v.cliente_dias) + "  | " + fmt(v.orgao_dias) + "\n";
   });
-  Logger.log("  -------------------------------|--------|---------|-------");
-  Logger.log("  TOTAL                          | " +
-    fmt(p.total.trevo_dias) + " | " + fmt(p.total.cliente_dias) + "  | " + fmt(p.total.orgao_dias));
-  Logger.log("  Total processo: " + (p.total.trevo_dias + p.total.cliente_dias + p.total.orgao_dias).toFixed(1) + "d");
+  out += "  -------------------------------|--------|---------|-------\n";
+  out += "  TOTAL                          | " +
+    fmt(p.total.trevo_dias) + " | " + fmt(p.total.cliente_dias) + "  | " + fmt(p.total.orgao_dias) + "\n";
+  out += "  Total processo: " + (p.total.trevo_dias + p.total.cliente_dias + p.total.orgao_dias).toFixed(1) + "d";
+  Logger.log(out);
+  return out;
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -4257,7 +4776,27 @@ function _processarEmailOrgao(msg) {
 
   const interp = interpretarEmailOrgao(corpo, assunto, remetente);
   if (!interp) {
-    _daniLog("ORGAO", "interpretação falhou — mantém email não lido");
+    // v7.12.1: marca lido pra NÃO reprocessar infinitamente em cada cron.
+    // Antes: ficava não-lido e Claude era chamada de novo a cada varredura → spam.
+    // Agora: marca lido + registra pendência manual pra equipe revisar no Sheets.
+    _daniLog("ORGAO", "interpretação Claude falhou — marcando lido + pendência manual");
+    try {
+      registrarPendencia({
+        dataHora: msg.getDate(), tipo: "E-MAIL ÓRGÃO",
+        cliente: remetente,
+        quadro: "INTERPRETAÇÃO FALHOU",
+        card: "(sem card identificado)",
+        cardUrl: "",
+        conteudo: (corpo || "").substring(0, 500),
+        respostaDani: "",
+        classificacao: "🔴 URGENTE",
+        acaoSugerida: "Claude não conseguiu interpretar o email. Revisar manualmente: " + (assunto || ""),
+        status: "PENDENTE — INTERPRETAÇÃO FALHOU",
+      });
+    } catch (e) {
+      _daniLog("ERRO", "registrarPendencia falhou no fallback de interpretação", { erro: String(e) });
+    }
+    msg.markRead();
     return;
   }
   Utilities.sleep(2000);

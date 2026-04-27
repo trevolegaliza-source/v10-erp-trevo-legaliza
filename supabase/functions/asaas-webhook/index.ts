@@ -11,6 +11,13 @@
 //  4. CUSTOMER MATCH: valida que payment.customer bate com
 //     clientes.asaas_customer_id da cobrança antes de mudar estado
 //  5. BODY DE RESPOSTA SANITIZADO: não vaza mensagem de erro crua
+//  6. audit fix #3 — STATUS HONESTO. Antes: SEMPRE 200, mesmo em erro
+//     de DB → Asaas marcava entregue, ninguém retentava, divergia silente.
+//     Agora: BusinessRuleError (cobrança não achada, customer mismatch)
+//     devolve 200 (já registrado em asaas_webhook_events.error pra
+//     investigação humana — Asaas não retenta erro permanente). Erro
+//     genérico (DB indisponível, JS exception) devolve 500 (transitório,
+//     Asaas retenta com backoff).
 //
 // Fluxo de estados das cobranças:
 //   PAYMENT_CONFIRMED / PAYMENT_RECEIVED → cobranca.status = 'paga',
@@ -42,6 +49,17 @@ function todayISO(): string {
 
 function nowISO(): string {
   return new Date().toISOString();
+}
+
+// audit fix #3 — erros de regra de negócio (não retenta) vs erros
+// transitórios (retenta). Asaas retenta com backoff em 5xx; em 200
+// considera entregue. Distinguir é vital pra não esconder problemas
+// nem entrar em loop infinito de retry em erro permanente.
+class BusinessRuleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BusinessRuleError";
+  }
 }
 
 // Comparação de strings resistente a timing attacks.
@@ -88,15 +106,15 @@ function assertCustomerMatches(
   const payloadCustomer: string | undefined = payload?.payment?.customer;
   const clienteCustomer = cobranca.clientes?.asaas_customer_id ?? null;
   if (!payloadCustomer) {
-    throw new Error("payload sem payment.customer");
+    throw new BusinessRuleError("payload sem payment.customer");
   }
   if (!clienteCustomer) {
-    throw new Error(
+    throw new BusinessRuleError(
       `cliente ${cobranca.cliente_id} sem asaas_customer_id registrado`
     );
   }
   if (payloadCustomer !== clienteCustomer) {
-    throw new Error(
+    throw new BusinessRuleError(
       `customer mismatch: payload=${payloadCustomer} cobranca=${clienteCustomer}`
     );
   }
@@ -105,7 +123,9 @@ function assertCustomerMatches(
 async function handlePaidEvent(paymentId: string, event: any) {
   const cobranca = await fetchCobrancaByPaymentId(paymentId);
   if (!cobranca) {
-    throw new Error(`cobrança não encontrada para payment_id=${paymentId}`);
+    throw new BusinessRuleError(
+      `cobrança não encontrada para payment_id=${paymentId}`
+    );
   }
   assertCustomerMatches(cobranca, event);
 
@@ -311,6 +331,7 @@ Deno.serve(async (req) => {
   }
 
   let processError: string | null = null;
+  let isBusinessRule = false;
   try {
     if (!paymentId) {
       console.log("[asaas-webhook] evento sem payment.id:", eventType);
@@ -349,7 +370,12 @@ Deno.serve(async (req) => {
     }
   } catch (e) {
     processError = e instanceof Error ? e.message : String(e);
-    console.error("[asaas-webhook] erro ao processar:", processError);
+    isBusinessRule = e instanceof BusinessRuleError;
+    if (isBusinessRule) {
+      console.warn("[asaas-webhook] business rule:", processError);
+    } else {
+      console.error("[asaas-webhook] erro transitório:", processError);
+    }
   }
 
   if (logId) {
@@ -362,15 +388,22 @@ Deno.serve(async (req) => {
       .eq("id", logId);
   }
 
-  // Sempre 200 pro Asaas não retentar; erros ficam registrados no DB.
-  // Body enxuto — mensagem de erro crua fica só no log + asaas_webhook_events.error.
+  // audit fix #3 — status honesto ao Asaas:
+  //  - sucesso → 200
+  //  - business rule (cobrança não achada, customer mismatch): 200
+  //    (não retenta — erro permanente, registrado em asaas_webhook_events
+  //    pra investigação humana via Painel)
+  //  - erro transitório (DB, network, JS exception): 500
+  //    (Asaas retenta com backoff; problema some sozinho na próxima)
+  const status = processError === null || isBusinessRule ? 200 : 500;
   return new Response(
     JSON.stringify({
       ok: processError === null,
       event_type: eventType,
+      ...(isBusinessRule ? { business_rule: true } : {}),
     }),
     {
-      status: 200,
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     }
   );

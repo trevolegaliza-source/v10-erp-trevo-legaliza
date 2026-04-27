@@ -1,14 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildCorsHeaders, handlePreflight } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+// Validação de email (audit fix #23)
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+function isValidEmail(s: unknown): s is string {
+  return typeof s === "string" && s.length <= 254 && EMAIL_REGEX.test(s);
+}
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // audit fix #21 — CORS allowlist
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
+  const corsHeaders = buildCorsHeaders(req.headers.get("Origin"));
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -55,6 +58,20 @@ Deno.serve(async (req) => {
 
     if (!email || !password || !role) {
       return new Response(JSON.stringify({ error: "Email, senha e role são obrigatórios" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // audit fix #23 — valida email + senha mínima
+    if (!isValidEmail(email)) {
+      return new Response(JSON.stringify({ error: "Email inválido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (typeof password !== "string" || password.length < 8) {
+      return new Response(JSON.stringify({ error: "Senha precisa ter pelo menos 8 caracteres" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
