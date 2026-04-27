@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      acessos_publicos_log: {
+        Row: {
+          acessado_em: string
+          id: number
+          tipo: string
+          token_hash: string
+        }
+        Insert: {
+          acessado_em?: string
+          id?: number
+          tipo: string
+          token_hash: string
+        }
+        Update: {
+          acessado_em?: string
+          id?: number
+          tipo?: string
+          token_hash?: string
+        }
+        Relationships: []
+      }
       asaas_webhook_events: {
         Row: {
           asaas_payment_id: string | null
@@ -1443,6 +1464,27 @@ export type Database = {
         }
         Relationships: []
       }
+      master_password_config: {
+        Row: {
+          id: number
+          password_hash: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: number
+          password_hash?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: number
+          password_hash?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       notas_estado: {
         Row: {
           conteudo: string | null
@@ -1571,6 +1613,7 @@ export type Database = {
           convertido_em: string | null
           created_at: string | null
           created_by: string | null
+          data_expiracao: string | null
           desconto_pct: number | null
           desconto_progressivo_ativo: boolean | null
           desconto_progressivo_limite: number | null
@@ -1626,6 +1669,7 @@ export type Database = {
           convertido_em?: string | null
           created_at?: string | null
           created_by?: string | null
+          data_expiracao?: string | null
           desconto_pct?: number | null
           desconto_progressivo_ativo?: boolean | null
           desconto_progressivo_limite?: number | null
@@ -1681,6 +1725,7 @@ export type Database = {
           convertido_em?: string | null
           created_at?: string | null
           created_by?: string | null
+          data_expiracao?: string | null
           desconto_pct?: number | null
           desconto_progressivo_ativo?: boolean | null
           desconto_progressivo_limite?: number | null
@@ -2346,6 +2391,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      _log_acesso_publico: {
+        Args: { p_tipo: string; p_token: string }
+        Returns: undefined
+      }
       asaas_tentar_lock_cobranca: {
         Args: { p_cobranca_id: string }
         Returns: Json
@@ -2489,6 +2538,7 @@ export type Database = {
       }
       get_user_empresa_id: { Args: never; Returns: string }
       get_user_role: { Args: never; Returns: string }
+      hash_master_password: { Args: { p_password: string }; Returns: string }
       mark_cobranca_visualizada: {
         Args: { p_token: string }
         Returns: undefined
@@ -2511,12 +2561,17 @@ export type Database = {
         Args: { p_itens_selecionados: Json; p_token: string }
         Returns: boolean
       }
+      set_master_password_hash: { Args: { p_hash: string }; Returns: undefined }
       tentar_aplicar_boas_vindas: {
         Args: { p_cliente_id: string }
         Returns: Json
       }
       verificar_senha_proposta: {
         Args: { p_senha: string; p_token: string }
+        Returns: boolean
+      }
+      verify_master_password_hash: {
+        Args: { p_password: string }
         Returns: boolean
       }
     }
