@@ -583,6 +583,7 @@ export type Database = {
           empresa_id: string
           extrato_id: string | null
           id: string
+          is_archived: boolean | null
           lancamento_ids: string[]
           pago_em: string | null
           share_token: string
@@ -615,6 +616,7 @@ export type Database = {
           empresa_id?: string
           extrato_id?: string | null
           id?: string
+          is_archived?: boolean | null
           lancamento_ids: string[]
           pago_em?: string | null
           share_token?: string
@@ -647,6 +649,7 @@ export type Database = {
           empresa_id?: string
           extrato_id?: string | null
           id?: string
+          is_archived?: boolean | null
           lancamento_ids?: string[]
           pago_em?: string | null
           share_token?: string
@@ -1631,6 +1634,7 @@ export type Database = {
           etapas_fluxo: Json | null
           headline_cenario: string | null
           id: string
+          is_archived: boolean | null
           itens_selecionados: Json | null
           naturezas: Json
           numero: number
@@ -1687,6 +1691,7 @@ export type Database = {
           etapas_fluxo?: Json | null
           headline_cenario?: string | null
           id?: string
+          is_archived?: boolean | null
           itens_selecionados?: Json | null
           naturezas?: Json
           numero?: number
@@ -1743,6 +1748,7 @@ export type Database = {
           etapas_fluxo?: Json | null
           headline_cenario?: string | null
           id?: string
+          is_archived?: boolean | null
           itens_selecionados?: Json | null
           naturezas?: Json
           numero?: number
@@ -2409,6 +2415,7 @@ export type Database = {
         }
         Returns: Json
       }
+      arquivar_cliente: { Args: { p_cliente_id: string }; Returns: undefined }
       asaas_tentar_lock_cobranca: {
         Args: { p_cobranca_id: string }
         Returns: Json
@@ -2458,6 +2465,10 @@ export type Database = {
           p_via_analise?: string
         }
         Returns: string
+      }
+      desarquivar_cliente: {
+        Args: { p_cliente_id: string }
+        Returns: undefined
       }
       get_cobranca_por_token: {
         Args: { p_token: string }
