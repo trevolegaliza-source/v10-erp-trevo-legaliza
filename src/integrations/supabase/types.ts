@@ -685,6 +685,42 @@ export type Database = {
           },
         ]
       }
+      cobrancas_lancamentos: {
+        Row: {
+          cobranca_id: string
+          created_at: string
+          empresa_id: string
+          lancamento_id: string
+        }
+        Insert: {
+          cobranca_id: string
+          created_at?: string
+          empresa_id: string
+          lancamento_id: string
+        }
+        Update: {
+          cobranca_id?: string
+          created_at?: string
+          empresa_id?: string
+          lancamento_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobrancas_lancamentos_cobranca_id_fkey"
+            columns: ["cobranca_id"]
+            isOneToOne: false
+            referencedRelation: "cobrancas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cobrancas_lancamentos_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "lancamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       colaborador_avaliacoes: {
         Row: {
           ano: number
