@@ -128,47 +128,68 @@ export function useUpdateCliente() {
   });
 }
 
+// audit fix #5 — DELETE bruto era catastrófico:
+// Apagava lancamentos + documentos + cliente (cascateando processos/cobrancas).
+// 1 clique acidental = todo o histórico financeiro do cliente perdido pra sempre.
+// Agora: alias para arquivamento via RPC atômica (arquivar_cliente). Histórico
+// financeiro PRESERVADO no banco (lancamentos/cobrancas continuam intactos).
+// Para purga real (raríssimo, ex: duplicata sem dados), há `usePurgeClienteForce`
+// abaixo, mas o banco bloqueia via RESTRICT se houver dependências.
 export function useDeleteCliente() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      // Delete lancamentos referencing this client's processes first
-      const { data: procs } = await supabase.from('processos').select('id').eq('cliente_id', id);
-      if (procs && procs.length > 0) {
-        const procIds = procs.map(p => p.id);
-        const { error: lErr } = await supabase.from('lancamentos').delete().in('processo_id', procIds);
-        if (lErr) throw lErr;
-      }
-      // Delete lancamentos referencing client directly
-      const { error: lcErr } = await supabase.from('lancamentos').delete().eq('cliente_id', id);
-      if (lcErr) throw lcErr;
-      // Delete documentos for processes
-      if (procs && procs.length > 0) {
-        const procIds = procs.map(p => p.id);
-        await supabase.from('documentos').delete().in('processo_id', procIds);
-      }
-      // Now delete client (processos cascade)
-      const { error } = await supabase.from('clientes').delete().eq('id', id);
+      const { error } = await supabase.rpc('arquivar_cliente' as any, {
+        p_cliente_id: id,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clientes'] });
       qc.invalidateQueries({ queryKey: ['processos_db'] });
       qc.invalidateQueries({ queryKey: ['lancamentos'] });
-      toast.success('Cliente e processos excluídos!');
+      toast.success('Cliente arquivado — histórico financeiro preservado.');
     },
-    onError: (e: Error) => toast.error('Erro ao excluir: ' + e.message),
+    onError: (e: Error) => toast.error('Erro ao arquivar: ' + e.message),
   });
 }
 
+// Purga REAL — só funciona se cliente não tem nenhum lancamento/cobranca/processo.
+// Banco bloqueia via FK RESTRICT (audit fix #5). Não exposto na UI por padrão;
+// use no console se precisar limpar duplicata acidental sem histórico.
+export function usePurgeClienteForce() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('clientes').delete().eq('id', id);
+      if (error) {
+        if (error.code === '23503') {
+          throw new Error(
+            'Cliente possui lançamentos, cobranças ou processos. ' +
+            'Use arquivar (preserva histórico) em vez de excluir.',
+          );
+        }
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clientes'] });
+      toast.success('Cliente excluído permanentemente.');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// audit fix #5 — usa RPC atômica com role check + tenant check no banco
+// (antes: UPDATE direto, dependia 100% do RLS pra barrar cross-tenant)
 export function useArchiveCliente() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error: cErr } = await supabase.from('clientes').update({ is_archived: true, updated_at: new Date().toISOString() } as any).eq('id', id);
-      if (cErr) throw cErr;
-      const { error: pErr } = await supabase.from('processos').update({ is_archived: true, updated_at: new Date().toISOString() } as any).eq('cliente_id', id);
-      if (pErr) throw pErr;
+      const { error } = await supabase.rpc('arquivar_cliente' as any, {
+        p_cliente_id: id,
+      });
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clientes'] });
@@ -183,10 +204,10 @@ export function useUnarchiveCliente() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error: cErr } = await supabase.from('clientes').update({ is_archived: false, updated_at: new Date().toISOString() } as any).eq('id', id);
-      if (cErr) throw cErr;
-      const { error: pErr } = await supabase.from('processos').update({ is_archived: false, updated_at: new Date().toISOString() } as any).eq('cliente_id', id);
-      if (pErr) throw pErr;
+      const { error } = await supabase.rpc('desarquivar_cliente' as any, {
+        p_cliente_id: id,
+      });
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clientes'] });

@@ -10,7 +10,7 @@ import { Plus, Users, Search, UserX, FileText, Download, Trash2, Archive, Archiv
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useClientes, useUpdateCliente, useDeleteCliente, useArchiveCliente, useUnarchiveCliente } from '@/hooks/useFinanceiro';
+import { useClientes, useUpdateCliente, useArchiveCliente, useUnarchiveCliente } from '@/hooks/useFinanceiro';
 import { useProcessos } from '@/hooks/useFinanceiro';
 import type { ClienteDB, TipoCliente } from '@/types/financial';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -39,7 +39,7 @@ export default function Clientes() {
   const { data: clientes, isLoading } = useClientes(search);
   const { data: processos } = useProcessos();
   const updateCliente = useUpdateCliente();
-  const deleteCliente = useDeleteCliente();
+  // audit fix #5 — useDeleteCliente removido daqui (era rota dupla pra arquivamento).
   const archiveCliente = useArchiveCliente();
   const unarchiveCliente = useUnarchiveCliente();
 
@@ -194,15 +194,8 @@ export default function Clientes() {
     });
   };
 
-  const handleDelete = () => {
-    if (!editClient) return;
-    setPendingDeleteAction(() => () => {
-      deleteCliente.mutate(editClient.id, {
-        onSuccess: () => setEditClient(null),
-      });
-    });
-    setShowDeletePassword(true);
-  };
+  // audit fix #5 — handleDelete removido (botão Excluir não existe mais aqui).
+  // Arquivamento é feito via handleArchive abaixo (RPC arquivar_cliente).
 
   const handleArchive = (clientId: string) => {
     setPendingDeleteAction(() => () => {
@@ -598,7 +591,9 @@ export default function Clientes() {
 
             <div className="flex items-center justify-between pt-2">
               <div className="flex gap-2">
-                <Button variant="destructive" size="sm" onClick={handleDelete}><Trash2 className="h-3.5 w-3.5 mr-1" />Excluir</Button>
+                {/* audit fix #5 — botão "Excluir" removido (era duplicado: agora chama o mesmo
+                    arquivar via RPC). Manter apenas Arquivar/Desarquivar evita confusão e
+                    elimina rota acidental que apagava histórico financeiro. */}
                 {!(editClient as any)?.is_archived ? (
                   <Button variant="outline" size="sm" onClick={() => editClient && handleArchive(editClient.id)}><Archive className="h-3.5 w-3.5 mr-1" />Arquivar</Button>
                 ) : (

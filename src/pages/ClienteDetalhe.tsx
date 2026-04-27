@@ -698,8 +698,9 @@ export default function ClienteDetalhe() {
               <Archive className="h-3.5 w-3.5" /> Arquivar
             </Button>
           )}
+          {/* audit fix #5 — botão "Excluir" hoje arquiva (preserva histórico financeiro) */}
           <Button variant="outline" size="sm" className="gap-1.5 text-xs text-destructive" onClick={() => setShowDeleteClientePassword(true)}>
-            <Trash2 className="h-3.5 w-3.5" /> Excluir
+            <Trash2 className="h-3.5 w-3.5" /> Arquivar
           </Button>
         </div>
       </div>
@@ -2053,12 +2054,12 @@ export default function ClienteDetalhe() {
         }}
       />
 
-      {/* Delete Cliente Password Dialog */}
+      {/* Arquivar Cliente Password Dialog (audit fix #5: era DELETE bruto) */}
       <PasswordConfirmDialog
         open={showDeleteClientePassword}
         onOpenChange={setShowDeleteClientePassword}
-        title="Excluir Cliente"
-        description={`Tem certeza? Isso excluirá permanentemente "${cliente.nome}" e todos os seus ${processos.length} processos e lançamentos.`}
+        title="Arquivar Cliente"
+        description={`Arquivar "${cliente.nome}" e seus ${processos.length} processo(s)? O histórico financeiro (cobranças e lançamentos) será PRESERVADO. Você pode desarquivar a qualquer momento.`}
         onConfirm={() => {
           if (!cliente) return;
           deleteCliente.mutate(cliente.id, { onSuccess: () => navigate('/clientes') });
