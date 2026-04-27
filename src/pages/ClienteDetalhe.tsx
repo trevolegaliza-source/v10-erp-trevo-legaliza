@@ -37,6 +37,7 @@ import { UFS_BRASIL } from '@/constants/estados-brasil';
 import PasswordConfirmDialog from '@/components/PasswordConfirmDialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { STORAGE_BUCKETS } from '@/constants/storage';
+import { empresaPath, getEmpresaId } from '@/lib/storage-path';
 import ContractDropzone from '@/components/contratos/ContractDropzone';
 import ContractPreviewModal from '@/components/contratos/ContractPreviewModal';
 import { useServiceNegotiations } from '@/hooks/useServiceNegotiations';
@@ -369,7 +370,8 @@ export default function ClienteDetalhe() {
   };
 
   const loadContracts = async (clienteId: string) => {
-    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(clienteId);
+    const empresaId = await getEmpresaId();
+    const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).list(`${empresaId}/${clienteId}`);
     setContracts((data || []).map(f => ({ name: f.name })));
   };
 
@@ -535,7 +537,7 @@ export default function ClienteDetalhe() {
     if (!allowed.includes(file.type)) { toast.error('Formato inválido. Aceitos: PDF, PNG, JPG'); throw new Error('invalid'); }
     if (file.size > 10 * 1024 * 1024) { toast.error('Arquivo muito grande. Máximo: 10MB'); throw new Error('too large'); }
     setUploadingContract(true);
-    const path = `${cliente.id}/${Date.now()}_${file.name}`;
+    const path = await empresaPath(`${cliente.id}/${Date.now()}_${file.name}`);
     const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).upload(path, file);
     if (error) { toast.error('Erro no upload: ' + error.message); setUploadingContract(false); throw error; }
     toast.success('Contrato anexado!');
@@ -545,7 +547,8 @@ export default function ClienteDetalhe() {
 
   const handleDownload = async (fileName: string) => {
     if (!cliente) return;
-    const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).download(`${cliente.id}/${fileName}`);
+    const path = await empresaPath(`${cliente.id}/${fileName}`);
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).download(path);
     if (error) { toast.error('Erro ao baixar'); return; }
     const url = URL.createObjectURL(data);
     const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
@@ -554,7 +557,7 @@ export default function ClienteDetalhe() {
 
   const handleViewContract = async (fileName: string) => {
     if (!cliente) return;
-    const storagePath = `${cliente.id}/${fileName}`;
+    const storagePath = await empresaPath(`${cliente.id}/${fileName}`);
     const { abrirArquivoStorage } = await import('@/lib/storage-utils');
     await abrirArquivoStorage(STORAGE_BUCKETS.CONTRACTS, storagePath);
   };
@@ -562,7 +565,8 @@ export default function ClienteDetalhe() {
   const handleDeleteContract = (fileName: string) => {
     if (!cliente) return;
     setPendingDeleteAction(() => async () => {
-      const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).remove([`${cliente.id}/${fileName}`]);
+      const path = await empresaPath(`${cliente.id}/${fileName}`);
+      const { error } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).remove([path]);
       if (error) toast.error('Erro ao excluir');
       else { toast.success('Removido'); loadContracts(cliente.id); }
     });
@@ -1275,7 +1279,8 @@ export default function ClienteDetalhe() {
                 <div className="space-y-2">
                   {contracts.map(c => {
                     const handlePreview = async () => {
-                      const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(`${cliente.id}/${c.name}`, 3600);
+                      const path = await empresaPath(`${cliente.id}/${c.name}`);
+                      const { data } = await supabase.storage.from(STORAGE_BUCKETS.CONTRACTS).createSignedUrl(path, 3600);
                       if (data?.signedUrl) { setPreviewUrl(data.signedUrl); setPreviewFileName(c.name); }
                     };
                     return (
