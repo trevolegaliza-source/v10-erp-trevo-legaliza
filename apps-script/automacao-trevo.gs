@@ -1,6 +1,15 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.12.6 — 27/04/2026 tarde — FIX diagnosticarCard mostrava (nenhuma) errado
+//   • Função recebia cardId como shortLink (ex: 'D4Frwt6A') mas timers e
+//     pendências G2 são armazenados nas Properties com o cardId LONGO
+//     (ex: '69b7f8892ef253505c8eb4ff'). Busca por prefix não batia, sempre
+//     mostrava "(nenhuma)" mesmo com timer rodando.
+//   • Sintoma: usuário viu card com etiqueta DOCUMENTO PENDENTE (timer
+//     deveria estar rodando), mas diagnóstico dizia "(nenhuma)" em
+//     "Etiquetas com timer rodando". Confundia diagnóstico de produção.
+//   • Fix: usar card.id (sempre fullId Trello) em vez do argumento.
 // v7.12.5 — 27/04/2026 tarde — FIX regex Placker (colchete antes de "learn more")
 //   • A v7.12.4 ainda falhava porque "learn more" vem dentro de markdown link
 //     [learn more](URL) — tem um "[" ANTES da palavra. Regex esperava
@@ -2031,23 +2040,29 @@ function painel_exportarRelatorio(filtros) {
  * pendências G2 ativas, bucket totals, últimos comentários.
  */
 function diagnosticarCard(cardId) {
-  if (!cardId) return "⚠️ Cole um cardId (24 chars hex)";
+  if (!cardId) return "⚠️ Cole um cardId (24 chars hex) ou shortLink (8 chars)";
   const card = _danigetCardCompleto(cardId);
   if (!card) return "❌ Card não encontrado: " + cardId;
+
+  // CRÍTICO: properties são salvas com o ID LONGO do Trello (card.id),
+  // não com o shortLink que o usuário cola no painel. Sem isso a busca
+  // por bucket_inicio_<cardId>_ e g2_pendencia_<cardId>_ falhava quando
+  // o argumento era shortLink, mostrando "(nenhuma)" mesmo com timer ativo.
+  const fullId = card.id;
 
   const lista = _danigetNomeLista(card.idList);
   const etiquetas = (card.labels || []).map(l => (l.name || "").trim()).filter(Boolean);
   const corCapa = (card.cover && card.cover.color) || "(sem capa)";
   const tipoProcesso = _corCapaParaTipo(corCapa) || "(tipo não inferível)";
-  const prazos = getPrazosDani(cardId);
+  const prazos = getPrazosDani(fullId);
 
   const props = getProps();
   const todas = props.getProperties();
   const etiquetasEmCurso = [];
   const pendenciasG2 = [];
   Object.keys(todas).forEach(k => {
-    if (k.indexOf("bucket_inicio_" + cardId + "_") === 0) {
-      const et = k.replace("bucket_inicio_" + cardId + "_", "");
+    if (k.indexOf("bucket_inicio_" + fullId + "_") === 0) {
+      const et = k.replace("bucket_inicio_" + fullId + "_", "");
       try {
         const obj = JSON.parse(todas[k]);
         const horas = ((new Date() - new Date(obj.ts)) / 3600000).toFixed(1);
@@ -2056,8 +2071,8 @@ function diagnosticarCard(cardId) {
         etiquetasEmCurso.push("  • " + et + " (raw: " + todas[k] + ")");
       }
     }
-    if (k.indexOf("g2_pendencia_" + cardId + "_") === 0) {
-      const et = k.replace("g2_pendencia_" + cardId + "_", "");
+    if (k.indexOf("g2_pendencia_" + fullId + "_") === 0) {
+      const et = k.replace("g2_pendencia_" + fullId + "_", "");
       try {
         const obj = JSON.parse(todas[k]);
         pendenciasG2.push("  • " + et + " (desde " + obj.timestamp_inicio + ", follow-up enviado: " + obj.follow_up_enviado + ")");

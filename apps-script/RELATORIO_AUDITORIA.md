@@ -1,21 +1,29 @@
-# 🔍 Relatório de Auditoria — Dani v7.12.5
+# 🔍 Relatório de Auditoria — Dani v7.12.6
 
-**Data:** 27/04/2026 (atualizado tarde — patch regex 2)
-**Arquivo:** `apps-script/automacao-trevo.gs` (~5230 linhas)
+**Data:** 27/04/2026 (atualizado tarde)
+**Arquivo:** `apps-script/automacao-trevo.gs` (~5240 linhas)
 **Método:** 4 agentes Claude analisando zonas paralelas + validação manual + bugs reportados em produção
 
 ---
 
 ## 📊 Sumário executivo
 
-Total: **26 issues mapeadas** distribuídas em 4 zonas do código.
+Total: **27 issues mapeadas** distribuídas em 4 zonas do código.
 
-| Severidade | Total | Corrigido até v7.12.5 | Pendente decisão Thales |
+| Severidade | Total | Corrigido até v7.12.6 | Pendente decisão Thales |
 |---|---|---|---|
 | 🔴 CRÍTICO | 9 | 5 | 4 |
-| 🟠 IMPORTANTE | 10 | 1 | 9 |
+| 🟠 IMPORTANTE | 11 | 2 | 9 |
 | 🟡 ATENÇÃO | 14 | 0 | 14 |
 | 🟢 NICE-TO-HAVE | 5 | 0 | 5 |
+
+---
+
+## 🔧 Patch v7.12.6 (27/04/2026 tarde) — diagnosticarCard mostrava (nenhuma) errado
+
+**Problema:** `diagnosticarCard(cardId)` recebia argumento como **shortLink** (8 chars, ex: 'D4Frwt6A'), mas Properties são salvas com o **fullId** Trello (24 chars hex, ex: '69b7f8892ef253505c8eb4ff'). Busca por prefixo `bucket_inicio_<shortLink>_` e `g2_pendencia_<shortLink>_` nunca batia → sempre mostrava "(nenhuma)" mesmo com timer rodando.
+**Sintoma:** usuário viu card com etiqueta DOCUMENTO PENDENTE aplicada (timer deveria estar rodando) e diagnóstico dizia "(nenhuma)" em "Etiquetas com timer rodando" → diagnóstico mentindo, confundia produção.
+**Fix:** usa `card.id` (fullId Trello, retornado pela API) em todas as buscas internas.
 
 ---
 
