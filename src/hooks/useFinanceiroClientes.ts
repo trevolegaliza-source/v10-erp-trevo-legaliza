@@ -175,53 +175,18 @@ export function useAlterarValorLancamento() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ lancamentoId, novoValor, valorAtual }: { lancamentoId: string; novoValor: number; valorAtual: number }) => {
-      const timestamp = new Date().toISOString();
-      const { data: { user } } = await supabase.auth.getUser();
+      // audit fix #17 — antes: 2 UPDATEs sequenciais (processo + lancamento)
+      // com rollback manual no catch. Se app caísse entre eles, processo
+      // ficava com valor novo e lancamento com valor velho — divergência
+      // silente. Agora: RPC alterar_valor_lancamento faz tudo num único
+      // bloco PL/pgSQL atômico (Postgres garante all-or-nothing).
+      const { error } = await supabase.rpc('alterar_valor_lancamento' as any, {
+        p_lancamento_id: lancamentoId,
+        p_novo_valor: novoValor,
+        p_valor_atual: valorAtual,
+      });
 
-      const { data: lancamentoAtual, error: fetchError } = await supabase
-        .from('lancamentos')
-        .select('processo_id, valor_original')
-        .eq('id', lancamentoId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      if (lancamentoAtual?.processo_id) {
-        const { error: processoError } = await supabase
-          .from('processos')
-          .update({
-            valor: novoValor,
-            updated_at: timestamp,
-          } as any)
-          .eq('id', lancamentoAtual.processo_id);
-
-        if (processoError) throw processoError;
-      }
-
-      const { error } = await supabase
-        .from('lancamentos')
-        .update({
-          valor: novoValor,
-          valor_original: lancamentoAtual?.valor_original ?? valorAtual,
-          valor_alterado_por: user?.id ?? null,
-          valor_alterado_em: timestamp,
-          updated_at: timestamp,
-        } as any)
-        .eq('id', lancamentoId);
-
-      if (error) {
-        if (lancamentoAtual?.processo_id) {
-          await supabase
-            .from('processos')
-            .update({
-              valor: valorAtual,
-              updated_at: timestamp,
-            } as any)
-            .eq('id', lancamentoAtual.processo_id);
-        }
-
-        throw error;
-      }
+      if (error) throw error;
     },
     onSuccess: () => {
       invalidateFinanceiro(qc);

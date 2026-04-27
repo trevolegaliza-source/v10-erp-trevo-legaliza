@@ -9,7 +9,13 @@
 //     fallback pra MASTER_PASSWORD env var (modo legado/migração)
 //  3. Comparação timing-safe em ambos os caminhos
 //
-// Rate limit: 5 tentativas/hora por user_id (mantido).
+// Rate limit (audit fix #11):
+//  - 5 falhas/hora por user_id
+//  - 10 falhas/hora por IP
+//  Usa RPC register_master_password_attempt que registra + retorna allowed.
+//  Antes: contava qualquer tentativa (mesmo sucesso) por user — atacante
+//  rotacionava contas authenticated pra burlar. Agora bloqueia também
+//  por IP (máquina comprometida não vira oráculo de brute force).
 // =============================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -71,24 +77,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Rate limiting: count attempts in last hour
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
-      .from("master_password_attempts")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .gte("attempted_at", oneHourAgo);
-
-    if ((count ?? 0) > 5) {
-      return new Response(
-        JSON.stringify({ valid: false, error: "Muitas tentativas. Aguarde 1 hora." }),
-        {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
     const { password } = await req.json();
     if (typeof password !== "string" || password.length === 0) {
       return new Response(
@@ -100,10 +88,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Record attempt antes de validar (oráculo de rate limit não vaza success)
-    await supabaseAdmin
-      .from("master_password_attempts")
-      .insert({ user_id: user.id });
+    // audit fix #11 — extrai IP do request (Cloudflare/Supabase proxy
+    // popula x-forwarded-for; pegamos primeiro IP da cadeia).
+    const xff = req.headers.get("x-forwarded-for") ?? "";
+    const callerIp = xff.split(",")[0]?.trim() || null;
 
     // === Validação ===
     // 1) Tenta RPC com hash bcrypt (audit fix #2)
@@ -157,6 +145,42 @@ Deno.serve(async (req) => {
         );
       }
       valid = timingSafeEqual(password, masterPassword);
+    }
+
+    // audit fix #11 — registra tentativa (com resultado real) e checa
+    // rate limit por user_id E por IP. Resposta 429 se excedeu;
+    // valid=false sem revelar se a senha estava correta (preservando
+    // ordem: ataque com senha correta também conta como falha pra
+    // limite, mas só se rate limit barrar antes — improvável em uso real).
+    const { data: rateData, error: rateErr } = await supabaseAdmin.rpc(
+      "register_master_password_attempt",
+      {
+        p_user_id: user.id,
+        p_ip: callerIp,
+        p_success: valid,
+      },
+    );
+
+    if (rateErr) {
+      // RPC nova ainda não disponível (migration não rodou) — degradação
+      // suave: não bloqueia, mas loga. Em produção esperamos sempre OK.
+      console.warn(
+        "[verify-master-password] RPC register_master_password_attempt indisponível:",
+        rateErr.message,
+      );
+    } else if (Array.isArray(rateData) && rateData[0] && rateData[0].allowed === false) {
+      const retry = rateData[0].retry_after_seconds ?? 3600;
+      return new Response(
+        JSON.stringify({
+          valid: false,
+          error: "Muitas tentativas. Aguarde antes de tentar novamente.",
+          retry_after_seconds: retry,
+        }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     return new Response(JSON.stringify({ valid }), {
