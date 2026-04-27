@@ -7,12 +7,13 @@
 // =============================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { buildCorsHeaders, handlePreflight } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// audit fix #24 — fetch externo (API Asaas) sem timeout pode travar
+// edge function pelo wall time inteiro (400s). Definimos AbortController
+// agressivo (15s) — Asaas normalmente responde <1s; se passou disso é
+// problema de rede e devemos falhar rápido.
+const ASAAS_FETCH_TIMEOUT_MS = 15_000;
 
 const ASAAS_API_KEY = Deno.env.get("ASAAS_API_KEY") ?? "";
 const ASAAS_BASE_URL = Deno.env.get("ASAAS_BASE_URL") ?? "https://api.asaas.com/v3";
@@ -34,9 +35,15 @@ async function asaasFetch(path: string, init: RequestInit = {}): Promise<AsaasRe
   const baseUrl = ASAAS_BASE_URL.replace(/\/+$/, ""); // remove trailing slash
   const fullUrl = `${baseUrl}${path}`;
   let res: Response;
+  // audit fix #24 — timeout via AbortController; cancela fetch se Asaas
+  // demorar > ASAAS_FETCH_TIMEOUT_MS. Sem isso, edge function poderia
+  // ficar travada até o wall time global (400s).
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), ASAAS_FETCH_TIMEOUT_MS);
   try {
     res = await fetch(fullUrl, {
       ...init,
+      signal: ctrl.signal,
       headers: {
         "access_token": ASAAS_API_KEY,
         "Content-Type": "application/json",
@@ -45,8 +52,19 @@ async function asaasFetch(path: string, init: RequestInit = {}): Promise<AsaasRe
       },
     });
   } catch (e) {
-    console.error("[asaasFetch] network error", { url: fullUrl, error: String(e) });
-    throw new Error(`Falha de rede ao chamar Asaas (${fullUrl}): ${String(e)}`);
+    const aborted = (e as any)?.name === "AbortError";
+    console.error("[asaasFetch] network error", {
+      url: fullUrl,
+      error: String(e),
+      timeout: aborted,
+    });
+    throw new Error(
+      aborted
+        ? `Asaas timeout após ${ASAAS_FETCH_TIMEOUT_MS}ms (${fullUrl})`
+        : `Falha de rede ao chamar Asaas (${fullUrl}): ${String(e)}`,
+    );
+  } finally {
+    clearTimeout(timeoutId);
   }
   const text = await res.text();
   let data: any = {};
@@ -159,9 +177,11 @@ async function fetchIdentificationField(paymentId: string) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  // audit fix #21 — CORS allowlist (substitui "*")
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
+  const corsHeaders = buildCorsHeaders(req.headers.get("Origin"));
+
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,

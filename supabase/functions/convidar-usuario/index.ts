@@ -1,10 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { buildCorsHeaders, handlePreflight } from "../_shared/cors.ts";
 
 // RFC 5322-lite — basta pra rejeitar lixo óbvio sem ser draconiano
 // (audit fix #23 — antes, qualquer string passava)
@@ -14,9 +9,10 @@ function isValidEmail(s: unknown): s is string {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // audit fix #21 — CORS allowlist
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
+  const corsHeaders = buildCorsHeaders(req.headers.get("Origin"));
 
   try {
     const authHeader = req.headers.get("Authorization");
