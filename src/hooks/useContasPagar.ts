@@ -162,24 +162,27 @@ export function useMarcarPago() {
         const vtVrIds = filtrados.map((item: any) => item.id);
 
         if (vtVrIds.length > 0) {
+          // audit fix #18 — defesa em profundidade: .neq evita sobrescrever
+          // pagamento já confirmado entre SELECT e UPDATE (race window).
           const { error } = await supabase.from('lancamentos').update({
             status: 'pago' as any,
             data_pagamento,
             comprovante_url: comprovante_url || null,
             updated_at: new Date().toISOString(),
-          }).in('id', vtVrIds);
+          }).in('id', vtVrIds).neq('status', 'pago');
           if (error) throw error;
         }
         // Retorna info pra UI mostrar quantos foram marcados
         return { count: vtVrIds.length, isVtVrCascade: vtVrIds.length > 1, items: filtrados };
       }
 
+      // audit fix #18 — guard race: nunca sobrescreve pagamento já feito.
       const { error } = await supabase.from('lancamentos').update({
         status: 'pago' as any,
         data_pagamento,
         comprovante_url: comprovante_url || null,
         updated_at: new Date().toISOString(),
-      }).eq('id', id);
+      }).eq('id', id).neq('status', 'pago');
       if (error) throw error;
       return { count: 1, isVtVrCascade: false, items: [] };
     },

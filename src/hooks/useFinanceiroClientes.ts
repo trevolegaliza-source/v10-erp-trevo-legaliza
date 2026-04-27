@@ -459,6 +459,9 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
 
   const marcarPago = useMutation({
     mutationFn: async ({ lancamentoIds, dataPagamento }: { lancamentoIds: string[]; dataPagamento?: string }) => {
+      // audit fix #19 — guarda .neq('status','pago') evita double-pay em
+      // janela de corrida entre SELECT (UI) e UPDATE (mutation). Se outro
+      // operador já marcou pago, esta UPDATE simplesmente não afeta linhas.
       const { error } = await supabase
         .from('lancamentos')
         .update({
@@ -467,7 +470,8 @@ export function useFinanceiroClientes(dataInicio?: string, dataFim?: string) {
           data_pagamento: dataPagamento || new Date().toISOString().split('T')[0],
           confirmado_recebimento: true,
         })
-        .in('id', lancamentoIds);
+        .in('id', lancamentoIds)
+        .neq('status', 'pago');
       if (error) throw error;
     },
     onSuccess: () => {

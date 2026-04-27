@@ -35,6 +35,11 @@ export function usePermissions(): UsePermissionsReturn {
   useEffect(() => {
     if (!user) { setLoading(false); return; }
 
+    // audit fix #8 — flag de cancelamento + refetch via Realtime.
+    // Antes: load 1x no mount, sem refetch. Admin aprovava usuário e
+    // ele continuava vendo "Aguardando Aprovação" até F5.
+    let cancelled = false;
+
     const load = async () => {
       const { data: profile } = await supabase
         .from('profiles')
@@ -42,8 +47,12 @@ export function usePermissions(): UsePermissionsReturn {
         .eq('id', user.id)
         .single() as any;
 
+      if (cancelled) return;
+
       if (profile && profile.ativo === false) {
         setRole('inativo');
+        setPerms({});
+        setTemplateModulos([]);
         setLoading(false);
         return;
       }
@@ -52,6 +61,8 @@ export function usePermissions(): UsePermissionsReturn {
         setRole(profile.role);
 
         if (profile.role === 'master') {
+          setPerms({});
+          setTemplateModulos([]);
           setLoading(false);
           return;
         }
@@ -62,9 +73,12 @@ export function usePermissions(): UsePermissionsReturn {
           .select('modulos_padrao')
           .eq('role', profile.role)
           .single() as any;
+        if (cancelled) return;
 
         if (template?.modulos_padrao) {
           setTemplateModulos(template.modulos_padrao);
+        } else {
+          setTemplateModulos([]);
         }
 
         // Fetch user-specific permissions (override)
@@ -72,6 +86,7 @@ export function usePermissions(): UsePermissionsReturn {
           .from('user_permissions')
           .select('modulo, pode_ver, pode_criar, pode_editar, pode_excluir, pode_aprovar')
           .eq('user_id', user.id) as any;
+        if (cancelled) return;
 
         if (permissions && permissions.length > 0) {
           const map: PermissionsMap = {};
@@ -85,13 +100,40 @@ export function usePermissions(): UsePermissionsReturn {
             };
           }
           setPerms(map);
+        } else {
+          setPerms({});
         }
-        // If no user_permissions exist, templateModulos will be used as fallback
       }
       setLoading(false);
     };
 
     load();
+
+    // Realtime: reage a mudanças no profile do user (role/ativo) e em
+    // user_permissions (admin alterou permissão pontual). Refetch instantâneo.
+    const profileChannel = supabase
+      .channel(`perm-profile-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+        () => { if (!cancelled) load(); },
+      )
+      .subscribe();
+
+    const permsChannel = supabase
+      .channel(`perm-userperms-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_permissions', filter: `user_id=eq.${user.id}` },
+        () => { if (!cancelled) load(); },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(profileChannel);
+      supabase.removeChannel(permsChannel);
+    };
   }, [user]);
 
   const isMaster = () => role === 'master';

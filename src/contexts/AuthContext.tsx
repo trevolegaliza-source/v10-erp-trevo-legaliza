@@ -49,6 +49,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [session, signOut]);
 
   useEffect(() => {
+    // audit fix #14, #20 — delega criação de profile ao trigger handle_new_user
+    // do banco. Antes: este client fazia LIMIT 1 master + insert manual com
+    // `as any`, duplicando bug multi-tenant do trigger e mascarando RLS.
+    // Agora: o trigger DB já cria profile com empresa_id correto. Aqui só
+    // tocamos ultimo_acesso e disparamos notificação se for primeiro login.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
 
@@ -57,43 +62,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             const { data: profile } = await supabase
               .from('profiles')
-              .select('id')
+              .select('id, empresa_id, ativo')
               .eq('id', session.user.id)
               .maybeSingle();
 
             if (!profile) {
-              const { data: masterProfile } = await supabase
-                .from('profiles')
-                .select('empresa_id')
-                .eq('role', 'master')
-                .limit(1)
-                .single();
-
-              const empresaId = masterProfile?.empresa_id || '';
-
-              await supabase.from('profiles').insert({
-                id: session.user.id,
-                email: session.user.email,
-                nome: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Novo Usuário',
-                role: 'usuario',
-                ativo: false,
-                empresa_id: empresaId,
-              } as any);
-
-              await supabase.from('notificacoes').insert({
-                tipo: 'aprovacao',
-                titulo: '👤 NOVO USUÁRIO AGUARDANDO APROVAÇÃO',
-                mensagem: `${session.user.email} solicitou acesso ao sistema. Vá em Configurações → Usuários para aprovar.`,
-                empresa_id: empresaId || null,
-              } as any);
+              // Trigger DB normalmente cria profile no signup. Se chegou aqui
+              // sem profile, é caso raro (signup pré-trigger ou falha).
+              // Apenas loga — não tenta criar manualmente (RLS/multi-tenant).
+              console.warn(
+                '[Auth] Sessão sem profile correspondente. Verifique trigger handle_new_user.',
+              );
             } else if (event === 'SIGNED_IN') {
               await supabase
                 .from('profiles')
                 .update({ ultimo_acesso: new Date().toISOString() } as any)
                 .eq('id', session.user.id);
+
+              // Se profile foi criado mas ainda inativo, notifica admins
+              // (idempotente: notif só conta como nova se ainda não tiver)
+              if (profile.ativo === false) {
+                const { data: existingNotif } = await supabase
+                  .from('notificacoes')
+                  .select('id')
+                  .eq('tipo', 'aprovacao')
+                  .ilike('mensagem', `%${session.user.email}%`)
+                  .limit(1)
+                  .maybeSingle();
+
+                if (!existingNotif) {
+                  await supabase.from('notificacoes').insert({
+                    tipo: 'aprovacao',
+                    titulo: '👤 NOVO USUÁRIO AGUARDANDO APROVAÇÃO',
+                    mensagem: `${session.user.email} solicitou acesso. Vá em Configurações → Usuários para aprovar.`,
+                    empresa_id: profile.empresa_id,
+                  } as any);
+                }
+              }
             }
           } catch (err) {
-            console.error('Error checking/creating profile:', err);
+            // Sem console.error — erro aqui não bloqueia auth flow
+            console.warn('[Auth] non-fatal profile sync error:', err);
           }
         }, 0);
       }

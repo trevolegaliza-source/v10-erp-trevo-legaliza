@@ -21,12 +21,19 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // audit fix #7 — race condition removida via flag de cancelamento.
+    // Antes: setInterval(check, 10000) deixava callback em voo após unmount,
+    // permitindo render brevíssimo do child com auth stale.
+    let cancelled = false;
+
     const check = async () => {
       const { data: profile } = await supabase
         .from('profiles')
         .select('ativo, role')
         .eq('id', session.user.id)
         .maybeSingle();
+
+      if (cancelled) return;
 
       if (!profile) {
         setProfileStatus('sem_profile');
@@ -39,20 +46,20 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
       // Check MFA status
       const { data: factors } = await supabase.auth.mfa.listFactors();
+      if (cancelled) return;
+
       const totpFactors = factors?.totp || [];
       const verifiedFactors = totpFactors.filter((f: any) => f.status === 'verified');
-      const unverifiedFactors = totpFactors.filter((f: any) => f.status === 'unverified');
 
       if (verifiedFactors.length > 0) {
-        // Has verified TOTP — check AAL level
         const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (cancelled) return;
         if (aal?.currentLevel === 'aal2') {
           setMfaStatus('verified');
         } else {
           setMfaStatus('needs_verify');
         }
       } else if (profile?.role === 'master' && profile?.ativo !== false) {
-        // Master without MFA — force enrollment
         setMfaStatus('needs_enroll');
       } else {
         setMfaStatus('none');
@@ -61,8 +68,29 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
     check();
 
-    const interval = setInterval(check, 10000);
-    return () => clearInterval(interval);
+    // audit fix #8 — refetch via Realtime quando perfil muda no banco (admin
+    // aprovou usuário, mudou role, etc). Antes: precisava F5 manual ou aguardar
+    // setInterval(10s). Agora: instantâneo.
+    const channel = supabase
+      .channel(`profile-watch-${session.user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${session.user.id}`,
+        },
+        () => {
+          if (!cancelled) check();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [session?.user?.id]);
 
   if (loading) {
