@@ -1,7 +1,7 @@
-# 🔍 Relatório de Auditoria — Dani v7.12.4
+# 🔍 Relatório de Auditoria — Dani v7.12.5
 
-**Data:** 27/04/2026 (atualizado tarde — patch regex)
-**Arquivo:** `apps-script/automacao-trevo.gs` (~5220 linhas)
+**Data:** 27/04/2026 (atualizado tarde — patch regex 2)
+**Arquivo:** `apps-script/automacao-trevo.gs` (~5230 linhas)
 **Método:** 4 agentes Claude analisando zonas paralelas + validação manual + bugs reportados em produção
 
 ---
@@ -10,12 +10,21 @@
 
 Total: **26 issues mapeadas** distribuídas em 4 zonas do código.
 
-| Severidade | Total | Corrigido até v7.12.4 | Pendente decisão Thales |
+| Severidade | Total | Corrigido até v7.12.5 | Pendente decisão Thales |
 |---|---|---|---|
 | 🔴 CRÍTICO | 9 | 5 | 4 |
 | 🟠 IMPORTANTE | 10 | 1 | 9 |
 | 🟡 ATENÇÃO | 14 | 0 | 14 |
 | 🟢 NICE-TO-HAVE | 5 | 0 | 5 |
+
+---
+
+## 🔧 Patch v7.12.5 (27/04/2026 tarde) — fix regex Placker (colchete)
+
+**Problema:** v7.12.4 ainda falhava. "learn more" vem dentro de markdown link `[learn more](URL)` — tem um `[` ANTES da palavra. Regex esperava `\s+learn more` direto, mas o texto real é `\s+[learn more]`. Match falhava em silêncio.
+**Sintoma:** dois deploys consecutivos (v7.12.3 e v7.12.4), Letícia comentou na CENTRAL três vezes, em nenhuma o `[PLACKER]` apareceu no log.
+**Diagnóstico:** testado localmente com node — regex `\s+learn more` não bate `\s+\[learn more`. Bug real, não problema de deploy.
+**Fix:** aceita `\[?` opcional antes de `learn more`.
 
 ---
 

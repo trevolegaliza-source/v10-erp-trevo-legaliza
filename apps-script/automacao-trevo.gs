@@ -1,6 +1,14 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.12.5 — 27/04/2026 tarde — FIX regex Placker (colchete antes de "learn more")
+//   • A v7.12.4 ainda falhava porque "learn more" vem dentro de markdown link
+//     [learn more](URL) — tem um "[" ANTES da palavra. Regex esperava
+//     "\s+learn more" (whitespace + palavra direto), mas o texto real é
+//     "\s+[learn more]". Match falhava silenciosamente.
+//   • Confirmado em teste real: dois deploys (v7.12.3 e v7.12.4), Letícia
+//     comentou na CENTRAL, regex nunca disparou. Testado localmente com node.
+//   • Fix: aceita "\[?" opcional antes de "learn more".
 // v7.12.4 — 27/04/2026 tarde — FIX regex Placker (markdown link em "learn more")
 //   • Texto espelhado pelo Placker chega como "...board. [learn more](URL)\n\n
 //     texto real". A regex v7.12.3 esperava "learn more" seguido direto de \n,
@@ -2535,7 +2543,7 @@ function _parsePlackerMirror(texto) {
   // "learn more" aparece dentro de markdown link [learn more](URL); a regex
   // tolera qualquer coisa não-newline depois ("[learn more](https://...)").
   const m = limpo.match(
-    /^([^\n]+?)\s+commented from the\s+.*?CENTRAL DE PROCESSO.*?\s+board\.\s+learn more[^\n]*\n+([\s\S]+)$/i
+    /^([^\n]+?)\s+commented from the\s+.*?CENTRAL DE PROCESSO.*?\s+board\.\s+\[?learn more[^\n]*\n+([\s\S]+)$/i
   );
   if (!m) return null;
   return {
