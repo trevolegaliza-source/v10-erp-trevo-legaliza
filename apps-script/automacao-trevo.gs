@@ -1,6 +1,20 @@
 // =============================================
 // AUTOMAÇÃO TREVO LEGALIZA 🍀
 // Google Forms → Drive → Trello + Secretária Dani
+// v7.12.3 — 27/04/2026 — FIX comentário espelhado pelo Placker (CRÍTICO)
+//   • Funcionários comentam 99% das vezes na CENTRAL DE PROCESSO. Placker
+//     espelha pro board do cliente como autor "Trevo Legaliza" + texto
+//     começando com "NOME commented from the 🍀 CENTRAL DE PROCESSO board.
+//     learn more". Sem este fix, todo comentário interno virava G4 (Dani
+//     achava que o bot Placker era "cliente respondendo") → cobrava
+//     pendência em vez de processar pedido. Bug afetava produção real.
+//   • Adicionada _parsePlackerMirror(texto) — extrai autor real + texto
+//     limpo do espelhamento.
+//   • handlerComentario agora detecta Placker antes de classificar autor;
+//     re-roteia pro G2 com nome e texto reais.
+//   • Se autor real não estiver na EQUIPE, loga PLACKER_WARN mas processa
+//     mesmo assim (regra: CENTRAL = só funcionário; ausente = cadastro
+//     pendente, não cliente).
 // v7.12.2 — 27/04/2026 — FIX classificação de funcionário com acento no nome
 //   • FIX CRÍTICO: ehEquipeInterna não normalizava acentos. Funcionário
 //     "Letícia Tonelli" cadastrado na aba EQUIPE não batia quando Trello
@@ -2491,6 +2505,35 @@ function _classificarComentarioFuncionario(textoComentario, contexto) {
  * Handler do webhook commentCard. G2 (funcionário) implementado.
  * Cliente (G4) fica como stub — Onda 1.B implementa.
  */
+/**
+ * Detecta comentário espelhado pelo Placker da CENTRAL DE PROCESSO.
+ *
+ * Funcionários comentam na CENTRAL (única que eles têm acesso). Placker
+ * espelha pro board do cliente com autor "Trevo Legaliza" e texto:
+ *
+ *   NOME_FUNCIONARIO commented from the 🍀 CENTRAL DE PROCESSO board. learn more
+ *
+ *   <texto real do comentário em uma ou mais linhas>
+ *
+ * Variações observadas no markdown salvo: linha pode iniciar com ">" ou
+ * o nome pode estar em "**negrito**". Regex tolera ambos.
+ *
+ * Retorna { autorReal, textoReal } ou null se não for espelhamento.
+ */
+function _parsePlackerMirror(texto) {
+  const limpo = String(texto || "")
+    .replace(/^[>\s]+/, "")          // remove blockquote/whitespace inicial
+    .replace(/\*\*([^*]+)\*\*/g, "$1"); // strip negrito markdown
+  const m = limpo.match(
+    /^([^\n]+?)\s+commented from the\s+.*?CENTRAL DE PROCESSO.*?\s+board\.\s+learn more\s*\n+([\s\S]+)$/i
+  );
+  if (!m) return null;
+  return {
+    autorReal: m[1].trim(),
+    textoReal: m[2].trim(),
+  };
+}
+
 function handlerComentario(action, cli) {
   const texto = (action.data && action.data.text) || "";
   const autor = (action.memberCreator && action.memberCreator.fullName) || "?";
@@ -2519,6 +2562,25 @@ function handlerComentario(action, cli) {
   if (!cardId) {
     _daniLog("ERRO", "card_id ausente");
     return _respJson({ ok: false, error: "card_id ausente" });
+  }
+
+  // ── Espelhamento Placker (CENTRAL → board cliente) ───────────────────
+  // Quando detectado, autor real está embutido no texto; força G2 com
+  // autor e texto extraídos. Se autor real não estiver na EQUIPE, ainda
+  // processa como funcionário (regra: CENTRAL é restrita a funcionários).
+  const placker = _parsePlackerMirror(texto);
+  if (placker) {
+    _daniLog("PLACKER", "espelhamento detectado", {
+      autorReal: placker.autorReal,
+      autorWebhook: autor,
+      preview: placker.textoReal.substring(0, 120),
+    });
+    if (!ehEquipeInterna(placker.autorReal)) {
+      _daniLog("PLACKER_WARN", "autor real fora da EQUIPE — cadastrar na aba", {
+        autorReal: placker.autorReal,
+      });
+    }
+    return _danihandlerG2(action, cli, placker.textoReal, placker.autorReal, cardId);
   }
 
   // ── G2: funcionário comenta ──────────────────────────────────────────

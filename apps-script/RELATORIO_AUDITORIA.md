@@ -1,25 +1,38 @@
-# 🔍 Relatório de Auditoria — Dani v7.12.2
+# 🔍 Relatório de Auditoria — Dani v7.12.3
 
-**Data:** 27/04/2026 (atualizado)
-**Arquivo:** `apps-script/automacao-trevo.gs` (~5190 linhas)
-**Método:** 4 agentes Claude analisando zonas paralelas + validação manual + bug reportado em produção
+**Data:** 27/04/2026 (atualizado tarde)
+**Arquivo:** `apps-script/automacao-trevo.gs` (~5210 linhas)
+**Método:** 4 agentes Claude analisando zonas paralelas + validação manual + bugs reportados em produção
 
 ---
 
 ## 📊 Sumário executivo
 
-Total: **25 issues mapeadas** distribuídas em 4 zonas do código.
+Total: **26 issues mapeadas** distribuídas em 4 zonas do código.
 
-| Severidade | Total | Corrigido até v7.12.2 | Pendente decisão Thales |
+| Severidade | Total | Corrigido até v7.12.3 | Pendente decisão Thales |
 |---|---|---|---|
-| 🔴 CRÍTICO | 8 | 4 | 4 |
+| 🔴 CRÍTICO | 9 | 5 | 4 |
 | 🟠 IMPORTANTE | 10 | 1 | 9 |
 | 🟡 ATENÇÃO | 14 | 0 | 14 |
 | 🟢 NICE-TO-HAVE | 5 | 0 | 5 |
 
 ---
 
-## ✅ Corrigido na v7.12.2 (27/04/2026)
+## ✅ Corrigido na v7.12.3 (27/04/2026 tarde)
+
+### 🔴 [Linha 2484] handlerComentario não tratava espelhamento Placker — Dani nunca atuava em produção real
+**Antes:** Funcionários comentam 99% das vezes na CENTRAL DE PROCESSO (única que têm acesso). Placker espelha bidirecionalmente, gerando webhook no board do cliente com:
+- Autor: `Trevo Legaliza` (bot Placker)
+- Texto: `NOME_FUNCIONARIO commented from the 🍀 CENTRAL DE PROCESSO board. learn more\n\nTEXTO_REAL`
+
+A Dani via "Trevo Legaliza" como autor → não batia com EQUIPE → classificava como **cliente** → caía em G4 (avalia cumprimento de pendência) → cobrava de volta o pedido anterior em vez de processar o novo.
+**Sintoma reportado:** Comentários do Arthur ("CASO NÃO TENHAM O USO DE SOLO..."), Amanda ("Transmitir viabilidade"), Letícia, Abner — todos tratados como cliente. Dani agia errado em todos os comentários espelhados desde o início (regra clientes nunca acessam CENTRAL → todo `commented from CENTRAL` é por definição funcionário).
+**Depois:** Adicionada `_parsePlackerMirror(texto)` (regex tolera markdown `>` e `**`). `handlerComentario` agora detecta espelhamento antes de classificar autor, extrai nome real e texto limpo, força roteamento G2. Se autor real não estiver na EQUIPE, loga `[PLACKER_WARN]` mas processa mesmo assim (regra de negócio: CENTRAL = funcionário; ausente = cadastro pendente).
+
+---
+
+## ✅ Corrigido na v7.12.2 (27/04/2026 manhã)
 
 ### 🔴 [Linha 5005] ehEquipeInterna não normalizava acentos — funcionário virava cliente
 **Antes:** Comparação por `.includes` em lowercase, sem remover acentos. Trello envia autor como "LETICIA TONELLI" (sem ç) mas a aba EQUIPE tem "Letícia Tonelli" (com ç). `.includes` falhava → Letícia era classificada como **cliente** → caía no fluxo G4 (avalia cumprimento de pendência) em vez do G2 (processa pedido interno) → comentários internos eram tratados como resposta de cliente.
