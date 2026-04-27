@@ -282,7 +282,7 @@
 <body>
 
 <h1>🤖 Painel Dani v1.0</h1>
-<div class="subtitle">Trevo Legaliza · IA de processos · v7.10.1</div>
+<div class="subtitle">Trevo Legaliza · IA de processos · v7.12.1</div>
 
 <!-- ─── STATUS ─── -->
 <h2>📊 Status atual</h2>
@@ -432,14 +432,28 @@
 
 <div class="form-card">
   <div class="form-row">
-    <label>Card específico — prazos</label>
-    <input type="text" id="cardId-input" placeholder="ID do card Trello (24 chars hex)">
+    <label>Card específico (cole o ID)</label>
+    <input type="text" id="cardId-input" placeholder="ID do card Trello (24 chars hex) — copie da URL do card">
   </div>
-  <button class="action-btn" onclick="rodarComArg('mostrarPrazosCard')">
-    <span class="btn-icon">🔍</span>
+  <button class="action-btn primary" onclick="rodarComArg('diagnosticarCard')">
+    <span class="btn-icon">🔬</span>
     <div class="btn-content">
-      <div class="btn-title">Ver prazos de um card</div>
-      <div class="btn-desc">Use pra investigar tempo decorrido em qualquer card.</div>
+      <div class="btn-title">Diagnóstico completo do card</div>
+      <div class="btn-desc">Mostra tipo (cor capa), lista atual, etiquetas, timers rodando, pendências G2, buckets e últimos comentários. <strong>Use sempre que Dani parecer ter agido estranho num card.</strong></div>
+    </div>
+  </button>
+  <button class="action-btn" onclick="rodarComArg('mostrarPrazosCard')">
+    <span class="btn-icon">⏱️</span>
+    <div class="btn-content">
+      <div class="btn-title">Só prazos do card</div>
+      <div class="btn-desc">Versão enxuta — só matriz lista×bucket sem comentários ou pendências.</div>
+    </div>
+  </button>
+  <button class="action-btn" onclick="rodarComArg('reconstruirBucketsCard')">
+    <span class="btn-icon">🔁</span>
+    <div class="btn-content">
+      <div class="btn-title">Reconstruir buckets do card</div>
+      <div class="btn-desc">Apaga e recalcula os tempos via histórico Trello (use se prazo ficar zoado).</div>
     </div>
   </button>
 </div>
