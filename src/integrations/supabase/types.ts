@@ -1450,16 +1450,22 @@ export type Database = {
         Row: {
           attempted_at: string | null
           id: string
+          ip: string | null
+          success: boolean
           user_id: string
         }
         Insert: {
           attempted_at?: string | null
           id?: string
+          ip?: string | null
+          success?: boolean
           user_id: string
         }
         Update: {
           attempted_at?: string | null
           id?: string
+          ip?: string | null
+          success?: boolean
           user_id?: string
         }
         Relationships: []
@@ -2395,6 +2401,14 @@ export type Database = {
         Args: { p_tipo: string; p_token: string }
         Returns: undefined
       }
+      alterar_valor_lancamento: {
+        Args: {
+          p_lancamento_id: string
+          p_novo_valor: number
+          p_valor_atual: number
+        }
+        Returns: Json
+      }
       asaas_tentar_lock_cobranca: {
         Args: { p_cobranca_id: string }
         Returns: Json
@@ -2547,6 +2561,14 @@ export type Database = {
       promover_lancamento_ao_deferir: {
         Args: { p_processo_id: string }
         Returns: Json
+      }
+      register_master_password_attempt: {
+        Args: { p_ip: string; p_success: boolean; p_user_id: string }
+        Returns: {
+          allowed: boolean
+          recent_failures: number
+          retry_after_seconds: number
+        }[]
       }
       resolve_empresa_config: { Args: { p_empresa_id: string }; Returns: Json }
       reverter_boas_vindas: {
