@@ -17,10 +17,10 @@ export interface ContratoData {
 }
 
 const LOGO_URLS = [
-  'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png',
-  'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza-hd.png',
-  'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza.png',
-  'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png',
+  'https://aahhauquuicvtwtrxyan.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png',
+  'https://aahhauquuicvtwtrxyan.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza-hd.png',
+  'https://aahhauquuicvtwtrxyan.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza.png',
+  'https://aahhauquuicvtwtrxyan.supabase.co/storage/v1/object/public/documentos/logo%2Ftrevo-legaliza.png',
 ];
 
 async function preloadImageAsBase64(url: string): Promise<string | null> {
