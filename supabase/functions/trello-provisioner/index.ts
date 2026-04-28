@@ -11,7 +11,7 @@ const TRELLO_TOKEN = Deno.env.get("TRELLO_TOKEN") ?? "";
 const TRELLO_SECRET = Deno.env.get("TRELLO_SECRET") ?? "";
 const TRELLO_GUARD_URL =
   Deno.env.get("TRELLO_GUARD_URL") ??
-  "https://gwyinucaeaayuckvevma.supabase.co/functions/v1/trello-guard";
+  "https://aahhauquuicvtwtrxyan.supabase.co/functions/v1/trello-guard";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;

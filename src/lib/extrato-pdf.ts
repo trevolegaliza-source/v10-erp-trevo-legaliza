@@ -14,7 +14,7 @@ const BRAND = {
   telefone: '(11) 93492-7001',
 };
 
-const LOGO_URL = 'https://gwyinucaeaayuckvevma.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png';
+const LOGO_URL = 'https://aahhauquuicvtwtrxyan.supabase.co/storage/v1/object/public/documentos/logo/trevo-legaliza-hd.png';
 const PDF_SCOPE_CLASS = 'extrato-pdf-scope';
 const PDF_SCOPE_SELECTOR = `.${PDF_SCOPE_CLASS}`;
 
