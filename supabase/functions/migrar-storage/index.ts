@@ -26,6 +26,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const SKIP_BUCKETS = new Set<string>(["_migracao_backup_27042026"]);
 const PAGE_SIZE = 100;
+// Margem de segurança vs limite de 150s da edge function.
+// Quando ultrapassar, devolvemos JSON parcial (parcial=true) e o cliente
+// re-invoca — idempotente porque todo upload usa x-upsert: true.
+const SOFT_DEADLINE_MS = 140_000;
 
 interface Falha {
   bucket: string;
@@ -113,30 +117,11 @@ async function ensureBucketExists(
   }
 }
 
-// HEAD no destino: se existe e tamanho bate, retorna true (skip).
-async function existsWithSameSize(
-  targetUrl: string,
-  targetKey: string,
-  bucket: string,
-  path: string,
-  expectedSize: number,
-): Promise<boolean> {
-  const url =
-    `${targetUrl}/storage/v1/object/authenticated/${encodeURIComponent(bucket)}/${path
-      .split("/")
-      .map(encodeURIComponent)
-      .join("/")}`;
-  const r = await fetch(url, {
-    method: "HEAD",
-    headers: {
-      Authorization: `Bearer ${targetKey}`,
-      apikey: targetKey,
-    },
-  });
-  if (!r.ok) return false;
-  const len = Number(r.headers.get("content-length") ?? "-1");
-  return len === expectedSize && expectedSize > 0;
-}
+// NOTA: removemos o HEAD-pre-check no destino. Estávamos pegando falso-positivo:
+// registros existiam em storage.objects (vieram via dump SQL) mas o binário
+// nunca tinha sido transferido. Agora sempre baixamos e re-enviamos com
+// x-upsert: true — o destino sobrescreve registro+binário e a operação é
+// idempotente, então re-rodar a função é seguro.
 
 async function uploadStreaming(
   targetUrl: string,
@@ -171,7 +156,14 @@ async function uploadStreaming(
 async function migrar(
   targetUrl: string,
   targetKey: string,
-): Promise<{ totalArquivos: number; migrados: number; pulados: number; falhas: Falha[] }> {
+  startedAt: number,
+): Promise<{
+  totalArquivos: number;
+  migrados: number;
+  pulados: number;
+  falhas: Falha[];
+  parcial: boolean;
+}> {
   const local = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   const { data: buckets, error: bErr } = await local.storage.listBuckets();
@@ -180,9 +172,10 @@ async function migrar(
   const falhas: Falha[] = [];
   let total = 0;
   let migrados = 0;
-  let pulados = 0;
+  const pulados = 0;
+  let parcial = false;
 
-  for (const b of buckets ?? []) {
+  outer: for (const b of buckets ?? []) {
     if (SKIP_BUCKETS.has(b.id)) {
       console.log(`[skip-bucket] ${b.id}`);
       continue;
@@ -212,19 +205,20 @@ async function migrar(
     total += objetos.length;
 
     for (const obj of objetos) {
-      try {
-        if (await existsWithSameSize(targetUrl, targetKey, b.id, obj.path, obj.size)) {
-          pulados++;
-          console.log(`[skip] ${b.id}/${obj.path} (já existe, mesmo tamanho)`);
-          continue;
-        }
+      // Deadline soft pra evitar o limite duro de 150s. Próxima invocação
+      // retoma de onde parou — upload com x-upsert é idempotente.
+      if (Date.now() - startedAt > SOFT_DEADLINE_MS) {
+        console.log(`[deadline] tempo esgotado, retornando parcial`);
+        parcial = true;
+        break outer;
+      }
 
+      try {
         const { data: blob, error: dErr } = await local.storage.from(b.id).download(obj.path);
         if (dErr || !blob) {
           throw new Error(`download: ${dErr?.message ?? "blob vazio"}`);
         }
 
-        // Streaming: usa o stream do Blob direto (não carrega tudo em memória)
         const ct = obj.contentType || blob.type || "application/octet-stream";
         await uploadStreaming(targetUrl, targetKey, b.id, obj.path, blob.stream(), ct);
         migrados++;
@@ -232,6 +226,8 @@ async function migrar(
           console.log(`[progress] ${migrados}/${total} migrados`);
         }
       } catch (e) {
+        // Inclui erros "Duplicate"/"already exists" — raros com upsert,
+        // mas registramos e seguimos sem abortar o loop.
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`[fail] ${b.id}/${obj.path}: ${msg}`);
         falhas.push({ bucket: b.id, path: obj.path, erro: msg });
@@ -239,7 +235,7 @@ async function migrar(
     }
   }
 
-  return { totalArquivos: total, migrados, pulados, falhas };
+  return { totalArquivos: total, migrados, pulados, falhas, parcial };
 }
 
 Deno.serve(async (req) => {
@@ -265,12 +261,14 @@ Deno.serve(async (req) => {
 
   console.log(`[migrar-storage] início → destino ${targetUrl}`);
 
+  const startedAt = Date.now();
   try {
-    const r = await migrar(targetUrl, targetKey);
-    const ok = r.falhas.length === 0;
-    console.log(`[migrar-storage] fim ok=${ok} total=${r.totalArquivos} migrados=${r.migrados} pulados=${r.pulados} falhas=${r.falhas.length}`);
+    const r = await migrar(targetUrl, targetKey, startedAt);
+    const ok = r.falhas.length === 0 && !r.parcial;
+    console.log(`[migrar-storage] fim ok=${ok} parcial=${r.parcial} total=${r.totalArquivos} migrados=${r.migrados} pulados=${r.pulados} falhas=${r.falhas.length}`);
     return jsonResponse({
       ok,
+      parcial: r.parcial,
       totalArquivos: r.totalArquivos,
       migrados: r.migrados,
       pulados: r.pulados,
