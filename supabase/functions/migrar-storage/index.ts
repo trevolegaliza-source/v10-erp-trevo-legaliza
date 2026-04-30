@@ -261,12 +261,14 @@ Deno.serve(async (req) => {
 
   console.log(`[migrar-storage] início → destino ${targetUrl}`);
 
+  const startedAt = Date.now();
   try {
-    const r = await migrar(targetUrl, targetKey);
-    const ok = r.falhas.length === 0;
-    console.log(`[migrar-storage] fim ok=${ok} total=${r.totalArquivos} migrados=${r.migrados} pulados=${r.pulados} falhas=${r.falhas.length}`);
+    const r = await migrar(targetUrl, targetKey, startedAt);
+    const ok = r.falhas.length === 0 && !r.parcial;
+    console.log(`[migrar-storage] fim ok=${ok} parcial=${r.parcial} total=${r.totalArquivos} migrados=${r.migrados} pulados=${r.pulados} falhas=${r.falhas.length}`);
     return jsonResponse({
       ok,
+      parcial: r.parcial,
       totalArquivos: r.totalArquivos,
       migrados: r.migrados,
       pulados: r.pulados,
