@@ -117,30 +117,11 @@ async function ensureBucketExists(
   }
 }
 
-// HEAD no destino: se existe e tamanho bate, retorna true (skip).
-async function existsWithSameSize(
-  targetUrl: string,
-  targetKey: string,
-  bucket: string,
-  path: string,
-  expectedSize: number,
-): Promise<boolean> {
-  const url =
-    `${targetUrl}/storage/v1/object/authenticated/${encodeURIComponent(bucket)}/${path
-      .split("/")
-      .map(encodeURIComponent)
-      .join("/")}`;
-  const r = await fetch(url, {
-    method: "HEAD",
-    headers: {
-      Authorization: `Bearer ${targetKey}`,
-      apikey: targetKey,
-    },
-  });
-  if (!r.ok) return false;
-  const len = Number(r.headers.get("content-length") ?? "-1");
-  return len === expectedSize && expectedSize > 0;
-}
+// NOTA: removemos o HEAD-pre-check no destino. Estávamos pegando falso-positivo:
+// registros existiam em storage.objects (vieram via dump SQL) mas o binário
+// nunca tinha sido transferido. Agora sempre baixamos e re-enviamos com
+// x-upsert: true — o destino sobrescreve registro+binário e a operação é
+// idempotente, então re-rodar a função é seguro.
 
 async function uploadStreaming(
   targetUrl: string,
