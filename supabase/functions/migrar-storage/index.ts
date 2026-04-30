@@ -26,6 +26,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const SKIP_BUCKETS = new Set<string>(["_migracao_backup_27042026"]);
 const PAGE_SIZE = 100;
+// Margem de segurança vs limite de 150s da edge function.
+// Quando ultrapassar, devolvemos JSON parcial (parcial=true) e o cliente
+// re-invoca — idempotente porque todo upload usa x-upsert: true.
+const SOFT_DEADLINE_MS = 140_000;
 
 interface Falha {
   bucket: string;
