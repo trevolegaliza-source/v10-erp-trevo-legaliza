@@ -256,6 +256,14 @@ async function migrar(
         break outer;
       }
 
+      // Skip por size: se já existe no destino com o mesmo tamanho, pula.
+      // Tamanho diferente (ou ausente) → re-upload via upsert.
+      const destSize = destinoMap.get(`${b.id}/${obj.path}`);
+      if (destSize !== undefined && destSize === obj.size && obj.size > 0) {
+        pulados++;
+        continue;
+      }
+
       try {
         const { data: blob, error: dErr } = await local.storage.from(b.id).download(obj.path);
         if (dErr || !blob) {
