@@ -211,6 +211,7 @@ async function migrar(
   parcial: boolean;
 }> {
   const local = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const target = createClient(targetUrl, targetKey);
 
   const { data: buckets, error: bErr } = await local.storage.listBuckets();
   if (bErr) throw new Error(`listBuckets: ${bErr.message}`);
@@ -222,8 +223,13 @@ async function migrar(
   let parcial = false;
 
   // Snapshot do destino — chave "bucket/path" → size em bytes.
-  // Usado pra pular arquivos cujo tamanho já bate com o source.
-  const destinoMap = await snapshotDestino(targetUrl, targetKey);
+  // Lista via Storage API porque PostgREST não expõe schema `storage`.
+  // Buckets que ainda não existem no destino são silenciosamente pulados;
+  // serão criados pelo ensureBucketExists abaixo.
+  const bucketsParaSnapshot = (buckets ?? [])
+    .filter((b) => !SKIP_BUCKETS.has(b.id))
+    .map((b) => b.id);
+  const destinoMap = await snapshotDestino(target, bucketsParaSnapshot);
 
   outer: for (const b of buckets ?? []) {
     if (SKIP_BUCKETS.has(b.id)) {
