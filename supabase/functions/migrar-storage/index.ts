@@ -117,47 +117,54 @@ async function ensureBucketExists(
   }
 }
 
-// Snapshot do destino: lista TODOS os objetos via PostgREST direto na
-// view storage.objects, paginando de 1000 em 1000. Retorna um Map de
-// "bucket/path" → size (bytes). Usado pra skip por comparação de tamanho.
+// Snapshot do destino: lista todos os objetos via Storage API (supabase-js)
+// porque o PostgREST do destino não expõe o schema `storage` (PGRST106).
+// Lista recursivamente cada bucket informado e retorna Map "bucket/path" → size.
 async function snapshotDestino(
-  targetUrl: string,
-  targetKey: string,
+  targetClient: ReturnType<typeof createClient>,
+  bucketIds: string[],
 ): Promise<Map<string, number>> {
   const map = new Map<string, number>();
-  const PAGE = 1000;
-  let from = 0;
+  const LIMIT = 1000;
 
-  while (true) {
-    const r = await fetch(
-      `${targetUrl}/rest/v1/objects?select=bucket_id,name,metadata&limit=${PAGE}&offset=${from}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${targetKey}`,
-          apikey: targetKey,
-          "Accept-Profile": "storage",
-          Accept: "application/json",
-        },
-      },
-    );
-    if (!r.ok) {
-      const txt = await r.text();
-      throw new Error(`snapshot destino ${r.status}: ${txt.slice(0, 300)}`);
+  for (const bucket of bucketIds) {
+    const walk = async (prefix = ""): Promise<void> => {
+      let offset = 0;
+      while (true) {
+        const { data, error } = await targetClient.storage.from(bucket).list(prefix, {
+          limit: LIMIT,
+          offset,
+          sortBy: { column: "name", order: "asc" },
+        });
+        if (error) {
+          throw new Error(`snapshot list ${bucket}/${prefix} falhou: ${error.message}`);
+        }
+        if (!data || data.length === 0) break;
+
+        for (const item of data) {
+          const fullPath = prefix ? `${prefix}/${item.name}` : item.name;
+          if (item.id === null) {
+            // Pasta — recursão
+            await walk(fullPath);
+          } else {
+            const size = Number(item.metadata?.size ?? 0);
+            map.set(`${bucket}/${fullPath}`, size);
+          }
+        }
+        if (data.length < LIMIT) break;
+        offset += LIMIT;
+      }
+    };
+
+    try {
+      await walk("");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Bucket pode não existir no destino ainda — seguimos sem snapshot dele.
+      console.warn(`[snapshot-destino] pulando bucket ${bucket}: ${msg}`);
     }
-    const rows = (await r.json()) as Array<{
-      bucket_id: string;
-      name: string;
-      metadata: { size?: number } | null;
-    }>;
-    if (!rows.length) break;
-    for (const row of rows) {
-      const size = Number(row.metadata?.size ?? 0);
-      map.set(`${row.bucket_id}/${row.name}`, size);
-    }
-    if (rows.length < PAGE) break;
-    from += PAGE;
   }
+
   console.log(`[snapshot-destino] ${map.size} objetos indexados`);
   return map;
 }
@@ -204,6 +211,7 @@ async function migrar(
   parcial: boolean;
 }> {
   const local = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const target = createClient(targetUrl, targetKey);
 
   const { data: buckets, error: bErr } = await local.storage.listBuckets();
   if (bErr) throw new Error(`listBuckets: ${bErr.message}`);
@@ -215,8 +223,13 @@ async function migrar(
   let parcial = false;
 
   // Snapshot do destino — chave "bucket/path" → size em bytes.
-  // Usado pra pular arquivos cujo tamanho já bate com o source.
-  const destinoMap = await snapshotDestino(targetUrl, targetKey);
+  // Lista via Storage API porque PostgREST não expõe schema `storage`.
+  // Buckets que ainda não existem no destino são silenciosamente pulados;
+  // serão criados pelo ensureBucketExists abaixo.
+  const bucketsParaSnapshot = (buckets ?? [])
+    .filter((b) => !SKIP_BUCKETS.has(b.id))
+    .map((b) => b.id);
+  const destinoMap = await snapshotDestino(target, bucketsParaSnapshot);
 
   outer: for (const b of buckets ?? []) {
     if (SKIP_BUCKETS.has(b.id)) {
