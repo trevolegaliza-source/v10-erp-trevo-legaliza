@@ -211,8 +211,12 @@ async function migrar(
   const falhas: Falha[] = [];
   let total = 0;
   let migrados = 0;
-  const pulados = 0;
+  let pulados = 0;
   let parcial = false;
+
+  // Snapshot do destino — chave "bucket/path" → size em bytes.
+  // Usado pra pular arquivos cujo tamanho já bate com o source.
+  const destinoMap = await snapshotDestino(targetUrl, targetKey);
 
   outer: for (const b of buckets ?? []) {
     if (SKIP_BUCKETS.has(b.id)) {
