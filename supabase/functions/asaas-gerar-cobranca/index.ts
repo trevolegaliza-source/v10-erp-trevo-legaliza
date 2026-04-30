@@ -236,14 +236,38 @@ Deno.serve(async (req) => {
 
   let body: any = {};
   try { body = await req.json(); } catch { /* empty */ }
-  const cobrancaId = body.cobranca_id as string | undefined;
-  const customDueDate = body.data_vencimento as string | undefined;
 
-  if (!cobrancaId) {
-    return new Response(JSON.stringify({ error: "cobranca_id obrigatório" }), {
+  // C41: validação de payload — sem dependência externa, regex simples.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return new Response(JSON.stringify({ error: "payload inválido" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  }
+
+  const cobrancaIdRaw = body.cobranca_id;
+  const customDueDateRaw = body.data_vencimento;
+
+  if (typeof cobrancaIdRaw !== "string" || !UUID_RE.test(cobrancaIdRaw)) {
+    return new Response(JSON.stringify({ error: "cobranca_id obrigatório (UUID)" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const cobrancaId: string = cobrancaIdRaw;
+
+  let customDueDate: string | undefined;
+  if (customDueDateRaw !== undefined && customDueDateRaw !== null) {
+    if (typeof customDueDateRaw !== "string" || !ISO_DATE_RE.test(customDueDateRaw)) {
+      return new Response(JSON.stringify({ error: "data_vencimento inválida (esperado YYYY-MM-DD)" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    customDueDate = customDueDateRaw;
   }
 
   // lockAcquired vira true quando este worker ganha o lock — precisa
