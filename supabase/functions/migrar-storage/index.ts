@@ -156,7 +156,14 @@ async function uploadStreaming(
 async function migrar(
   targetUrl: string,
   targetKey: string,
-): Promise<{ totalArquivos: number; migrados: number; pulados: number; falhas: Falha[] }> {
+  startedAt: number,
+): Promise<{
+  totalArquivos: number;
+  migrados: number;
+  pulados: number;
+  falhas: Falha[];
+  parcial: boolean;
+}> {
   const local = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   const { data: buckets, error: bErr } = await local.storage.listBuckets();
@@ -165,9 +172,10 @@ async function migrar(
   const falhas: Falha[] = [];
   let total = 0;
   let migrados = 0;
-  let pulados = 0;
+  const pulados = 0;
+  let parcial = false;
 
-  for (const b of buckets ?? []) {
+  outer: for (const b of buckets ?? []) {
     if (SKIP_BUCKETS.has(b.id)) {
       console.log(`[skip-bucket] ${b.id}`);
       continue;
@@ -197,19 +205,20 @@ async function migrar(
     total += objetos.length;
 
     for (const obj of objetos) {
-      try {
-        if (await existsWithSameSize(targetUrl, targetKey, b.id, obj.path, obj.size)) {
-          pulados++;
-          console.log(`[skip] ${b.id}/${obj.path} (já existe, mesmo tamanho)`);
-          continue;
-        }
+      // Deadline soft pra evitar o limite duro de 150s. Próxima invocação
+      // retoma de onde parou — upload com x-upsert é idempotente.
+      if (Date.now() - startedAt > SOFT_DEADLINE_MS) {
+        console.log(`[deadline] tempo esgotado, retornando parcial`);
+        parcial = true;
+        break outer;
+      }
 
+      try {
         const { data: blob, error: dErr } = await local.storage.from(b.id).download(obj.path);
         if (dErr || !blob) {
           throw new Error(`download: ${dErr?.message ?? "blob vazio"}`);
         }
 
-        // Streaming: usa o stream do Blob direto (não carrega tudo em memória)
         const ct = obj.contentType || blob.type || "application/octet-stream";
         await uploadStreaming(targetUrl, targetKey, b.id, obj.path, blob.stream(), ct);
         migrados++;
@@ -217,6 +226,8 @@ async function migrar(
           console.log(`[progress] ${migrados}/${total} migrados`);
         }
       } catch (e) {
+        // Inclui erros "Duplicate"/"already exists" — raros com upsert,
+        // mas registramos e seguimos sem abortar o loop.
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`[fail] ${b.id}/${obj.path}: ${msg}`);
         falhas.push({ bucket: b.id, path: obj.path, erro: msg });
@@ -224,7 +235,7 @@ async function migrar(
     }
   }
 
-  return { totalArquivos: total, migrados, pulados, falhas };
+  return { totalArquivos: total, migrados, pulados, falhas, parcial };
 }
 
 Deno.serve(async (req) => {
