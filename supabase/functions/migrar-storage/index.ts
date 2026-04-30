@@ -117,11 +117,50 @@ async function ensureBucketExists(
   }
 }
 
-// NOTA: removemos o HEAD-pre-check no destino. Estávamos pegando falso-positivo:
-// registros existiam em storage.objects (vieram via dump SQL) mas o binário
-// nunca tinha sido transferido. Agora sempre baixamos e re-enviamos com
-// x-upsert: true — o destino sobrescreve registro+binário e a operação é
-// idempotente, então re-rodar a função é seguro.
+// Snapshot do destino: lista TODOS os objetos via PostgREST direto na
+// view storage.objects, paginando de 1000 em 1000. Retorna um Map de
+// "bucket/path" → size (bytes). Usado pra skip por comparação de tamanho.
+async function snapshotDestino(
+  targetUrl: string,
+  targetKey: string,
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  const PAGE = 1000;
+  let from = 0;
+
+  while (true) {
+    const r = await fetch(
+      `${targetUrl}/rest/v1/objects?select=bucket_id,name,metadata&limit=${PAGE}&offset=${from}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${targetKey}`,
+          apikey: targetKey,
+          "Accept-Profile": "storage",
+          Accept: "application/json",
+        },
+      },
+    );
+    if (!r.ok) {
+      const txt = await r.text();
+      throw new Error(`snapshot destino ${r.status}: ${txt.slice(0, 300)}`);
+    }
+    const rows = (await r.json()) as Array<{
+      bucket_id: string;
+      name: string;
+      metadata: { size?: number } | null;
+    }>;
+    if (!rows.length) break;
+    for (const row of rows) {
+      const size = Number(row.metadata?.size ?? 0);
+      map.set(`${row.bucket_id}/${row.name}`, size);
+    }
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  console.log(`[snapshot-destino] ${map.size} objetos indexados`);
+  return map;
+}
 
 async function uploadStreaming(
   targetUrl: string,
@@ -172,8 +211,12 @@ async function migrar(
   const falhas: Falha[] = [];
   let total = 0;
   let migrados = 0;
-  const pulados = 0;
+  let pulados = 0;
   let parcial = false;
+
+  // Snapshot do destino — chave "bucket/path" → size em bytes.
+  // Usado pra pular arquivos cujo tamanho já bate com o source.
+  const destinoMap = await snapshotDestino(targetUrl, targetKey);
 
   outer: for (const b of buckets ?? []) {
     if (SKIP_BUCKETS.has(b.id)) {
@@ -211,6 +254,14 @@ async function migrar(
         console.log(`[deadline] tempo esgotado, retornando parcial`);
         parcial = true;
         break outer;
+      }
+
+      // Skip por size: se já existe no destino com o mesmo tamanho, pula.
+      // Tamanho diferente (ou ausente) → re-upload via upsert.
+      const destSize = destinoMap.get(`${b.id}/${obj.path}`);
+      if (destSize !== undefined && destSize === obj.size && obj.size > 0) {
+        pulados++;
+        continue;
       }
 
       try {
